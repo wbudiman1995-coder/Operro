@@ -1,0 +1,171 @@
+# TEST_EXECUTION_LOG.md — Operro 0013 Final Security & Integrity Pass
+
+This is the execution record for migration `0013` and its full test/harness
+suite, produced by the reproducible clean-room runner `run_clean_room.sh`.
+
+## Environment
+
+- **PostgreSQL:** 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu,
+  compiled by gcc 13.3.0, 64-bit.
+- **OS:** Ubuntu 24.04.
+- **Execution timestamp (UTC):** 2026-07-21T05:14Z (clean-room `final` run,
+  targeted integrity patch: quantity + deleted_at removed from authenticated
+  UPDATE grants).
+- **Runner:** `run_clean_room.sh`, executed as the `postgres` OS user so that
+  plain `psql` / `createdb` / `dropdb` work against local peer auth.
+- **Prerequisites the base migrations assume, created by the runner:** an `auth`
+  schema with `auth.users(id uuid primary key)`, and a nologin `authenticated`
+  role.
+
+## What the clean-room runner does (no reliance on pre-existing state)
+
+It provisions FOUR independent fresh databases (each: empty → `auth` stub →
+`authenticated` role → migrations `0001`–`0012` applied by explicit filename),
+then:
+
+1. `uuid_validator` — `validate_uuids.py` over every SQL/harness file.
+2. `positive_backfill` — seed legacy singular-column bookings, apply `0013`,
+   assert all legacy values migrated and the columns dropped.
+3. `negative_rollback` — seed a poison non-grooming booking, apply `0013`,
+   REQUIRE `BACKFILL ABORT`, then prove on a fresh connection that the whole
+   migration rolled back and the pre-0013 DB is intact.
+4. `apply_0013` — apply the migration to a clean baseline.
+5. `main_tests` — `0013_test_core_neutrality.sql`.
+6. `effects_tests` — `0013_effects_eligibility_scenario.sql`.
+7. `security_tests` — `0013_test_security_final.sql` (final-pass items 1–4).
+8. `concurrency_T11` — strict authenticated-role concurrency harness.
+9. Writes checksums and per-step logs; exits nonzero on ANY failure.
+
+## Exact commands
+
+```bash
+# As the postgres OS user, from the artifact directory:
+LOGDIR=./execution_logs/final bash run_clean_room.sh
+
+# Equivalent manual sequence per database (what the runner automates):
+createdb <db>
+psql <db> -c "create schema if not exists auth; create table if not exists auth.users(id uuid primary key);"
+psql <db> -c "do \$\$ begin create role authenticated nologin; exception when duplicate_object then null; end \$\$;"
+for f in 0001_extensions_and_helpers.sql 0002_identity_access.sql \
+         0003_platform_entitlements.sql 0004_commercial_core.sql \
+         0005_scheduling_core.sql 0006_inventory_tasks.sql \
+         0007_customer_programs.sql 0008_financial_sales.sql \
+         0009_payroll_expenses.sql 0010_security_rls_isolation.sql \
+         0011_security_rls_capabilities.sql 0012_cross_cutting_services.sql; do
+  psql <db> -v ON_ERROR_STOP=1 -f "migrations/$f"
+done
+python3 validate_uuids.py <files...>
+DATABASE_URL="postgresql:///<db_pos>" MIGRATION="$PWD/0013_core_neutrality_grooming_lines.sql" \
+  bash 0013_backfill_harness/run_backfill_positive.sh
+DATABASE_URL="postgresql:///<db_neg>" MIGRATION="$PWD/0013_core_neutrality_grooming_lines.sql" \
+  bash 0013_backfill_harness/run_backfill_negative.sh
+psql <db_main> -v ON_ERROR_STOP=1 -f 0013_core_neutrality_grooming_lines.sql
+psql <db_main> -v ON_ERROR_STOP=1 -f 0013_test_core_neutrality.sql
+psql <db_main> -v ON_ERROR_STOP=1 -f 0013_effects_eligibility_scenario.sql
+psql <db_main> -v ON_ERROR_STOP=1 -f 0013_test_security_final.sql
+DATABASE_URL="postgresql:///<db_conc>" bash run_concurrency.sh
+```
+
+## Results (passed / failed counts)
+
+| Step | Log file | Result | Assertions |
+|------|----------|--------|-----------:|
+| uuid_validator     | `00_uuid.log`                | PASS | 441 literals valid, exit 0 |
+| positive_backfill  | `02_positive_backfill.log`   | PASS | 8 / 8 |
+| negative_rollback  | `03_negative_backfill.log`   | PASS | 8 / 8 |
+| apply_0013         | `04_apply_0013.log`          | PASS | applies clean (COMMIT) |
+| main_tests         | `05_main_tests.log`          | PASS | 35 / 35 |
+| effects_tests      | `06_effects_tests.log`       | PASS | 6 / 6 |
+| security_tests     | `07_security_tests.log`      | PASS | 39 / 39 |
+| concurrency_T11    | `09_concurrency.log`         | PASS | A_RC=0, B_RC≠0, 1 reservation |
+
+**Total functional assertions: 35 + 6 + 39 + 8 + 8 = 96, all passing. 0 failed.**
+Clean-room runner overall exit: **0**.
+
+Negative-path proof: applying `0013` to a poison baseline exits nonzero via the
+SECTION 310 `BACKFILL ABORT`, and a fresh connection confirms zero residue
+(no new tables/functions/constraints, legacy columns still present, the six
+SECTION 000 drop-target functions survived).
+
+Self-test of the runner: injecting a deliberately broken test file makes the
+runner exit **1** (failure is detected and propagated, not swallowed).
+
+## Final-pass security guarantees proven live (`07_security_tests.log`)
+
+- **Item 1** — `TCREATE1/2/3` (direct INSERT rejected on all three tables),
+  `TDEL1/2/3` (direct DELETE rejected), `TPROT1–4` (protected identity/commercial
+  columns not client-updatable), `TSAFE` / `TSAFE_LINE` (safe operational columns
+  still work). **Targeted integrity patch:** `TQTY_DENIED` + `TQTY_UNCHANGED`
+  (client cannot UPDATE line quantity; failed attempt leaves the row unchanged),
+  `TSOFTDEL_PET` + `TSOFTDEL_LINE` (client cannot set deleted_at on a pet or a
+  line, and the failed attempt does not modify the row), `TQTY_EFFECTS`
+  (commission base = unit_price × authoritative quantity = 100×3 = 300; inventory
+  consumption = recipe qty × authoritative quantity = 2×3 = 6 — effects use the
+  unchanged authoritative quantity).
+- **Item 2** — `TBRANCH_READ_*` (branch-restricted user sees only its branch;
+  `branches.all` sees both), `TBRANCH_UPD` (cross-branch update hits zero rows),
+  `TBRANCH_RESERVE` (cross-branch reserve denied `wrong_branch`),
+  `TBRANCH_RESERVE_OK` (own-branch reserve succeeds).
+- **Item 3** — `TREL_CANCEL` / `TREL_NOSHOW` (reservation released, availability
+  restored, no silent consumption), `TREL_IDEMP` (terminal-state re-transition
+  rejected → no double-release).
+- **Item 4** — `TCACHE_INS` / `TCACHE_UPD` (booking cache columns not client-
+  writable on INSERT or UPDATE).
+
+## Live privilege spot-checks (also asserted in tests)
+
+- `has_function_privilege('public', 'app.complete_booking(uuid,boolean,text)', 'execute')` = **false**;
+  `('authenticated', …)` = **true**.
+- `has_table_privilege('authenticated', 'public.grooming_job_pets', 'INSERT'|'DELETE')` = **false**;
+  same for `grooming_job_pet_services` and `package_reservations`.
+- Only SELECT (table-level) on all three grooming tables for `authenticated`.
+  `grooming_job_pets` UPDATE limited to 7 safe columns (status, instructions,
+  warnings, preferences, metadata, updated_at, updated_by — **deleted_at
+  removed**). `grooming_job_pet_services` UPDATE limited to 5 safe columns
+  (duration_minutes, instructions, metadata, updated_at, updated_by —
+  **quantity and deleted_at removed**).
+- `pg_constraint.confdeltype` for `fk_pr_line` = **r** (RESTRICT).
+- Booking cache columns `service_name_snapshot` / `price_snapshot` / `currency`
+  absent from both INSERT and UPDATE column grants for `authenticated`.
+
+## File checksums (SHA-256)
+
+See `execution_logs/final/CHECKSUMS.sha256` (regenerated by every run). Values
+from the `final` run:
+
+```
+aceed414a9e95a174c1fca7309601caab72a8da7b7d5e1639299d8bb3fa52cd7  0013_core_neutrality_grooming_lines.sql
+1cce9208df84b3415cd541cda4c4383d498d19a7cf52760db0f58edd74cb1bb2  0013_test_core_neutrality.sql
+5b56decb79123f1ccb5d9a81b11b240f33ec918b382d943bc026d9fbf141bf62  0013_effects_eligibility_scenario.sql
+6e8a77a0662407a1a2d57668c88c695f55731f4e12ce41b12105eed577aa905f  0013_test_security_final.sql
+5a7fc0e2eba45e7fb64460ff55c0de57b475fc908292cfbdd11f9ed84d3d8a20  validate_uuids.py
+fea4f55bc498329754d08f158dfb09ef0b38717e28f0983d8742b25a13c1cfd6  run_concurrency.sh
+b72e9bb5994583e4798308f0a90f2149c93855470fad8a1e8668e1634628eb11  run_clean_room.sh
+5de67a8fbe4fbea05da15c5b975dcf8707eba31fcad01bf7945f7d3bf346bc23  sessionA.sql
+c8680e49e78fc12ac7b04d3f6d438fc85f2aee63ca2ee1230cf5160b1882e6c6  sessionB.sql
+07e748b7b473e56c21d61ffe4585a7cacee505689daa9bf7d83ab7980579857e  setup.sql
+65921b84c14e19352b4b0a477521a1e5c1100e8a918b6ea35240bbf471be9d08  0013_backfill_harness/run_backfill_negative.sh
+847ef99308ebd3aa3fd5d7b12563fdc465b8397c23507c383ea1d7cddd3778f8  0013_backfill_harness/run_backfill_positive.sh
+574247fa6019d4b03bfce7d8d8f9d8a0c47a935bc32af53be659151452c0be32  0013_backfill_harness/negative_assert.sql
+5bd19862b4076d7aef0205d94188f6b0829f82db376df29354b798f0806462aa  0013_backfill_harness/negative_seed.sql
+994920bd757037d802c3f336c5a9c77baee735059a29a719b181cfa2e7dc94c5  0013_backfill_harness/positive_assert.sql
+acc9edfda79b19d4afcc7a4339a35d0813594f26b3c242bef052ab6132506c58  0013_backfill_harness/positive_seed.sql
+```
+
+(The `0013_core_neutrality_grooming_lines.sql` checksum changes whenever the
+migration is edited; always regenerate rather than trusting a pasted value.)
+
+## Local-PostgreSQL limitations / Supabase verification still required
+
+- This is a **local PostgreSQL 16.14** run, not the target managed/Supabase
+  environment. RLS behaviour under the real `authenticator` → `authenticated`
+  JWT switch (via PostgREST) should be confirmed there; here it is simulated
+  with `set local role authenticated` + `request.jwt.claims`.
+- The `authenticated` role here is a bare nologin role; a managed platform may
+  attach additional default grants or a different search_path. Re-run this same
+  clean-room against a staging Supabase project before promoting.
+- Base tables such as `subscriptions` may carry extra NOT-NULL columns in your
+  environment; the fixtures seed the minimum this engine requires.
+- No `0014`, SDK, backend, or UI work is included or implied. The governed
+  support-access path (platform-admin visibility, privileged repair) is
+  explicitly deferred to `0014` and is intentionally absent here.

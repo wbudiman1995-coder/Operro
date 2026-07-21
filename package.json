@@ -1,0 +1,43 @@
+# Operro Migration Index (0001–0012)
+
+Status: **validated engine**, applied in order on Postgres 16.
+Frozen architecture layers: **Identity → Security → Operational → Commercial → Financial → Cross-Cutting.**
+Two schemas: `app` (infra, hidden from PostgREST) and `public` (business).
+
+Do not build 0013+ here — those are Increment 1 scope, tracked in
+`00_HANDOFF_FOR_CODEX.md` §7, not part of this validated bundle.
+
+| # | File | Milestone | Purpose | Depends on | Key objects |
+|---|------|-----------|---------|------------|-------------|
+| 0001 | extensions_and_helpers | 1 — Postgres Foundation | Substrate: extensions, `app` schema, UUIDv7, JWT claim readers, generic trigger/audit/soft-delete machinery | — | `app.uuid_generate_v7()`, `app.current_user_id()`, `app.active_org_id()`, `app.is_platform_admin()`, `app.audit_log` |
+| 0002 | identity_access | 2 — Identity & Access | Global User, tenant Organization+Branch, Membership bridge, dynamic RBAC catalog. **Renames Milestone-1 objects** to match naming conventions (e.g. `app.uuid_generate_v7()` → `app.fn_uuid_v7()`, `app.tg_write_audit_log()` → `app.tg_write_audit()`) | 0001 | `organizations`, `branches`, `users`, `roles`, `memberships`, `permissions`, `role_permissions`, `membership_branch_access` |
+| 0003 | platform_entitlements | 3 — Platform Entitlements | Commercial layer as pure data: Module/Feature catalogs, Plans, per-org Subscription/Module/Feature state, resolver functions | 0001, 0002 | `modules`, `features`, `plans`, `subscriptions`, `organization_modules`, `app.has_module()`, `app.has_feature()` |
+| 0004 | commercial_core | 4A — Commercial (core) | Vertical-neutral CRM entities: Party/Customer, generic Pet, Service + Product catalogs | 0001–0003 | `customers`, `pets`, `service_catalog`, `product_catalog` |
+| 0005 | scheduling_core | 5A — Operations (Scheduling) | Universal scheduling primitive: Resources+availability, thin Booking core, typed extensions, GiST no-double-book | 0001, 0002, 0004 | `resources`, `bookings`, `booking_resources` (GiST exclusion), `grooming_jobs`, `boarding_stays` |
+| 0006 | inventory_tasks | 5B — Operations (Inventory + Tasks) | Append-only inventory ledger + derived balance cache, consumption recipes, SOP templates, tasks | 0001, 0002, 0004, 0005 | `inventory_movements`, `inventory_levels`, `service_products`, `sop_templates`, `tasks` |
+| 0007 | customer_programs | 4B — Customer Programs | 5 independent ledger-backed systems: Membership Plans, Packages, Loyalty, Wallet/Credits, Referrals | 0001, 0002, 0004–0006 | `membership_plans`, `customer_packages`, `customer_package_ledger`, `loyalty_ledger`, `wallet_ledger`, `referrals` |
+| 0008 | financial_sales | 6A — Financial (Sales & Receivables) | Pure pricing resolver, mutable Order, immutable Invoice snapshot, Payments/Refunds, auto Financial Ledger | 0001, 0002, 0004, 0005, 0007 | `app.resolve_line_price()`, `orders`, `invoices`/`invoice_lines`, `payments`, `refunds`, `financial_ledger` |
+| 0009 | payroll_expenses | 6B — Financial (Payroll/Commission/Expenses) | Pure commission resolver + immutable ledger, staff compensation, Payroll (freezes on approval), Expenses | 0001, 0002, 0004, 0005, 0008 | `app.resolve_commission()`, `commission_entries`, `payroll_runs`/`payroll_items`, `expenses` |
+| 0010 | security_rls_isolation | 8A — Security/RLS (Isolation) | Activates Postgres as authz engine: tenant + branch isolation, membership validation (permissive policies) | 0001–0009 | `app.has_membership()`, `app.has_permission()`, `app.has_branch()`, org/branch isolation policies on all tables |
+| 0011 | security_rls_capabilities | 8B — Security/RLS (Capabilities) | Domain permission catalog + RESTRICTIVE module/read/write policies layered on 8A; explainability fn | 0002, 0003, 0010 | domain permissions seed, `app.explain_authorization()`, restrictive policies |
+| 0012 | cross_cutting_services | 7 — Cross-Cutting Services | Domain-agnostic services: Attachments, Timeline (observability), Notifications+templates, System Settings, Preferences | 0001–0011 | `subject_types` registry, `attachments`, `timeline_events`, `notifications`, `preferences` |
+
+## Architectural rules to keep in mind when extending this schema
+- **Composite FKs** `(organization_id, parent_id)` enforce tenant integrity everywhere; `UNIQUE(organization_id, id)` is added on any table that's a composite-FK target.
+- **No native enums** — text + check constraint, or a lookup table.
+- **Resolvers decide, financial records preserve, accounting consumes** — pricing/commission are pure functions; invoices/commission entries snapshot the decision and never recompute.
+- **The only sanctioned generic/polymorphic reference** is the registry-checked cross-cutting subject (`subject_types` + `subject_id`), used by attachments/timeline/notifications only — not a pattern to reuse elsewhere (ADR-002 §3.5 exception).
+- **Any trigger writing to a system/protected table** (audit_log, ledgers, caches) must be `SECURITY DEFINER set search_path = app, public`, or RLS blocks it for normal users (fixed in 0011 SECTION 000 — follow this pattern for new side-effect triggers).
+- Naming: `pk_`/`fk_`/`uq_`/`chk_`/`ex_` constraints, `idx_` indexes, `trg_` triggers, `tg_` trigger functions, snake_case throughout.
+
+## Known next work (NOT in this bundle — see handoff §7)
+- **0013** — Core neutrality (BUILT, final security & integrity pass; executed on
+  PG 16.14): drop `bookings.pet_id`/`service_id` after an atomic validated
+  backfill; add `grooming_job_pets`, `grooming_job_pet_services`,
+  `package_reservations`; per-line commission/inventory/package consumption;
+  single SECURITY DEFINER `complete_booking` RPC; tenant + BRANCH RLS isolation;
+  no direct client INSERT/DELETE on authoritative tables; cancel/no_show releases
+  reservations. Artifacts + evidence: `0013_*.sql`, `0013_backfill_harness/`,
+  `run_concurrency.sh`, `run_clean_room.sh`, `TEST_EXECUTION_LOG.md`.
+- **0014** — Capability-scoped support access (`support_access_requests`, `support_grants`, `privileged_sessions`); replace `is_platform_admin()` in tenant RLS with per-table support capability.
+- **0015 is explicitly GATED** until a formal preset manifest/override merge spec is authored — do not build.

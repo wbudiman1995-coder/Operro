@@ -1,0 +1,62 @@
+# BACKFILL_REPORT.md — 0013 legacy data preservation
+
+## What is preserved
+Every legacy grooming booking that carried a `pet_id` (and optionally a
+`service_id` + snapshots) is migrated into the new model BEFORE the columns are
+dropped, in `0013` SECTION 300:
+
+- **grooming_jobs** — ensured present for each grooming booking with a pet.
+- **grooming_job_pets** — one row per legacy `bookings.pet_id`; `sequence=1`;
+  `status='complete'` if the booking was already completed, else `'pending'`;
+  `is_required=true`.
+- **grooming_job_pet_services** — one row per legacy `bookings.service_id`
+  (when present), carrying `service_name_snapshot` (falling back to the catalog
+  name, then `'Legacy service'`), `unit_price_snapshot = price_snapshot`,
+  `currency`, `quantity=1`.
+
+The backfill is **idempotent** (each insert guarded by a `not exists`), so
+re-running the migration on a partially-migrated DB is safe.
+
+## Validation query (SECTION 310) — pass 3
+Three counts are computed:
+1. grooming bookings with a `pet_id` that have **no** matching
+   `grooming_job_pet`.
+2. those bookings (with a `service_id`) that have **no** matching
+   `grooming_job_pet_service`.
+3. **(pass 3, REVIEW ITEM 13)** bookings whose `booking_type <> 'grooming'`
+   that still carry a non-null `pet_id` or `service_id`. SECTION 300 backfills
+   only grooming rows, so these have no mapping path and SECTION 320 would drop
+   their columns and lose the data.
+
+If **any** of the three is non-zero the migration **RAISES `BACKFILL ABORT`**
+(errcode `data_exception`). Because pass-3 wraps the whole file in one
+`begin; … commit;`, that raise aborts the **entire** transaction: the column
+drops never run, and none of SECTIONS 000–300's work (dropped legacy effect
+functions, new tables, backfill rows, new constraints) is committed either.
+The `0013_backfill_harness/run_backfill_negative.sh` harness proves this on a
+fresh connection after a deliberate abort.
+
+## Rows that cannot be mapped deterministically
+The backfill maps a row deterministically when: the booking is
+`booking_type='grooming'`, `pet_id` is not null, and (for the service line)
+`service_id` is not null. Cases that will be reported as unmapped and abort the
+migration until resolved:
+
+- A grooming booking whose `pet_id` references a pet that violates the
+  composite FK (e.g. wrong org / removed) — the `grooming_job_pets` insert
+  fails the FK; resolve the data first.
+- A booking whose `booking_type` is not `'grooming'` but nonetheless carries a
+  `pet_id`/`service_id` — **not** migrated by design (only grooming lines are
+  modeled in this batch). In **pass 3** the SECTION 310 validation counts these
+  explicitly (count #3 above) and **automatically aborts** the whole migration
+  if any exist, so the drop can never silently discard them. To proceed, either
+  clear those columns on the non-grooming rows or ship that vertical's own
+  backfill (mirroring SECTION 300) first.
+
+## Non-grooming bookings
+`bookings.pet_id`/`service_id` were nullable and, in practice, used only by the
+grooming path. If your dataset has other `booking_type` rows with these set,
+pass-3 SECTION 310 will **refuse to apply** (BACKFILL ABORT) rather than drop
+them destructively — export/clear or add a per-vertical backfill first. This is
+verified by the negative harness, which seeds exactly such a poison row and
+confirms the migration rolls back completely.
