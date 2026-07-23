@@ -1,0 +1,22 @@
+$ npm run build --workspaces --if-present
+
+> @operro/backend@0.1.0 build
+> tsc -b
+
+
+> @operro/preset-grooming@0.1.0 build
+> tsc -b
+
+
+> @operro/sdk@0.1.0 build
+> tsc -b
+
+EXIT CODE: 0
+
+$ ls -l packages/*/dist/index.js packages/*/dist/index.d.ts
+-rw-r--r-- 1 root root 403 Jul 21 10:51 packages/backend/dist/index.d.ts
+-rw-r--r-- 1 root root 368 Jul 21 10:51 packages/backend/dist/index.js
+-rw-r--r-- 1 root root 329 Jul 21 10:51 packages/preset-grooming/dist/index.d.ts
+-rw-r--r-- 1 root root 294 Jul 21 10:51 packages/preset-grooming/dist/index.js
+-rw-r--r-- 1 root root 222 Jul 21 10:51 packages/sdk/dist/index.d.ts
+-rw-r--r-- 1 root root 187 Jul 21 10:51 packages/sdk/dist/index.js

@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/sdk" },
+    { "path": "./packages/preset-grooming" },
+    { "path": "./packages/backend" }
+  ]
+}

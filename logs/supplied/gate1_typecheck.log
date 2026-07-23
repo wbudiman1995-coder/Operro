@@ -1,0 +1,9 @@
+$ npx tsc --version
+Version 5.9.3
+
+$ npx tsc -p tsconfig.typecheck.json --noEmit --pretty false
+[stdout+stderr above; empty output == no diagnostics]
+EXIT CODE: 0
+
+$ npx tsc -p tsconfig.typecheck.json --noEmit --listEmittedFiles (proof: noEmit, so none)
+EXIT CODE: 0

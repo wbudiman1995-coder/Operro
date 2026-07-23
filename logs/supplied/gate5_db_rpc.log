@@ -1,0 +1,51 @@
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 4
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 3
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:84: NOTICE:  PASS: C1 add_pet accepts pet owned by booking customer
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:92: NOTICE:  PASS: C2 cross-customer pet rejected pet_customer_mismatch
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:100: NOTICE:  PASS: C3 add_line snapshots catalog duration 90 (not default 60)
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:109: NOTICE:  PASS: C4 inactive service rejected
+psql:supabase/tests/20260721001350_test_assembly.sql:109: NOTICE:  PASS: C5 soft-deleted service rejected
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C6 assign_pet_resource sets the groomer
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C7 reassignment writes a reassigned audit event
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C8 retired/inactive resource rejected
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C8b cross-branch resource rejected (not_active_or_not_in_branch)
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C9 reserve rejects qty<>1 line (package_requires_unit_quantity)
+psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C10 qty=1 line reserves a package session
+psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C11 set_qty rejects line with package reservation (any status)
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C12 availability is 2 (1 reserved of 3) before removal
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C13 remove_pet released the reservation; availability back to 3
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C14 reservation row preserved with status released
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C15 repeated removal cannot double-release (pet_not_found)
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:174: NOTICE:  PASS: C16 re-adding a removed pet raises stable pet_removal_is_permanent
+DO
+ROLLBACK

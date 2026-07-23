@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@operro/sdk": ["./packages/sdk/src/index.ts"],
+      "@operro/preset-grooming": ["./packages/preset-grooming/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts", "packages/backend/test/**/*.ts"]
+}

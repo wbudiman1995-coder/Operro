@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": { "@operro/sdk": ["../sdk/dist/index.d.ts"] }
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../sdk" }]
+}

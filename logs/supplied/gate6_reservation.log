@@ -1,0 +1,54 @@
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 4
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 5
+INSERT 0 5
+DO
+CREATE SEQUENCE
+CREATE FUNCTION
+psql:supabase/tests/20260721001350_test_reservation.sql:86: NOTICE:  PASS: R1 qty<>1 rejected (package_requires_unit_quantity)
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:93: NOTICE:  PASS: R2 qty=1 accepted
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:101: NOTICE:  PASS: R3 expired package rejected (package_expired)
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:109: NOTICE:  PASS: R4 service mismatch rejected
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:117: NOTICE:  PASS: R5 customer mismatch rejected
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:125: NOTICE:  PASS: R6 missing package rejected (package_not_found)
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7a exactly three reserved lifecycle rows exist
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7b availability is 0 before expiration processing (three stale-but-reserved holds)
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7c new reservation succeeds after stale holds expired
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7d the three stale rows changed to expired
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7e the new reservation is reserved
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7f final availability is correct (3 total - 1 active = 2)
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:189: NOTICE:  PASS: R8a set_qty rejected while RESERVED
+psql:supabase/tests/20260721001350_test_reservation.sql:189: NOTICE:  PASS: R8b set_qty rejected while CONSUMED
+psql:supabase/tests/20260721001350_test_reservation.sql:189: NOTICE:  PASS: R8c set_qty rejected while REVERSED/RELEASED
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:196: NOTICE:  PASS: R8d set_qty rejected while RELEASED
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:203: NOTICE:  PASS: R8e set_qty rejected while EXPIRED
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:213: NOTICE:  PASS: R9 reserve rejected on completed booking (booking_not_open_for_assembly)
+DO
+ROLLBACK
