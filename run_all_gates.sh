@@ -119,8 +119,17 @@ for migration in "${EXPECTED_MIGRATIONS[@]}"; do
   psql_db operro_cc -q -v ON_ERROR_STOP=1 -f "$migration"
 done
 psql_db operro_cc -q -v ON_ERROR_STOP=1 -f supabase/tests/concurrency/conc_seed.sql
+CONC_TMP="$(mktemp -d /tmp/operro-concurrency.XXXXXX)"
+trap 'rm -rf "$CONC_TMP"' EXIT
+
+cp -a supabase/tests/concurrency/. "$CONC_TMP/"
+chmod -R a+rX "$CONC_TMP"
+
 run_as_postgres env DATABASE_URL='postgresql:///operro_cc' \
-  bash supabase/tests/concurrency/run_concurrency_assembly.sh
+  bash "$CONC_TMP/run_concurrency_assembly.sh"
+
+rm -rf "$CONC_TMP"
+trap - EXIT
 
 echo ""
 echo "ALL GATES PASSED"
