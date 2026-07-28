@@ -1,0 +1,23 @@
+{
+  "name": "@operro/backend",
+  "version": "0.1.0",
+  "description": "Operro backend \u2014 grooming BookingAssembly service + repository over the approved RPCs.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --dry"
+  },
+  "peerDependencies": {
+    "@operro/sdk": "^0.1.0",
+    "@operro/preset-grooming": "^0.1.0"
+  }
+}

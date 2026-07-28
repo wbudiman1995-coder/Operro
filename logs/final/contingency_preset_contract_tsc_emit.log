@@ -1,0 +1,16 @@
+$ node emitted preset_contract.test.js
+PASS: 1 42501/wrong_branch -> AUTHORIZATION
+PASS: 2 pet_already_on_booking -> CONFLICT
+PASS: 3 line_not_found -> NOT_FOUND
+PASS: 4 pet_customer_mismatch -> BUSINESS_RULE
+PASS: 5 resource_not_active_or_not_in_branch classified
+PASS: 6 package_requires_unit_quantity -> BUSINESS_RULE
+PASS: 7 unknown -> INTERNAL
+PASS: 8 prefix match returns stable code
+PASS: 9 contract includes resource_not_active_or_not_in_branch
+PASS: 10 obsolete resource_not_active_or_not_in_org removed
+PASS: 11 RPC name from preset
+PASS: 12 gate from preset
+PASS: 13 repository methods accept preset Repo* input types (compile-time)
+
+13 assertions passed.

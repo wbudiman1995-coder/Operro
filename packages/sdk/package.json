@@ -1,0 +1,19 @@
+{
+  "name": "@operro/sdk",
+  "version": "0.1.0",
+  "description": "Operro Platform SDK \u2014 the canonical application contract (ids, errors, Result, context/authorize, constants, domain).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --dry"
+  }
+}

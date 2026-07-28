@@ -1,0 +1,15 @@
+$ node emitted assembly_service.inmemory.test.js
+PASS: 1 authorized addPet delegates to repo/RPC
+PASS: 2 addLine defaults quantity to 1
+PASS: 3 missing module denied
+PASS: 4 wrong-branch denied
+PASS: 5 missing permission denied
+PASS: 6 voidLine without reason -> BUSINESS_RULE, no RPC
+PASS: 7 setLineQuantity(0) -> BUSINESS_RULE
+PASS: 8 repo 42501 -> AUTHORIZATION
+PASS: 9 repo 23505 -> CONFLICT
+PASS: 10 repo pet_customer_mismatch -> BUSINESS_RULE
+PASS: 11 assignPetResource delegates to repo/RPC
+PASS: 12 getJob returns empty job with real branchId (item 5)
+
+12 assertions passed.

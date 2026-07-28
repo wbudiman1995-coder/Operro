@@ -1,0 +1,22 @@
+Environment availability check — 2026-07-22 UTC
+================================================
+
+$ node --version
+v22.16.0
+$ npm --version
+10.9.2
+$ command -v psql
+psql: NOT FOUND
+$ command -v postgres
+postgres: NOT FOUND
+
+$ curl Artifactory system ping
+HTTP/2 503 
+date: Wed, 22 Jul 2026 06:32:57 GMT
+content-type: text/html
+content-length: 190
+strict-transport-security: max-age=31536000; includeSubDomains
+
+
+$ npm ci (fail-fast diagnostic; required registry unavailable)
+npm_ci_diagnostic_exit=1

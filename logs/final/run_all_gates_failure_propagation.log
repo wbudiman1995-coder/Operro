@@ -1,0 +1,33 @@
+Synthetic failure-propagation audit
+===================================
+
+CASE 1 typecheck failure: script rc=23 (expected 23); final success marker absent
+
+########## GATE 1 — strict TypeScript typecheck ##########
+Version synthetic
+synthetic typecheck failure
+typecheck exit=23
+
+CASE 2 database setup failure: script rc=31 (expected 31); final success marker absent
+
+########## GATE 1 — strict TypeScript typecheck ##########
+Version synthetic
+typecheck exit=0
+
+########## GATE 2 — workspace build ##########
+-rw-r--r-- 1 root root 0 Jul 22 06:30 packages/backend/dist/index.d.ts
+-rw-r--r-- 1 root root 0 Jul 22 06:30 packages/backend/dist/index.js
+-rw-r--r-- 1 root root 0 Jul 22 06:30 packages/preset-grooming/dist/index.d.ts
+-rw-r--r-- 1 root root 0 Jul 22 06:30 packages/preset-grooming/dist/index.js
+-rw-r--r-- 1 root root 0 Jul 22 06:30 packages/sdk/dist/index.d.ts
+-rw-r--r-- 1 root root 0 Jul 22 06:30 packages/sdk/dist/index.js
+
+########## GATE 3 — in-memory + preset-contract tests ##########
+
+########## GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150) ##########
+synthetic dropdb failure
+
+CASE 3 concurrency reset failure: harness rc=1 (expected nonzero); explicit reset failure present
+== case: complete_booking vs set_line_quantity ==
+synthetic reset-state psql failure
+CONC FAIL: complete_booking vs set_line_quantity reset_state failed

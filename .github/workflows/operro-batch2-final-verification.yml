@@ -1,0 +1,263 @@
+name: Operro Batch 2 Final Verification
+
+"on":
+  workflow_dispatch:
+  push:
+    branches:
+      - audit/batch2-final-verification
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operro-batch2-final-verification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: PostgreSQL 16 clean-room gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out audit branch
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Initialize evidence directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p logs/github-actions/gates
+          {
+            echo "node=$(node --version)"
+            echo "npm=$(npm --version)"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "commit=${GITHUB_SHA}"
+            echo "ref=${GITHUB_REF}"
+          } | tee logs/github-actions/environment.log
+          [[ "$(node --version)" == v22.* ]]
+
+      - name: Verify canonical checksums before execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c docs/CHECKSUMS_AFTER_EXTRACTION.sha256 \
+            | tee logs/github-actions/checksum_verification.log
+
+      - name: Verify archive hygiene and migration lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          : > logs/github-actions/forbidden_artifacts.log
+          find . -path './.git' -prune -o \
+            -type d \( -name node_modules -o -name dist \) -print \
+            >> logs/github-actions/forbidden_artifacts.log
+          find . -path './.git' -prune -o \
+            -type f -name '*.tsbuildinfo' -print \
+            >> logs/github-actions/forbidden_artifacts.log
+          find supabase/migrations -maxdepth 1 -type f \
+            \( -iname '*0014*.sql' -o -name '0100_grooming_assembly_operations.sql' \) \
+            -print >> logs/github-actions/forbidden_artifacts.log
+          sort -u -o logs/github-actions/forbidden_artifacts.log \
+            logs/github-actions/forbidden_artifacts.log
+
+          if [[ -s logs/github-actions/forbidden_artifacts.log ]]; then
+            cat logs/github-actions/forbidden_artifacts.log
+            exit 1
+          fi
+          echo "Archive hygiene: PASS" \
+            | tee logs/github-actions/archive_hygiene.log
+
+          cat > logs/github-actions/expected_migration_lineage.txt <<'EOF'
+          20260721000100_extensions_and_helpers.sql
+          20260721000150_fix_uuidv7_supabase.sql
+          20260721000200_identity_access.sql
+          20260721000300_platform_entitlements.sql
+          20260721000400_commercial_core.sql
+          20260721000500_scheduling_core.sql
+          20260721000600_inventory_tasks.sql
+          20260721000700_customer_programs.sql
+          20260721000800_financial_sales.sql
+          20260721000900_payroll_expenses.sql
+          20260721001000_security_rls_isolation.sql
+          20260721001100_security_rls_capabilities.sql
+          20260721001200_cross_cutting_services.sql
+          20260721001300_core_neutrality_grooming_lines.sql
+          20260721001350_grooming_assembly_operations.sql
+          EOF
+          sed -i 's/^          //' logs/github-actions/expected_migration_lineage.txt
+
+          find supabase/migrations -maxdepth 1 -type f -name '*.sql' \
+            -printf '%f\n' | sort \
+            | tee logs/github-actions/actual_migration_lineage.txt
+
+          diff -u \
+            logs/github-actions/expected_migration_lineage.txt \
+            logs/github-actions/actual_migration_lineage.txt \
+            | tee logs/github-actions/migration_lineage_diff.log
+
+      - name: Capture clean repository tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -path './.git' -prune -o -type f -print \
+            | sed 's#^\./##' \
+            | sort \
+            | tee logs/github-actions/repository_tree.txt
+
+      - name: Install and start PostgreSQL 16
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            postgresql-16 postgresql-client-16
+
+          if ! pg_lsclusters --no-header \
+              | awk '$1 == "16" && $2 == "main" { found=1 } END { exit !found }'; then
+            sudo pg_createcluster 16 main
+          fi
+
+          while read -r version cluster _port status _rest; do
+            if [[ "$status" == "online" ]]; then
+              sudo pg_ctlcluster "$version" "$cluster" stop
+            fi
+          done < <(pg_lsclusters --no-header)
+
+          sudo pg_conftool 16 main set port 5432
+          sudo pg_ctlcluster 16 main start
+
+          client_version="$(psql --version)"
+          server_version="$(sudo -u postgres psql -Atqc 'show server_version;')"
+          {
+            echo "$client_version"
+            echo "server_version=$server_version"
+          } | tee logs/github-actions/postgresql_version.log
+
+          [[ "$client_version" == *" 16."* ]]
+          [[ "$server_version" == 16.* ]]
+          pg_isready -h 127.0.0.1 -p 5432
+
+      - name: Run all Batch 2 gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp logs/extraction_rerun.log \
+            logs/github-actions/supplied_extraction_rerun.log
+          : > logs/extraction_rerun.log
+
+          set +e
+          sudo env \
+            "PATH=$PATH" \
+            "HOME=/root" \
+            "RUN_AS_POSTGRES=1" \
+            bash run_all_gates.sh \
+            2>&1 | tee logs/extraction_rerun.log
+          gate_rc=${PIPESTATUS[0]}
+          set -e
+
+          echo "$gate_rc" \
+            | tee logs/github-actions/run_all_gates.exit_code
+          if [[ "$gate_rc" -ne 0 ]]; then
+            exit "$gate_rc"
+          fi
+          grep -Fxq 'ALL GATES PASSED' logs/extraction_rerun.log
+
+      - name: Verify fresh assertion counts and split gate logs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          awk '
+            /^########## GATE 1 / { out="logs/github-actions/gates/gate1_typecheck.log" }
+            /^########## GATE 2 / { out="logs/github-actions/gates/gate2_build.log" }
+            /^########## GATE 3 / { out="logs/github-actions/gates/gate3_typescript_tests.log" }
+            /^########## GATE 4 / { out="logs/github-actions/gates/gate4_migration.log" }
+            /^########## GATE 5 / { out="logs/github-actions/gates/gate5_assembly_rpc.log" }
+            /^########## GATE 6 / { out="logs/github-actions/gates/gate6_reservation.log" }
+            /^########## GATE 7 / { out="logs/github-actions/gates/gate7_authenticated_integration.log" }
+            /^########## GATE 8 / { out="logs/github-actions/gates/gate8_concurrency.log" }
+            out != "" { print >> out }
+          ' logs/extraction_rerun.log
+
+          generated_entries=0
+          for file in \
+            packages/sdk/dist/index.js \
+            packages/sdk/dist/index.d.ts \
+            packages/preset-grooming/dist/index.js \
+            packages/preset-grooming/dist/index.d.ts \
+            packages/backend/dist/index.js \
+            packages/backend/dist/index.d.ts; do
+            [[ -f "$file" ]]
+            generated_entries=$((generated_entries + 1))
+          done
+
+          inmemory_count="$(grep -Fxc '12 assertions passed.' logs/extraction_rerun.log || true)"
+          preset_count="$(grep -Fxc '13 assertions passed.' logs/extraction_rerun.log || true)"
+          assembly_count="$(grep -c 'PASS: C' logs/extraction_rerun.log || true)"
+          reservation_count="$(grep -c 'PASS: R' logs/extraction_rerun.log || true)"
+          integration_count="$(grep -c 'PASS: I' logs/extraction_rerun.log || true)"
+          concurrency_count="$(grep -c '^  OK: complete_booking vs ' logs/extraction_rerun.log || true)"
+
+          {
+            echo "generated_package_entry_points=$generated_entries"
+            echo "inmemory_summary_lines=$inmemory_count"
+            echo "preset_summary_lines=$preset_count"
+            echo "assembly_rpc_assertions=$assembly_count"
+            echo "reservation_assertions=$reservation_count"
+            echo "authenticated_integration_assertions=$integration_count"
+            echo "concurrency_cases=$concurrency_count"
+          } | tee logs/github-actions/assertion_counts.log
+
+          [[ "$generated_entries" -eq 6 ]]
+          [[ "$inmemory_count" -eq 1 ]]
+          [[ "$preset_count" -eq 1 ]]
+          [[ "$assembly_count" -eq 17 ]]
+          [[ "$reservation_count" -eq 18 ]]
+          [[ "$integration_count" -eq 11 ]]
+          [[ "$concurrency_count" -eq 3 ]]
+          grep -Fq 'CONC PASS: all three cases serialized; no deadlock; A committed; B blocked then rejected; final state correct.' \
+            logs/extraction_rerun.log
+
+      - name: Verify frozen migration integrity after execution
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep '  supabase/migrations/' \
+            docs/CHECKSUMS_AFTER_EXTRACTION.sha256 \
+            | sha256sum -c - \
+            | tee logs/github-actions/frozen_migration_checksum_verification.log
+
+      - name: Confirm tracked source was not modified by gates
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- \
+            . \
+            ':(exclude)logs/extraction_rerun.log' \
+            | tee logs/github-actions/source_integrity.log
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: operro-batch2-final-verification-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            logs/extraction_rerun.log
+            logs/github-actions/**

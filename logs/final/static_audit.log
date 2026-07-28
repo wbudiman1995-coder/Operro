@@ -1,0 +1,97 @@
+Operro Batch 2 final static audit
+=================================
+
+[Functional files changed vs untouched canonical]
+CHANGED docs/BATCH2_IMPACT_INVENTORY.md
+CHANGED docs/EXECUTION_COMMANDS.md
+CHANGED run_all_gates.sh
+CHANGED supabase/tests/concurrency/run_concurrency_assembly.sh
+Application source and migration 01350 comparisons:
+UNCHANGED packages/backend/src/repositories/grooming.ts
+UNCHANGED packages/backend/src/services/BookingAssemblyService.ts
+UNCHANGED packages/preset-grooming/src/assembly.ts
+UNCHANGED supabase/migrations/20260721001350_grooming_assembly_operations.sql
+UNCHANGED integration/0100_integration_client.sql
+UNCHANGED integration/0100_integration_seed.sql
+UNCHANGED supabase/tests/20260721001350_test_assembly.sql
+UNCHANGED supabase/tests/20260721001350_test_reservation.sql
+
+[Frozen migration integrity]
+UNCHANGED supabase/migrations/20260721000100_extensions_and_helpers.sql
+UNCHANGED supabase/migrations/20260721000150_fix_uuidv7_supabase.sql
+UNCHANGED supabase/migrations/20260721000200_identity_access.sql
+UNCHANGED supabase/migrations/20260721000300_platform_entitlements.sql
+UNCHANGED supabase/migrations/20260721000400_commercial_core.sql
+UNCHANGED supabase/migrations/20260721000500_scheduling_core.sql
+UNCHANGED supabase/migrations/20260721000600_inventory_tasks.sql
+UNCHANGED supabase/migrations/20260721000700_customer_programs.sql
+UNCHANGED supabase/migrations/20260721000800_financial_sales.sql
+UNCHANGED supabase/migrations/20260721000900_payroll_expenses.sql
+UNCHANGED supabase/migrations/20260721001000_security_rls_isolation.sql
+UNCHANGED supabase/migrations/20260721001100_security_rls_capabilities.sql
+UNCHANGED supabase/migrations/20260721001200_cross_cutting_services.sql
+UNCHANGED supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql
+
+[Migration lineage]
+20260721000100_extensions_and_helpers.sql
+20260721000150_fix_uuidv7_supabase.sql
+20260721000200_identity_access.sql
+20260721000300_platform_entitlements.sql
+20260721000400_commercial_core.sql
+20260721000500_scheduling_core.sql
+20260721000600_inventory_tasks.sql
+20260721000700_customer_programs.sql
+20260721000800_financial_sales.sql
+20260721000900_payroll_expenses.sql
+20260721001000_security_rls_isolation.sql
+20260721001100_security_rls_capabilities.sql
+20260721001200_cross_cutting_services.sql
+20260721001300_core_neutrality_grooming_lines.sql
+20260721001350_grooming_assembly_operations.sql
+migration_count=15
+No migration 0014 and no obsolete 0100 migration: PASS
+
+[Required behavior markers]
+supabase/migrations/20260721001350_grooming_assembly_operations.sql:83:    raise exception 'pet_removal_is_permanent' using errcode = 'check_violation';
+docs/PET_REMOVAL_BEHAVIOR.md:26:| Pet was previously removed from this booking | `pet_removal_is_permanent` |
+docs/PET_REMOVAL_BEHAVIOR.md:36:`pet_removal_is_permanent` (and explicitly fails if a raw unique violation leaks
+10:set local role authenticated;
+21:set local role authenticated;
+40:set local role authenticated;
+66:set local role authenticated;
+81:set local role authenticated;
+100:set local role authenticated;
+95:-- I8/I9/I10/I11 — reserve_package_session through the REAL authenticated role
+113:  v_res := app.reserve_package_session(v_line,'0e000000-0000-4000-8000-0000000ca001');
+114:  perform pg_temp.ok(v_res is not null,'I8 authenticated can reserve_package_session via RPC (EXECUTE grant works)');
+153:  perform pg_temp.ok(v_before = 0, 'R7b availability is 0 before expiration processing (three stale-but-reserved holds)');
+69:run_case "complete_booking vs set_line_quantity" conc_sessionB_setqty.sql
+70:run_case "complete_booking vs void_line"         conc_sessionB_void.sql
+71:run_case "complete_booking vs reserve_package_session" conc_sessionB_reserve.sql
+
+[Counts from supplied historical raw logs]
+logs/supplied/gate3_inmemory.log:12 assertions passed.
+logs/supplied/gate3_preset_contract.log:13 assertions passed.
+logs/supplied/gate4_migrate.log:migrate: 15 files, assembly fns=8
+logs/supplied/gate8_concurrency.log:CONC PASS: all three cases serialized; no deadlock; A committed; B blocked then rejected; final state correct.
+assembly_pass_notices=17
+reservation_pass_notices=18
+integration_pass_notices=11
+
+[Independent contingency counts]
+logs/final/contingency_inmemory_tsc_emit.log:12 assertions passed.
+logs/final/contingency_preset_contract_tsc_emit.log:13 assertions passed.
+
+[Shell syntax]
+run_all_gates.sh: PASS
+concurrency harness: PASS
+
+[Fresh extraction current-session result]
+
+########## GATE 1 — strict TypeScript typecheck ##########
+npm error code E503
+npm error 503 Service Temporarily Unavailable - GET https://packages.applied-caas-gateway1.internal.api.openai.org/artifactory/api/npm/npm-public/undici-types/-/undici-types-6.21.0.tgz
+npm error A complete log of this run can be found in: /home/oai/.npm/_logs/2026-07-22T06_36_17_052Z-debug-0.log
+
+fresh_extraction_run_exit=1
+Result: BLOCKED at dependency installation; ALL GATES PASSED was not emitted.

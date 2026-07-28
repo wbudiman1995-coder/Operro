@@ -1,0 +1,22 @@
+{
+  "name": "@operro/preset-grooming",
+  "version": "0.1.0",
+  "description": "Operro grooming preset \u2014 the BookingAssembly contract (RPC names, gate, branded input types, arg mapping, error map) layered on @operro/sdk.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --dry"
+  },
+  "peerDependencies": {
+    "@operro/sdk": "^0.1.0"
+  }
+}

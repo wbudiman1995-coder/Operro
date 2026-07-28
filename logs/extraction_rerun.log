@@ -1,0 +1,8 @@
+
+########## GATE 1 — strict TypeScript typecheck ##########
+npm error code E503
+npm error 503 Service Temporarily Unavailable - GET https://packages.applied-caas-gateway1.internal.api.openai.org/artifactory/api/npm/npm-public/undici-types/-/undici-types-6.21.0.tgz
+npm error A complete log of this run can be found in: /home/oai/.npm/_logs/2026-07-22T06_36_17_052Z-debug-0.log
+
+fresh_extraction_run_exit=1
+Result: BLOCKED at dependency installation; ALL GATES PASSED was not emitted.

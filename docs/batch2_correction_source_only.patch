@@ -1,0 +1,794 @@
+diff --git a/docs/BATCH2_IMPACT_INVENTORY.md b/docs/BATCH2_IMPACT_INVENTORY.md
+index 84fa6b5bc2e0329ef2560c110303d23ac8955a39..55d7988ea15e7074899211e80214afea13e1b84e 100644
+--- a/docs/BATCH2_IMPACT_INVENTORY.md
++++ b/docs/BATCH2_IMPACT_INVENTORY.md
+@@ -35,5 +35,5 @@ into `supabase/migrations/`; all corrections live in the new 01350 migration).
+ | 10 | real repository tree (packages/, supabase/, integration/, docs/); root workspace package.json + tsconfig; checksums; clean patch; archive; no `mnt/user-data/...` paths |
+ 
+ ## Not done (explicitly out of scope)
+-- Migration 0014 (governed support access) — skeleton only in `docs/`.
+-- Supabase remote push / PostgREST HTTP (gate 8) — human-run; no remote creds here.
++- Migration 0014 (governed support access) — NOT started; no skeleton in this bundle.
++- Supabase remote push / PostgREST HTTP (Gate 11) — human-run; no remote creds here.
+diff --git a/docs/EXECUTION_COMMANDS.md b/docs/EXECUTION_COMMANDS.md
+index ebc6b0e76e19361d0aa7ed0efd75974c98e57209..c24e70e5bfb08125327dd41407337ff4d841428b 100644
+--- a/docs/EXECUTION_COMMANDS.md
++++ b/docs/EXECUTION_COMMANDS.md
+@@ -6,8 +6,8 @@ Node 22 + npm for the TypeScript gates.
+ 
+ ## Gate 1 — strict root TypeScript typecheck
+ ```bash
+-npm install
+-npx tsc -p tsconfig.typecheck.json --noEmit
++npm ci
++npx tsc -p tsconfig.typecheck.json --noEmit --pretty false
+ ```
+ 
+ ## Gate 2 — build every workspace package (project references)
+@@ -19,9 +19,10 @@ ls packages/preset-grooming/dist/index.js packages/preset-grooming/dist/index.d.
+ ls packages/backend/dist/index.js packages/backend/dist/index.d.ts
+ ```
+ 
+-## Gate 3 — in-memory service tests
++## Gate 3 — in-memory + preset-contract tests
+ ```bash
+ npx tsx packages/backend/test/assembly_service.inmemory.test.ts
++npx tsx packages/backend/test/preset_contract.test.ts
+ ```
+ 
+ ## Gate 4 — fresh PostgreSQL 16 apply using the approved timestamped sequence
+@@ -62,7 +63,7 @@ psql operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20260721001350_test_reserv
+ 
+ ## Gate 7 — real authenticated-role integration tests
+ ```bash
+-psql operro_gate -v ON_ERROR_STOP=1 -c "do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticator login noinherit password 'stagingpw'; exception when duplicate_object then null; end \$\$; grant anon to authenticator; grant authenticated to authenticator; grant usage on schema public, app to anon, authenticated;"
++psql operro_gate -v ON_ERROR_STOP=1 -c "do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticator login noinherit; exception when duplicate_object then null; end \$\$; alter role authenticator login noinherit password 'stagingpw'; grant anon to authenticator; grant authenticated to authenticator; grant usage on schema public, app to anon, authenticated;"
+ psql operro_gate -v ON_ERROR_STOP=1 -f integration/0100_integration_seed.sql
+ PGPASSWORD=stagingpw psql "host=127.0.0.1 port=5432 dbname=operro_gate user=authenticator" -v ON_ERROR_STOP=1 -f integration/0100_integration_client.sql
+ ```
+@@ -79,11 +80,13 @@ DATABASE_URL="postgresql:///operro_cc" bash supabase/tests/concurrency/run_concu
+ 
+ ## Gate 9 — checksum verification
+ ```bash
+-sha256sum -c docs/CHECKSUMS.sha256
++sha256sum -c docs/CHECKSUMS_AFTER_EXTRACTION.sha256
+ ```
+ 
+ ## Gate 10 — fresh archive extraction and rerun
+ ```bash
++rm -rf /tmp/verify
++mkdir -p /tmp/verify
+ tar -xzf operro_batch2_repo.tar.gz -C /tmp/verify
+ cd /tmp/verify/operro-grooming-batch2
+ # re-run gates 1-8 above from the extracted tree
+@@ -99,8 +102,10 @@ supabase db push        # applies the 20260721* timestamped migration tree in or
+ 
+ ## One-shot fresh-extraction rerun (recommended for reviewers)
+ ```bash
+-tar -xzf operro_batch2_repo.tar.gz
+-cd operro-grooming-batch2
++rm -rf /tmp/operro-batch2-review
++mkdir -p /tmp/operro-batch2-review
++tar -xzf operro_batch2_repo.tar.gz -C /tmp/operro-batch2-review
++cd /tmp/operro-batch2-review/operro-grooming-batch2
+ bash run_all_gates.sh          # runs gates 1-8; exits nonzero on any failure
+ ```
+ The captured output of exactly this run is in `logs/extraction_rerun.log`.
+diff --git a/docs/PET_REMOVAL_BEHAVIOR.md b/docs/PET_REMOVAL_BEHAVIOR.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad7ed1b7e43cb125b6fa97d7afc59f2886f27b53
+--- /dev/null
++++ b/docs/PET_REMOVAL_BEHAVIOR.md
+@@ -0,0 +1,44 @@
++# Pet-removal behavior (v1)
++
++## Decision: removal is permanent for v1
++
++Removing a pet from a booking (`app.assembly_remove_pet`) is a **soft delete**:
++the `grooming_job_pets` row is retained with `deleted_at` set (so history,
++audit, and any released reservations are preserved).
++
++The uniqueness index that guarantees one pet-per-booking —
++`uq_gjp_job_pet (organization_id, grooming_job_id, pet_id)` — is **not** partial;
++it spans soft-deleted rows. As a direct consequence, **a removed pet cannot be
++added again to the same booking** in v1.
++
++This is an intentional v1 constraint, not a bug. A controlled "restore" operation
++(which would revive the soft-deleted row rather than insert a new one) is
++deliberately out of scope for this increment.
++
++## Stable, explicit error
++
++`assembly_add_pet` detects the prior soft-deleted row and raises a stable,
++documented business error rather than leaking the raw Postgres unique violation:
++
++| Situation | Error (SQLSTATE 23514, check_violation) |
++|---|---|
++| Pet is currently on the booking (active row) | `pet_already_on_booking` |
++| Pet was previously removed from this booking | `pet_removal_is_permanent` |
++
++Both are part of the preset error contract (`ASSEMBLY_ERRORS`) and classify to
++`BUSINESS_RULE`, so the service surfaces them as a `BusinessRuleError` with the
++stable code, never as an opaque `23505`.
++
++## Test coverage
++
++`supabase/tests/20260721001350_test_assembly.sql` case **C16** adds a pet,
++removes it, then asserts that re-adding the same pet to the same booking raises
++`pet_removal_is_permanent` (and explicitly fails if a raw unique violation leaks
++instead).
++
++## Future work (not v1)
++
++If product later needs re-add, the sanctioned path is a new controlled operation
++`assembly_restore_pet(p_pet)` that clears `deleted_at` on the existing row under
++the same booking→pet lock order and authorization, rather than relaxing the
++unique index. That is explicitly deferred.
+diff --git a/integration/0100_integration_client.sql b/integration/0100_integration_client.sql
+index 7fb06b14c32e45c4ea54df124e86f1c86065a962..cc47dce89e4b93946dcf4c4792d3f56f4e2fca28 100644
+--- a/integration/0100_integration_client.sql
++++ b/integration/0100_integration_client.sql
+@@ -91,3 +91,45 @@ do $$ declare v_pet uuid; begin
+     'I7 assembly_assign_pet_resource works under real authenticated role');
+ end $$;
+ commit;
++
++-- I8/I9/I10/I11 — reserve_package_session through the REAL authenticated role
++-- (item 1): proves the authenticated EXECUTE grant + role behavior, RLS
++-- visibility, and correct org/line/package/status. Adds a fresh pet + qty-1
++-- Bath line, reserves a session, then asserts the row and its visibility.
++begin;
++set local role authenticated;
++select set_config('request.jwt.claims',
++  json_build_object('sub','0e000000-0000-4000-8000-0000000000c1','role','authenticated',
++                    'active_org_id','0e000000-0000-4000-8000-000000000001')::text,true);
++do $$
++declare v_pet uuid; v_line uuid; v_res uuid; r record;
++begin
++  -- ResPet (owned by booking customer f0) is seeded by the owner; the client
++  -- only assembles via RPCs (direct table writes are correctly blocked by RLS).
++  v_pet := app.assembly_add_pet('0e000000-0000-4000-8000-00000000ba01','0e000000-0000-4000-8000-0000000000f9',true);
++  v_line := app.assembly_add_line(v_pet,'0e000000-0000-4000-8000-000000005001',1);
++
++  -- reserve via the RPC AS authenticated (proves EXECUTE grant + role behavior)
++  v_res := app.reserve_package_session(v_line,'0e000000-0000-4000-8000-0000000ca001');
++  perform pg_temp.ok(v_res is not null,'I8 authenticated can reserve_package_session via RPC (EXECUTE grant works)');
++
++  -- visible through RLS as the authenticated role
++  perform pg_temp.ok(
++    exists (select 1 from public.package_reservations where id=v_res),
++    'I9 reservation visible through RLS as authenticated');
++
++  -- org / line / package / status all correct
++  select * into r from public.package_reservations where id=v_res;
++  perform pg_temp.ok(
++    r.organization_id='0e000000-0000-4000-8000-000000000001'
++    and r.grooming_job_pet_service_id=v_line
++    and r.customer_package_id='0e000000-0000-4000-8000-0000000ca001'
++    and r.status='reserved',
++    'I10 reservation org/line/package/status are correct');
++
++  -- availability decremented (3 sessions - 1 reserved = 2), via the client RPC
++  perform pg_temp.ok(
++    app.package_available_sessions('0e000000-0000-4000-8000-0000000ca001')=2,
++    'I11 availability decremented to 2 after reservation (authenticated read RPC)');
++end $$;
++commit;
+diff --git a/integration/0100_integration_seed.sql b/integration/0100_integration_seed.sql
+index 7ab6f7ca5ac5275f8e9b800fb4b8bdd00fe1f9a0..44bae99c69ca26b79dcbd9dddf8105245ecbf527 100644
+--- a/integration/0100_integration_seed.sql
++++ b/integration/0100_integration_seed.sql
+@@ -32,11 +32,12 @@ insert into public.membership_branch_access (organization_id,membership_id,branc
+   ('0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-0000000000d1','0e000000-0000-4000-8000-0000000000a1') on conflict do nothing;
+ insert into public.permissions (id,key,resource,action,description) values
+   ('0e000000-0000-4000-8000-0000000000f2','booking.read','booking','read','r'),
+-  ('0e000000-0000-4000-8000-0000000000f3','booking.update','booking','update','u')
++  ('0e000000-0000-4000-8000-0000000000f3','booking.update','booking','update','u'),
++  ('0e000000-0000-4000-8000-0000000000f5','membership.read','membership','read','m')
+   on conflict (key) do nothing;
+ insert into public.role_permissions (organization_id,role_id,permission_id)
+   select '0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-0000000000e1',p.id
+-  from public.permissions p where p.key in ('booking.read','booking.update') on conflict do nothing;
++  from public.permissions p where p.key in ('booking.read','booking.update','membership.read') on conflict do nothing;
+ insert into public.organization_modules (organization_id,module_id,enabled)
+   select '0e000000-0000-4000-8000-000000000001',m.id,true from public.modules m where m.key in ('scheduling','membership')
+   on conflict (organization_id,module_id) do update set enabled=true;
+@@ -60,3 +61,16 @@ insert into public.pets (id,organization_id,customer_id,name) values
+   ('0e000000-0000-4000-8000-0000000000f2','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-00000000c102','OtherPet') on conflict do nothing;
+ insert into public.resources (id,organization_id,branch_id,kind,name,capacity,status,membership_id) values
+   ('0e000000-0000-4000-8000-0000000e5001','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-0000000000a1','staff','Groomer',1,'active','0e000000-0000-4000-8000-0000000000d1') on conflict do nothing;
++
++-- Package + customer-package fixtures for the authenticated reservation test
++-- (item 1). Package is Bath-specific, belongs to the booking's customer (f0),
++-- three sessions available.
++insert into public.packages (id,organization_id,name,service_id,total_sessions,price,currency) values
++  ('0e000000-0000-4000-8000-00000000a001','0e000000-0000-4000-8000-000000000001','Bath3','0e000000-0000-4000-8000-000000005001',3,240,'USD') on conflict do nothing;
++insert into public.customer_packages (id,organization_id,customer_id,package_id,service_id,status) values
++  ('0e000000-0000-4000-8000-0000000ca001','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-0000000000f0','0e000000-0000-4000-8000-00000000a001','0e000000-0000-4000-8000-000000005001','active') on conflict do nothing;
++insert into public.customer_package_ledger (organization_id,customer_package_id,delta,reason) values
++  ('0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-0000000ca001',3,'purchase') on conflict do nothing;
++-- ResPet for the authenticated reservation test (owned by booking customer f0).
++insert into public.pets (id,organization_id,customer_id,name) values
++  ('0e000000-0000-4000-8000-0000000000f9','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-0000000000f0','ResPet') on conflict do nothing;
+diff --git a/packages/backend/src/repositories/grooming.ts b/packages/backend/src/repositories/grooming.ts
+index 62517d2ee4b74a71a402d47eadd2078c61f173c1..33aff44a48061d5313b168bdcae48a9426f38a0c 100644
+--- a/packages/backend/src/repositories/grooming.ts
++++ b/packages/backend/src/repositories/grooming.ts
+@@ -26,7 +26,16 @@ import {
+   type GroomingJobPetService,
+   type GroomingPetStatus,
+ } from "@operro/sdk";
+-import { ASSEMBLY_RPC, toRpcArgs } from "@operro/preset-grooming";
++import {
++  ASSEMBLY_RPC,
++  toRpcArgs,
++  type RepoAddPet,
++  type RepoRemovePet,
++  type RepoAddLine,
++  type RepoSetLineQuantity,
++  type RepoVoidLine,
++  type RepoAssignPetResource,
++} from "@operro/preset-grooming";
+ import type { DatabaseClient } from "../infra/index.js";
+ 
+ interface BookingRow {
+@@ -76,12 +85,12 @@ export interface LoadJobOptions {
+ 
+ export interface GroomingRepository {
+   loadJob(bookingId: BookingId, opts?: LoadJobOptions): Promise<GroomingJob | null>;
+-  addPet(input: { bookingId: BookingId; petId: PetId; isRequired: boolean }): Promise<GroomingJobPetId>;
+-  removePet(input: { groomingJobPetId: GroomingJobPetId; reason: string }): Promise<void>;
+-  addLine(input: { groomingJobPetId: GroomingJobPetId; serviceId: ServiceId; quantity: number }): Promise<LineId>;
+-  setLineQuantity(input: { lineId: LineId; quantity: number }): Promise<void>;
+-  voidLine(input: { lineId: LineId; reason: string }): Promise<void>;
+-  assignPetResource(input: { groomingJobPetId: GroomingJobPetId; resourceId: ResourceId }): Promise<void>;
++  addPet(input: RepoAddPet): Promise<GroomingJobPetId>;
++  removePet(input: RepoRemovePet): Promise<void>;
++  addLine(input: RepoAddLine): Promise<LineId>;
++  setLineQuantity(input: RepoSetLineQuantity): Promise<void>;
++  voidLine(input: RepoVoidLine): Promise<void>;
++  assignPetResource(input: RepoAssignPetResource): Promise<void>;
+ }
+ 
+ /** Boundary validation: reject bad DB values loudly instead of casting blindly. */
+@@ -170,24 +179,24 @@ export class SupabaseGroomingRepository implements GroomingRepository {
+     return l.duration_minutes !== null ? { ...base, durationMinutes: l.duration_minutes } : base;
+   }
+ 
+-  async addPet(input: { bookingId: BookingId; petId: PetId; isRequired: boolean }): Promise<GroomingJobPetId> {
++  async addPet(input: RepoAddPet): Promise<GroomingJobPetId> {
+     const id = await this.db.rpc<string>(ASSEMBLY_RPC.addPet, toRpcArgs.addPet(input));
+     return toId<GroomingJobPetId>(id);
+   }
+-  async removePet(input: { groomingJobPetId: GroomingJobPetId; reason: string }): Promise<void> {
++  async removePet(input: RepoRemovePet): Promise<void> {
+     await this.db.rpc<void>(ASSEMBLY_RPC.removePet, toRpcArgs.removePet(input));
+   }
+-  async addLine(input: { groomingJobPetId: GroomingJobPetId; serviceId: ServiceId; quantity: number }): Promise<LineId> {
++  async addLine(input: RepoAddLine): Promise<LineId> {
+     const id = await this.db.rpc<string>(ASSEMBLY_RPC.addLine, toRpcArgs.addLine(input));
+     return toId<LineId>(id);
+   }
+-  async setLineQuantity(input: { lineId: LineId; quantity: number }): Promise<void> {
++  async setLineQuantity(input: RepoSetLineQuantity): Promise<void> {
+     await this.db.rpc<void>(ASSEMBLY_RPC.setLineQuantity, toRpcArgs.setLineQuantity(input));
+   }
+-  async voidLine(input: { lineId: LineId; reason: string }): Promise<void> {
++  async voidLine(input: RepoVoidLine): Promise<void> {
+     await this.db.rpc<void>(ASSEMBLY_RPC.voidLine, toRpcArgs.voidLine(input));
+   }
+-  async assignPetResource(input: { groomingJobPetId: GroomingJobPetId; resourceId: ResourceId }): Promise<void> {
++  async assignPetResource(input: RepoAssignPetResource): Promise<void> {
+     await this.db.rpc<void>(ASSEMBLY_RPC.assignPetResource, toRpcArgs.assignPetResource(input));
+   }
+ }
+diff --git a/packages/backend/src/services/BookingAssemblyService.ts b/packages/backend/src/services/BookingAssemblyService.ts
+index 3b3d40baf04ff8511049bdbff439bb9b9e401527..de967df48337491747194f6486ae04968796928f 100644
+--- a/packages/backend/src/services/BookingAssemblyService.ts
++++ b/packages/backend/src/services/BookingAssemblyService.ts
+@@ -35,6 +35,8 @@ import {
+ } from "@operro/sdk";
+ import {
+   ASSEMBLY_GATE,
++  classifyDbError,
++  type PlatformErrorCategory,
+   type AddPetInput,
+   type RemovePetInput,
+   type AddLineInput,
+@@ -48,22 +50,22 @@ export interface AssemblyDeps {
+   readonly grooming: GroomingRepository;
+ }
+ 
+-/** Map a DB/repo error to the platform error vocabulary (Rules 47/53/57). */
++/**
++ * Map a DB/repo error to the platform error vocabulary using the preset-owned
++ * classifier (item 2) — the service keeps NO independent regex list of business
++ * error names. The preset returns a category + the matched stable code; we wrap
++ * that in the SDK error type, preserving the DB message.
++ */
+ function mapDbError(e: unknown): PlatformError {
+-  const anyE = e as { code?: string; message?: string };
+-  const msg = anyE?.message ?? "";
+-  if (anyE?.code === "42501" || /wrong_branch|missing_permission|missing_module|no_active_membership|wrong_organization/.test(msg))
+-    return new AuthorizationError(msg || "not_authorized");
+-  if (anyE?.code === "23505" || /already_on_booking/.test(msg))
+-    return new ConflictError(msg || "conflict");
+-  if (anyE?.code === "P0002" || /_not_found/.test(msg))
+-    return new ResourceNotFound("grooming_record");
+-  if (
+-    anyE?.code === "23514" ||
+-    /must_be_positive|reason_required|not_open_for_assembly|has_realized_effects|has_package_reservation|requires_unit_quantity|customer_mismatch|not_active_or_not_in_org|not_active_or_not_in_branch|not_in_org|package_not_active|package_expired|package_not_applicable|no_sessions_available/.test(msg)
+-  )
+-    return new BusinessRuleError(msg || "business_rule");
+-  return new InternalError(msg || "assembly_failed");
++  const msg = (e as { message?: string })?.message ?? "";
++  const { category }: { category: PlatformErrorCategory } = classifyDbError(e);
++  switch (category) {
++    case "AUTHORIZATION": return new AuthorizationError(msg || "not_authorized");
++    case "CONFLICT": return new ConflictError(msg || "conflict");
++    case "NOT_FOUND": return new ResourceNotFound("grooming_record");
++    case "BUSINESS_RULE": return new BusinessRuleError(msg || "business_rule");
++    default: return new InternalError(msg || "assembly_failed");
++  }
+ }
+ 
+ export class BookingAssemblyService {
+diff --git a/packages/backend/test/preset_contract.test.ts b/packages/backend/test/preset_contract.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4648e9957cde6c0803de54723ce3043e3f102d7
+--- /dev/null
++++ b/packages/backend/test/preset_contract.test.ts
+@@ -0,0 +1,60 @@
++/**
++ * Preset-contract test (item 2): proves the backend consumes @operro/preset-grooming
++ * as the single source for the operation contract and error classification —
++ * not local duplicates.
++ *
++ * - classifyDbError (preset-owned) maps each known DB error to the right
++ *   platform category, so the service does not need its own regex list.
++ * - the corrected error contract includes resource_not_active_or_not_in_branch
++ *   and does NOT include the obsolete resource_not_active_or_not_in_org.
++ * - the repository's mutation methods accept the preset Repo* input types
++ *   (compile-time: assigning preset-typed inputs must type-check).
++ */
++import {
++  classifyDbError,
++  ASSEMBLY_ERRORS,
++  ASSEMBLY_RPC,
++  ASSEMBLY_GATE,
++  type RepoAddPet,
++  type RepoAssignPetResource,
++} from "@operro/preset-grooming";
++import { toId, MODULES, PERMISSIONS, type BookingId, type PetId, type GroomingJobPetId, type ResourceId } from "@operro/sdk";
++import type { GroomingRepository } from "../src/repositories/grooming.js";
++
++let passed = 0;
++function ok(cond: boolean, label: string): void {
++  if (!cond) { console.error(`FAIL: ${label}`); process.exit(1); }
++  console.log(`PASS: ${label}`);
++  passed++;
++}
++
++// 1. classification: each category resolves correctly from a raw DB error.
++ok(classifyDbError({ code: "42501", message: "wrong_branch" }).category === "AUTHORIZATION", "1 42501/wrong_branch -> AUTHORIZATION");
++ok(classifyDbError({ code: "23505", message: "pet_already_on_booking" }).category === "CONFLICT", "2 pet_already_on_booking -> CONFLICT");
++ok(classifyDbError({ code: "P0002", message: "line_not_found" }).category === "NOT_FOUND", "3 line_not_found -> NOT_FOUND");
++ok(classifyDbError({ code: "23514", message: "pet_customer_mismatch" }).category === "BUSINESS_RULE", "4 pet_customer_mismatch -> BUSINESS_RULE");
++ok(classifyDbError({ code: "23514", message: "resource_not_active_or_not_in_branch" }).category === "BUSINESS_RULE", "5 resource_not_active_or_not_in_branch classified");
++ok(classifyDbError({ message: "package_requires_unit_quantity" }).category === "BUSINESS_RULE", "6 package_requires_unit_quantity -> BUSINESS_RULE");
++ok(classifyDbError({ code: "99999", message: "something else" }).category === "INTERNAL", "7 unknown -> INTERNAL");
++ok(classifyDbError({ code: "23514", message: "booking_not_open_for_assembly:completed" }).code === "booking_not_open_for_assembly", "8 prefix match returns stable code");
++
++// 2. corrected error contract membership.
++ok("resource_not_active_or_not_in_branch" in ASSEMBLY_ERRORS, "9 contract includes resource_not_active_or_not_in_branch");
++ok(!("resource_not_active_or_not_in_org" in ASSEMBLY_ERRORS), "10 obsolete resource_not_active_or_not_in_org removed");
++
++// 3. RPC names + gate come from the preset (single source).
++ok(ASSEMBLY_RPC.assignPetResource === "assembly_assign_pet_resource", "11 RPC name from preset");
++ok(ASSEMBLY_GATE.module === MODULES.SCHEDULING && ASSEMBLY_GATE.permission === PERMISSIONS.BOOKING_UPDATE, "12 gate from preset");
++
++// 4. compile-time: preset Repo* inputs are exactly what the repository accepts.
++//    (If the repo redeclared incompatible anonymous shapes, this would not compile.)
++const addPetInput: RepoAddPet = { bookingId: toId<BookingId>("00000000-0000-4000-8000-000000000001"), petId: toId<PetId>("00000000-0000-4000-8000-000000000002"), isRequired: true };
++const assignInput: RepoAssignPetResource = { groomingJobPetId: toId<GroomingJobPetId>("00000000-0000-4000-8000-000000000003"), resourceId: toId<ResourceId>("00000000-0000-4000-8000-000000000004") };
++type RepoAddPetParam = Parameters<GroomingRepository["addPet"]>[0];
++type RepoAssignParam = Parameters<GroomingRepository["assignPetResource"]>[0];
++const _p1: RepoAddPetParam = addPetInput;   // must assign
++const _p2: RepoAssignParam = assignInput;   // must assign
++void _p1; void _p2;
++ok(true, "13 repository methods accept preset Repo* input types (compile-time)");
++
++console.log(`\n${passed} assertions passed.`);
+diff --git a/packages/preset-grooming/src/assembly.ts b/packages/preset-grooming/src/assembly.ts
+index 882ebc5e0928cb217d420455dca5ebe13492612a..d14aeeee96d92b9b0e5599106d9792dacf05a62d 100644
+--- a/packages/preset-grooming/src/assembly.ts
++++ b/packages/preset-grooming/src/assembly.ts
+@@ -95,24 +95,98 @@ export const toRpcArgs = {
+ } as const;
+ 
+ /**
+- * Stable business error strings the RPCs raise (SQLSTATE-mapped). The service
+- * layer translates these to the platform error vocabulary.
++ * The platform error categories a caller maps DB failures onto. The preset OWNS
++ * this classification so the backend service does not maintain its own regex
++ * list of business-error names (item 2).
++ */
++export type PlatformErrorCategory =
++  | "AUTHORIZATION"
++  | "CONFLICT"
++  | "NOT_FOUND"
++  | "BUSINESS_RULE"
++  | "INTERNAL";
++
++/**
++ * Stable business/authorization error strings the assembly + reservation RPCs
++ * raise, each mapped to a SQLSTATE and a platform category. This is the single
++ * source of truth; keep in lockstep with the migration's RAISE statements.
++ *
++ * Note: the resource check raises `resource_not_active_or_not_in_branch`
++ * (branch-scoped, per correction). There is NO `resource_not_active_or_not_in_org`
++ * — no RPC raises it — so it is intentionally absent (item 2).
+  */
+ export const ASSEMBLY_ERRORS = {
+-  booking_not_found: "no_data_found",
+-  booking_not_open_for_assembly: "check_violation",
+-  pet_not_in_org: "check_violation",
+-  pet_customer_mismatch: "check_violation",
+-  pet_already_on_booking: "unique_violation",
+-  pet_not_found: "no_data_found",
+-  service_not_active_or_not_in_org: "check_violation",
+-  resource_not_active_or_not_in_org: "check_violation",
+-  quantity_must_be_positive: "check_violation",
+-  line_not_found: "no_data_found",
+-  line_has_realized_effects_use_void: "check_violation",
+-  line_has_package_reservation: "check_violation",
+-  package_requires_unit_quantity: "check_violation",
+-  reason_required: "check_violation",
+-} as const;
++  // not found (SQLSTATE P0002 / no_data_found)
++  booking_not_found: { sqlstate: "P0002", category: "NOT_FOUND" },
++  pet_not_found: { sqlstate: "P0002", category: "NOT_FOUND" },
++  line_not_found: { sqlstate: "P0002", category: "NOT_FOUND" },
++  package_not_found: { sqlstate: "P0002", category: "NOT_FOUND" },
++  customer_package_not_found: { sqlstate: "P0002", category: "NOT_FOUND" },
++  // conflict (23505 / unique_violation)
++  pet_already_on_booking: { sqlstate: "23505", category: "CONFLICT" },
++  // business rule (23514 / check_violation)
++  booking_not_open_for_assembly: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  pet_not_in_org: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  pet_customer_mismatch: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  pet_removal_is_permanent: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  service_not_active_or_not_in_org: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  resource_not_active_or_not_in_branch: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  quantity_must_be_positive: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  line_has_realized_effects_use_void: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  line_has_package_reservation: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  package_requires_unit_quantity: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  package_not_active: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  package_expired: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  package_not_applicable_to_service: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  package_customer_mismatch: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  no_sessions_available: { sqlstate: "23514", category: "BUSINESS_RULE" },
++  reason_required: { sqlstate: "23514", category: "BUSINESS_RULE" },
++} as const satisfies Record<string, { sqlstate: string; category: PlatformErrorCategory }>;
+ 
+ export type AssemblyErrorCode = keyof typeof ASSEMBLY_ERRORS;
++
++/** Shape of a raw DB/driver error (subset we rely on). */
++export interface RawDbError {
++  readonly code?: string;
++  readonly message?: string;
++}
++
++/**
++ * Preset-owned classification (item 2): turn a raw DB error into a platform
++ * category using the known error contract first, then SQLSTATE, without the
++ * caller keeping its own list of business-error names. Also returns the matched
++ * stable code (if any) so callers can surface it.
++ */
++export function classifyDbError(e: unknown): { category: PlatformErrorCategory; code?: AssemblyErrorCode } {
++  const err = (e ?? {}) as RawDbError;
++  const msg = err.message ?? "";
++  // 1. Match a known stable error name embedded in the message (RPCs raise
++  //    'name' or 'name:detail', so match by prefix token).
++  for (const key of Object.keys(ASSEMBLY_ERRORS) as AssemblyErrorCode[]) {
++    if (msg.includes(key)) {
++      return { category: ASSEMBLY_ERRORS[key].category, code: key };
++    }
++  }
++  // 2. Authorization comes from assert_tenant_authorized (SQLSTATE 42501) or its
++  //    reason strings, which are SDK/DB authz reasons, not assembly errors.
++  if (err.code === "42501" || /wrong_branch|missing_permission|missing_module|no_active_membership|wrong_organization/.test(msg)) {
++    return { category: "AUTHORIZATION" };
++  }
++  // 3. Fall back to SQLSTATE class.
++  switch (err.code) {
++    case "23505": return { category: "CONFLICT" };
++    case "P0002": return { category: "NOT_FOUND" };
++    case "23514": return { category: "BUSINESS_RULE" };
++    default: return { category: "INTERNAL" };
++  }
++}
++
++// ---- Repository-facing input shapes (persistence inputs, no ctx/branch) ------
++// The repository imports THESE from the preset instead of redeclaring anonymous
++// object shapes (item 2). They are the sanctioned inputs to each RPC call.
++export interface RepoAddPet { bookingId: BookingId; petId: PetId; isRequired: boolean }
++export interface RepoRemovePet { groomingJobPetId: GroomingJobPetId; reason: string }
++export interface RepoAddLine { groomingJobPetId: GroomingJobPetId; serviceId: ServiceId; quantity: number }
++export interface RepoSetLineQuantity { lineId: LineId; quantity: number }
++export interface RepoVoidLine { lineId: LineId; reason: string }
++export interface RepoAssignPetResource { groomingJobPetId: GroomingJobPetId; resourceId: ResourceId }
+diff --git a/run_all_gates.sh b/run_all_gates.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..f07fc8e438b0c2365458f80bc8e0832a7b5eaee7
+--- /dev/null
++++ b/run_all_gates.sh
+@@ -0,0 +1,126 @@
++#!/usr/bin/env bash
++# run_all_gates.sh — full gate suite for the Batch 2 grooming bundle.
++# Run from the repository root. The script exits immediately on any failed
++# critical command and prints a final success marker only after every gate passes.
++#
++# Requirements: Node 20+/npm and PostgreSQL 16. RUN_AS_POSTGRES=1 (default)
++# executes local database administration through the postgres OS user; set it to
++# 0 when the current user already has the required PostgreSQL privileges.
++set -euo pipefail
++
++step() {
++  echo ""
++  echo "########## $* ##########"
++}
++
++run_as_postgres() {
++  if [ "${RUN_AS_POSTGRES:-1}" = "1" ] && [ "$(id -un)" != "postgres" ]; then
++    local command_string
++    printf -v command_string '%q ' "$@"
++    su -s /bin/bash postgres -c "$command_string"
++  else
++    "$@"
++  fi
++}
++
++psql_db() {
++  run_as_postgres psql "$@"
++}
++
++EXPECTED_MIGRATIONS=(
++  supabase/migrations/20260721000100_extensions_and_helpers.sql
++  supabase/migrations/20260721000150_fix_uuidv7_supabase.sql
++  supabase/migrations/20260721000200_identity_access.sql
++  supabase/migrations/20260721000300_platform_entitlements.sql
++  supabase/migrations/20260721000400_commercial_core.sql
++  supabase/migrations/20260721000500_scheduling_core.sql
++  supabase/migrations/20260721000600_inventory_tasks.sql
++  supabase/migrations/20260721000700_customer_programs.sql
++  supabase/migrations/20260721000800_financial_sales.sql
++  supabase/migrations/20260721000900_payroll_expenses.sql
++  supabase/migrations/20260721001000_security_rls_isolation.sql
++  supabase/migrations/20260721001100_security_rls_capabilities.sql
++  supabase/migrations/20260721001200_cross_cutting_services.sql
++  supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql
++  supabase/migrations/20260721001350_grooming_assembly_operations.sql
++)
++mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
++if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
++  echo "Migration lineage mismatch." >&2
++  echo "Expected:" >&2
++  printf '  %s\n' "${EXPECTED_MIGRATIONS[@]}" >&2
++  echo "Actual:" >&2
++  printf '  %s\n' "${ACTUAL_MIGRATIONS[@]}" >&2
++  exit 1
++fi
++
++step "GATE 1 — strict TypeScript typecheck"
++npm ci
++npx tsc --version
++if npx tsc -p tsconfig.typecheck.json --noEmit --pretty false; then
++  echo "typecheck exit=0"
++else
++  rc=$?
++  echo "typecheck exit=$rc" >&2
++  exit "$rc"
++fi
++
++step "GATE 2 — workspace build"
++npm run build --workspaces --if-present
++ls -l \
++  packages/sdk/dist/index.js \
++  packages/sdk/dist/index.d.ts \
++  packages/preset-grooming/dist/index.js \
++  packages/preset-grooming/dist/index.d.ts \
++  packages/backend/dist/index.js \
++  packages/backend/dist/index.d.ts
++
++step "GATE 3 — in-memory + preset-contract tests"
++npx tsx packages/backend/test/assembly_service.inmemory.test.ts
++npx tsx packages/backend/test/preset_contract.test.ts
++
++step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
++run_as_postgres dropdb --if-exists operro_gate
++run_as_postgres createdb operro_gate
++psql_db operro_gate -q -v ON_ERROR_STOP=1 -c \
++  "create schema if not exists auth; create table if not exists auth.users(id uuid primary key); do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
++for migration in "${EXPECTED_MIGRATIONS[@]}"; do
++  psql_db operro_gate -q -v ON_ERROR_STOP=1 -f "$migration"
++done
++assembly_fns=$(psql_db operro_gate -tAc \
++  "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app' and proname like 'assembly%';" | tr -d '[:space:]')
++echo "assembly fns: $assembly_fns"
++[ "$assembly_fns" = "8" ] || {
++  echo "Expected 8 assembly functions, found $assembly_fns" >&2
++  exit 1
++}
++
++step "GATE 5 — assembly RPC tests"
++psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20260721001350_test_assembly.sql
++
++step "GATE 6 — package-reservation regression tests"
++psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20260721001350_test_reservation.sql
++
++step "GATE 7 — real authenticated-role integration (incl reserve_package_session)"
++psql_db operro_gate -q -v ON_ERROR_STOP=1 -c \
++  "do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticator login noinherit; exception when duplicate_object then null; end \$\$; alter role authenticator login noinherit password 'stagingpw'; grant anon to authenticator; grant authenticated to authenticator; grant usage on schema public, app to anon, authenticated;"
++psql_db operro_gate -q -v ON_ERROR_STOP=1 -f integration/0100_integration_seed.sql
++PGPASSWORD=stagingpw psql \
++  "host=127.0.0.1 port=5432 dbname=operro_gate user=authenticator" \
++  -v ON_ERROR_STOP=1 \
++  -f integration/0100_integration_client.sql
++
++step "GATE 8 — completion vs assembly/reservation concurrency"
++run_as_postgres dropdb --if-exists operro_cc
++run_as_postgres createdb operro_cc
++psql_db operro_cc -q -v ON_ERROR_STOP=1 -c \
++  "create schema if not exists auth; create table if not exists auth.users(id uuid primary key); do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
++for migration in "${EXPECTED_MIGRATIONS[@]}"; do
++  psql_db operro_cc -q -v ON_ERROR_STOP=1 -f "$migration"
++done
++psql_db operro_cc -q -v ON_ERROR_STOP=1 -f supabase/tests/concurrency/conc_seed.sql
++run_as_postgres env DATABASE_URL='postgresql:///operro_cc' \
++  bash supabase/tests/concurrency/run_concurrency_assembly.sh
++
++echo ""
++echo "ALL GATES PASSED"
+diff --git a/supabase/migrations/20260721001350_grooming_assembly_operations.sql b/supabase/migrations/20260721001350_grooming_assembly_operations.sql
+index 65924fba581913615e61fbde329aeb89a45d0ae8..053533e4b1115f54055b87887ca7c557df077ead 100644
+--- a/supabase/migrations/20260721001350_grooming_assembly_operations.sql
++++ b/supabase/migrations/20260721001350_grooming_assembly_operations.sql
+@@ -72,6 +72,16 @@ begin
+                and gjp.pet_id = p_pet and gjp.deleted_at is null) then
+     raise exception 'pet_already_on_booking' using errcode = 'unique_violation';
+   end if;
++  -- v1 pet-removal permanence (item 6): removal is a SOFT delete and the unique
++  -- index uq_gjp_job_pet(org, job, pet) spans soft-deleted rows, so a removed pet
++  -- cannot be re-added to the same booking. Detect the prior soft-deleted row and
++  -- raise a STABLE, explicit error instead of leaking the raw 23505 unique
++  -- violation. (A controlled restore op is deliberately out of scope for v1.)
++  if exists (select 1 from public.grooming_job_pets gjp
++             where gjp.organization_id = b.organization_id and gjp.grooming_job_id = b.id
++               and gjp.pet_id = p_pet and gjp.deleted_at is not null) then
++    raise exception 'pet_removal_is_permanent' using errcode = 'check_violation';
++  end if;
+   select coalesce(max(sequence),0)+1 into v_seq from public.grooming_job_pets
+    where organization_id = b.organization_id and grooming_job_id = b.id;
+   insert into public.grooming_job_pets (organization_id, grooming_job_id, pet_id, sequence, status, is_required)
+diff --git a/supabase/tests/20260721001350_test_assembly.sql b/supabase/tests/20260721001350_test_assembly.sql
+index e32ba6e087fc7484023cb7e2eef646f5d803642b..553da6150a1a31133e0d2401f62e1a51ca6f3427 100644
+--- a/supabase/tests/20260721001350_test_assembly.sql
++++ b/supabase/tests/20260721001350_test_assembly.sql
+@@ -161,5 +161,17 @@ do $$ declare v_avail_before int; v_avail_after int; v_pet uuid; begin
+   exception when no_data_found then perform pg_temp.ok(true,'C15 repeated removal cannot double-release (pet_not_found)'); end;
+ end $$;
+ 
++-- ITEM 6: pet removal is permanent for v1 — re-adding a removed pet raises the
++-- stable pet_removal_is_permanent error (not a raw 23505 unique violation).
++do $$ begin
++  begin
++    perform app.assembly_add_pet('0f000000-0000-4000-8000-00000000ba01','0f000000-0000-4000-8000-00000000f101',true);
++    perform pg_temp.ok(false,'C16 re-adding a removed pet should be rejected');
++  exception
++    when check_violation then perform pg_temp.ok(sqlerrm like '%pet_removal_is_permanent%','C16 re-adding a removed pet raises stable pet_removal_is_permanent');
++    when unique_violation then perform pg_temp.ok(false,'C16 leaked raw unique violation instead of stable error');
++  end;
++end $$;
++
+ rollback;
+ -- END 20260721001350_test_assembly
+diff --git a/supabase/tests/20260721001350_test_reservation.sql b/supabase/tests/20260721001350_test_reservation.sql
+index b7e92f501978697772af5a33f67b64132b402f94..42d4805fad88ed49bc0889a83589bbbbe192be2a 100644
+--- a/supabase/tests/20260721001350_test_reservation.sql
++++ b/supabase/tests/20260721001350_test_reservation.sql
+@@ -49,12 +49,14 @@ insert into public.customer_packages (id,organization_id,customer_id,package_id,
+   ('01000000-0000-4000-8000-0000000ca001','01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-00000000c101','01000000-0000-4000-8000-00000000a001','01000000-0000-4000-8000-000000005001','active',null),
+   ('01000000-0000-4000-8000-0000000ca002','01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-00000000c101','01000000-0000-4000-8000-00000000a001','01000000-0000-4000-8000-000000005001','active',now()-interval '1 day'),
+   ('01000000-0000-4000-8000-0000000ca003','01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-00000000c101','01000000-0000-4000-8000-00000000a001','01000000-0000-4000-8000-000000005002','active',null),
+-  ('01000000-0000-4000-8000-0000000ca004','01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-00000000c102','01000000-0000-4000-8000-00000000a001','01000000-0000-4000-8000-000000005001','active',null);
++  ('01000000-0000-4000-8000-0000000ca004','01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-00000000c102','01000000-0000-4000-8000-00000000a001','01000000-0000-4000-8000-000000005001','active',null),
++  ('01000000-0000-4000-8000-0000000ca005','01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-00000000c101','01000000-0000-4000-8000-00000000a001','01000000-0000-4000-8000-000000005001','active',null);
+ insert into public.customer_package_ledger (organization_id,customer_package_id,delta,reason) values
+   ('01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000ca001',3,'purchase'),
+   ('01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000ca002',3,'purchase'),
+   ('01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000ca003',3,'purchase'),
+-  ('01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000ca004',3,'purchase');
++  ('01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000ca004',3,'purchase'),
++  ('01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000ca005',3,'purchase');
+ 
+ do $$ begin perform pg_temp.act_as('01000000-0000-4000-8000-0000000000c1','01000000-0000-4000-8000-000000000001'); end $$;
+ 
+@@ -122,19 +124,52 @@ do $$ declare l uuid; begin
+   exception when no_data_found then perform pg_temp.ok(sqlerrm like '%package_not_found%','R6 missing package rejected (package_not_found)'); end;
+ end $$;
+ 
+--- R7 stale holds expired before availability calc (oversubscription protection)
+--- Fill availability with a stale (expired-by-time) reservation, then a new
+--- reserve must first expire it and succeed rather than see 0 available.
+-do $$ declare l_stale uuid; l_new uuid; r_stale uuid; begin
+-  -- reserve all 3 sessions via 3 lines, but make them time-expired holds
+-  l_stale := pg_temp.new_line(1);
+-  r_stale := app.reserve_package_session(l_stale,'01000000-0000-4000-8000-0000000ca001', now() - interval '1 hour');
+-  -- also directly age any remaining reserved rows to be safe
++-- R7 stale-hold expiration before availability calc (blocker 3). Fully subscribe
++-- a 3-session package with THREE reserved rows, then age ALL of them to
++-- expired-by-time while their stored status stays 'reserved'. Before expiration
++-- processing availability is 0 (three active holds). A new reserve must first
++-- run expire_package_reservations (flipping the 3 to 'expired'), see 3 free, and
++-- succeed. This FAILS if the expire call is removed from reserve_package_session
++-- (the package would still read 0 available and raise no_sessions_available).
++do $$
++declare l1 uuid; l2 uuid; l3 uuid; l_new uuid; v_before int; v_after int;
++        v_expired int; v_new_status text; r_new uuid;
++begin
++  -- three qty-1 lines, each reserving one session (package now fully held)
++  l1 := pg_temp.new_line(1); perform app.reserve_package_session(l1,'01000000-0000-4000-8000-0000000ca005');
++  l2 := pg_temp.new_line(1); perform app.reserve_package_session(l2,'01000000-0000-4000-8000-0000000ca005');
++  l3 := pg_temp.new_line(1); perform app.reserve_package_session(l3,'01000000-0000-4000-8000-0000000ca005');
++  perform pg_temp.ok(
++    (select count(*) from public.package_reservations
++      where customer_package_id='01000000-0000-4000-8000-0000000ca005' and status='reserved')=3,
++    'R7a exactly three reserved lifecycle rows exist');
++
++  -- age ALL three to expired-by-time, but leave stored status = 'reserved'
+   update public.package_reservations set expires_at = now() - interval '1 hour'
+-    where customer_package_id='01000000-0000-4000-8000-0000000ca001' and status='reserved';
++    where customer_package_id='01000000-0000-4000-8000-0000000ca005' and status='reserved';
++
++  -- BEFORE expiration processing: availability is 0 (three active holds counted)
++  v_before := app.fn_package_available_sessions('01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000ca005');
++  perform pg_temp.ok(v_before = 0, 'R7b availability is 0 before expiration processing (three stale-but-reserved holds)');
++
++  -- attempt a NEW reservation: reserve_package_session must expire the stale
++  -- holds first, then find 3 free and succeed.
+   l_new := pg_temp.new_line(1);
+-  perform pg_temp.ok(app.reserve_package_session(l_new,'01000000-0000-4000-8000-0000000ca001') is not null,
+-    'R7 stale holds expired before availability calc (new reserve succeeds)');
++  r_new := app.reserve_package_session(l_new,'01000000-0000-4000-8000-0000000ca005');
++  perform pg_temp.ok(r_new is not null, 'R7c new reservation succeeds after stale holds expired');
++
++  -- the three stale rows are now 'expired'
++  select count(*) into v_expired from public.package_reservations
++    where grooming_job_pet_service_id in (l1,l2,l3) and status='expired';
++  perform pg_temp.ok(v_expired = 3, 'R7d the three stale rows changed to expired');
++
++  -- the new reservation is 'reserved'
++  select status into v_new_status from public.package_reservations where id=r_new;
++  perform pg_temp.ok(v_new_status = 'reserved', 'R7e the new reservation is reserved');
++
++  -- final availability: 3 sessions - 1 active (the new) = 2
++  v_after := app.fn_package_available_sessions('01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000ca005');
++  perform pg_temp.ok(v_after = 2, 'R7f final availability is correct (3 total - 1 active = 2)');
+ end $$;
+ 
+ -- R8 quantity change rejected across the WHOLE lifecycle (reserved/consumed/released/expired)
+diff --git a/supabase/tests/concurrency/run_concurrency_assembly.sh b/supabase/tests/concurrency/run_concurrency_assembly.sh
+index a7ecc3a84ba355ac5e25011af07452cb44f0b1ab..34c203d0ef38c61279d0d2d4af543ea51bc28558 100755
+--- a/supabase/tests/concurrency/run_concurrency_assembly.sh
++++ b/supabase/tests/concurrency/run_concurrency_assembly.sh
+@@ -36,7 +36,7 @@ SQL
+ run_case() {
+   local label="$1" bscript="$2"
+   echo "== case: $label =="
+-  reset_state
++  reset_state || fail "$label reset_state failed"
+   local t0 tA tB
+   t0=$(date +%s.%N)
+   ( psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$DIR/conc_sessionA.sql" >"$OUT/A.out" 2>&1; echo $? >"$OUT/A.rc"; date +%s.%N >"$OUT/A.t" ) &
