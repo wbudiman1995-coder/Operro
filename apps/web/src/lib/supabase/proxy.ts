@@ -1,3 +1,7 @@
+/**
+ * Function index:
+ * - updateSession: refreshes and propagates Supabase SSR cookies and cache-control headers.
+ */
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 

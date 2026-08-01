@@ -1,102 +1,53 @@
-"use client";
+/**
+ * Function index:
+ * - LoginPage: redirects existing sessions and renders the secure email/password sign-in screen.
+ */
+import { redirect } from "next/navigation";
 
-import { type FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { LoginForm } from "@/components/login-form";
+import { OperroMark } from "@/components/operro-mark";
+import { loadAuthContext } from "@/lib/auth-context";
+import { createClient } from "@/lib/supabase/server";
 
-import { createClient } from "@/lib/supabase/client";
+export const metadata = { title: "Masuk" };
 
-export default function LoginPage() {
-  const router = useRouter();
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+export default async function LoginPage() {
+  const supabase = await createClient();
+  const context = await loadAuthContext(supabase);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    setError("");
-    setLoading(true);
-
-    const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
-
-    if (!email || !password) {
-      setError("Email and password are required.");
-      setLoading(false);
-      return;
-    }
-
-    const supabase = createClient();
-
-    const { error: loginError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (loginError) {
-      setError("Invalid email or password.");
-      setLoading(false);
-      return;
-    }
-
-    router.replace("/dashboard");
-    router.refresh();
+  if (context) {
+    redirect(
+      context.organizations.length === 1 && context.activeOrganization
+        ? "/dashboard"
+        : "/organizations",
+    );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-white">
-      <section className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-8">
-        <p className="mb-2 text-sm font-medium text-zinc-400">OPERRO</p>
-        <h1 className="text-3xl font-semibold">Sign in</h1>
-        <p className="mt-2 text-sm text-zinc-400">
-          Access your Operro workspace.
-        </p>
-
-        {error ? (
-          <p
-            role="alert"
-            className="mt-6 rounded-lg border border-red-900 bg-red-950 p-3 text-sm text-red-200"
-          >
-            {error}
-          </p>
-        ) : null}
-
-        <form
-          method="post"
-          onSubmit={handleSubmit}
-          className="mt-8 space-y-5"
-        >
-          <label className="block">
-            <span className="mb-2 block text-sm text-zinc-300">Email</span>
-            <input
-              required
-              name="email"
-              type="email"
-              autoComplete="email"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-400"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-sm text-zinc-300">Password</span>
-            <input
-              required
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-400"
-            />
-          </label>
-
-          <button
-            disabled={loading}
-            type="submit"
-            className="w-full rounded-lg bg-white px-4 py-3 font-medium text-black hover:bg-zinc-200 disabled:opacity-50"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+    <main className="grid min-h-screen bg-white lg:grid-cols-[0.95fr_1.05fr]">
+      <section className="flex items-center justify-center px-5 py-10 sm:px-8 lg:px-12">
+        <div className="w-full max-w-md">
+          <OperroMark />
+          <p className="mt-12 text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Selamat datang kembali</p>
+          <h1 className="mt-3 text-4xl font-bold tracking-[-0.05em] text-slate-950">Masuk ke workspace Anda</h1>
+          <p className="mt-4 text-sm leading-7 text-slate-500">Gunakan email dan kata sandi yang terdaftar. Organisasi aktif akan diverifikasi sebelum dashboard dibuka.</p>
+          <LoginForm />
+          <p className="mt-8 text-xs leading-5 text-slate-400">Dengan masuk, Anda mengakses data sesuai membership dan kebijakan keamanan organisasi Anda.</p>
+        </div>
       </section>
+      <aside className="relative hidden overflow-hidden bg-slate-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute -right-24 -top-24 size-96 rounded-full bg-emerald-500/25 blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 size-80 rounded-full bg-lime-400/10 blur-3xl" />
+        <div className="relative">
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-emerald-300">Owner-first operating system</span>
+          <blockquote className="mt-10 max-w-xl text-4xl font-semibold leading-tight tracking-[-0.045em]">“Satu tempat untuk melihat apa yang terjadi, apa yang tertunda, dan apa yang harus dilakukan berikutnya.”</blockquote>
+        </div>
+        <div className="relative grid grid-cols-3 gap-3">
+          {["Booking", "Pelanggan", "Operasional"].map((label) => (
+            <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm font-semibold text-slate-300">{label}</div>
+          ))}
+        </div>
+      </aside>
     </main>
   );
 }

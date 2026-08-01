@@ -1,3 +1,7 @@
+/**
+ * Function index:
+ * - createClient: creates the cookie-backed server Supabase client for Server Components and Route Handlers.
+ */
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -18,8 +22,7 @@ export async function createClient() {
               cookieStore.set(name, value, options),
             );
           } catch {
-            // Server Components cannot always write cookies.
-            // Session refresh will be handled by proxy.ts.
+            // Server Components cannot always write cookies; proxy.ts refreshes them.
           }
         },
       },
