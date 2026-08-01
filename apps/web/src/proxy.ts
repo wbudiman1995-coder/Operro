@@ -1,3 +1,7 @@
+/**
+ * Function index:
+ * - proxy: delegates request cookie refresh to the preserved Supabase SSR proxy helper.
+ */
 import type { NextRequest } from "next/server";
 
 import { updateSession } from "@/lib/supabase/proxy";

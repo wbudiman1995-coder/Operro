@@ -1,3 +1,7 @@
+/**
+ * Function index:
+ * - createClient: creates the browser Supabase client with publishable credentials only.
+ */
 import { createBrowserClient } from "@supabase/ssr";
 
 export function createClient() {
