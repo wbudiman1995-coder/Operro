@@ -2,6 +2,7 @@
  * Function index:
  * - LightweightIcon: shared SVG wrapper.
  * - DashboardIcon, CalendarIcon, CustomersIcon, TasksIcon, SettingsIcon, ChevronIcon, ArrowIcon, BuildingIcon.
+ * - GroomingIcon, CatalogIcon, ProgramsIcon, InventoryIcon, FinanceIcon, ReportsIcon.
  */
 import type { SVGProps } from "react";
 
@@ -94,4 +95,28 @@ export function BuildingIcon(props: IconProps) {
       <path d="M3 21h18M6 21V5l6-2 6 2v16M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1" />
     </LightweightIcon>
   );
+}
+
+export function GroomingIcon(props: IconProps) {
+  return <LightweightIcon {...props}><path d="M8 11c-2 0-4 1.7-4 4s1.8 4 4 4c1.6 0 2.5-.8 4-2 1.5 1.2 2.4 2 4 2 2.2 0 4-1.7 4-4s-2-4-4-4c-1.4 0-2.6.7-4 2-1.4-1.3-2.6-2-4-2Z"/><circle cx="6" cy="6" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="18" cy="6" r="2"/></LightweightIcon>;
+}
+
+export function CatalogIcon(props: IconProps) {
+  return <LightweightIcon {...props}><path d="M4 5h16v14H4zM4 10h16M9 10v9"/><path d="m13 14 2 2 4-4"/></LightweightIcon>;
+}
+
+export function ProgramsIcon(props: IconProps) {
+  return <LightweightIcon {...props}><path d="M20 12v8H4v-8M2 7h20v5H2zM12 7v13M12 7H7.5a2.5 2.5 0 1 1 2.2-3.7L12 7Zm0 0h4.5a2.5 2.5 0 1 0-2.2-3.7L12 7Z"/></LightweightIcon>;
+}
+
+export function InventoryIcon(props: IconProps) {
+  return <LightweightIcon {...props}><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7 8 4 8-4v10l-8 4-8-4V7ZM12 11v10"/></LightweightIcon>;
+}
+
+export function FinanceIcon(props: IconProps) {
+  return <LightweightIcon {...props}><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/></LightweightIcon>;
+}
+
+export function ReportsIcon(props: IconProps) {
+  return <LightweightIcon {...props}><path d="M4 20V10M10 20V4M16 20v-7M22 20V7"/></LightweightIcon>;
 }

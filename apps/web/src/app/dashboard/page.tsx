@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { NoOrganizationState } from "@/components/no-organization-state";
 import { loadAuthContext } from "@/lib/auth-context";
+import { loadDashboardData } from "@/lib/pilot-data";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Dashboard" };
@@ -29,11 +30,14 @@ export default async function DashboardPage() {
     return redirect("/organizations");
   }
 
+  const data = await loadDashboardData(supabase, activeOrganization.id);
+
   return (
     <DashboardShell
       organizations={context.organizations}
       activeOrganization={activeOrganization}
       userEmail={context.user.email ?? "Akun Operro"}
+      data={data}
     />
   );
 }
