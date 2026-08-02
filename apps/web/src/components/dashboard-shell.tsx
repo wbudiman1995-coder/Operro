@@ -26,10 +26,10 @@ interface DashboardShellProps {
 }
 
 const navigation = [
-  { label: "Ringkasan", icon: DashboardIcon, active: true },
-  { label: "Booking", icon: CalendarIcon, active: false },
-  { label: "Pelanggan", icon: CustomersIcon, active: false },
-  { label: "Tugas", icon: TasksIcon, active: false },
+  { label: "Ringkasan", icon: DashboardIcon, active: true, href: "/dashboard" },
+  { label: "Booking", icon: CalendarIcon, active: false, href: "/bookings" },
+  { label: "Pelanggan", icon: CustomersIcon, active: false, href: null },
+  { label: "Tugas", icon: TasksIcon, active: false, href: null },
 ];
 
 function SidebarNav() {
@@ -37,23 +37,25 @@ function SidebarNav() {
     <nav aria-label="Navigasi utama" className="mt-8 space-y-1.5">
       {navigation.map((item) => {
         const Icon = item.icon;
-        return (
-          <span
+        const className = `flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${
+          item.active ? "bg-emerald-50 text-emerald-800" : item.href ? "text-slate-500 hover:bg-slate-50" : "text-slate-500"
+        }`;
+        return item.href ? (
+          <Link
             key={item.label}
+            href={item.href}
             aria-current={item.active ? "page" : undefined}
-            className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${
-              item.active
-                ? "bg-emerald-50 text-emerald-800"
-                : "text-slate-500"
-            }`}
+            className={className}
           >
             <Icon className="size-5" />
             {item.label}
-            {!item.active ? (
-              <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-slate-300">
-                Segera
-              </span>
-            ) : null}
+          </Link>
+        ) : (
+          <span key={item.label} className={className}>
+            <Icon className="size-5" />{item.label}
+            <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-slate-300">
+              Segera
+            </span>
           </span>
         );
       })}
@@ -196,17 +198,8 @@ export function DashboardShell({
                 Mulai dari operasional yang paling penting
               </h2>
               <div className="mt-6 space-y-3">
-                {["Buat booking baru", "Tambah pelanggan", "Lihat daftar tugas"].map((label) => (
-                  <div
-                    key={label}
-                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm font-semibold text-slate-300"
-                  >
-                    <span>{label}</span>
-                    <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                      Segera
-                    </span>
-                  </div>
-                ))}
+                <Link href="/bookings#booking-baru" className="flex items-center justify-between rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-4 text-sm font-semibold text-emerald-200"><span>Buat booking baru</span><ArrowIcon className="size-4" /></Link>
+                {["Tambah pelanggan", "Lihat daftar tugas"].map((label) => <div key={label} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm font-semibold text-slate-300"><span>{label}</span><span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Segera</span></div>)}
               </div>
               <div className="mt-6 flex items-center gap-2 text-xs leading-5 text-slate-400">
                 <ArrowIcon className="size-4 shrink-0 text-emerald-400" />
@@ -222,18 +215,20 @@ export function DashboardShell({
         >
           {navigation.map((item) => {
             const Icon = item.icon;
-            return (
-              <span
+            return item.href ? (
+              <Link
                 key={item.label}
+                href={item.href}
                 aria-current={item.active ? "page" : undefined}
-                aria-disabled={!item.active}
                 className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-semibold ${
                   item.active ? "bg-emerald-50 text-emerald-800" : "text-slate-400"
                 }`}
               >
                 <Icon className="size-4" />
                 {item.label}
-              </span>
+              </Link>
+            ) : (
+              <span key={item.label} aria-disabled className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-semibold text-slate-400"><Icon className="size-4" />{item.label}</span>
             );
           })}
         </nav>
