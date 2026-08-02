@@ -14,6 +14,23 @@ function assertResult(scope: string, error: { message: string } | null) {
   if (error) throw new Error(`${scope}_failed:${error.message}`);
 }
 
+function relationRows(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null);
+  return typeof value === "object" && value !== null ? [value as Record<string, unknown>] : [];
+}
+
+function embeddedCustomerName(value: unknown) {
+  const name = relationRows(value)[0]?.display_name;
+  return typeof name === "string" ? name : "Pelanggan";
+}
+
+function embeddedPetNames(value: unknown) {
+  return relationRows(value).flatMap((job) => relationRows(job.grooming_job_pets)).flatMap((jobPet) => {
+    const name = relationRows(jobPet.pets)[0]?.name;
+    return typeof name === "string" ? [name] : [];
+  });
+}
+
 export function formatRupiah(value: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
 }
@@ -36,27 +53,15 @@ export async function loadDashboardData(supabase: SupabaseClient, organizationId
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).in("status", ["todo", "in_progress"]).is("deleted_at", null),
     supabase.from("payments").select("amount").eq("organization_id", organizationId).eq("status", "succeeded").gte("paid_at", start.toISOString()).lt("paid_at", end.toISOString()),
-    supabase.from("bookings").select("id,customer_id,starts_at,status").eq("organization_id", organizationId).gte("starts_at", now.toISOString()).lt("starts_at", upcomingEnd.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null).order("starts_at").limit(6),
+    supabase.from("bookings").select("id,starts_at,status,customers(display_name),grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", now.toISOString()).lt("starts_at", upcomingEnd.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null).order("starts_at").limit(6),
   ]);
   for (const [scope, result] of [["dashboard_bookings", bookingCount], ["dashboard_customers", customerCount], ["dashboard_tasks", taskCount], ["dashboard_payments", paymentRows], ["dashboard_upcoming", bookingRows]] as const) assertResult(scope, result.error);
-  const ids = (bookingRows.data ?? []).map((row) => row.id);
-  const customerIds = [...new Set((bookingRows.data ?? []).map((row) => row.customer_id))];
-  const [customers, jobPets] = await Promise.all([
-    customerIds.length ? supabase.from("customers").select("id,display_name").in("id", customerIds) : Promise.resolve({ data: [], error: null }),
-    ids.length ? supabase.from("grooming_job_pets").select("grooming_job_id,pet_id").in("grooming_job_id", ids).is("deleted_at", null) : Promise.resolve({ data: [], error: null }),
-  ]);
-  assertResult("dashboard_customer_names", customers.error); assertResult("dashboard_pet_links", jobPets.error);
-  const petIds = [...new Set((jobPets.data ?? []).map((row) => row.pet_id))];
-  const pets = petIds.length ? await supabase.from("pets").select("id,name").in("id", petIds) : { data: [], error: null };
-  assertResult("dashboard_pet_names", pets.error);
-  const customerMap = new Map((customers.data ?? []).map((row) => [row.id, row.display_name]));
-  const petMap = new Map((pets.data ?? []).map((row) => [row.id, row.name]));
   return {
     bookingToday: bookingCount.count ?? 0,
     revenueToday: (paymentRows.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
     activeCustomers: customerCount.count ?? 0,
     openTasks: taskCount.count ?? 0,
-    upcoming: (bookingRows.data ?? []).map((row) => ({ id: row.id, startsAt: row.starts_at, status: row.status, customerName: customerMap.get(row.customer_id) ?? "Pelanggan", petNames: (jobPets.data ?? []).filter((item) => item.grooming_job_id === row.id).map((item) => petMap.get(item.pet_id)).filter((name): name is string => Boolean(name)) })),
+    upcoming: (bookingRows.data ?? []).map((row) => ({ id: row.id, startsAt: row.starts_at, status: row.status, customerName: embeddedCustomerName(row.customers), petNames: embeddedPetNames(row.grooming_jobs) })),
   };
 }
 

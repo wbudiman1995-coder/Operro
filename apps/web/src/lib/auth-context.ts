@@ -43,16 +43,21 @@ export async function loadAuthContext(
     return null;
   }
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  const [
+    {
+      data: { user },
+      error: userError,
+    },
+    organizations,
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    loadAccessibleOrganizations(supabase, subject),
+  ]);
 
   if (userError || !user || user.id !== subject) {
     return null;
   }
 
-  const organizations = await loadAccessibleOrganizations(supabase, user.id);
   const activeOrganizationId = readStringClaim(claims, "active_org_id");
   const activeOrganization = findActiveOrganization(
     organizations,

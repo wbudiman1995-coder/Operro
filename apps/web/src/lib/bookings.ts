@@ -28,6 +28,18 @@ function fail(scope: string, message: string) {
   throw new Error(`${scope}_failed:${message}`);
 }
 
+function relationRows(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null);
+  return typeof value === "object" && value !== null ? [value as Record<string, unknown>] : [];
+}
+
+function embeddedPetNames(value: unknown) {
+  return relationRows(value).flatMap((job) => relationRows(job.grooming_job_pets)).flatMap((jobPet) => {
+    const name = relationRows(jobPet.pets)[0]?.name;
+    return typeof name === "string" ? [name] : [];
+  });
+}
+
 export async function loadBookingWorkspace(
   supabase: SupabaseClient,
   organizationId: string,
@@ -40,7 +52,7 @@ export async function loadBookingWorkspace(
     supabase.from("pets").select("id,customer_id,name,breed").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("service_catalog").select("id,name,duration_minutes,base_price,currency").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,name").eq("organization_id", organizationId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).order("name"),
-    supabase.from("bookings").select("id,branch_id,customer_id,starts_at,ends_at,status,fulfillment_mode").eq("organization_id", organizationId).gte("starts_at", from).lt("starts_at", to).is("deleted_at", null).order("starts_at"),
+    supabase.from("bookings").select("id,branch_id,customer_id,starts_at,ends_at,status,fulfillment_mode,grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", from).lt("starts_at", to).is("deleted_at", null).order("starts_at"),
   ]);
 
   for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["bookings", bookingResult]] as const) {
@@ -48,17 +60,6 @@ export async function loadBookingWorkspace(
   }
 
   const bookingRows = bookingResult.data ?? [];
-  const bookingIds = bookingRows.map((row) => row.id);
-  const petNamesByBooking = new Map<string, string[]>();
-  if (bookingIds.length > 0) {
-    const { data: jobPets, error } = await supabase.from("grooming_job_pets").select("grooming_job_id,pets!inner(name)").in("grooming_job_id", bookingIds).is("deleted_at", null);
-    if (error) fail("booking_pets", error.message);
-    for (const row of jobPets ?? []) {
-      const related = Array.isArray(row.pets) ? row.pets[0] : row.pets;
-      const name = related && typeof related === "object" && "name" in related ? String(related.name) : null;
-      if (name) petNamesByBooking.set(row.grooming_job_id, [...(petNamesByBooking.get(row.grooming_job_id) ?? []), name]);
-    }
-  }
   const customers = (customerResult.data ?? []).map((row) => ({ id: row.id, name: row.display_name, phone: row.phone }));
   const customerNames = new Map(customers.map((customer) => [customer.id, customer.name]));
 
@@ -72,7 +73,7 @@ export async function loadBookingWorkspace(
       id: row.id,
       branchId: row.branch_id,
       customerName: customerNames.get(row.customer_id) ?? "Pelanggan",
-      petNames: petNamesByBooking.get(row.id) ?? [],
+      petNames: embeddedPetNames(row.grooming_jobs),
       startsAt: row.starts_at,
       endsAt: row.ends_at,
       status: row.status,
