@@ -94,7 +94,11 @@ export async function transitionBookingAction(formData: FormData) {
   const context = await workspace(); if (!context) return;
   const bookingId = idValue(formData, "bookingId"); const status = textValue(formData, "status", 30);
   if (!bookingId || !allowedBookingStatuses.has(status)) return;
-  await context.supabase.rpc("transition_booking_status", { p_booking: bookingId, p_to: status });
+  const app = context.supabase.schema("app");
+  const result = status === "completed"
+    ? await app.rpc("complete_booking", { p_booking: bookingId, p_override: false, p_reason: null })
+    : await app.rpc("transition_booking_status", { p_booking: bookingId, p_to: status });
+  if (result.error) throw new Error(`Status booking gagal diperbarui: ${result.error.message}`);
   revalidatePath("/operations"); revalidatePath("/bookings"); revalidatePath("/dashboard"); revalidatePath("/reports");
 }
 

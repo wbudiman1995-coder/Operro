@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 export interface CreateBookingState { error: string | null }
 
 async function cancelDraft(supabase: Awaited<ReturnType<typeof createClient>>, bookingId: string) {
-  await supabase.rpc("transition_booking_status", { p_booking: bookingId, p_to: "canceled" });
+  await supabase.schema("app").rpc("transition_booking_status", { p_booking: bookingId, p_to: "canceled" });
 }
 
 export async function createBookingAction(
@@ -29,6 +29,7 @@ export async function createBookingAction(
   }
 
   const organizationId = context.activeOrganization.id;
+  const app = supabase.schema("app");
   const [{ data: branch }, { data: customer }, { data: pets }, { data: services }, { data: resources }] = await Promise.all([
     supabase.from("branches").select("id").eq("organization_id", organizationId).eq("id", draft.branchId).eq("status", "active").is("deleted_at", null).maybeSingle(),
     supabase.from("customers").select("id").eq("organization_id", organizationId).eq("id", draft.customerId).is("deleted_at", null).maybeSingle(),
@@ -67,16 +68,16 @@ export async function createBookingAction(
     if (holdError) throw holdError;
 
     for (const pet of draft.pets) {
-      const { data: jobPetId, error: petError } = await supabase.rpc("assembly_add_pet", { p_booking: booking.id, p_pet: pet.petId, p_is_required: true });
+      const { data: jobPetId, error: petError } = await app.rpc("assembly_add_pet", { p_booking: booking.id, p_pet: pet.petId, p_is_required: true });
       if (petError || !jobPetId) throw petError ?? new Error("pet_assembly_failed");
-      const { error: resourceError } = await supabase.rpc("assembly_assign_pet_resource", { p_pet: jobPetId, p_resource: pet.resourceId });
+      const { error: resourceError } = await app.rpc("assembly_assign_pet_resource", { p_pet: jobPetId, p_resource: pet.resourceId });
       if (resourceError) throw resourceError;
       for (const serviceId of pet.serviceIds) {
-        const { error: lineError } = await supabase.rpc("assembly_add_line", { p_pet: jobPetId, p_service: serviceId, p_quantity: 1 });
+        const { error: lineError } = await app.rpc("assembly_add_line", { p_pet: jobPetId, p_service: serviceId, p_quantity: 1 });
         if (lineError) throw lineError;
       }
     }
-    const { error: confirmError } = await supabase.rpc("transition_booking_status", { p_booking: booking.id, p_to: "confirmed" });
+    const { error: confirmError } = await app.rpc("transition_booking_status", { p_booking: booking.id, p_to: "confirmed" });
     if (confirmError) throw confirmError;
   } catch (error) {
     await cancelDraft(supabase, booking.id);
