@@ -3,6 +3,7 @@
  * - LightweightIcon: shared SVG wrapper.
  * - DashboardIcon, CalendarIcon, CustomersIcon, TasksIcon, SettingsIcon, ChevronIcon, ArrowIcon, BuildingIcon.
  * - GroomingIcon, CatalogIcon, ProgramsIcon, InventoryIcon, FinanceIcon, ReportsIcon.
+ * - BookingIcon: booking creation entry point, distinct from the calendar board.
  */
 import type { SVGProps } from "react";
 
@@ -41,6 +42,15 @@ export function CalendarIcon(props: IconProps) {
     <LightweightIcon {...props}>
       <path d="M7 3v3M17 3v3M4 9h16" />
       <rect x="4" y="5" width="16" height="16" rx="3" />
+    </LightweightIcon>
+  );
+}
+
+export function BookingIcon(props: IconProps) {
+  return (
+    <LightweightIcon {...props}>
+      <rect x="4" y="5" width="16" height="16" rx="3" />
+      <path d="M7 3v3M17 3v3M9 13h6M12 10v6" />
     </LightweightIcon>
   );
 }

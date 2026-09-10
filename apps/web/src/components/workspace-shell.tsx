@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
+  BookingIcon,
   CalendarIcon,
   CatalogIcon,
   CustomersIcon,
@@ -18,6 +19,7 @@ import {
   ReportsIcon,
   TasksIcon,
 } from "@/components/icons";
+import { CommandPalette } from "@/components/command-palette";
 import { LogoutButton } from "@/components/logout-button";
 import { OperroMark } from "@/components/operro-mark";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
@@ -33,7 +35,8 @@ interface WorkspaceShellProps {
 
 const primaryNavigation = [
   { label: "Ringkasan", href: "/dashboard", icon: DashboardIcon },
-  { label: "Booking", href: "/bookings", icon: CalendarIcon },
+  { label: "Kalender", href: "/schedule", icon: CalendarIcon },
+  { label: "Booking", href: "/bookings", icon: BookingIcon },
   { label: "Pelanggan", href: "/customers", icon: CustomersIcon },
   { label: "Tugas", href: "/tasks", icon: TasksIcon },
 ];
@@ -115,13 +118,16 @@ export function WorkspaceShell({ organizations, activeOrganization, userEmail, a
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Workspace aktif</p>
               <p className="mt-1 truncate text-sm font-semibold text-slate-700">{activeOrganization.name}</p>
             </div>
+            <div className="w-full sm:max-w-xs lg:max-w-sm">
+              <CommandPalette />
+            </div>
             <div className="w-full sm:max-w-md">
               <OrganizationSwitcher organizations={organizations} activeOrganizationId={activeOrganization.id} variant="compact" />
             </div>
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-4 py-7 pb-28 sm:px-7 sm:py-10 lg:pb-10">{children}</main>
-        <nav aria-label="Navigasi seluler" className="fixed inset-x-4 bottom-4 z-30 grid grid-cols-4 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-2xl shadow-slate-950/10 backdrop-blur lg:hidden">
+        <nav aria-label="Navigasi seluler" className="fixed inset-x-4 bottom-4 z-30 grid grid-cols-5 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-2xl shadow-slate-950/10 backdrop-blur lg:hidden">
           {primaryNavigation.map((item) => <NavigationItem key={item.href} item={item} activePath={activePath} compact />)}
         </nav>
       </div>

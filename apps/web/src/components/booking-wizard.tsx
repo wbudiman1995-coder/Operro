@@ -13,6 +13,11 @@ interface Props {
   services: ServiceOption[];
   resources: ResourceOption[];
   defaultStart: string;
+  /**
+   * Server-validated preselected customer. The page only passes a value after reading the
+   * customer inside the active organization, so this is never a raw browser-supplied id.
+   */
+  preselectedCustomerId?: string;
 }
 
 interface PetSelection { petId: string; resourceId: string; serviceIds: string[] }
@@ -26,11 +31,15 @@ function addMinutes(localDateTime: string, minutes: number) {
   return new Date(date.valueOf() - offset * 60_000).toISOString().slice(0, 16);
 }
 
-export function BookingWizard({ branches, customers, pets, services, resources, defaultStart }: Props) {
+export function BookingWizard({ branches, customers, pets, services, resources, defaultStart, preselectedCustomerId }: Props) {
   const [state, action, pending] = useActionState(createBookingAction, initialState);
   const [step, setStep] = useState(1);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
-  const [customerId, setCustomerId] = useState("");
+  // Only honored when the id is actually in the loaded, organization-scoped option list,
+  // so a stale or unauthorized value simply opens the wizard unselected.
+  const [customerId, setCustomerId] = useState(
+    preselectedCustomerId && customers.some((customer) => customer.id === preselectedCustomerId) ? preselectedCustomerId : "",
+  );
   const [startsAt, setStartsAt] = useState(defaultStart);
   const [endsAt, setEndsAt] = useState(addMinutes(defaultStart, 60));
   const [fulfillmentMode, setFulfillmentMode] = useState<FulfillmentMode>("home");
