@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 
 import { createBookingAction, type CreateBookingState } from "@/app/bookings/actions";
-import type { BranchOption, CustomerOption, PetOption, ResourceOption, ServiceOption } from "@/lib/bookings";
+import type { AddressOption, BranchOption, CustomerOption, PetOption, ResourceOption, ServiceOption } from "@/lib/bookings";
 import type { FulfillmentMode } from "@/lib/booking-validation";
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   pets: PetOption[];
   services: ServiceOption[];
   resources: ResourceOption[];
+  addresses: AddressOption[];
   defaultStart: string;
   /**
    * Server-validated preselected customer. The page only passes a value after reading the
@@ -31,7 +32,7 @@ function addMinutes(localDateTime: string, minutes: number) {
   return new Date(date.valueOf() - offset * 60_000).toISOString().slice(0, 16);
 }
 
-export function BookingWizard({ branches, customers, pets, services, resources, defaultStart, preselectedCustomerId }: Props) {
+export function BookingWizard({ branches, customers, pets, services, resources, addresses, defaultStart, preselectedCustomerId }: Props) {
   const [state, action, pending] = useActionState(createBookingAction, initialState);
   const [step, setStep] = useState(1);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
@@ -45,15 +46,19 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   const [fulfillmentMode, setFulfillmentMode] = useState<FulfillmentMode>("home");
   const [notes, setNotes] = useState("");
   const [selectedPets, setSelectedPets] = useState<PetSelection[]>([]);
+  const [customerAddressId, setCustomerAddressId] = useState("");
 
   const customerPets = useMemo(() => pets.filter((pet) => pet.customerId === customerId), [customerId, pets]);
+  const customerAddresses = useMemo(() => addresses.filter((address) => address.customerId === customerId), [customerId, addresses]);
   const branchResources = resources.filter((resource) => resource.branchId === branchId);
   const duration = Math.max(60, ...selectedPets.flatMap((pet) => pet.serviceIds.map((id) => services.find((service) => service.id === id)?.durationMinutes ?? 60)));
-  const payload = JSON.stringify({ branchId, customerId, startsAt, endsAt, fulfillmentMode, notes, pets: selectedPets });
+  const payload = JSON.stringify({ branchId, customerId, startsAt, endsAt, fulfillmentMode, notes, pets: selectedPets, ...(fulfillmentMode === "home" && customerAddressId ? { customerAddressId } : {}) });
 
   function chooseCustomer(id: string) {
     setCustomerId(id);
     setSelectedPets([]);
+    const defaultAddress = addresses.find((address) => address.customerId === id && address.isDefault);
+    setCustomerAddressId(defaultAddress?.id ?? "");
   }
   function togglePet(petId: string) {
     setSelectedPets((current) => current.some((pet) => pet.petId === petId) ? current.filter((pet) => pet.petId !== petId) : [...current, { petId, resourceId: branchResources[0]?.id ?? "", serviceIds: [] }]);
@@ -69,7 +74,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   function canContinue() {
     if (step === 1) return Boolean(branchId && customerId && selectedPets.length);
     if (step === 2) return selectedPets.every((pet) => pet.serviceIds.length > 0 && pet.resourceId);
-    if (step === 3) return Boolean(startsAt && endsAt && new Date(endsAt) > new Date(startsAt));
+    if (step === 3) return Boolean(startsAt && endsAt && new Date(endsAt) > new Date(startsAt) && (fulfillmentMode !== "home" || customerAddressId));
     return true;
   }
 
@@ -100,12 +105,24 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
           <WizardTitle title="Jadwal dan metode layanan" helper="Konflik jadwal groomer akan diperiksa kembali oleh database saat disimpan." />
           <div className="grid gap-4 sm:grid-cols-2"><Field label="Mulai"><input type="datetime-local" value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setEndsAt(addMinutes(event.target.value, duration)); }} className="field" /></Field><Field label="Selesai"><input type="datetime-local" value={endsAt} min={startsAt} onChange={(event) => setEndsAt(event.target.value)} className="field" /></Field></div>
           <Field label="Metode layanan"><div className="grid gap-2 sm:grid-cols-3">{([['home','Ke rumah'],['in_store','Di lokasi'],['pickup_delivery','Antar-jemput']] as const).map(([value,label]) => <button type="button" key={value} onClick={() => setFulfillmentMode(value)} className={`rounded-xl border px-3 py-3 text-sm font-semibold ${fulfillmentMode === value ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200"}`}>{label}</button>)}</div></Field>
+          {fulfillmentMode === "home" ? (
+            <Field label="Alamat pelanggan">
+              {customerAddresses.length === 0 ? (
+                <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">Pelanggan ini belum memiliki alamat tersimpan. Tambahkan alamat pada tab Alamat di Profil 360 pelanggan sebelum membuat booking home service.</p>
+              ) : (
+                <select value={customerAddressId} onChange={(event) => setCustomerAddressId(event.target.value)} className="field">
+                  <option value="">Pilih alamat</option>
+                  {customerAddresses.map((address) => <option key={address.id} value={address.id}>{address.label} · {address.formattedLine}{address.isDefault ? " (utama)" : ""}</option>)}
+                </select>
+              )}
+            </Field>
+          ) : null}
           <Field label="Catatan (opsional)"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} rows={4} className="field h-auto py-3" placeholder="Instruksi operasional yang aman dan relevan" /></Field>
         </div> : null}
 
         {step === 4 ? <div className="space-y-6">
           <WizardTitle title="Periksa dan konfirmasi" helper="Booking akan langsung dikonfirmasi setelah semua bagian berhasil disimpan." />
-          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={new Date(startsAt).toLocaleString("id-ID")} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} /></dl>
+          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={new Date(startsAt).toLocaleString("id-ID")} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} />{fulfillmentMode === "home" ? <Summary label="Alamat" value={customerAddresses.find((address) => address.id === customerAddressId)?.formattedLine ?? "—"} /> : null}</dl>
           {state.error ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{state.error}</p> : null}
         </div> : null}
       </div>

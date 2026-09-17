@@ -1,5 +1,9 @@
 /**
- * Read-only Customer 360.
+ * Customer 360 — read-only except for saved addresses.
+ *
+ * The Addresses tab is a deliberate, narrow exception to the read-only design: it is the
+ * only place a customer's saved addresses are created, edited, deleted, or have their
+ * default changed. Every other tab remains a pure read surface.
  *
  * Tabs are server-rendered and each fetches only its own data, so opening a profile does
  * not pull invoices, packages, and history the user has not asked for. There is no Visits
@@ -20,6 +24,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Customer360Notes, Customer360Header, Customer360Tabs } from "@/components/customer-360";
+import { CustomerAddressActions, CustomerAddressForm } from "@/components/customer-address-forms";
 import { EmptyState, StatusBadge } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
@@ -27,6 +32,7 @@ import { loadCapabilities } from "@/lib/authorization";
 import { loadBranchTimezones } from "@/lib/branch-context";
 import {
   isCustomer360TabPermitted,
+  loadCustomerAddresses,
   loadCustomerBookings,
   loadCustomerHistory,
   loadCustomerInvoices,
@@ -76,6 +82,7 @@ export default async function CustomerDetailPage({
 
   const zoneFor = (branchId: string) => branchContext.byBranchId.get(branchId) ?? branchContext.defaultTimezone;
 
+  const addresses = tab === "addresses" && tabPermitted ? await loadCustomerAddresses(workspace.supabase, organizationId, customerId) : [];
   const bookings = tab === "bookings" && tabPermitted ? await loadCustomerBookings(workspace.supabase, organizationId, customerId) : [];
   const invoices = tab === "invoices" && tabPermitted ? await loadCustomerInvoices(workspace.supabase, organizationId, customerId) : [];
   const packages = tab === "packages" && tabPermitted ? await loadCustomerPackages(workspace.supabase, organizationId, customerId) : [];
@@ -163,6 +170,41 @@ export default async function CustomerDetailPage({
               ))}
             </div>
           )
+        ) : null}
+
+        {tabPermitted && tab === "addresses" ? (
+          <div className="space-y-4">
+            {addresses.length === 0 ? (
+              <EmptyState title="Belum ada alamat tersimpan" description="Tambahkan alamat agar booking home service dapat dibuat dengan lokasi yang jelas." />
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {addresses.map((address) => (
+                  <article key={address.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800">{address.label}{address.isDefault ? <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Utama</span> : null}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{address.formattedLine}</p>
+                        {address.recipientName || address.recipientPhone ? (
+                          <p className="mt-1 text-xs text-slate-400">{[address.recipientName, address.recipientPhone].filter(Boolean).join(" · ")}</p>
+                        ) : null}
+                        {address.landmark ? <p className="mt-1 text-xs text-slate-400">Patokan: {address.landmark}</p> : null}
+                        {address.accessNotes ? <p className="mt-1 rounded-lg bg-amber-50 p-2 text-[11px] leading-5 text-amber-900">{address.accessNotes}</p> : null}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <a href={address.mapsUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-200">Buka di Maps</a>
+                      <CustomerAddressActions customerId={customerId} address={address} />
+                    </div>
+                    <details className="mt-3 rounded-lg border border-slate-100"><summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-500">Ubah alamat ini</summary><div className="p-3 pt-1"><CustomerAddressForm customerId={customerId} existing={address} /></div></details>
+                  </article>
+                ))}
+              </div>
+            )}
+            <details className="rounded-2xl border border-dashed border-slate-300 p-4">
+              <summary className="cursor-pointer text-sm font-bold text-emerald-700">+ Tambah alamat baru</summary>
+              <div className="mt-3"><CustomerAddressForm customerId={customerId} /></div>
+            </details>
+          </div>
         ) : null}
 
         {tabPermitted && tab === "bookings" ? (
@@ -276,7 +318,7 @@ export default async function CustomerDetailPage({
       </div>
 
       <p className="mt-7 rounded-2xl border border-dashed border-slate-200 px-4 py-4 text-[11px] leading-5 text-slate-400">
-        Profil ini masih baca-saja. Ubah data pelanggan pada halaman <Link href="/customers" className="font-semibold text-emerald-700 underline">Pelanggan</Link>.
+        Alamat dapat dikelola langsung pada tab Alamat di atas. Data pelanggan lainnya masih baca-saja — ubah pada halaman <Link href="/customers" className="font-semibold text-emerald-700 underline">Pelanggan</Link>.
         Foto before/after menyusul pada Batch 2 dengan penyimpanan privat.
       </p>
     </WorkspaceShell>

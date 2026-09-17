@@ -219,7 +219,42 @@ export async function loadPayrollWorkspace(supabase: SupabaseClient, organizatio
   };
 }
 
-export interface MyScheduleJob { groomingJobPetId: string; startsAt: string; customerName: string; petName: string; services: string[]; status: string }
+export interface MyScheduleJob {
+  groomingJobPetId: string;
+  bookingId: string;
+  startsAt: string;
+  customerName: string;
+  customerPhone: string | null;
+  petName: string;
+  services: string[];
+  status: string;
+  fulfillmentMode: string;
+  dispatchStage: string | null;
+  /** Immutable booking-time snapshot — never the customer's current saved address. */
+  address: { formattedLine: string; landmark: string | null; accessNotes: string | null; mapsUrl: string } | null;
+}
+
+function readAddressSnapshot(value: unknown): MyScheduleJob["address"] {
+  if (typeof value !== "object" || value === null) return null;
+  const row = value as Record<string, unknown>;
+  const line1 = typeof row.line1 === "string" ? row.line1 : "";
+  if (!line1) return null;
+  const parts = [line1, row.line2, row.kecamatan, row.kabupaten_kota, row.province, row.postal_code].filter(
+    (part): part is string => typeof part === "string" && part.trim().length > 0,
+  );
+  const formattedLine = parts.join(", ");
+  const latitude = typeof row.latitude === "number" ? row.latitude : null;
+  const longitude = typeof row.longitude === "number" ? row.longitude : null;
+  const mapsUrl = latitude !== null && longitude !== null
+    ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formattedLine)}`;
+  return {
+    formattedLine,
+    landmark: typeof row.landmark === "string" ? row.landmark : null,
+    accessNotes: typeof row.access_notes === "string" ? row.access_notes : null,
+    mapsUrl,
+  };
+}
 
 export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organizationId: string, userId: string): Promise<MyScheduleJob[]> {
   const membership = await supabase.from("memberships").select("id").eq("organization_id", organizationId).eq("user_id", userId).eq("status", "active").is("deleted_at", null).maybeSingle();
@@ -229,7 +264,7 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
 
   const from = new Date(); from.setHours(0, 0, 0, 0);
   const to = new Date(from); to.setDate(to.getDate() + 8);
-  const bookings = await supabase.from("bookings").select("id,starts_at,customers(display_name)").eq("organization_id", organizationId).gte("starts_at", from.toISOString()).lt("starts_at", to.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null).order("starts_at");
+  const bookings = await supabase.from("bookings").select("id,starts_at,fulfillment_mode,dispatch_stage,address_snapshot,customers(display_name,phone)").eq("organization_id", organizationId).gte("starts_at", from.toISOString()).lt("starts_at", to.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null).order("starts_at");
   assertResult("my_schedule_bookings", bookings.error); const bookingIds = (bookings.data ?? []).map((row) => row.id); if (!bookingIds.length) return [];
 
   const gjps = await supabase.from("grooming_job_pets").select("id,grooming_job_id,pet_id,status").in("assigned_resource_id", resourceIds).in("grooming_job_id", bookingIds).neq("status", "complete").is("deleted_at", null);
@@ -242,7 +277,23 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
   assertResult("my_schedule_pets", pets.error); assertResult("my_schedule_lines", lines.error);
   const bookingMap = new Map((bookings.data ?? []).map((row) => [row.id, row])); const petMap = new Map((pets.data ?? []).map((row) => [row.id, row.name]));
   const servicesByGjp = new Map<string, string[]>(); for (const row of lines.data ?? []) { const arr = servicesByGjp.get(row.grooming_job_pet_id) ?? []; arr.push(row.service_name_snapshot); servicesByGjp.set(row.grooming_job_pet_id, arr); }
-  return (gjps.data ?? []).map((row) => { const booking = bookingMap.get(row.grooming_job_id); return { groomingJobPetId: row.id, startsAt: booking?.starts_at ?? "", customerName: embeddedCustomerName(booking?.customers), petName: petMap.get(row.pet_id) ?? "Hewan", services: servicesByGjp.get(row.id) ?? [], status: row.status }; }).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  return (gjps.data ?? []).map((row) => {
+    const booking = bookingMap.get(row.grooming_job_id);
+    const customer = relationRows(booking?.customers)[0];
+    return {
+      groomingJobPetId: row.id,
+      bookingId: row.grooming_job_id,
+      startsAt: booking?.starts_at ?? "",
+      customerName: embeddedCustomerName(booking?.customers),
+      customerPhone: typeof customer?.phone === "string" ? customer.phone : null,
+      petName: petMap.get(row.pet_id) ?? "Hewan",
+      services: servicesByGjp.get(row.id) ?? [],
+      status: row.status,
+      fulfillmentMode: booking?.fulfillment_mode ?? "in_store",
+      dispatchStage: booking?.dispatch_stage ?? null,
+      address: readAddressSnapshot(booking?.address_snapshot),
+    };
+  }).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
 
 // Revenue-per-groomer is deliberately not shown: an invoice is per booking, a booking can

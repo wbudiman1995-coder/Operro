@@ -15,6 +15,16 @@ export interface BookingDraft {
   fulfillmentMode: FulfillmentMode;
   notes: string;
   pets: BookingPetDraft[];
+  /**
+   * Structurally optional here — a UUID if present, nothing enforced about *when* it must
+   * be present. "Required for fulfillmentMode 'home'" is a business rule, not a shape rule,
+   * and is checked in the server action (createBookingAction) where the DB lookup that
+   * proves the address actually exists and belongs to this customer already has to happen.
+   * Keeping that rule out of this pure function is also what keeps the existing
+   * booking-validation.test.ts fixtures (all fulfillmentMode: "home", none with an address)
+   * passing unchanged.
+   */
+  customerAddressId?: string;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -56,6 +66,10 @@ export function parseBookingDraft(raw: unknown): BookingDraft {
     throw new Error("Hewan yang sama tidak boleh dipilih dua kali.");
   }
 
+  if (value.customerAddressId !== undefined && (typeof value.customerAddressId !== "string" || !UUID.test(value.customerAddressId))) {
+    throw new Error("Alamat pelanggan tidak valid.");
+  }
+
   return {
     branchId: value.branchId as string,
     customerId: value.customerId as string,
@@ -64,5 +78,6 @@ export function parseBookingDraft(raw: unknown): BookingDraft {
     fulfillmentMode: value.fulfillmentMode as FulfillmentMode,
     notes: typeof value.notes === "string" ? value.notes.trim().slice(0, 1000) : "",
     pets: normalizedPets,
+    ...(typeof value.customerAddressId === "string" ? { customerAddressId: value.customerAddressId } : {}),
   };
 }

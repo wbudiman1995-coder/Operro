@@ -52,6 +52,10 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20260721001400_active_organization_context.sql
   supabase/migrations/20260910120000_audit_log_read_api.sql
   supabase/migrations/20260916150000_customer_program_tenant_isolation.sql
+  supabase/migrations/20260917100000_customer_addresses.sql
+  supabase/migrations/20260917100100_branch_service_areas.sql
+  supabase/migrations/20260917100200_booking_location_snapshot.sql
+  supabase/migrations/20260917100300_batch_permissions.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then

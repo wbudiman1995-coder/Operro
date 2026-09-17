@@ -19,6 +19,7 @@ export function StatCard({ label, value, helper, tone = "default" }: { label: st
 const statusLabels: Record<string, string> = {
   draft: "Draft", requested: "Diminta", confirmed: "Dikonfirmasi", in_progress: "Berjalan", completed: "Selesai", canceled: "Dibatalkan", no_show: "Tidak hadir",
   todo: "Belum dikerjakan", done: "Selesai", active: "Aktif", inactive: "Tidak aktif", issued: "Terbit", paid: "Lunas", void: "Batal", pending: "Menunggu", succeeded: "Berhasil", failed: "Gagal", recorded: "Tercatat", approved: "Disetujui", reimbursed: "Diganti",
+  scheduled: "Terjadwal", en_route: "Dalam perjalanan", arrived: "Tiba", in_service: "Sedang melayani",
 };
 
 export function StatusBadge({ status }: { status: string }) {

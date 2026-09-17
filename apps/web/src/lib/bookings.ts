@@ -5,6 +5,7 @@ export interface CustomerOption { id: string; name: string; phone: string | null
 export interface PetOption { id: string; customerId: string; name: string; breed: string | null }
 export interface ServiceOption { id: string; name: string; durationMinutes: number; basePrice: number; currency: string }
 export interface ResourceOption { id: string; branchId: string; name: string }
+export interface AddressOption { id: string; customerId: string; label: string; formattedLine: string; kecamatan: string | null; kabupatenKota: string | null; isDefault: boolean }
 export interface BookingListItem {
   id: string;
   branchId: string;
@@ -21,6 +22,7 @@ export interface BookingWorkspaceData {
   pets: PetOption[];
   services: ServiceOption[];
   resources: ResourceOption[];
+  addresses: AddressOption[];
   bookings: BookingListItem[];
 }
 
@@ -46,16 +48,17 @@ export async function loadBookingWorkspace(
   from: string,
   to: string,
 ): Promise<BookingWorkspaceData> {
-  const [branchResult, customerResult, petResult, serviceResult, resourceResult, bookingResult] = await Promise.all([
+  const [branchResult, customerResult, petResult, serviceResult, resourceResult, addressResult, bookingResult] = await Promise.all([
     supabase.from("branches").select("id,name,timezone").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("customers").select("id,display_name,phone").eq("organization_id", organizationId).in("status", ["lead", "active"]).is("deleted_at", null).order("display_name"),
     supabase.from("pets").select("id,customer_id,name,breed").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("service_catalog").select("id,name,duration_minutes,base_price,currency").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,name").eq("organization_id", organizationId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).order("name"),
+    supabase.from("customer_addresses").select("id,customer_id,label,line1,line2,kecamatan,kabupaten_kota,province,postal_code,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
     supabase.from("bookings").select("id,branch_id,customer_id,starts_at,ends_at,status,fulfillment_mode,grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", from).lt("starts_at", to).is("deleted_at", null).order("starts_at"),
   ]);
 
-  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["bookings", bookingResult]] as const) {
+  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["addresses", addressResult], ["bookings", bookingResult]] as const) {
     if (result.error) fail(scope, result.error.message);
   }
 
@@ -69,6 +72,15 @@ export async function loadBookingWorkspace(
     pets: (petResult.data ?? []).map((row) => ({ id: row.id, customerId: row.customer_id, name: row.name, breed: row.breed })),
     services: (serviceResult.data ?? []).map((row) => ({ id: row.id, name: row.name, durationMinutes: row.duration_minutes, basePrice: Number(row.base_price), currency: row.currency })),
     resources: (resourceResult.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, name: row.name })),
+    addresses: (addressResult.data ?? []).map((row) => ({
+      id: row.id,
+      customerId: row.customer_id,
+      label: row.label,
+      formattedLine: [row.line1, row.line2, row.kecamatan, row.kabupaten_kota, row.province, row.postal_code].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(", "),
+      kecamatan: row.kecamatan,
+      kabupatenKota: row.kabupaten_kota,
+      isDefault: row.is_default,
+    })),
     bookings: bookingRows.map((row) => ({
       id: row.id,
       branchId: row.branch_id,

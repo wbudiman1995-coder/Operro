@@ -40,11 +40,12 @@ export const CUSTOMER_INVOICE_LIMIT = 40;
 export const CUSTOMER_HISTORY_LIMIT = 60;
 export const CUSTOMER_PAYMENT_LIMIT = 500;
 
-export const CUSTOMER_360_TABS = ["pets", "bookings", "invoices", "packages", "notes", "history"] as const;
+export const CUSTOMER_360_TABS = ["pets", "addresses", "bookings", "invoices", "packages", "notes", "history"] as const;
 export type Customer360Tab = (typeof CUSTOMER_360_TABS)[number];
 
 export const CUSTOMER_360_TAB_LABELS: Record<Customer360Tab, string> = {
   pets: "Hewan",
+  addresses: "Alamat",
   bookings: "Booking",
   invoices: "Invoice",
   packages: "Paket",
@@ -55,6 +56,7 @@ export const CUSTOMER_360_TAB_LABELS: Record<Customer360Tab, string> = {
 /** Permission required to read each tab, or null when membership alone is sufficient. */
 export const CUSTOMER_360_TAB_CAPABILITY: Record<Customer360Tab, keyof CapabilityMap | null> = {
   pets: null,
+  addresses: null,
   bookings: "booking.read",
   invoices: "finance.read",
   packages: "membership.read",
@@ -116,6 +118,29 @@ export interface CustomerOverview {
   pets: CustomerPetProfile[];
 }
 
+export interface CustomerAddress {
+  id: string;
+  label: string;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  line1: string;
+  line2: string | null;
+  rt: string | null;
+  rw: string | null;
+  kelurahan: string | null;
+  kecamatan: string | null;
+  kabupatenKota: string | null;
+  province: string | null;
+  postalCode: string | null;
+  landmark: string | null;
+  accessNotes: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  isDefault: boolean;
+  formattedLine: string;
+  mapsUrl: string;
+}
+
 function readAddressLine(address: unknown): string | null {
   if (typeof address !== "object" || address === null || Array.isArray(address)) return null;
   const record = address as Record<string, unknown>;
@@ -124,6 +149,84 @@ function readAddressLine(address: unknown): string | null {
     return typeof value === "string" && value.trim().length > 0 ? [value.trim()] : [];
   });
   return parts.length > 0 ? parts.join(", ") : null;
+}
+
+interface CustomerAddressRow {
+  id: string;
+  label: string;
+  recipient_name: string | null;
+  recipient_phone: string | null;
+  line1: string;
+  line2: string | null;
+  rt: string | null;
+  rw: string | null;
+  kelurahan: string | null;
+  kecamatan: string | null;
+  kabupaten_kota: string | null;
+  province: string | null;
+  postal_code: string | null;
+  landmark: string | null;
+  access_notes: string | null;
+  latitude: number | string | null;
+  longitude: number | string | null;
+  is_default: boolean;
+}
+
+/** Maps a customer_addresses row to its display shape: one readable line and a Maps URL
+ * that prefers precise coordinates over a text search when both are available. */
+function formatCustomerAddress(row: CustomerAddressRow): CustomerAddress {
+  const latitude = row.latitude === null ? null : Number(row.latitude);
+  const longitude = row.longitude === null ? null : Number(row.longitude);
+  const hasCoordinates = latitude !== null && longitude !== null && Number.isFinite(latitude) && Number.isFinite(longitude);
+  const formattedLine = [row.line1, row.line2, row.kecamatan, row.kabupaten_kota, row.province, row.postal_code]
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+    .join(", ");
+  const mapsUrl = hasCoordinates
+    ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formattedLine)}`;
+  return {
+    id: row.id,
+    label: row.label,
+    recipientName: row.recipient_name,
+    recipientPhone: row.recipient_phone,
+    line1: row.line1,
+    line2: row.line2,
+    rt: row.rt,
+    rw: row.rw,
+    kelurahan: row.kelurahan,
+    kecamatan: row.kecamatan,
+    kabupatenKota: row.kabupaten_kota,
+    province: row.province,
+    postalCode: row.postal_code,
+    landmark: row.landmark,
+    accessNotes: row.access_notes,
+    latitude,
+    longitude,
+    isDefault: row.is_default,
+    formattedLine,
+    mapsUrl,
+  };
+}
+
+const CUSTOMER_ADDRESS_COLUMNS =
+  "id,label,recipient_name,recipient_phone,line1,line2,rt,rw,kelurahan,kecamatan,kabupaten_kota,province,postal_code,landmark,access_notes,latitude,longitude,is_default";
+
+/** All saved addresses for one customer, default first. Used by the Addresses tab. */
+export async function loadCustomerAddresses(
+  supabase: SupabaseClient,
+  organizationId: string,
+  customerId: string,
+): Promise<CustomerAddress[]> {
+  const result = await supabase
+    .from("customer_addresses")
+    .select(CUSTOMER_ADDRESS_COLUMNS)
+    .eq("organization_id", organizationId)
+    .eq("customer_id", customerId)
+    .is("deleted_at", null)
+    .order("is_default", { ascending: false })
+    .order("created_at", { ascending: true });
+  assertResult("customer_addresses", result.error);
+  return (result.data ?? []).map(formatCustomerAddress);
 }
 
 /** Groups payment amounts by currency, largest first. Never adds across currencies. */
@@ -157,7 +260,7 @@ export async function loadCustomerOverview(
   const customer = customerResult.data;
   if (!customer) return null;
 
-  const [petResult, paymentResult] = await Promise.all([
+  const [petResult, paymentResult, defaultAddressResult] = await Promise.all([
     supabase
       .from("pets")
       .select("id,name,species,breed,sex,birthdate,weight_kg,color,temperament,notes,status,medical_flags,metadata")
@@ -176,22 +279,37 @@ export async function loadCustomerOverview(
           .eq("status", "succeeded")
           .limit(CUSTOMER_PAYMENT_LIMIT + 1)
       : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from("customer_addresses")
+      .select(CUSTOMER_ADDRESS_COLUMNS)
+      .eq("organization_id", organizationId)
+      .eq("customer_id", customerId)
+      .eq("is_default", true)
+      .is("deleted_at", null)
+      .maybeSingle(),
   ]);
   assertResult("customer_pets", petResult.error);
   assertResult("customer_payments", paymentResult.error);
+  assertResult("customer_default_address", defaultAddressResult.error);
 
   const paymentRows = paymentResult.data ?? [];
   const spendCapped = paymentRows.length > CUSTOMER_PAYMENT_LIMIT;
   const countedPayments = spendCapped ? paymentRows.slice(0, CUSTOMER_PAYMENT_LIMIT) : paymentRows;
 
-  const addressLine = readAddressLine(customer.address);
-  const latitude = customer.latitude === null ? null : Number(customer.latitude);
-  const longitude = customer.longitude === null ? null : Number(customer.longitude);
-  const mapsUrl =
-    latitude !== null && longitude !== null && Number.isFinite(latitude) && Number.isFinite(longitude)
-      ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
-      : addressLine
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressLine)}`
+  // A structured saved address (customer_addresses) always wins over the legacy free-form
+  // `customers.address` jsonb blob — it is the first-class source now; the old columns are
+  // kept only for customers who have never been given a proper address (see Deliverable A).
+  const savedDefault = defaultAddressResult.data ? formatCustomerAddress(defaultAddressResult.data) : null;
+  const legacyAddressLine = readAddressLine(customer.address);
+  const legacyLatitude = customer.latitude === null ? null : Number(customer.latitude);
+  const legacyLongitude = customer.longitude === null ? null : Number(customer.longitude);
+  const addressLine = savedDefault?.formattedLine || legacyAddressLine;
+  const mapsUrl = savedDefault
+    ? savedDefault.mapsUrl
+    : legacyLatitude !== null && legacyLongitude !== null && Number.isFinite(legacyLatitude) && Number.isFinite(legacyLongitude)
+      ? `https://www.google.com/maps/search/?api=1&query=${legacyLatitude},${legacyLongitude}`
+      : legacyAddressLine
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(legacyAddressLine)}`
         : null;
 
   return {

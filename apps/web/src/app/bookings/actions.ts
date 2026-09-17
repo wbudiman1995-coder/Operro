@@ -42,6 +42,43 @@ export async function createBookingAction(
     return { error: "Pilihan booking berubah atau tidak dapat diakses. Muat ulang halaman lalu coba lagi." };
   }
 
+  // Home-service bookings carry an immutable location snapshot: the full address, contact
+  // and access notes as they are right now, plus the service-area/travel-fee decision made
+  // at booking time. Neither is re-derived later, so editing or deleting the saved address
+  // afterward cannot change a booking that already exists (Deliverable B).
+  let addressSnapshot: Record<string, unknown> | null = null;
+  let travelFee: number | null = null;
+  let travelMinutesSnapshot: number | null = null;
+  let serviceAreaMatched: boolean | null = null;
+  if (draft.fulfillmentMode === "home") {
+    if (!draft.customerAddressId) return { error: "Pilih alamat pelanggan untuk booking home service." };
+    const { data: address } = await supabase
+      .from("customer_addresses")
+      .select("id,label,recipient_name,recipient_phone,line1,line2,rt,rw,kelurahan,kecamatan,kabupaten_kota,province,postal_code,landmark,access_notes,latitude,longitude")
+      .eq("organization_id", organizationId)
+      .eq("customer_id", draft.customerId)
+      .eq("id", draft.customerAddressId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!address) return { error: "Alamat pelanggan tidak ditemukan atau bukan milik pelanggan ini." };
+
+    const { data: coverage, error: coverageError } = await app.rpc("fn_check_service_area", {
+      p_branch: draft.branchId,
+      p_kecamatan: address.kecamatan,
+      p_kabupaten_kota: address.kabupaten_kota,
+    });
+    if (coverageError) return { error: `Pemeriksaan area layanan gagal: ${coverageError.message}` };
+    const zone = Array.isArray(coverage) ? coverage[0] : coverage;
+    if (!zone?.allowed) {
+      return { error: `Lokasi ini (${address.kecamatan ?? address.kabupaten_kota ?? "area tidak diketahui"}) belum tercakup oleh cabang ini. Pilih cabang lain atau perbarui area layanan.` };
+    }
+
+    addressSnapshot = address;
+    travelFee = Number(zone.travel_fee ?? 0);
+    travelMinutesSnapshot = Number(zone.estimated_travel_minutes ?? 0);
+    serviceAreaMatched = true;
+  }
+
   const { data: booking, error: bookingError } = await supabase.from("bookings").insert({
     organization_id: organizationId,
     branch_id: draft.branchId,
@@ -51,6 +88,12 @@ export async function createBookingAction(
     starts_at: draft.startsAt,
     ends_at: draft.endsAt,
     notes: draft.notes || null,
+    customer_address_id: draft.fulfillmentMode === "home" ? draft.customerAddressId : null,
+    address_snapshot: addressSnapshot,
+    travel_fee: travelFee,
+    travel_minutes_snapshot: travelMinutesSnapshot,
+    service_area_matched: serviceAreaMatched,
+    dispatch_stage: draft.fulfillmentMode === "home" ? "scheduled" : null,
   }).select("id").single();
   if (bookingError || !booking) return { error: `Booking tidak dapat dibuat: ${bookingError?.message ?? "unknown"}` };
 

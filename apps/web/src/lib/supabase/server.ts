@@ -2,10 +2,18 @@
  * Function index:
  * - createClient: creates the cookie-backed server Supabase client for Server Components and Route Handlers.
  */
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-export async function createClient() {
+/**
+ * Wrapped in React `cache()` so every Server Component in one request/render
+ * pass gets the SAME client instance instead of a fresh one per call. This is
+ * what makes caching `loadAuthContext`/`requireActiveWorkspace` actually
+ * effective — `cache()` dedupes by argument identity, and a fresh client
+ * per caller would defeat it even if the downstream functions were cached.
+ */
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -28,4 +36,4 @@ export async function createClient() {
       },
     },
   );
-}
+});

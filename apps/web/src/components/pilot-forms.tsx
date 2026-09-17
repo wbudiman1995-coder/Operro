@@ -32,7 +32,32 @@ function ActionMessage({ state }: { state: PilotActionState }) {
 
 export function CustomerForm() {
   const [state, action, pending] = useActionState(createCustomerAction, initialPilotActionState);
-  return <form action={action} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="name" placeholder="Nama pelanggan" required /><input className={inputClass} name="phone" placeholder="WhatsApp, contoh 0812..." /></div><div className="grid gap-3 sm:grid-cols-3"><input className={inputClass} name="petName" placeholder="Nama hewan" /><select className={inputClass} name="species" defaultValue="dog"><option value="dog">Anjing</option><option value="cat">Kucing</option><option value="rabbit">Kelinci</option></select><input className={inputClass} name="breed" placeholder="Ras" /></div><div className="flex flex-wrap items-center justify-between gap-3"><ActionMessage state={state} /><button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Tambah pelanggan"}</button></div></form>;
+  return <form action={action} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="name" placeholder="Nama pelanggan" required /><input className={inputClass} name="phone" placeholder="WhatsApp, contoh 0812..." /></div><div className="grid gap-3 sm:grid-cols-3"><input className={inputClass} name="petName" placeholder="Nama hewan" /><select className={inputClass} name="species" defaultValue="dog"><option value="dog">Anjing</option><option value="cat">Kucing</option><option value="rabbit">Kelinci</option></select><input className={inputClass} name="breed" placeholder="Ras" /></div>
+    <details className="rounded-xl border border-slate-200 p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-slate-700">Alamat (opsional, untuk layanan home service)</summary>
+      <div className="mt-3 space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input className={inputClass} name="label" placeholder="Label, contoh Rumah / Kantor" />
+          <input className={inputClass} name="recipientPhone" placeholder="No. WhatsApp penerima di lokasi" />
+        </div>
+        <input className={inputClass} name="line1" placeholder="Nama jalan dan nomor rumah" />
+        <div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="line2" placeholder="Detail tambahan (blok, unit)" /><input className={inputClass} name="landmark" placeholder="Patokan (contoh: sebelah minimarket)" /></div>
+        <div className="grid gap-3 sm:grid-cols-4">
+          <input className={inputClass} name="rt" placeholder="RT" />
+          <input className={inputClass} name="rw" placeholder="RW" />
+          <input className={inputClass} name="kelurahan" placeholder="Kelurahan/Desa" />
+          <input className={inputClass} name="kecamatan" placeholder="Kecamatan" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <input className={inputClass} name="kabupatenKota" placeholder="Kabupaten/Kota" />
+          <input className={inputClass} name="province" placeholder="Provinsi" />
+          <input className={inputClass} name="postalCode" placeholder="Kode pos" />
+        </div>
+        <textarea className={`${inputClass} h-auto py-2`} name="accessNotes" placeholder="Catatan akses (pagar, parkir, keamanan)" rows={2} />
+        <div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="latitude" placeholder="Latitude (opsional)" /><input className={inputClass} name="longitude" placeholder="Longitude (opsional)" /></div>
+      </div>
+    </details>
+    <div className="flex flex-wrap items-center justify-between gap-3"><ActionMessage state={state} /><button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Tambah pelanggan"}</button></div></form>;
 }
 
 export function TaskForm({ branches }: { branches: Array<{ id: string; name: string }> }) {

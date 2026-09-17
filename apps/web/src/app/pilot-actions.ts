@@ -2,9 +2,11 @@
 
 /**
  * Function index:
- * - createCustomerAction: creates a customer and optional first pet.
+ * - createCustomerAction: creates a customer and optional first pet and address.
+ * - createCustomerAddressAction / updateCustomerAddressAction / deleteCustomerAddressAction / setDefaultCustomerAddressAction: manages saved addresses.
  * - createTaskAction / updateTaskStatusAction: manages operational tasks.
  * - transitionBookingAction / updatePetJobStatusAction: advances grooming work.
+ * - setDispatchStageAction: advances a home-service booking's dispatch stage (scheduled/en_route/arrived/in_service), independent of bookings.status.
  * - updateGroomingChecklistAction / issueInvoiceForBookingAction: closes the service-to-cash loop.
  * - createServiceAction / createResourceAction: configures the operating catalog.
  * - adjustInventoryAction: appends an inventory adjustment movement.
@@ -51,6 +53,68 @@ function databaseError(scope: string, message: string) {
   return { error: `${scope}: ${message}`, success: null };
 }
 
+const PHONE_PATTERN = /^\+?[0-9][0-9 .\-()]{6,19}$/;
+const POSTAL_PATTERN = /^[0-9]{4,10}$/;
+
+interface AddressFieldValues {
+  label: string;
+  recipient_name: string | null;
+  recipient_phone: string | null;
+  line1: string;
+  line2: string | null;
+  rt: string | null;
+  rw: string | null;
+  kelurahan: string | null;
+  kecamatan: string | null;
+  kabupaten_kota: string | null;
+  province: string | null;
+  postal_code: string | null;
+  landmark: string | null;
+  access_notes: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+interface AddressFieldsInvalid { invalid: string }
+
+/** Reads the optional full-address fields shared by customer creation and address CRUD. */
+function addressFields(formData: FormData): AddressFieldValues | AddressFieldsInvalid | null {
+  const line1 = textValue(formData, "line1", 200);
+  if (!line1) return null;
+  const recipientPhone = textValue(formData, "recipientPhone", 40);
+  const postalCode = textValue(formData, "postalCode", 10);
+  if (recipientPhone && !PHONE_PATTERN.test(recipientPhone)) return { invalid: "Nomor telepon penerima tidak valid" };
+  if (postalCode && !POSTAL_PATTERN.test(postalCode)) return { invalid: "Kode pos tidak valid" };
+  // A local, stricter numeric reader: numberValue() treats a missing/empty field as 0
+  // (Number("") === 0), which would silently place every address-less submission at
+  // the Gulf of Guinea. Coordinates are optional, so blank must stay null, not 0.
+  const coordinate = (key: string) => {
+    const raw = String(formData.get(key) ?? "").trim();
+    if (!raw) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const latitude = coordinate("latitude");
+  const longitude = coordinate("longitude");
+  return {
+    label: textValue(formData, "label", 60) || "Rumah",
+    recipient_name: textValue(formData, "recipientName", 120) || null,
+    recipient_phone: recipientPhone || null,
+    line1,
+    line2: textValue(formData, "line2", 200) || null,
+    rt: textValue(formData, "rt", 10) || null,
+    rw: textValue(formData, "rw", 10) || null,
+    kelurahan: textValue(formData, "kelurahan", 100) || null,
+    kecamatan: textValue(formData, "kecamatan", 100) || null,
+    kabupaten_kota: textValue(formData, "kabupatenKota", 100) || null,
+    province: textValue(formData, "province", 100) || null,
+    postal_code: postalCode || null,
+    landmark: textValue(formData, "landmark", 200) || null,
+    access_notes: textValue(formData, "accessNotes", 500) || null,
+    latitude,
+    longitude,
+  };
+}
+
 export async function createCustomerAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace();
   if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
@@ -60,6 +124,10 @@ export async function createCustomerAction(_previous: PilotActionState, formData
   const breed = textValue(formData, "breed", 100);
   const species = textValue(formData, "species", 30) || "dog";
   if (name.length < 2) return databaseError("Pelanggan", "nama wajib diisi");
+
+  const address = addressFields(formData);
+  if (address && "invalid" in address) return databaseError("Alamat", address.invalid);
+
   const { data: customer, error } = await context.supabase.from("customers").insert({ organization_id: context.organizationId, display_name: name, phone: phone || null, status: "active", source: "Operro", metadata: { created_from: "homepaw_pilot" } }).select("id").single();
   if (error || !customer) return databaseError("Pelanggan gagal dibuat", error?.message ?? "unknown");
   if (petName) {
@@ -69,8 +137,62 @@ export async function createCustomerAction(_previous: PilotActionState, formData
       return databaseError("Hewan gagal dibuat", petError.message);
     }
   }
+  if (address && !("invalid" in address)) {
+    const { error: addressError } = await context.supabase.from("customer_addresses").insert({ organization_id: context.organizationId, customer_id: customer.id, is_default: true, ...address });
+    // A bad address must not silently discard an otherwise-valid new customer — report it,
+    // but the customer record (and pet, if any) already committed successfully above.
+    if (addressError) return { error: null, success: `${name} berhasil ditambahkan, tetapi alamat gagal disimpan: ${addressError.message}` };
+  }
   revalidatePath("/customers"); revalidatePath("/bookings"); revalidatePath("/dashboard");
   return { error: null, success: `${name} berhasil ditambahkan.` };
+}
+
+export async function createCustomerAddressAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace();
+  if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  const customerId = idValue(formData, "customerId");
+  if (!customerId) return databaseError("Alamat", "pelanggan tidak valid");
+  const address = addressFields(formData);
+  if (!address) return databaseError("Alamat", "alamat baris pertama wajib diisi");
+  if ("invalid" in address) return databaseError("Alamat", address.invalid);
+  const { count } = await context.supabase.from("customer_addresses").select("id", { count: "exact", head: true }).eq("organization_id", context.organizationId).eq("customer_id", customerId).is("deleted_at", null);
+  const { error } = await context.supabase.from("customer_addresses").insert({ organization_id: context.organizationId, customer_id: customerId, is_default: (count ?? 0) === 0, ...address });
+  if (error) return databaseError("Alamat gagal disimpan", error.message);
+  revalidatePath(`/customers/${customerId}`);
+  return { error: null, success: "Alamat berhasil ditambahkan." };
+}
+
+export async function updateCustomerAddressAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace();
+  if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  const addressId = idValue(formData, "addressId");
+  const customerId = idValue(formData, "customerId");
+  if (!addressId || !customerId) return databaseError("Alamat", "alamat tidak valid");
+  const address = addressFields(formData);
+  if (!address) return databaseError("Alamat", "alamat baris pertama wajib diisi");
+  if ("invalid" in address) return databaseError("Alamat", address.invalid);
+  const { error } = await context.supabase.from("customer_addresses").update(address).eq("organization_id", context.organizationId).eq("customer_id", customerId).eq("id", addressId);
+  if (error) return databaseError("Alamat gagal diperbarui", error.message);
+  revalidatePath(`/customers/${customerId}`);
+  return { error: null, success: "Alamat berhasil diperbarui." };
+}
+
+export async function deleteCustomerAddressAction(formData: FormData) {
+  const context = await workspace(); if (!context) return;
+  const addressId = idValue(formData, "addressId");
+  const customerId = idValue(formData, "customerId");
+  if (!addressId || !customerId) return;
+  await context.supabase.from("customer_addresses").update({ deleted_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("customer_id", customerId).eq("id", addressId);
+  revalidatePath(`/customers/${customerId}`);
+}
+
+export async function setDefaultCustomerAddressAction(formData: FormData) {
+  const context = await workspace(); if (!context) return;
+  const addressId = idValue(formData, "addressId");
+  const customerId = idValue(formData, "customerId");
+  if (!addressId || !customerId) return;
+  await context.supabase.schema("app").rpc("fn_set_default_customer_address", { p_address_id: addressId });
+  revalidatePath(`/customers/${customerId}`);
 }
 
 export async function createTaskAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
@@ -109,6 +231,23 @@ export async function updatePetJobStatusAction(formData: FormData) {
   const petJobId = idValue(formData, "petJobId"); const status = textValue(formData, "status", 30);
   if (!petJobId || !allowedPetStatuses.has(status)) return;
   await context.supabase.from("grooming_job_pets").update({ status }).eq("organization_id", context.organizationId).eq("id", petJobId);
+  revalidatePath("/operations"); revalidatePath("/my-schedule");
+}
+
+const allowedDispatchStages = new Set(["scheduled", "en_route", "arrived", "in_service"]);
+
+/**
+ * Advances a home-service booking's dispatch stage. This never touches `bookings.status` —
+ * it calls `app.fn_set_dispatch_stage`, which is deliberately separate from and subordinate
+ * to `app.transition_booking_status`/`app.complete_booking`. A dispatcher marking "arrived"
+ * cannot accidentally (or otherwise) move a booking through the real, frozen state machine.
+ */
+export async function setDispatchStageAction(formData: FormData) {
+  const context = await workspace(); if (!context) return;
+  const bookingId = idValue(formData, "bookingId");
+  const stage = textValue(formData, "stage", 20);
+  if (!bookingId || !allowedDispatchStages.has(stage)) return;
+  await context.supabase.schema("app").rpc("fn_set_dispatch_stage", { p_booking: bookingId, p_stage: stage });
   revalidatePath("/operations"); revalidatePath("/my-schedule");
 }
 

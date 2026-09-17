@@ -3,6 +3,7 @@
  * - loadAuthContext: verifies Supabase identity, loads accessible organizations, and resolves the active claim.
  * - readStringClaim: safely reads custom string claims without trusting arbitrary JWT payload shapes.
  */
+import { cache } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import {
@@ -26,7 +27,12 @@ function readStringClaim(
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-export async function loadAuthContext(
+/**
+ * Cached per-request (see createClient in lib/supabase/server.ts — every
+ * caller now shares one client instance, which is what makes this cache
+ * key/hit correctly instead of re-running on every call).
+ */
+export const loadAuthContext = cache(async function loadAuthContext(
   supabase: SupabaseClient,
 ): Promise<AuthContext | null> {
   const { data: claimsData, error: claimsError } =
@@ -70,4 +76,4 @@ export async function loadAuthContext(
     activeOrganization,
     activeOrganizationId,
   };
-}
+});

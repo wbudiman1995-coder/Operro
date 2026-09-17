@@ -28,7 +28,7 @@ major_version = 17
 [db.seed]
 enabled = true
 # The CLI runs these as SQL batches in order; psql \ir directives are unsupported.
-sql_paths = ["./seed.sql", "./seeds/homepaw_demo.sql", "./seeds/local_qa_payroll.sql"]
+sql_paths = ["./seed.sql", "./seeds/homepaw_demo.sql", "./seeds/homepaw_home_service_setup.sql", "./seeds/local_qa_payroll.sql"]
 
 [studio]
 enabled = true

@@ -52,22 +52,26 @@ export type CapabilityMap = Record<CapabilityKey, boolean>;
 export const BRANCHES_ALL_PERMISSION = "branches.all";
 
 /**
- * Resolves each permission key independently. A failed check is treated as denied: a
- * transport or policy error must never open a surface it would otherwise close.
+ * Resolves every capability key in ONE round trip via `app.list_my_permissions`,
+ * which runs the identical join/filter logic as `app.has_permission` for every
+ * key the caller holds at once (see migration 20260917100300_batch_permissions.sql).
+ * This replaces 13 permission RPC calls with one database round trip. Route
+ * timing still needs to be measured separately before assigning a broader
+ * navigation improvement to this change.
+ *
+ * A failed batch call is treated as fully denied, matching the previous
+ * per-key behavior: a transport or policy error must never open a surface it
+ * would otherwise close.
  */
 export async function loadCapabilities(
   supabase: SupabaseClient,
   keys: readonly CapabilityKey[] = CAPABILITY_KEYS,
 ): Promise<CapabilityMap> {
-  const app = supabase.schema("app");
-  const results = await Promise.all(
-    keys.map(async (key) => {
-      const { data, error } = await app.rpc("has_permission", { perm: key });
-      return [key, error ? false : data === true] as const;
-    }),
-  );
   const map = Object.fromEntries(CAPABILITY_KEYS.map((key) => [key, false])) as CapabilityMap;
-  for (const [key, allowed] of results) map[key] = allowed;
+  const { data, error } = await supabase.schema("app").rpc("list_my_permissions");
+  if (error || !data) return map;
+  const granted = new Set((data as Array<{ perm: string }>).map((row) => row.perm));
+  for (const key of keys) map[key] = granted.has(key);
   return map;
 }
 
