@@ -1,0 +1,55 @@
+# Minimal local Supabase CLI config for feat/m13-booking.
+#
+# UNVERIFIED: written by reading this project's migrations and app code (which calls
+# `supabase.schema("app").rpc(...)` throughout — see apps/web/src/lib/authorization.ts,
+# apps/web/src/app/bookings/actions.ts, apps/web/src/app/schedule/actions.ts) — not run
+# against a real `supabase start` in this session (no Docker/Supabase CLI available here).
+# If `supabase start` rejects a key below, your installed CLI version's config schema has
+# moved on; drop or rename the offending key, the two things that must not be lost are:
+#   1. `app` in api.schemas (every RPC call above 404s on PostgREST without it)
+#   2. the custom_access_token_hook wiring (production also relies on it for active_org_id
+#      and is_platform_admin JWT claims — see supabase/migrations/20260721001400_*.sql)
+
+project_id = "operro-m13-local"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "app", "graphql_public"]
+extra_search_path = ["public", "app"]
+max_rows = 1000
+
+[db]
+port = 54322
+# Supabase CLI 2.117.0 supports PostgreSQL 17 for its managed local stack.
+# run_all_gates.sh uses a separate PostgreSQL 16 container for lineage gates.
+major_version = 17
+
+[db.seed]
+enabled = true
+# The CLI runs these as SQL batches in order; psql \ir directives are unsupported.
+sql_paths = ["./seed.sql", "./seeds/homepaw_demo.sql", "./seeds/local_qa_payroll.sql"]
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_confirmations = false
+
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/custom_access_token_hook"
+
+[realtime]
+enabled = false
+
+[storage]
+enabled = false

@@ -3,10 +3,16 @@
 # Run from the repository root. The script exits immediately on any failed
 # critical command and prints a final success marker only after every gate passes.
 #
-# Requirements: Node 20+/npm and PostgreSQL 16. RUN_AS_POSTGRES=1 (default)
-# executes local database administration through the postgres OS user; set it to
-# 0 when the current user already has the required PostgreSQL privileges.
+# Requirements: Node 20+/npm and PostgreSQL 16. By default the database gates
+# connect to the local-only PostgreSQL container on 127.0.0.1:54322. Override
+# the PG* variables when running against another disposable development server.
 set -euo pipefail
+
+export PGHOST="${PGHOST:-127.0.0.1}"
+export PGPORT="${PGPORT:-54322}"
+export PGUSER="${PGUSER:-postgres}"
+export PGPASSWORD="${PGPASSWORD:-postgres}"
+export RUN_AS_POSTGRES="${RUN_AS_POSTGRES:-0}"
 
 step() {
   echo ""
@@ -43,6 +49,9 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20260721001200_cross_cutting_services.sql
   supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql
   supabase/migrations/20260721001350_grooming_assembly_operations.sql
+  supabase/migrations/20260721001400_active_organization_context.sql
+  supabase/migrations/20260910120000_audit_log_read_api.sql
+  supabase/migrations/20260916150000_customer_program_tenant_isolation.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -83,7 +92,7 @@ step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
 run_as_postgres dropdb --if-exists operro_gate
 run_as_postgres createdb operro_gate
 psql_db operro_gate -q -v ON_ERROR_STOP=1 -c \
-  "create schema if not exists auth; create table if not exists auth.users(id uuid primary key); do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
+  "create schema if not exists auth; create table if not exists auth.users(id uuid primary key, email text, raw_user_meta_data jsonb); do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role service_role nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role supabase_auth_admin nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
 for migration in "${EXPECTED_MIGRATIONS[@]}"; do
   psql_db operro_gate -q -v ON_ERROR_STOP=1 -f "$migration"
 done
@@ -103,10 +112,10 @@ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20260721001350_test_res
 
 step "GATE 7 — real authenticated-role integration (incl reserve_package_session)"
 psql_db operro_gate -q -v ON_ERROR_STOP=1 -c \
-  "do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticator login noinherit; exception when duplicate_object then null; end \$\$; alter role authenticator login noinherit password 'stagingpw'; grant anon to authenticator; grant authenticated to authenticator; grant usage on schema public, app to anon, authenticated;"
+  "do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role operro_gate_client login noinherit; exception when duplicate_object then null; end \$\$; alter role operro_gate_client login noinherit password 'stagingpw'; grant anon to operro_gate_client; grant authenticated to operro_gate_client; grant usage on schema public, app to anon, authenticated;"
 psql_db operro_gate -q -v ON_ERROR_STOP=1 -f integration/0100_integration_seed.sql
 PGPASSWORD=stagingpw psql \
-  "host=127.0.0.1 port=5432 dbname=operro_gate user=authenticator" \
+  "host=$PGHOST port=$PGPORT dbname=operro_gate user=operro_gate_client" \
   -v ON_ERROR_STOP=1 \
   -f integration/0100_integration_client.sql
 
@@ -114,7 +123,7 @@ step "GATE 8 — completion vs assembly/reservation concurrency"
 run_as_postgres dropdb --if-exists operro_cc
 run_as_postgres createdb operro_cc
 psql_db operro_cc -q -v ON_ERROR_STOP=1 -c \
-  "create schema if not exists auth; create table if not exists auth.users(id uuid primary key); do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
+  "create schema if not exists auth; create table if not exists auth.users(id uuid primary key, email text, raw_user_meta_data jsonb); do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role service_role nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role supabase_auth_admin nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
 for migration in "${EXPECTED_MIGRATIONS[@]}"; do
   psql_db operro_cc -q -v ON_ERROR_STOP=1 -f "$migration"
 done
@@ -125,7 +134,7 @@ trap 'rm -rf "$CONC_TMP"' EXIT
 cp -a supabase/tests/concurrency/. "$CONC_TMP/"
 chmod -R a+rX "$CONC_TMP"
 
-run_as_postgres env DATABASE_URL='postgresql:///operro_cc' \
+run_as_postgres env DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/operro_cc" \
   bash "$CONC_TMP/run_concurrency_assembly.sh"
 
 rm -rf "$CONC_TMP"

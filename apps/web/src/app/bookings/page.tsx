@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { BookingShell } from "@/components/booking-shell";
 import { NoOrganizationState } from "@/components/no-organization-state";
 import { loadAuthContext } from "@/lib/auth-context";
+import { loadCapabilities } from "@/lib/authorization";
 import { loadBookingWorkspace } from "@/lib/bookings";
 import { loadBranchTimezones } from "@/lib/branch-context";
 import { mondayOf } from "@/lib/schedule-layout";
@@ -59,9 +60,10 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   const from = zonedDateTimeToUtc(weekStartISO, 0, defaultTimezone).toISOString();
   const to = zonedDateTimeToUtc(weekEndISO, 0, defaultTimezone).toISOString();
 
-  const [data, preselectedCustomerId] = await Promise.all([
+  const [data, preselectedCustomerId, capabilities] = await Promise.all([
     loadBookingWorkspace(supabase, organizationId, from, to),
     resolvePreselectedCustomer(supabase, organizationId, params.customerId),
+    loadCapabilities(supabase),
   ]);
-  return <BookingShell organizations={context.organizations} activeOrganization={context.activeOrganization} userEmail={context.user.email ?? "Akun Operro"} data={data} weekStartISO={weekStartISO} defaultTimezone={defaultTimezone} created={Boolean(params.created)} preselectedCustomerId={preselectedCustomerId} />;
+  return <BookingShell organizations={context.organizations} activeOrganization={context.activeOrganization} userEmail={context.user.email ?? "Akun Operro"} capabilities={capabilities} data={data} weekStartISO={weekStartISO} defaultTimezone={defaultTimezone} created={Boolean(params.created)} preselectedCustomerId={preselectedCustomerId} />;
 }

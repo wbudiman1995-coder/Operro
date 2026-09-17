@@ -136,7 +136,7 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-10 w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-400 transition hover:border-slate-300 hover:text-slate-600"
+        className="flex h-10 w-full items-center gap-2 rounded-[10px] border border-[#e4e7ec] bg-[#fbfbfc] px-3 text-left text-sm font-semibold text-[#8a93a3] transition hover:border-[#d0d5dd] hover:bg-white hover:text-[#5b6472]"
       >
         <svg viewBox="0 0 20 20" fill="none" aria-hidden className="size-4 shrink-0 stroke-current" strokeWidth={1.8}>
           <circle cx="9" cy="9" r="5.5" />
@@ -149,7 +149,7 @@ export function CommandPalette() {
       {open ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[8vh]" role="dialog" aria-modal="true" aria-label="Pencarian global">
           <button type="button" aria-label="Tutup pencarian" onClick={close} className="absolute inset-0 cursor-default bg-slate-950/40 backdrop-blur-sm" />
-          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+          <div className="relative w-full max-w-xl overflow-hidden rounded-[16px] border border-[#e4e7ec] bg-white shadow-2xl">
             <div className="flex items-center gap-3 border-b border-slate-100 px-4">
               <svg viewBox="0 0 20 20" fill="none" aria-hidden className="size-4 shrink-0 stroke-slate-400" strokeWidth={1.8}>
                 <circle cx="9" cy="9" r="5.5" />
@@ -190,7 +190,7 @@ export function CommandPalette() {
                             key={`${group.key}-${hit.id}`}
                             href={hit.href}
                             onClick={close}
-                            className={`flex items-baseline justify-between gap-3 rounded-xl px-3 py-2.5 text-sm ${active ? "bg-emerald-50 text-emerald-900" : "text-slate-700 hover:bg-slate-50"}`}
+                            className={`flex items-baseline justify-between gap-3 rounded-[10px] px-3 py-2.5 text-sm ${active ? "bg-[#e3f5f1] text-[#0b6e5a]" : "text-slate-700 hover:bg-slate-50"}`}
                           >
                             <span className="truncate font-semibold">{hit.title}</span>
                             {hit.subtitle ? <span className="shrink-0 truncate text-xs text-slate-400">{hit.subtitle}</span> : null}

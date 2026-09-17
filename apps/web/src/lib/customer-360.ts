@@ -272,6 +272,14 @@ export async function loadCustomerBookings(
   });
 }
 
+export interface CustomerInvoiceLineRow {
+  id: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
 export interface CustomerInvoiceRow {
   id: string;
   invoiceNumber: string;
@@ -283,6 +291,7 @@ export interface CustomerInvoiceRow {
   dueAt: string | null;
   paidAt: string | null;
   paidAmount: number;
+  lines: CustomerInvoiceLineRow[];
 }
 
 export async function loadCustomerInvoices(
@@ -301,13 +310,22 @@ export async function loadCustomerInvoices(
   const invoices = invoiceResult.data ?? [];
   if (invoices.length === 0) return [];
 
-  const paymentResult = await supabase
-    .from("payments")
-    .select("invoice_id,amount,currency")
-    .eq("organization_id", organizationId)
-    .eq("status", "succeeded")
-    .in("invoice_id", invoices.map((invoice) => invoice.id));
+  const [paymentResult, lineResult] = await Promise.all([
+    supabase
+      .from("payments")
+      .select("invoice_id,amount,currency")
+      .eq("organization_id", organizationId)
+      .eq("status", "succeeded")
+      .in("invoice_id", invoices.map((invoice) => invoice.id)),
+    supabase
+      .from("invoice_lines")
+      .select("id,invoice_id,name_snapshot,quantity,unit_price,line_total")
+      .eq("organization_id", organizationId)
+      .in("invoice_id", invoices.map((invoice) => invoice.id))
+      .order("created_at"),
+  ]);
   assertResult("customer_invoice_payments", paymentResult.error);
+  assertResult("customer_invoice_lines", lineResult.error);
 
   // Only payments in the invoice's own currency count toward its settled amount; a
   // payment recorded in another currency needs an explicit conversion policy that the
@@ -331,6 +349,9 @@ export async function loadCustomerInvoices(
     dueAt: invoice.due_at,
     paidAt: invoice.paid_at,
     paidAmount: paidByInvoice.get(invoice.id) ?? 0,
+    lines: (lineResult.data ?? [])
+      .filter((line) => line.invoice_id === invoice.id)
+      .map((line) => ({ id: line.id, name: line.name_snapshot, quantity: Number(line.quantity), unitPrice: Number(line.unit_price), lineTotal: Number(line.line_total) })),
   }));
 }
 

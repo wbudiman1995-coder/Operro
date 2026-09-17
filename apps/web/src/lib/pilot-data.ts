@@ -7,6 +7,10 @@
  * - loadCatalogWorkspace: loads services, groomers, packages, products, and stock.
  * - loadFinanceWorkspace: loads invoices, payments, and expenses.
  * - loadReportWorkspace: aggregates the current month's operating report.
+ * - loadPayrollWorkspace: loads staff base pay + accrued commission for a period, and any existing run.
+ * - loadMyScheduleWorkspace: loads the current user's own assigned, incomplete grooming jobs.
+ * - loadLeaderboardWorkspace: ranks staff by dogs groomed and commission earned this month.
+ * - loadFollowupWorkspace: finds customers whose pets are overdue for grooming.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -186,4 +190,128 @@ export async function loadReportWorkspace(supabase: SupabaseClient, organization
   const canceled = (bookings.data ?? []).filter((row) => ["canceled", "no_show"].includes(row.status)).length;
   const methodTotals = new Map<string, number>(); for (const row of payments.data ?? []) if (row.status === "succeeded") methodTotals.set(row.method, (methodTotals.get(row.method) ?? 0) + Number(row.amount));
   return { revenue, expense, net: revenue - expense, totalBookings: (bookings.data ?? []).length, completed, canceled, completionRate: (bookings.data ?? []).length ? Math.round(completed / (bookings.data ?? []).length * 100) : 0, methodTotals: [...methodTotals.entries()].map(([method, total]) => ({ method, total })) };
+}
+
+function embeddedStaffName(value: unknown) {
+  const user = relationRows(relationRows(value)[0]?.users)[0];
+  const name = user?.full_name ?? user?.email;
+  return typeof name === "string" && name.length > 0 ? name : "Staf";
+}
+
+// No hours-worked/attendance table exists in this schema, so hourly pay_type cannot be
+// computed from real hours worked — base_amount is used as-is for every pay_type.
+export interface PayrollWorkspace {
+  run: { id: string; status: string; totalGross: number; totalNet: number } | null;
+  staff: Array<{ membershipId: string; name: string; basePay: number; commissionTotal: number; grossPay: number; currency: string }>;
+}
+
+export async function loadPayrollWorkspace(supabase: SupabaseClient, organizationId: string, periodStart: string, periodEnd: string): Promise<PayrollWorkspace> {
+  const [staff, commissions, run] = await Promise.all([
+    supabase.from("staff_compensation").select("membership_id,base_amount,currency,memberships(users(email,full_name))").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null),
+    supabase.from("commission_entries").select("membership_id,commission_amount").eq("organization_id", organizationId).eq("status", "accrued").gte("occurred_at", periodStart).lt("occurred_at", periodEnd),
+    supabase.from("payroll_runs").select("id,status,total_gross,total_net").eq("organization_id", organizationId).eq("period_start", periodStart).eq("period_end", periodEnd).maybeSingle(),
+  ]);
+  assertResult("payroll_staff", staff.error); assertResult("payroll_commissions", commissions.error); assertResult("payroll_run", run.error);
+  const commissionByMembership = new Map<string, number>(); for (const row of commissions.data ?? []) commissionByMembership.set(row.membership_id, (commissionByMembership.get(row.membership_id) ?? 0) + Number(row.commission_amount));
+  return {
+    run: run.data ? { id: run.data.id, status: run.data.status, totalGross: Number(run.data.total_gross), totalNet: Number(run.data.total_net) } : null,
+    staff: (staff.data ?? []).map((row) => { const basePay = Number(row.base_amount); const commissionTotal = commissionByMembership.get(row.membership_id) ?? 0; return { membershipId: row.membership_id, name: embeddedStaffName(row.memberships), basePay, commissionTotal, grossPay: Math.round((basePay + commissionTotal) * 100) / 100, currency: row.currency }; }),
+  };
+}
+
+export interface MyScheduleJob { groomingJobPetId: string; startsAt: string; customerName: string; petName: string; services: string[]; status: string }
+
+export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organizationId: string, userId: string): Promise<MyScheduleJob[]> {
+  const membership = await supabase.from("memberships").select("id").eq("organization_id", organizationId).eq("user_id", userId).eq("status", "active").is("deleted_at", null).maybeSingle();
+  assertResult("my_schedule_membership", membership.error); if (!membership.data) return [];
+  const resources = await supabase.from("resources").select("id").eq("organization_id", organizationId).eq("membership_id", membership.data.id).is("deleted_at", null);
+  assertResult("my_schedule_resources", resources.error); const resourceIds = (resources.data ?? []).map((row) => row.id); if (!resourceIds.length) return [];
+
+  const from = new Date(); from.setHours(0, 0, 0, 0);
+  const to = new Date(from); to.setDate(to.getDate() + 8);
+  const bookings = await supabase.from("bookings").select("id,starts_at,customers(display_name)").eq("organization_id", organizationId).gte("starts_at", from.toISOString()).lt("starts_at", to.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null).order("starts_at");
+  assertResult("my_schedule_bookings", bookings.error); const bookingIds = (bookings.data ?? []).map((row) => row.id); if (!bookingIds.length) return [];
+
+  const gjps = await supabase.from("grooming_job_pets").select("id,grooming_job_id,pet_id,status").in("assigned_resource_id", resourceIds).in("grooming_job_id", bookingIds).neq("status", "complete").is("deleted_at", null);
+  assertResult("my_schedule_gjps", gjps.error); if (!(gjps.data ?? []).length) return [];
+  const petIds = [...new Set((gjps.data ?? []).map((row) => row.pet_id))]; const gjpIds = (gjps.data ?? []).map((row) => row.id);
+  const [pets, lines] = await Promise.all([
+    supabase.from("pets").select("id,name").eq("organization_id", organizationId).in("id", petIds),
+    supabase.from("grooming_job_pet_services").select("grooming_job_pet_id,service_name_snapshot").eq("organization_id", organizationId).in("grooming_job_pet_id", gjpIds).is("deleted_at", null),
+  ]);
+  assertResult("my_schedule_pets", pets.error); assertResult("my_schedule_lines", lines.error);
+  const bookingMap = new Map((bookings.data ?? []).map((row) => [row.id, row])); const petMap = new Map((pets.data ?? []).map((row) => [row.id, row.name]));
+  const servicesByGjp = new Map<string, string[]>(); for (const row of lines.data ?? []) { const arr = servicesByGjp.get(row.grooming_job_pet_id) ?? []; arr.push(row.service_name_snapshot); servicesByGjp.set(row.grooming_job_pet_id, arr); }
+  return (gjps.data ?? []).map((row) => { const booking = bookingMap.get(row.grooming_job_id); return { groomingJobPetId: row.id, startsAt: booking?.starts_at ?? "", customerName: embeddedCustomerName(booking?.customers), petName: petMap.get(row.pet_id) ?? "Hewan", services: servicesByGjp.get(row.id) ?? [], status: row.status }; }).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Revenue-per-groomer is deliberately not shown: an invoice is per booking, a booking can
+// have multiple groomers on different pets, and this schema defines no rule for splitting
+// an invoice total across them. Dogs groomed and commission earned are both cleanly
+// attributable per staff member, so the leaderboard ranks on those instead.
+export interface LeaderboardRow { resourceId: string; name: string; dogsGroomed: number; commissionTotal: number; currency: string }
+
+export async function loadLeaderboardWorkspace(supabase: SupabaseClient, organizationId: string, periodStart: string, periodEnd: string): Promise<LeaderboardRow[]> {
+  const resources = await supabase.from("resources").select("id,name,membership_id").eq("organization_id", organizationId).eq("kind", "staff").is("deleted_at", null);
+  assertResult("leaderboard_resources", resources.error); if (!(resources.data ?? []).length) return [];
+
+  const bookings = await supabase.from("bookings").select("id").eq("organization_id", organizationId).eq("status", "completed").gte("starts_at", periodStart).lt("starts_at", periodEnd);
+  assertResult("leaderboard_bookings", bookings.error); const bookingIds = (bookings.data ?? []).map((row) => row.id);
+
+  const dogsByResource = new Map<string, number>();
+  if (bookingIds.length) {
+    const gjps = await supabase.from("grooming_job_pets").select("assigned_resource_id").eq("organization_id", organizationId).eq("status", "complete").in("grooming_job_id", bookingIds).not("assigned_resource_id", "is", null);
+    assertResult("leaderboard_gjps", gjps.error);
+    for (const row of gjps.data ?? []) if (row.assigned_resource_id) dogsByResource.set(row.assigned_resource_id, (dogsByResource.get(row.assigned_resource_id) ?? 0) + 1);
+  }
+
+  const membershipIds = [...new Set((resources.data ?? []).map((row) => row.membership_id).filter((id): id is string => Boolean(id)))];
+  const commissionByMembership = new Map<string, number>(); let currency = "IDR";
+  if (membershipIds.length) {
+    const commissions = await supabase.from("commission_entries").select("membership_id,commission_amount,currency").eq("organization_id", organizationId).in("membership_id", membershipIds).gte("occurred_at", periodStart).lt("occurred_at", periodEnd);
+    assertResult("leaderboard_commissions", commissions.error);
+    for (const row of commissions.data ?? []) { currency = row.currency; commissionByMembership.set(row.membership_id, (commissionByMembership.get(row.membership_id) ?? 0) + Number(row.commission_amount)); }
+  }
+
+  return (resources.data ?? []).map((row) => ({ resourceId: row.id, name: row.name, dogsGroomed: dogsByResource.get(row.id) ?? 0, commissionTotal: row.membership_id ? (commissionByMembership.get(row.membership_id) ?? 0) : 0, currency })).sort((a, b) => b.dogsGroomed - a.dogsGroomed);
+}
+
+// "Last groomed" comes from completed grooming_job_pets (pet-level), not bookings.pet_id —
+// this vertical treats bookings.pet_id as non-authoritative (see packages/sdk's grooming
+// domain model). A pet with no completed grooming at all is new, not overdue.
+export interface FollowupGroup { customerId: string; customerName: string; phone: string | null; pets: Array<{ petName: string; daysSince: number }> }
+
+export async function loadFollowupWorkspace(supabase: SupabaseClient, organizationId: string, thresholdDays = 30): Promise<FollowupGroup[]> {
+  const gjps = await supabase.from("grooming_job_pets").select("grooming_job_id,pet_id").eq("organization_id", organizationId).eq("status", "complete").is("deleted_at", null);
+  assertResult("followup_gjps", gjps.error); if (!(gjps.data ?? []).length) return [];
+
+  const bookingIds = [...new Set((gjps.data ?? []).map((row) => row.grooming_job_id))];
+  const bookings = await supabase.from("bookings").select("id,starts_at").eq("organization_id", organizationId).eq("status", "completed").in("id", bookingIds);
+  assertResult("followup_bookings", bookings.error);
+  const startsAtByBooking = new Map((bookings.data ?? []).map((row) => [row.id, row.starts_at as string]));
+
+  const lastGroomedByPet = new Map<string, string>();
+  for (const row of gjps.data ?? []) { const startsAt = startsAtByBooking.get(row.grooming_job_id); if (!startsAt) continue; const current = lastGroomedByPet.get(row.pet_id); if (!current || startsAt > current) lastGroomedByPet.set(row.pet_id, startsAt); }
+  if (!lastGroomedByPet.size) return [];
+
+  const petIds = [...lastGroomedByPet.keys()];
+  const pets = await supabase.from("pets").select("id,name,customer_id").eq("organization_id", organizationId).in("id", petIds).eq("status", "active").is("deleted_at", null);
+  assertResult("followup_pets", pets.error); if (!(pets.data ?? []).length) return [];
+
+  const now = Date.now(); const thresholdMs = thresholdDays * 86_400_000;
+  const overdue = (pets.data ?? []).map((pet) => { const lastGroomedAt = lastGroomedByPet.get(pet.id)!; return { pet, daysSince: Math.floor((now - new Date(lastGroomedAt).getTime()) / 86_400_000) }; }).filter((row) => row.daysSince * 86_400_000 >= thresholdMs);
+  if (!overdue.length) return [];
+
+  const customerIds = [...new Set(overdue.map((row) => row.pet.customer_id))];
+  const customers = await supabase.from("customers").select("id,display_name,phone").eq("organization_id", organizationId).in("id", customerIds);
+  assertResult("followup_customers", customers.error);
+  const customerMap = new Map((customers.data ?? []).map((row) => [row.id, row]));
+
+  const groups = new Map<string, FollowupGroup>();
+  for (const { pet, daysSince } of overdue) {
+    const customer = customerMap.get(pet.customer_id); if (!customer) continue;
+    if (!groups.has(customer.id)) groups.set(customer.id, { customerId: customer.id, customerName: customer.display_name, phone: customer.phone, pets: [] });
+    groups.get(customer.id)!.pets.push({ petName: pet.name, daysSince });
+  }
+  return [...groups.values()].sort((a, b) => Math.max(...b.pets.map((p) => p.daysSince)) - Math.max(...a.pets.map((p) => p.daysSince)));
 }

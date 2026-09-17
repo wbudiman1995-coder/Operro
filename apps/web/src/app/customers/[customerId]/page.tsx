@@ -206,6 +206,16 @@ export default async function CustomerDetailPage({
                       <span className="text-sm font-bold text-slate-900">{formatMoney(invoice.total, invoice.currency)}</span>
                       <StatusBadge status={invoice.status} />
                     </div>
+                    {invoice.lines.length > 0 ? (
+                      <ul className="mt-3 w-full space-y-1 border-t border-slate-100 pt-3">
+                        {invoice.lines.map((line) => (
+                          <li key={line.id} className="flex items-center justify-between gap-3 text-xs text-slate-600">
+                            <span className="truncate">{line.name} × {line.quantity}</span>
+                            <span className="font-semibold text-slate-800">{formatMoney(line.lineTotal, invoice.currency)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </li>
                 );
               })}

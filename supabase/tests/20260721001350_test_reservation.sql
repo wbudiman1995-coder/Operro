@@ -16,8 +16,8 @@ begin;
 -- fixtures
 insert into public.organizations (id,name,slug,status) values ('01000000-0000-4000-8000-000000000001','R Org','r-org','active');
 insert into public.branches (id,organization_id,name,is_default,status) values ('01000000-0000-4000-8000-0000000000a1','01000000-0000-4000-8000-000000000001','Main',true,'active');
-insert into auth.users (id) values ('01000000-0000-4000-8000-0000000000c1') on conflict do nothing;
-insert into public.users (id,full_name,email,status) values ('01000000-0000-4000-8000-0000000000c1','O','o@r.test','active');
+insert into auth.users (id) values ('01000000-0000-4000-8000-0000000000c1') on conflict (id) do nothing;
+insert into public.users (id,full_name,email,status) values ('01000000-0000-4000-8000-0000000000c1','O','o@r.test','active') on conflict (id) do update set full_name=excluded.full_name,email=excluded.email,status=excluded.status;
 insert into public.roles (id,organization_id,name,is_system) values ('01000000-0000-4000-8000-0000000000e1','01000000-0000-4000-8000-000000000001','Owner',true);
 insert into public.memberships (id,organization_id,user_id,role_id,status) values ('01000000-0000-4000-8000-0000000000d1','01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000000c1','01000000-0000-4000-8000-0000000000e1','active');
 insert into public.membership_branch_access (organization_id,membership_id,branch_id) values ('01000000-0000-4000-8000-000000000001','01000000-0000-4000-8000-0000000000d1','01000000-0000-4000-8000-0000000000a1');

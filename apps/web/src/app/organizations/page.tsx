@@ -9,6 +9,7 @@ import { NoOrganizationState } from "@/components/no-organization-state";
 import { OperroMark } from "@/components/operro-mark";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { loadAuthContext } from "@/lib/auth-context";
+import { defaultWorkspacePath, loadCapabilities } from "@/lib/authorization";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Pilih organisasi" };
@@ -26,7 +27,8 @@ export default async function OrganizationsPage() {
   }
 
   if (context.organizations.length === 1 && context.activeOrganization) {
-    redirect("/dashboard");
+    const capabilities = await loadCapabilities(supabase);
+    redirect(defaultWorkspacePath(capabilities));
   }
 
   return (

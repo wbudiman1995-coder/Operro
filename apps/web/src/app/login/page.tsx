@@ -16,11 +16,7 @@ export default async function LoginPage() {
   const context = await loadAuthContext(supabase);
 
   if (context) {
-    redirect(
-      context.organizations.length === 1 && context.activeOrganization
-        ? "/dashboard"
-        : "/organizations",
-    );
+    redirect("/organizations");
   }
 
   return (
@@ -28,18 +24,18 @@ export default async function LoginPage() {
       <section className="flex items-center justify-center px-5 py-10 sm:px-8 lg:px-12">
         <div className="w-full max-w-md">
           <OperroMark />
-          <p className="mt-12 text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Selamat datang kembali</p>
+          <p className="mt-12 text-xs font-bold uppercase tracking-[0.18em] text-[#0f8a72]">Selamat datang kembali</p>
           <h1 className="mt-3 text-4xl font-bold tracking-[-0.05em] text-slate-950">Masuk ke workspace Anda</h1>
           <p className="mt-4 text-sm leading-7 text-slate-500">Gunakan email dan kata sandi yang terdaftar. Organisasi aktif akan diverifikasi sebelum dashboard dibuka.</p>
           <LoginForm />
           <p className="mt-8 text-xs leading-5 text-slate-400">Dengan masuk, Anda mengakses data sesuai membership dan kebijakan keamanan organisasi Anda.</p>
         </div>
       </section>
-      <aside className="relative hidden overflow-hidden bg-slate-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute -right-24 -top-24 size-96 rounded-full bg-emerald-500/25 blur-3xl" />
-        <div className="absolute -bottom-20 -left-20 size-80 rounded-full bg-lime-400/10 blur-3xl" />
+      <aside className="relative hidden overflow-hidden bg-[#0f1b2d] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute -right-24 -top-24 size-96 rounded-full bg-[#0f8a72]/25 blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 size-80 rounded-full bg-[#f2994a]/10 blur-3xl" />
         <div className="relative">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-emerald-300">Owner-first operating system</span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-[#57c9ad]">Sistem operasional untuk pemilik bisnis</span>
           <blockquote className="mt-10 max-w-xl text-4xl font-semibold leading-tight tracking-[-0.045em]">“Satu tempat untuk melihat apa yang terjadi, apa yang tertunda, dan apa yang harus dilakukan berikutnya.”</blockquote>
         </div>
         <div className="relative grid grid-cols-3 gap-3">

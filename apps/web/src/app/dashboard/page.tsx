@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { NoOrganizationState } from "@/components/no-organization-state";
 import { loadAuthContext } from "@/lib/auth-context";
+import { defaultWorkspacePath, loadCapabilities } from "@/lib/authorization";
 import { loadDashboardData } from "@/lib/pilot-data";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,6 +31,9 @@ export default async function DashboardPage() {
     return redirect("/organizations");
   }
 
+  const capabilities = await loadCapabilities(supabase);
+  const landingPath = defaultWorkspacePath(capabilities);
+  if (landingPath !== "/dashboard") redirect(landingPath);
   const data = await loadDashboardData(supabase, activeOrganization.id);
 
   return (
@@ -38,6 +42,7 @@ export default async function DashboardPage() {
       activeOrganization={activeOrganization}
       userEmail={context.user.email ?? "Akun Operro"}
       data={data}
+      capabilities={capabilities}
     />
   );
 }

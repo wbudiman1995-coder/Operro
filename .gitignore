@@ -5,3 +5,6 @@ node_modules/
 **/*.tsbuildinfo
 .vercel
 .env*
+.claude/
+supabase/.branches/
+supabase/.temp/

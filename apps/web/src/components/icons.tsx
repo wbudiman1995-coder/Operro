@@ -4,6 +4,7 @@
  * - DashboardIcon, CalendarIcon, CustomersIcon, TasksIcon, SettingsIcon, ChevronIcon, ArrowIcon, BuildingIcon.
  * - GroomingIcon, CatalogIcon, ProgramsIcon, InventoryIcon, FinanceIcon, ReportsIcon.
  * - BookingIcon: booking creation entry point, distinct from the calendar board.
+ * - PayrollIcon, MyScheduleIcon, LeaderboardIcon, FollowupIcon.
  */
 import type { SVGProps } from "react";
 
@@ -129,4 +130,20 @@ export function FinanceIcon(props: IconProps) {
 
 export function ReportsIcon(props: IconProps) {
   return <LightweightIcon {...props}><path d="M4 20V10M10 20V4M16 20v-7M22 20V7"/></LightweightIcon>;
+}
+
+export function PayrollIcon(props: IconProps) {
+  return <LightweightIcon {...props}><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 6v12M18 6v12"/></LightweightIcon>;
+}
+
+export function MyScheduleIcon(props: IconProps) {
+  return <LightweightIcon {...props}><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 2v4M15 2v4M9 13l2 2 4-4"/></LightweightIcon>;
+}
+
+export function LeaderboardIcon(props: IconProps) {
+  return <LightweightIcon {...props}><path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4a2 2 0 0 0 2 4M17 6h3a2 2 0 0 1-2 4"/></LightweightIcon>;
+}
+
+export function FollowupIcon(props: IconProps) {
+  return <LightweightIcon {...props}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></LightweightIcon>;
 }

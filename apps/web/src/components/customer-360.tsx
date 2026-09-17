@@ -32,10 +32,10 @@ export function buildWhatsAppUrl(phone: string | null, message?: string): string
 export function Customer360Header({ overview }: { overview: CustomerOverview }) {
   const waUrl = buildWhatsAppUrl(overview.phone, `Halo ${overview.name},`);
   return (
-    <header className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+    <header className="rounded-[14px] border border-[#e4e7ec] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.06)] sm:p-7">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-emerald-700">Profil 360</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0f8a72]">Profil 360</p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold tracking-[-0.04em]">{overview.name}</h1>
             <StatusBadge status={overview.status} />
@@ -48,7 +48,7 @@ export function Customer360Header({ overview }: { overview: CustomerOverview }) 
           {overview.addressLine ? <p className="mt-1 max-w-xl text-xs leading-5 text-slate-400">{overview.addressLine}</p> : null}
         </div>
 
-        <div className="shrink-0 rounded-2xl bg-slate-50 px-5 py-4">
+        <div className="shrink-0 rounded-[12px] border border-[#e4e7ec] bg-[#fbfbfc] px-5 py-4">
           <p className="text-xs font-semibold text-slate-400">Total pembayaran masuk</p>
           {overview.spendByCurrency === null ? (
             <>
@@ -76,12 +76,12 @@ export function Customer360Header({ overview }: { overview: CustomerOverview }) 
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        {waUrl ? <a href={waUrl} target="_blank" rel="noreferrer" className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100">Buka WhatsApp</a> : null}
-        {overview.mapsUrl ? <a href={overview.mapsUrl} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-200">Lihat lokasi</a> : null}
+        {waUrl ? <a href={waUrl} target="_blank" rel="noreferrer" className="rounded-[10px] bg-[#e3f5f1] px-3 py-2 text-xs font-bold text-[#0b6e5a] transition hover:bg-[#d2eee7]">Buka WhatsApp</a> : null}
+        {overview.mapsUrl ? <a href={overview.mapsUrl} target="_blank" rel="noreferrer" className="rounded-[10px] bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-200">Lihat lokasi</a> : null}
         {/* customerId is a preselection HINT only. /bookings re-reads it server-side,
             organization-scoped, and ignores it when the customer is not accessible. */}
-        <Link href={`/bookings?customerId=${encodeURIComponent(overview.id)}#booking-baru`} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800">Buat booking</Link>
-        <Link href="/schedule" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50">Lihat kalender</Link>
+        <Link href={`/bookings?customerId=${encodeURIComponent(overview.id)}#booking-baru`} className="rounded-[10px] bg-[#0f8a72] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#0b6e5a]">Buat booking</Link>
+        <Link href="/schedule" className="rounded-[10px] border border-[#e4e7ec] px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-[#fbfbfc]">Lihat kalender</Link>
       </div>
     </header>
   );
@@ -106,7 +106,7 @@ export function Customer360Tabs({
             key={tab}
             href={`/customers/${customerId}?tab=${tab}`}
             aria-current={active ? "page" : undefined}
-            className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition ${active ? "bg-emerald-600 text-white" : "bg-white text-slate-500 ring-1 ring-slate-200 hover:text-slate-800"}`}
+            className={`shrink-0 rounded-[10px] px-3.5 py-2 text-xs font-bold transition ${active ? "bg-[#0f8a72] text-white" : "bg-white text-slate-500 ring-1 ring-[#e4e7ec] hover:text-slate-800"}`}
           >
             {CUSTOMER_360_TAB_LABELS[tab]}
           </Link>

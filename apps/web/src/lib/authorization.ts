@@ -32,8 +32,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const CAPABILITY_KEYS = [
   "booking.read",
+  "customer.read",
   "finance.read",
+  "inventory.read",
   "membership.read",
+  "payroll.read",
+  "reports.view",
+  "service.manage",
+  "task.manage",
   // Batch 1B write capabilities.
   "booking.update",
   "booking.create",
@@ -128,4 +134,21 @@ export async function explainAuthorization(
     allowed: payload.allowed === true,
     reason: typeof payload.reason === "string" ? payload.reason : "unknown",
   };
+}
+
+/** Chooses a useful landing page from live capabilities after organization resolution. */
+export function defaultWorkspacePath(capabilities: CapabilityMap): string {
+  const hasManagementSurface =
+    capabilities["booking.create"] ||
+    capabilities["customer.read"] ||
+    capabilities["finance.read"] ||
+    capabilities["inventory.read"] ||
+    capabilities["membership.read"] ||
+    capabilities["payroll.read"] ||
+    capabilities["reports.view"] ||
+    capabilities["service.manage"] ||
+    capabilities["task.manage"];
+  if (hasManagementSurface) return "/dashboard";
+  if (capabilities["booking.read"]) return "/my-schedule";
+  return "/organizations";
 }

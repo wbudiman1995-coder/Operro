@@ -96,7 +96,7 @@ export function LoginForm() {
           required
           disabled={loading}
           placeholder="nama@bisnis.com"
-          className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-50"
+          className="h-12 w-full rounded-[10px] border border-[#e4e7ec] bg-white px-4 text-sm text-[#1a2233] outline-none transition placeholder:text-slate-400 focus:border-[#0f8a72] focus:ring-4 focus:ring-[#0f8a72]/10 disabled:cursor-not-allowed disabled:bg-slate-50"
         />
       </div>
 
@@ -117,14 +117,14 @@ export function LoginForm() {
           required
           disabled={loading}
           placeholder="••••••••"
-          className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-50"
+          className="h-12 w-full rounded-[10px] border border-[#e4e7ec] bg-white px-4 text-sm text-[#1a2233] outline-none transition placeholder:text-slate-400 focus:border-[#0f8a72] focus:ring-4 focus:ring-[#0f8a72]/10 disabled:cursor-not-allowed disabled:bg-slate-50"
         />
       </div>
 
       <button
         type="submit"
         disabled={loading}
-        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-slate-950 px-5 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-12 w-full items-center justify-center rounded-[10px] bg-[#0f1b2d] px-5 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:bg-[#0f8a72] focus:outline-none focus:ring-4 focus:ring-[#0f8a72]/20 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading ? (
           <span className="inline-flex items-center gap-2">

@@ -126,7 +126,7 @@ export function OrganizationSwitcher({
               onChange={(event: ChangeEvent<HTMLSelectElement>) =>
                 setSelectedId(event.target.value)
               }
-              className="h-11 w-full appearance-none truncate rounded-xl border border-slate-200 bg-white pl-3 pr-9 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 disabled:opacity-60"
+              className="h-10 w-full appearance-none truncate rounded-[10px] border border-[#e4e7ec] bg-white pl-3 pr-9 text-sm font-semibold text-[#1a2233] outline-none transition focus:border-[#0f8a72] focus:ring-4 focus:ring-[#0f8a72]/10 disabled:opacity-60"
             >
               {organizations.map((organization) => (
                 <option key={organization.id} value={organization.id}>
@@ -140,7 +140,7 @@ export function OrganizationSwitcher({
             type="button"
             disabled={Boolean(switchingId) || selectedId === activeOrganizationId}
             onClick={() => void switchOrganization(selectedId)}
-            className="h-11 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-10 rounded-[10px] bg-[#0f1b2d] px-4 text-sm font-semibold text-white transition hover:bg-[#0f8a72] focus:outline-none focus:ring-4 focus:ring-[#0f8a72]/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {switchingId ? "Memuat…" : "Ganti"}
           </button>
@@ -167,9 +167,9 @@ export function OrganizationSwitcher({
               type="button"
               disabled={Boolean(switchingId)}
               onClick={() => void switchOrganization(organization.id)}
-              className="group flex min-h-36 w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-950/5 focus:outline-none focus:ring-4 focus:ring-emerald-500/15 disabled:cursor-wait disabled:opacity-60"
+              className="group flex min-h-36 w-full items-center gap-4 rounded-[14px] border border-[#e4e7ec] bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#0f8a72]/40 hover:shadow-xl hover:shadow-slate-950/5 focus:outline-none focus:ring-4 focus:ring-[#0f8a72]/15 disabled:cursor-wait disabled:opacity-60"
             >
-              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-100">
+              <span className="grid size-12 shrink-0 place-items-center rounded-[12px] bg-[#e3f5f1] text-[#0f8a72] transition group-hover:bg-[#d2eee7]">
                 <BuildingIcon className="size-6" />
               </span>
               <span className="min-w-0 flex-1">
