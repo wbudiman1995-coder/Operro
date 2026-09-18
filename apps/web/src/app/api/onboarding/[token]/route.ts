@@ -1,0 +1,5 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+export async function GET(_request:Request,{params}:{params:Promise<{token:string}>}){const {token}=await params;const supabase=await createClient();const {data,error}=await supabase.schema("app").rpc("get_customer_onboarding_link",{p_token:token});if(error||!data?.[0])return NextResponse.json({valid:false,status:"invalid"},{status:404});return NextResponse.json(data[0],{headers:{"cache-control":"no-store"}})}
+export async function POST(request:Request,{params}:{params:Promise<{token:string}>}){try{const {token}=await params;const payload=await request.json();const supabase=await createClient();const {data,error}=await supabase.schema("app").rpc("submit_customer_onboarding",{p_token:token,p_payload:payload});if(error)return NextResponse.json({error:error.message.includes("expired")?"expired":"invalid_submission"},{status:400});return NextResponse.json({submissionId:data},{status:201})}catch{return NextResponse.json({error:"invalid_submission"},{status:400})}}

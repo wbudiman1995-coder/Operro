@@ -16,7 +16,7 @@ export default async function CustomersPage() {
   const incompleteLocations = data.customers.filter((customer) => customer.addresses.length === 0 || customer.addresses.every((address) => address.latitude === null || address.longitude === null)).length;
 
   return <WorkspaceShell {...workspace} activePath="/customers">
-    <PageHeader eyebrow="CRM HomePaw" title="Pelanggan & hewan" description="Satu profil pelanggan untuk semua hewan, alamat home service, catatan grooming, dan saldo paket." />
+    <PageHeader eyebrow="CRM HomePaw" title="Pelanggan & hewan" description="Satu profil pelanggan untuk semua hewan, alamat home service, catatan grooming, dan saldo paket." action={<Link href="/customers/onboarding" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">Link pendaftaran</Link>} />
     {incompleteLocations > 0 ? <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">{incompleteLocations} pelanggan belum memiliki alamat dengan koordinat lengkap. Lengkapi sebelum menyusun rute home service.</p> : null}
     <div className="mt-7 grid gap-5 xl:grid-cols-2"><FastCustomerImport /><section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="font-bold">Tambah pelanggan manual</h2><p className="mb-5 mt-1 text-xs text-slate-500">Hewan dan alamat pertama dapat langsung ditambahkan bersama profil pelanggan.</p><CustomerForm /></section></div>
     <section className="mt-7 space-y-4">
