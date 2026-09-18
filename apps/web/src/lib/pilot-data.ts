@@ -249,6 +249,7 @@ export interface MyScheduleJob {
   fulfillmentMode: string;
   dispatchStage: string | null;
   evidence: Array<{ id: string; category: string; filename: string; url: string; createdAt: string }>;
+  stylingReferences: Array<{ id: string; petId: string; filename: string; caption: string | null; url: string; expiresAt: string; createdAt: string }>;
   /** Immutable booking-time snapshot — never the customer's current saved address. */
   address: { formattedLine: string; landmark: string | null; accessNotes: string | null; mapsUrl: string } | null;
 }
@@ -289,12 +290,13 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
   const gjps = await supabase.from("grooming_job_pets").select("id,grooming_job_id,pet_id,status").in("assigned_resource_id", resourceIds).in("grooming_job_id", bookingIds).neq("status", "complete").is("deleted_at", null);
   assertResult("my_schedule_gjps", gjps.error); if (!(gjps.data ?? []).length) return [];
   const petIds = [...new Set((gjps.data ?? []).map((row) => row.pet_id))]; const gjpIds = (gjps.data ?? []).map((row) => row.id);
-  const [pets, lines, evidenceLinks] = await Promise.all([
+  const [pets, lines, evidenceLinks, stylingLinks] = await Promise.all([
     supabase.from("pets").select("id,name").eq("organization_id", organizationId).in("id", petIds),
     supabase.from("grooming_job_pet_services").select("grooming_job_pet_id,service_name_snapshot").eq("organization_id", organizationId).in("grooming_job_pet_id", gjpIds).is("deleted_at", null),
     supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", bookingIds),
+    supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "pet").in("subject_id", petIds),
   ]);
-  assertResult("my_schedule_pets", pets.error); assertResult("my_schedule_lines", lines.error); assertResult("my_schedule_evidence_links", evidenceLinks.error);
+  assertResult("my_schedule_pets", pets.error); assertResult("my_schedule_lines", lines.error); assertResult("my_schedule_evidence_links", evidenceLinks.error); assertResult("my_schedule_styling_links", stylingLinks.error);
   const attachmentIds = [...new Set((evidenceLinks.data ?? []).map((link) => link.attachment_id))];
   const evidenceResult = attachmentIds.length > 0
     ? await supabase.from("attachments").select("id,storage_bucket,storage_path,filename,metadata,created_at").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null)
@@ -311,6 +313,23 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
     const items = evidenceByPetJob.get(petJobId) ?? [];
     items.push({ id: attachment.id, category: typeof metadata.category === "string" ? metadata.category : "other", filename: attachment.filename, url: signed.data.signedUrl, createdAt: attachment.created_at });
     evidenceByPetJob.set(petJobId, items);
+  }));
+  const stylingAttachmentIds = [...new Set((stylingLinks.data ?? []).map((link) => link.attachment_id))];
+  const stylingResult = stylingAttachmentIds.length > 0
+    ? await supabase.from("attachments").select("id,storage_bucket,storage_path,filename,metadata,created_at").eq("organization_id", organizationId).eq("storage_bucket", "styling-references").in("id", stylingAttachmentIds).is("deleted_at", null)
+    : { data: [], error: null };
+  assertResult("my_schedule_styling_references", stylingResult.error);
+  const petByStylingAttachment = new Map((stylingLinks.data ?? []).map((link) => [link.attachment_id, link.subject_id]));
+  const stylingByPet = new Map<string, MyScheduleJob["stylingReferences"]>();
+  await Promise.all((stylingResult.data ?? []).map(async (attachment) => {
+    const metadata = typeof attachment.metadata === "object" && attachment.metadata !== null && !Array.isArray(attachment.metadata) ? attachment.metadata as Record<string, unknown> : {};
+    const petId = petByStylingAttachment.get(attachment.id); const expiresAt = typeof metadata.expires_at === "string" ? metadata.expires_at : "";
+    if (!petId || metadata.kind !== "styling_reference" || !expiresAt || Date.parse(expiresAt) <= Date.now()) return;
+    const signed = await supabase.storage.from(attachment.storage_bucket).createSignedUrl(attachment.storage_path, 1800);
+    if (signed.error || !signed.data?.signedUrl) return;
+    const items = stylingByPet.get(petId) ?? [];
+    items.push({ id: attachment.id, petId, filename: attachment.filename, caption: typeof metadata.caption === "string" && metadata.caption ? metadata.caption : null, url: signed.data.signedUrl, expiresAt, createdAt: attachment.created_at });
+    stylingByPet.set(petId, items);
   }));
   const bookingMap = new Map((bookings.data ?? []).map((row) => [row.id, row])); const petMap = new Map((pets.data ?? []).map((row) => [row.id, row.name]));
   const servicesByGjp = new Map<string, string[]>(); for (const row of lines.data ?? []) { const arr = servicesByGjp.get(row.grooming_job_pet_id) ?? []; arr.push(row.service_name_snapshot); servicesByGjp.set(row.grooming_job_pet_id, arr); }
@@ -329,6 +348,7 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
       fulfillmentMode: booking?.fulfillment_mode ?? "in_store",
       dispatchStage: booking?.dispatch_stage ?? null,
       evidence: (evidenceByPetJob.get(row.id) ?? []).sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+      stylingReferences: (stylingByPet.get(row.pet_id) ?? []).sort((left,right)=>right.createdAt.localeCompare(left.createdAt)),
       address: readAddressSnapshot(booking?.address_snapshot),
     };
   }).sort((a, b) => a.startsAt.localeCompare(b.startsAt));

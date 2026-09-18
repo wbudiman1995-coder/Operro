@@ -4,6 +4,7 @@ import Image from "next/image";
 import { startTransition, useActionState, useState } from "react";
 
 import { uploadGroomingEvidenceAction, type PilotActionState } from "@/app/pilot-actions";
+import { compressPhoto } from "@/lib/image-compression";
 
 const initialState: PilotActionState = { error: null, success: null };
 
@@ -36,24 +37,6 @@ export function GroomingEvidenceForm({ bookingId, petJobId }: { bookingId: strin
       <button disabled={pending || preparing} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{preparing ? "Menyiapkan…" : pending ? "Mengunggah…" : "Unggah foto"}</button>
     </div>
   </form>;
-}
-
-async function compressPhoto(file: File): Promise<File> {
-  if (file.size <= 1_200_000 || !file.type.startsWith("image/")) return file;
-  try {
-    const bitmap = await createImageBitmap(file);
-    const ratio = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
-    canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
-    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
-    if (!blob || blob.size >= file.size) return file;
-    return new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "foto"}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
-  } catch {
-    return file;
-  }
 }
 
 export function GroomingEvidenceGallery({ evidence }: { evidence: Array<{ id: string; category: string; filename: string; url: string; createdAt: string }> }) {

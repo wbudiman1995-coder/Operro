@@ -40,11 +40,12 @@ export const CUSTOMER_INVOICE_LIMIT = 40;
 export const CUSTOMER_HISTORY_LIMIT = 60;
 export const CUSTOMER_PAYMENT_LIMIT = 500;
 
-export const CUSTOMER_360_TABS = ["pets", "addresses", "bookings", "invoices", "packages", "notes", "history"] as const;
+export const CUSTOMER_360_TABS = ["pets", "style", "addresses", "bookings", "invoices", "packages", "notes", "history"] as const;
 export type Customer360Tab = (typeof CUSTOMER_360_TABS)[number];
 
 export const CUSTOMER_360_TAB_LABELS: Record<Customer360Tab, string> = {
   pets: "Hewan",
+  style: "Referensi gaya",
   addresses: "Alamat",
   bookings: "Booking",
   invoices: "Invoice",
@@ -56,6 +57,7 @@ export const CUSTOMER_360_TAB_LABELS: Record<Customer360Tab, string> = {
 /** Permission required to read each tab, or null when membership alone is sufficient. */
 export const CUSTOMER_360_TAB_CAPABILITY: Record<Customer360Tab, keyof CapabilityMap | null> = {
   pets: null,
+  style: null,
   addresses: null,
   bookings: "booking.read",
   invoices: "finance.read",
@@ -116,6 +118,46 @@ export interface CustomerOverview {
   spendByCurrency: CurrencyTotal[] | null;
   spendCapped: boolean;
   pets: CustomerPetProfile[];
+}
+
+export interface CustomerStylingReference {
+  id: string;
+  petId: string;
+  filename: string;
+  caption: string | null;
+  url: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+/** Active, private style photos linked to this customer's pets. Expired rows are
+ * hidden immediately even before the later storage-maintenance job removes bytes. */
+export async function loadCustomerStylingReferences(
+  supabase: SupabaseClient,
+  organizationId: string,
+  petIds: string[],
+): Promise<CustomerStylingReference[]> {
+  if (petIds.length === 0) return [];
+  const links = await supabase.from("attachment_links").select("attachment_id,subject_id")
+    .eq("organization_id", organizationId).eq("subject_type", "pet").in("subject_id", petIds);
+  assertResult("customer_styling_links", links.error);
+  const attachmentIds = [...new Set((links.data ?? []).map((row) => row.attachment_id))];
+  if (attachmentIds.length === 0) return [];
+  const attachments = await supabase.from("attachments").select("id,storage_bucket,storage_path,filename,metadata,created_at")
+    .eq("organization_id", organizationId).eq("storage_bucket", "styling-references").in("id", attachmentIds).is("deleted_at", null);
+  assertResult("customer_styling_references", attachments.error);
+  const petByAttachment = new Map((links.data ?? []).map((row) => [row.attachment_id, row.subject_id]));
+  const now = Date.now();
+  const results = await Promise.all((attachments.data ?? []).map(async (row): Promise<CustomerStylingReference | null> => {
+    const metadata = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) ? row.metadata as Record<string, unknown> : {};
+    const expiresAt = typeof metadata.expires_at === "string" ? metadata.expires_at : "";
+    const petId = petByAttachment.get(row.id);
+    if (metadata.kind !== "styling_reference" || !petId || !expiresAt || Date.parse(expiresAt) <= now) return null;
+    const signed = await supabase.storage.from(row.storage_bucket).createSignedUrl(row.storage_path, 1800);
+    if (signed.error || !signed.data?.signedUrl) return null;
+    return { id: row.id, petId, filename: row.filename, caption: typeof metadata.caption === "string" && metadata.caption ? metadata.caption : null, url: signed.data.signedUrl, expiresAt, createdAt: row.created_at };
+  }));
+  return results.filter((row): row is CustomerStylingReference => row !== null).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
 }
 
 export interface CustomerAddress {

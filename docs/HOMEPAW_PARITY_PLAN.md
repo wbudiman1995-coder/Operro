@@ -14,7 +14,7 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 2 | Customer CRM | Partial+ | Maps paste/short-link parsing added; add sort/filter, customer code, richer editing and bulk location repair |
 | 3 | Customer 360 | Partial+ | Addresses, spend, pets, booking, invoice, package, notes and timeline exist; add editing, balances, visit summary and custom fields |
 | 4 | Pet database | Partial | Add pet CRUD UI, coat/profile fields, wash counters and last-groomed automation |
-| 5 | Styling references | Missing | Private photo storage, compression, expiry and groomer visibility |
+| 5 | Styling references | Implemented foundation | Private tenant storage, browser compression, expiry, Customer 360 upload/delete and groomer schedule visibility exist; add public onboarding upload and automated expired-byte cleanup |
 | 6 | Fast customer entry | Implemented foundation | Booking-chat parser, editable multi-pet preview, Maps expansion, duplicate-phone guard and tenant-scoped import are live; expand fuzzy city dictionaries as real templates require |
 | 7 | Customer self-onboarding | Implemented foundation | Hashed two-day single-use links, public multi-pet form, duplicate warning, approve/merge, reject and revoke exist; add styling-reference uploads and configurable invitation templates |
 | 8 | Complimentary next appointment | Missing | One-use discount rule and atomic consumption |

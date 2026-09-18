@@ -8,6 +8,7 @@ import { setDispatchStageAction, updatePetJobStatusAction } from "@/app/pilot-ac
 import { ActionSubmitButton } from "@/components/action-submit-button";
 import { buildWhatsAppUrl } from "@/components/customer-360";
 import { GroomingEvidenceForm, GroomingEvidenceGallery } from "@/components/grooming-evidence-form";
+import { StylingReferenceGallery } from "@/components/styling-references";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { loadMyScheduleWorkspace } from "@/lib/pilot-data";
@@ -59,6 +60,7 @@ export default async function MySchedulePage() {
             </div>;
           })() : null}
           <GroomingEvidenceGallery evidence={job.evidence} />
+          <StylingReferenceGallery photos={job.stylingReferences} petNames={{[job.stylingReferences[0]?.petId??""]:job.petName}} compact />
           <GroomingEvidenceForm bookingId={job.bookingId} petJobId={job.groomingJobPetId} />
           <form action={updatePetJobStatusAction} className="mt-4 flex gap-2">
             <input type="hidden" name="petJobId" value={job.groomingJobPetId} />

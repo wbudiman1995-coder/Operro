@@ -28,6 +28,7 @@ import { CustomerAddressActions, CustomerAddressForm } from "@/components/custom
 import { EmptyState, StatusBadge } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
+import { StylingReferenceGallery, StylingReferenceUploader } from "@/components/styling-references";
 import { loadCapabilities } from "@/lib/authorization";
 import { loadBranchTimezones } from "@/lib/branch-context";
 import {
@@ -38,6 +39,7 @@ import {
   loadCustomerInvoices,
   loadCustomerOverview,
   loadCustomerPackages,
+  loadCustomerStylingReferences,
   parseCustomer360Tab,
   visibleCustomer360Tabs,
 } from "@/lib/customer-360";
@@ -86,6 +88,7 @@ export default async function CustomerDetailPage({
   const bookings = tab === "bookings" && tabPermitted ? await loadCustomerBookings(workspace.supabase, organizationId, customerId) : [];
   const invoices = tab === "invoices" && tabPermitted ? await loadCustomerInvoices(workspace.supabase, organizationId, customerId) : [];
   const packages = tab === "packages" && tabPermitted ? await loadCustomerPackages(workspace.supabase, organizationId, customerId) : [];
+  const stylingReferences = tab === "style" && tabPermitted ? await loadCustomerStylingReferences(workspace.supabase, organizationId, overview.pets.map((pet) => pet.id)) : [];
   const history =
     tab === "history" && tabPermitted
       ? await loadCustomerHistory(workspace.supabase, organizationId, customerId, overview.pets.map((pet) => pet.id))
@@ -170,6 +173,13 @@ export default async function CustomerDetailPage({
               ))}
             </div>
           )
+        ) : null}
+
+        {tabPermitted && tab === "style" ? (
+          <div className="space-y-4">
+            {overview.pets.length > 0 && capabilities["customer.manage"] ? <StylingReferenceUploader customerId={customerId} pets={overview.pets.map((pet)=>({id:pet.id,name:pet.name}))}/> : null}
+            {stylingReferences.length === 0 ? <EmptyState title="Belum ada referensi gaya" description="Simpan foto model potongan agar groomer dapat melihatnya langsung pada jadwal layanan."/> : <StylingReferenceGallery photos={stylingReferences} petNames={Object.fromEntries(overview.pets.map((pet)=>[pet.id,pet.name]))} customerId={customerId} canManage={Boolean(capabilities["customer.manage"])}/>}
+          </div>
         ) : null}
 
         {tabPermitted && tab === "addresses" ? (
@@ -319,7 +329,7 @@ export default async function CustomerDetailPage({
 
       <p className="mt-7 rounded-2xl border border-dashed border-slate-200 px-4 py-4 text-[11px] leading-5 text-slate-400">
         Alamat dapat dikelola langsung pada tab Alamat di atas. Data pelanggan lainnya masih baca-saja — ubah pada halaman <Link href="/customers" className="font-semibold text-emerald-700 underline">Pelanggan</Link>.
-        Foto before/after menyusul pada Batch 2 dengan penyimpanan privat.
+        Foto layanan dan referensi gaya disimpan privat dan hanya tersedia untuk anggota workspace aktif.
       </p>
     </WorkspaceShell>
   );
