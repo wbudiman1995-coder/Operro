@@ -7,6 +7,7 @@
  * - createTaskAction / updateTaskStatusAction: manages operational tasks.
  * - transitionBookingAction / updatePetJobStatusAction: advances grooming work.
  * - setDispatchStageAction: advances a home-service booking's dispatch stage (scheduled/en_route/arrived/in_service), independent of bookings.status.
+ * - uploadGroomingEvidenceAction: stores private, booking-linked grooming evidence for an assigned groomer.
  * - updateGroomingChecklistAction / issueInvoiceForBookingAction: closes the service-to-cash loop.
  * - createServiceAction / createResourceAction: configures the operating catalog.
  * - adjustInventoryAction: appends an inventory adjustment movement.
@@ -46,7 +47,7 @@ async function workspace() {
   const supabase = await createClient();
   const context = await loadAuthContext(supabase);
   if (!context?.activeOrganization) return null;
-  return { supabase, organizationId: context.activeOrganization.id };
+  return { supabase, organizationId: context.activeOrganization.id, userId: context.user.id };
 }
 
 function databaseError(scope: string, message: string) {
@@ -249,6 +250,59 @@ export async function setDispatchStageAction(formData: FormData) {
   if (!bookingId || !allowedDispatchStages.has(stage)) return;
   await context.supabase.schema("app").rpc("fn_set_dispatch_stage", { p_booking: bookingId, p_stage: stage });
   revalidatePath("/operations"); revalidatePath("/my-schedule");
+}
+
+const allowedEvidenceCategories = new Set(["before", "after", "ear", "hygiene", "dematting", "fungal", "injury", "other", "attendance"]);
+const evidenceMimeExtensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+export async function uploadGroomingEvidenceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace();
+  if (!context) return databaseError("Foto", "sesi atau workspace aktif tidak tersedia");
+  const petJobId = idValue(formData, "petJobId");
+  const bookingId = idValue(formData, "bookingId");
+  const category = textValue(formData, "category", 30);
+  const file = formData.get("photo");
+  if (!petJobId || !bookingId || !allowedEvidenceCategories.has(category)) return databaseError("Foto", "data pekerjaan tidak valid");
+  if (!(file instanceof File) || file.size === 0) return databaseError("Foto", "pilih foto terlebih dahulu");
+  const extension = evidenceMimeExtensions[file.type];
+  if (!extension) return databaseError("Foto", "format harus JPG, PNG, atau WebP");
+  if (file.size > 4 * 1024 * 1024) return databaseError("Foto", "ukuran maksimum 4 MB setelah kompresi");
+
+  const membership = await context.supabase.from("memberships").select("id").eq("organization_id", context.organizationId).eq("user_id", context.userId).eq("status", "active").is("deleted_at", null).maybeSingle();
+  if (membership.error || !membership.data) return databaseError("Foto", "membership groomer tidak ditemukan");
+  const resources = await context.supabase.from("resources").select("id").eq("organization_id", context.organizationId).eq("membership_id", membership.data.id).eq("status", "active").is("deleted_at", null);
+  if (resources.error) return databaseError("Foto", resources.error.message);
+  const resourceIds = (resources.data ?? []).map((resource) => resource.id);
+  if (resourceIds.length === 0) return databaseError("Foto", "akun ini belum terhubung ke profil groomer");
+  const assignment = await context.supabase.from("grooming_job_pets").select("id,grooming_job_id").eq("organization_id", context.organizationId).eq("id", petJobId).eq("grooming_job_id", bookingId).in("assigned_resource_id", resourceIds).is("deleted_at", null).maybeSingle();
+  if (assignment.error || !assignment.data) return databaseError("Foto", "pekerjaan ini tidak ditugaskan ke akun Anda");
+
+  const storagePath = `${context.organizationId}/${bookingId}/${petJobId}/${crypto.randomUUID()}.${extension}`;
+  const upload = await context.supabase.storage.from("attachments").upload(storagePath, file, { contentType: file.type, upsert: false });
+  if (upload.error) return databaseError("Foto gagal diunggah", upload.error.message);
+
+  const attachment = await context.supabase.from("attachments").insert({
+    organization_id: context.organizationId,
+    storage_bucket: "attachments",
+    storage_path: storagePath,
+    filename: file.name.slice(0, 200) || `${category}.${extension}`,
+    mime_type: file.type,
+    size_bytes: file.size,
+    uploaded_by: context.userId,
+    metadata: { category, grooming_job_pet_id: petJobId },
+  }).select("id").single();
+  if (attachment.error || !attachment.data) {
+    await context.supabase.storage.from("attachments").remove([storagePath]);
+    return databaseError("Metadata foto gagal disimpan", attachment.error?.message ?? "unknown");
+  }
+  const link = await context.supabase.from("attachment_links").insert({ organization_id: context.organizationId, attachment_id: attachment.data.id, subject_type: "booking", subject_id: bookingId });
+  if (link.error) {
+    await context.supabase.from("attachments").delete().eq("organization_id", context.organizationId).eq("id", attachment.data.id);
+    await context.supabase.storage.from("attachments").remove([storagePath]);
+    return databaseError("Foto gagal ditautkan", link.error.message);
+  }
+  revalidatePath("/my-schedule"); revalidatePath("/operations");
+  return { error: null, success: "Foto berhasil disimpan." };
 }
 
 export async function updateGroomingChecklistAction(formData: FormData) {

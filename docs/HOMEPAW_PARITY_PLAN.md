@@ -37,7 +37,7 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 25 | Membership administration | Partial | Balances exist; add lifecycle filters, urgency, edit/renew/details/archive |
 | 26 | Subscription reconciliation | Missing | Review-only recomputation and guarded per-membership repair |
 | 27 | Invoice documents and communication | Partial | Invoice lines exist; add branded preview/PDF, terms/photo pages and WhatsApp templates |
-| 28 | Grooming photo documentation | Schema only | Build private attachment upload/capture, categories, timestamps and document inclusion |
+| 28 | Grooming photo documentation | Partial+ | Private categorized field capture/gallery exists; add compression, deletion, admin history and document inclusion |
 | 29 | Payment control | Partial | Payments exist; add screenshot-confirmed/bank-validated stages and locked validated records |
 | 30 | Visit management | Partial | Booking/job execution exists; add explicit visit register, manual billing and unmatched-visit handling |
 | 31 | Financial operations | Partial | Invoices, payments and expenses exist; add capital/cash-on-hand, refunds, status drill-down and exports |
@@ -52,7 +52,7 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 40 | Custom fields | Schema metadata only | Admin builder and customer/pet rendering/editor |
 | 41 | Accounts and permissions | Implemented foundation | Multi-org membership and capabilities exist; add staff invitation and role-management UI |
 | 42 | Personal preferences | Partial | Responsive shell exists; add language, landing page, calendar and dashboard preferences |
-| 43 | Storage and maintenance | Foundation | Attachments table exists; add bucket policy, usage view, cleanup and retention controls |
+| 43 | Storage and maintenance | Partial | Private tenant-partitioned evidence bucket exists; add usage view, cleanup and retention controls |
 | 44 | Reliability and safeguards | Partial+ | RLS, audit, immutable snapshots, state RPCs and tests exist; add idempotency for remaining financial writes, monitoring and recovery UI |
 
 ## Delivery order

@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   experimental: {
     serverActions: {
+      bodySizeLimit: "4mb",
       allowedOrigins: (process.env.OPERRO_SERVER_ACTION_ALLOWED_ORIGINS ?? "")
         .split(",")
         .map((origin) => origin.trim())

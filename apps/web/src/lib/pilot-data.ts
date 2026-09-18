@@ -248,6 +248,7 @@ export interface MyScheduleJob {
   status: string;
   fulfillmentMode: string;
   dispatchStage: string | null;
+  evidence: Array<{ id: string; category: string; filename: string; url: string; createdAt: string }>;
   /** Immutable booking-time snapshot — never the customer's current saved address. */
   address: { formattedLine: string; landmark: string | null; accessNotes: string | null; mapsUrl: string } | null;
 }
@@ -288,11 +289,29 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
   const gjps = await supabase.from("grooming_job_pets").select("id,grooming_job_id,pet_id,status").in("assigned_resource_id", resourceIds).in("grooming_job_id", bookingIds).neq("status", "complete").is("deleted_at", null);
   assertResult("my_schedule_gjps", gjps.error); if (!(gjps.data ?? []).length) return [];
   const petIds = [...new Set((gjps.data ?? []).map((row) => row.pet_id))]; const gjpIds = (gjps.data ?? []).map((row) => row.id);
-  const [pets, lines] = await Promise.all([
+  const [pets, lines, evidenceLinks] = await Promise.all([
     supabase.from("pets").select("id,name").eq("organization_id", organizationId).in("id", petIds),
     supabase.from("grooming_job_pet_services").select("grooming_job_pet_id,service_name_snapshot").eq("organization_id", organizationId).in("grooming_job_pet_id", gjpIds).is("deleted_at", null),
+    supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", bookingIds),
   ]);
-  assertResult("my_schedule_pets", pets.error); assertResult("my_schedule_lines", lines.error);
+  assertResult("my_schedule_pets", pets.error); assertResult("my_schedule_lines", lines.error); assertResult("my_schedule_evidence_links", evidenceLinks.error);
+  const attachmentIds = [...new Set((evidenceLinks.data ?? []).map((link) => link.attachment_id))];
+  const evidenceResult = attachmentIds.length > 0
+    ? await supabase.from("attachments").select("id,storage_bucket,storage_path,filename,metadata,created_at").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null)
+    : { data: [], error: null };
+  assertResult("my_schedule_evidence", evidenceResult.error);
+  const bookingByAttachment = new Map((evidenceLinks.data ?? []).map((link) => [link.attachment_id, link.subject_id]));
+  const evidenceByPetJob = new Map<string, MyScheduleJob["evidence"]>();
+  await Promise.all((evidenceResult.data ?? []).map(async (attachment) => {
+    const metadata = typeof attachment.metadata === "object" && attachment.metadata !== null && !Array.isArray(attachment.metadata) ? attachment.metadata as Record<string, unknown> : {};
+    const petJobId = typeof metadata.grooming_job_pet_id === "string" ? metadata.grooming_job_pet_id : null;
+    if (!petJobId || !gjpIds.includes(petJobId) || bookingByAttachment.get(attachment.id) === undefined) return;
+    const signed = await supabase.storage.from(attachment.storage_bucket).createSignedUrl(attachment.storage_path, 3600);
+    if (signed.error || !signed.data?.signedUrl) return;
+    const items = evidenceByPetJob.get(petJobId) ?? [];
+    items.push({ id: attachment.id, category: typeof metadata.category === "string" ? metadata.category : "other", filename: attachment.filename, url: signed.data.signedUrl, createdAt: attachment.created_at });
+    evidenceByPetJob.set(petJobId, items);
+  }));
   const bookingMap = new Map((bookings.data ?? []).map((row) => [row.id, row])); const petMap = new Map((pets.data ?? []).map((row) => [row.id, row.name]));
   const servicesByGjp = new Map<string, string[]>(); for (const row of lines.data ?? []) { const arr = servicesByGjp.get(row.grooming_job_pet_id) ?? []; arr.push(row.service_name_snapshot); servicesByGjp.set(row.grooming_job_pet_id, arr); }
   return (gjps.data ?? []).map((row) => {
@@ -309,6 +328,7 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
       status: row.status,
       fulfillmentMode: booking?.fulfillment_mode ?? "in_store",
       dispatchStage: booking?.dispatch_stage ?? null,
+      evidence: (evidenceByPetJob.get(row.id) ?? []).sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
       address: readAddressSnapshot(booking?.address_snapshot),
     };
   }).sort((a, b) => a.startsAt.localeCompare(b.startsAt));

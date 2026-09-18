@@ -1,13 +1,13 @@
 /**
  * A staff member's own assigned grooming jobs, for the HomePaw pilot.
  *
- * Narrower than /operations on purpose: no photo capture (attachments exist in the schema
- * for this, but wiring Storage upload is separate work) and no SOP checklist here — just
- * "what's mine, mark it done."
+ * Gives each groomer only their assigned jobs, dispatch controls, private evidence capture,
+ * and the minimal state changes needed in the field.
  */
 import { setDispatchStageAction, updatePetJobStatusAction } from "@/app/pilot-actions";
 import { ActionSubmitButton } from "@/components/action-submit-button";
 import { buildWhatsAppUrl } from "@/components/customer-360";
+import { GroomingEvidenceForm, GroomingEvidenceGallery } from "@/components/grooming-evidence-form";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { loadMyScheduleWorkspace } from "@/lib/pilot-data";
@@ -58,6 +58,8 @@ export default async function MySchedulePage() {
               </form> : null}
             </div>;
           })() : null}
+          <GroomingEvidenceGallery evidence={job.evidence} />
+          <GroomingEvidenceForm bookingId={job.bookingId} petJobId={job.groomingJobPetId} />
           <form action={updatePetJobStatusAction} className="mt-4 flex gap-2">
             <input type="hidden" name="petJobId" value={job.groomingJobPetId} />
             {job.status === "pending" ? <ActionSubmitButton name="status" value="in_progress" pendingLabel="Memulai…" className="rounded-lg border px-3 py-2 text-xs font-bold disabled:cursor-wait disabled:opacity-60">Mulai</ActionSubmitButton> : null}
