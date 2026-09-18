@@ -20,6 +20,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 
 import { loadAuthContext } from "@/lib/auth-context";
+import { loadCapabilities } from "@/lib/authorization";
 import { createClient } from "@/lib/supabase/server";
 
 export interface PilotActionState { error: string | null; success: string | null }
@@ -146,6 +147,56 @@ export async function createCustomerAction(_previous: PilotActionState, formData
   }
   revalidatePath("/customers"); revalidatePath("/bookings"); revalidatePath("/dashboard");
   return { error: null, success: `${name} berhasil ditambahkan.` };
+}
+
+export async function importCustomerHouseholdAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace();
+  if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  const capabilities = await loadCapabilities(context.supabase);
+  if (!capabilities["customer.manage"]) return databaseError("Impor", "Anda tidak memiliki izin mengelola pelanggan");
+  const raw = textValue(formData, "household", 20_000);
+  let payload: Record<string, unknown>;
+  try { payload = JSON.parse(raw) as Record<string, unknown>; } catch { return databaseError("Impor", "hasil parsing tidak valid"); }
+  const name = typeof payload.customerName === "string" ? payload.customerName.trim().slice(0, 120) : "";
+  const phone = typeof payload.phone === "string" ? payload.phone.trim().slice(0, 40) : "";
+  const source = typeof payload.source === "string" ? payload.source.trim().slice(0, 80) : "Fast booking import";
+  const pets = Array.isArray(payload.pets) ? payload.pets.slice(0, 10) : [];
+  if (name.length < 2 || pets.length === 0) return databaseError("Impor", "nama pelanggan dan minimal satu hewan wajib ada");
+  if (phone && !PHONE_PATTERN.test(phone)) return databaseError("Impor", "nomor WhatsApp tidak valid");
+  const petRows = pets.flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const pet = value as Record<string, unknown>;
+    const petName = typeof pet.name === "string" ? pet.name.trim().slice(0, 80) : "";
+    if (!petName) return [];
+    const weight = pet.weightKg === null || pet.weightKg === "" ? null : Number(pet.weightKg);
+    return [{ name: petName, species: pet.species === "cat" ? "cat" : "dog", breed: typeof pet.breed === "string" ? pet.breed.trim().slice(0, 100) || null : null, weight_kg: Number.isFinite(weight) && Number(weight) > 0 ? Number(weight) : null, color: typeof pet.color === "string" ? pet.color.trim().slice(0, 80) || null : null, notes: typeof pet.notes === "string" ? pet.notes.trim().slice(0, 1000) || null : null, metadata: { created_from: "booking_chat_import", stated_age: typeof pet.age === "string" ? pet.age.trim().slice(0, 80) : "" } }];
+  });
+  if (petRows.length !== pets.length) return databaseError("Impor", "setiap hewan harus memiliki nama");
+
+  if (phone) {
+    const localPhone = phone.startsWith("+62") ? `0${phone.slice(3)}` : phone;
+    const duplicate = await context.supabase.from("customers").select("id").eq("organization_id", context.organizationId).is("deleted_at", null).in("phone", [...new Set([phone, localPhone])]).limit(1);
+    if (duplicate.error) return databaseError("Impor", "pemeriksaan duplikat gagal");
+    if ((duplicate.data ?? []).length > 0) return databaseError("Impor", "nomor WhatsApp sudah digunakan pelanggan lain. Buka pelanggan yang ada agar tidak membuat duplikat");
+  }
+
+  const { data: customer, error: customerError } = await context.supabase.from("customers").insert({ organization_id: context.organizationId, display_name: name, phone: phone || null, status: "active", source: source || "Fast booking import", metadata: { created_from: "booking_chat_import", original_maps_input: typeof payload.mapsInput === "string" ? payload.mapsInput.slice(0, 1000) : null } }).select("id").single();
+  if (customerError || !customer) return databaseError("Impor pelanggan gagal", customerError?.message ?? "unknown");
+  const { error: petsError } = await context.supabase.from("pets").insert(petRows.map((pet) => ({ ...pet, organization_id: context.organizationId, customer_id: customer.id, status: "active" })));
+  if (petsError) {
+    await context.supabase.from("customers").update({ deleted_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("id", customer.id);
+    return databaseError("Impor hewan gagal", petsError.message);
+  }
+  const line1 = typeof payload.addressLine === "string" ? payload.addressLine.trim().slice(0, 200) : "";
+  if (line1) {
+    const latitude = payload.latitude === null ? null : Number(payload.latitude);
+    const longitude = payload.longitude === null ? null : Number(payload.longitude);
+    const validCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(Number(latitude)) <= 90 && Math.abs(Number(longitude)) <= 180;
+    const { error: addressError } = await context.supabase.from("customer_addresses").insert({ organization_id: context.organizationId, customer_id: customer.id, label: "Rumah", recipient_name: name, recipient_phone: phone || null, line1, kecamatan: typeof payload.kecamatan === "string" ? payload.kecamatan.trim().slice(0, 100) || null : null, kabupaten_kota: typeof payload.kabupatenKota === "string" ? payload.kabupatenKota.trim().slice(0, 100) || null : null, latitude: validCoordinates ? latitude : null, longitude: validCoordinates ? longitude : null, is_default: true });
+    if (addressError) return { error: null, success: `${name} dan ${petRows.length} hewan dibuat, tetapi alamat perlu diperiksa: ${addressError.message}` };
+  }
+  revalidatePath("/customers"); revalidatePath("/bookings"); revalidatePath("/dashboard");
+  return { error: null, success: `${name} dan ${petRows.length} hewan berhasil diimpor.` };
 }
 
 export async function createCustomerAddressAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {

@@ -2,6 +2,7 @@
 import Link from "next/link";
 
 import { CustomerForm } from "@/components/pilot-forms";
+import { FastCustomerImport } from "@/components/fast-customer-import";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { loadCustomerWorkspace } from "@/lib/pilot-data";
@@ -17,7 +18,7 @@ export default async function CustomersPage() {
   return <WorkspaceShell {...workspace} activePath="/customers">
     <PageHeader eyebrow="CRM HomePaw" title="Pelanggan & hewan" description="Satu profil pelanggan untuk semua hewan, alamat home service, catatan grooming, dan saldo paket." />
     {incompleteLocations > 0 ? <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">{incompleteLocations} pelanggan belum memiliki alamat dengan koordinat lengkap. Lengkapi sebelum menyusun rute home service.</p> : null}
-    <section className="mt-7 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="font-bold">Tambah pelanggan</h2><p className="mb-5 mt-1 text-xs text-slate-500">Hewan dan alamat pertama dapat langsung ditambahkan bersama profil pelanggan.</p><CustomerForm /></section>
+    <div className="mt-7 grid gap-5 xl:grid-cols-2"><FastCustomerImport /><section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="font-bold">Tambah pelanggan manual</h2><p className="mb-5 mt-1 text-xs text-slate-500">Hewan dan alamat pertama dapat langsung ditambahkan bersama profil pelanggan.</p><CustomerForm /></section></div>
     <section className="mt-7 space-y-4">
       {data.customers.length === 0 ? <EmptyState title="Belum ada pelanggan" description="Tambahkan pelanggan pertama untuk mulai menerima booking." /> : data.customers.map((customer) => {
         const address = customer.addresses.find((item) => item.isDefault) ?? customer.addresses[0];

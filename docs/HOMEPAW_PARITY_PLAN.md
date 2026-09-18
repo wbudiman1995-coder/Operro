@@ -15,14 +15,14 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 3 | Customer 360 | Partial+ | Addresses, spend, pets, booking, invoice, package, notes and timeline exist; add editing, balances, visit summary and custom fields |
 | 4 | Pet database | Partial | Add pet CRUD UI, coat/profile fields, wash counters and last-groomed automation |
 | 5 | Styling references | Missing | Private photo storage, compression, expiry and groomer visibility |
-| 6 | Fast customer entry | Missing | Port HomePaw paste parser and multi-pet import preview |
+| 6 | Fast customer entry | Implemented foundation | Booking-chat parser, editable multi-pet preview, Maps expansion, duplicate-phone guard and tenant-scoped import are live; expand fuzzy city dictionaries as real templates require |
 | 7 | Customer self-onboarding | Missing | Token links, public form, review/approve/reject/revoke and duplicate detection |
 | 8 | Complimentary next appointment | Missing | One-use discount rule and atomic consumption |
-| 9 | Advanced calendar | Partial | Day/3-day/week and filters exist; add grouped drag/drop, mass actions, refresh and source badges |
-| 10 | Booking wizard | Partial+ | Multi-pet/service/groomer and fulfillment modes exist; coverage/travel preview added; add slots, category discounts, distinct note types and package allocation |
-| 11 | Recurring appointments | Schema only | Series creation, collision handling and series-aware deletion UI |
-| 12 | Route-aware scheduling | Foundation | Coordinates, service areas, travel snapshot and dispatch exist; add seven-day slot search, Haversine ranking, previous-stop/base comparison and traffic factor |
-| 13 | Availability and blocked days | Partial | Blackouts exist; add weekly schedule editor, served-city dates and conflict warnings |
+| 9 | Advanced calendar | Partial+ | Real day/3-day/week time grid, filters, mobile layout and refresh exist; add grouped drag/drop, mass actions and source badges |
+| 10 | Booking wizard | Partial+ | Multi-pet/service/groomer, fulfillment, coverage/travel preview and ranked seven-day slots exist; add category discounts, distinct note types and package allocation |
+| 11 | Recurring appointments | Partial+ | Series materialization for weekly/biweekly/monthly patterns and skip/stop collision handling exists; add alternative-time and series-aware deletion UI |
+| 12 | Route-aware scheduling | Partial+ | Seven-day common-slot search, Haversine ranking, previous-stop/base comparison, traffic factor and coordinate warnings exist; add anchor-customer choice and daily-city compatibility |
+| 13 | Availability and blocked days | Partial+ | Blackouts, conflict checks and weekly per-groomer schedule editor exist; add served-city dates and business-wide blocks |
 | 14 | Safe deletion | Partial | Soft delete/state controls exist; add series scope preview, linked visit and package-counter cleanup |
 | 15 | Groomer management | Partial | Basic resource management exists; add phone, color, base location, active toggle and schedule-link management |
 | 16 | Attendance | Missing | GPS/photo check-in, lateness classification, waiver and cycle summary |

@@ -33,6 +33,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const CAPABILITY_KEYS = [
   "booking.read",
   "customer.read",
+  "customer.manage",
   "finance.read",
   "inventory.read",
   "membership.read",
