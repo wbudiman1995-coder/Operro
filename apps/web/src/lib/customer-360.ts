@@ -144,7 +144,7 @@ export async function loadCustomerStylingReferences(
   const attachmentIds = [...new Set((links.data ?? []).map((row) => row.attachment_id))];
   if (attachmentIds.length === 0) return [];
   const attachments = await supabase.from("attachments").select("id,storage_bucket,storage_path,filename,metadata,created_at")
-    .eq("organization_id", organizationId).eq("storage_bucket", "styling-references").in("id", attachmentIds).is("deleted_at", null);
+    .eq("organization_id", organizationId).in("storage_bucket", ["styling-references", "onboarding-styling"]).in("id", attachmentIds).is("deleted_at", null);
   assertResult("customer_styling_references", attachments.error);
   const petByAttachment = new Map((links.data ?? []).map((row) => [row.attachment_id, row.subject_id]));
   const now = Date.now();

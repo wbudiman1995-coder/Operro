@@ -66,11 +66,10 @@ export async function deleteStylingReferenceAction(formData: FormData) {
   const attachmentId = String(formData.get("attachmentId") ?? "");
   const customerId = String(formData.get("customerId") ?? "");
   if (!attachmentId || !customerId) return;
-  const row = await workspace.supabase.from("attachments").select("id,storage_path,storage_bucket,metadata").eq("organization_id", workspace.activeOrganization.id).eq("id", attachmentId).eq("storage_bucket", "styling-references").is("deleted_at", null).maybeSingle();
+  const row = await workspace.supabase.from("attachments").select("id,storage_path,storage_bucket,metadata").eq("organization_id", workspace.activeOrganization.id).eq("id", attachmentId).in("storage_bucket", ["styling-references", "onboarding-styling"]).is("deleted_at", null).maybeSingle();
   const metadata = row.data?.metadata && typeof row.data.metadata === "object" && !Array.isArray(row.data.metadata) ? row.data.metadata as Record<string, unknown> : {};
   if (row.error || !row.data || metadata.kind !== "styling_reference" || metadata.customer_id !== customerId) return;
   await workspace.supabase.from("attachments").update({ deleted_at: new Date().toISOString() }).eq("organization_id", workspace.activeOrganization.id).eq("id", attachmentId);
   await workspace.supabase.storage.from(row.data.storage_bucket).remove([row.data.storage_path]);
   revalidatePath(`/customers/${customerId}`); revalidatePath("/my-schedule");
 }
-

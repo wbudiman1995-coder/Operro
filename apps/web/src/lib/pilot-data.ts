@@ -316,7 +316,7 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
   }));
   const stylingAttachmentIds = [...new Set((stylingLinks.data ?? []).map((link) => link.attachment_id))];
   const stylingResult = stylingAttachmentIds.length > 0
-    ? await supabase.from("attachments").select("id,storage_bucket,storage_path,filename,metadata,created_at").eq("organization_id", organizationId).eq("storage_bucket", "styling-references").in("id", stylingAttachmentIds).is("deleted_at", null)
+    ? await supabase.from("attachments").select("id,storage_bucket,storage_path,filename,metadata,created_at").eq("organization_id", organizationId).in("storage_bucket", ["styling-references", "onboarding-styling"]).in("id", stylingAttachmentIds).is("deleted_at", null)
     : { data: [], error: null };
   assertResult("my_schedule_styling_references", stylingResult.error);
   const petByStylingAttachment = new Map((stylingLinks.data ?? []).map((link) => [link.attachment_id, link.subject_id]));
