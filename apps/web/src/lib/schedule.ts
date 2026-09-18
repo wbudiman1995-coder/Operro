@@ -52,9 +52,9 @@ export const SCHEDULE_ROW_LIMIT = 400;
  * the unfiltered calendar entirely.
  */
 export const BOOKING_SELECT_ALL =
-  "id,customer_id,starts_at,ends_at,status,fulfillment_mode,notes,customers(display_name),booking_resources(resource_id,is_active),grooming_jobs(grooming_job_pets(pet_id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot)))";
+  "id,customer_id,starts_at,ends_at,status,fulfillment_mode,dispatch_stage,address_snapshot,travel_fee,travel_minutes_snapshot,service_area_matched,notes,customers(display_name),booking_resources(resource_id,is_active),grooming_jobs(grooming_job_pets(pet_id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot)))";
 export const BOOKING_SELECT_FILTERED =
-  "id,customer_id,starts_at,ends_at,status,fulfillment_mode,notes,customers(display_name),booking_resources!inner(resource_id,is_active),grooming_jobs(grooming_job_pets(pet_id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot)))";
+  "id,customer_id,starts_at,ends_at,status,fulfillment_mode,dispatch_stage,address_snapshot,travel_fee,travel_minutes_snapshot,service_area_matched,notes,customers(display_name),booking_resources!inner(resource_id,is_active),grooming_jobs(grooming_job_pets(pet_id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot)))";
 
 /**
  * Derives the groomer columns a booking occupies.
@@ -115,6 +115,11 @@ export interface ScheduleBooking {
   endLabel: string;
   status: string;
   fulfillmentMode: string;
+  dispatchStage: string | null;
+  locationLabel: string | null;
+  travelFee: number | null;
+  travelMinutes: number | null;
+  serviceAreaMatched: boolean | null;
   customerId: string;
   customerName: string;
   resourceIds: string[];
@@ -310,6 +315,18 @@ export async function loadScheduleWorkspace(
         endLabel: formatZonedTime(ends, timeZone),
         status: row.status,
         fulfillmentMode: row.fulfillment_mode,
+        dispatchStage: typeof row.dispatch_stage === "string" ? row.dispatch_stage : null,
+        locationLabel: (() => {
+          if (typeof row.address_snapshot !== "object" || row.address_snapshot === null) return null;
+          const address = row.address_snapshot as Record<string, unknown>;
+          for (const key of ["formatted", "formatted_address", "line1", "address"]) {
+            if (typeof address[key] === "string" && address[key].trim()) return address[key].trim();
+          }
+          return null;
+        })(),
+        travelFee: row.travel_fee === null || row.travel_fee === undefined ? null : Number(row.travel_fee),
+        travelMinutes: typeof row.travel_minutes_snapshot === "number" ? row.travel_minutes_snapshot : null,
+        serviceAreaMatched: typeof row.service_area_matched === "boolean" ? row.service_area_matched : null,
         customerId: row.customer_id,
         customerName: (() => {
           const name = relationRows(row.customers)[0]?.display_name;

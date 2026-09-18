@@ -4,15 +4,15 @@
  * Function index:
  * - ScheduleBoard: dispatcher calendar with day/3-day/week views, filters, and detail drawer.
  * - DayResourceGrid: day view — one column per groomer, absolute time positioning.
- * - MultiDayAgenda: 3-day and week views — one column per day, time-ordered entries.
+ * - MultiDayCalendar: 3-day and week views — one time grid column per day.
  * - BookingDrawer: read-only booking detail as a right drawer on desktop, sheet on mobile.
  *
  * View design note: the day view is the true dispatch board (columns = groomers). The
  * 3-day and week views use day columns instead, because groomers × 7 days is unusable at
  * any realistic width. This is a deliberate departure from the HomePaw grid.
  *
- * Batch 1A is read-only. There are no mutations here — no drag, no reschedule, no cancel.
- * Those arrive in Batch 1B behind the exclusion constraint and explicit conflict handling.
+ * Calendar mutations stay behind the explicit reschedule/cancel forms and the database
+ * exclusion constraint. The visual board never writes booking rows directly.
  */
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -139,6 +139,14 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
           <span aria-live="polite" className="ml-auto text-xs font-semibold text-slate-400">
             {pending ? "Memuat…" : `${visibleBookings.length} booking · ${data.activeBranch.timezone}`}
           </span>
+          <button
+            type="button"
+            onClick={() => startTransition(() => router.refresh())}
+            disabled={pending}
+            className="h-9 rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            {pending ? "Memuat…" : "Segarkan"}
+          </button>
         </div>
 
         {data.branchResources.length > 0 ? (
@@ -190,7 +198,7 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
       ) : view === "day" ? (
         <DayResourceGrid data={data} bookings={visibleBookings} bounds={bounds} dayISO={data.days[0]} onOpen={openBooking} activeBookingId={detail?.id ?? null} />
       ) : (
-        <MultiDayAgenda data={data} bookings={visibleBookings} onOpen={openBooking} activeBookingId={detail?.id ?? null} />
+        <MultiDayCalendar data={data} bookings={visibleBookings} bounds={bounds} todayISO={todayISO} onOpen={openBooking} activeBookingId={detail?.id ?? null} />
       )}
 
       {canManageResources ? (
@@ -315,6 +323,7 @@ function DayResourceGrid({
                         {segment.continuesBefore ? "◂ " : ""}{booking.startLabel} {booking.customerName}{segment.continuesAfter ? " ▸" : ""}
                       </p>
                       <p className="truncate text-[10px] text-emerald-700">{booking.pets.map((pet) => pet.petName).join(", ") || "Tanpa hewan"}</p>
+                      <BookingBadges booking={booking} compact />
                     </button>
                   );
                 })}
@@ -326,21 +335,59 @@ function DayResourceGrid({
   );
 }
 
-function MultiDayAgenda({
+function BookingBadges({ booking, compact = false }: { booking: ScheduleWorkspace["bookings"][number]; compact?: boolean }) {
+  const mode = booking.fulfillmentMode === "home" ? "Home" : booking.fulfillmentMode === "pickup_delivery" ? "Antar-jemput" : "Toko";
+  const modeClass = booking.fulfillmentMode === "home" ? "bg-blue-100 text-blue-700" : booking.fulfillmentMode === "pickup_delivery" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600";
+  return (
+    <span className={`mt-1 flex flex-wrap items-center gap-1 ${compact ? "max-h-4 overflow-hidden" : ""}`}>
+      <span className={`rounded px-1 py-0.5 text-[9px] font-extrabold ${modeClass}`}>{mode}</span>
+      {booking.dispatchStage ? <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] font-extrabold text-amber-700">{booking.dispatchStage.replaceAll("_", " ")}</span> : null}
+      {booking.travelMinutes ? <span className="rounded bg-cyan-50 px-1 py-0.5 text-[9px] font-bold text-cyan-700">{booking.travelMinutes} mnt jalan</span> : null}
+      {booking.serviceAreaMatched === false ? <span className="rounded bg-rose-100 px-1 py-0.5 text-[9px] font-extrabold text-rose-700">Di luar area</span> : null}
+    </span>
+  );
+}
+
+function MultiDayCalendar({
   data,
   bookings,
+  bounds,
+  todayISO,
   onOpen,
   activeBookingId,
 }: {
   data: ScheduleWorkspace;
   bookings: ScheduleWorkspace["bookings"];
+  bounds: { startMinutes: number; endMinutes: number };
+  todayISO: string;
   onOpen: (id: string) => void;
   activeBookingId: string | null;
 }) {
   const resourceNames = new Map(data.resources.map((resource) => [resource.id, resource.name]));
+  const markers = slotMarkers(bounds);
+  const gridHeight = Math.max(((bounds.endMinutes - bounds.startMinutes) / 30) * 34, 420);
   return (
-    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {data.days.map((dayISO) => {
+    <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div style={{ minWidth: `${Math.max(720, data.days.length * 180 + 64)}px` }}>
+        <div className="sticky top-0 z-20 flex border-b border-slate-200 bg-white/95 backdrop-blur">
+          <div className="w-16 shrink-0 border-r border-slate-100 px-2 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">Jam</div>
+          {data.days.map((dayISO) => {
+            const count = bookings.filter((booking) => booking.segments.some((segment) => segment.dayISO === dayISO)).length;
+            return (
+              <div key={dayISO} className={`min-w-0 flex-1 border-r border-slate-100 px-3 py-3 last:border-r-0 ${dayISO === todayISO ? "bg-emerald-50/70" : ""}`}>
+                <p className={`text-sm font-bold ${dayISO === todayISO ? "text-emerald-800" : "text-slate-700"}`}>{dayHeading(dayISO)}</p>
+                <p className="text-[11px] text-slate-400">{count} booking</p>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex" style={{ height: gridHeight }}>
+          <div className="relative w-16 shrink-0 border-r border-slate-100">
+            {markers.map((minute) => (
+              <span key={minute} className="absolute left-0 w-full -translate-y-1/2 px-2 text-right text-[10px] font-semibold text-slate-300" style={{ top: `${((minute - bounds.startMinutes) / (bounds.endMinutes - bounds.startMinutes)) * 100}%` }}>{minutesToLabel(minute)}</span>
+            ))}
+          </div>
+          {data.days.map((dayISO) => {
         const dayBookings = bookings
           .flatMap((booking) => booking.segments.filter((segment) => segment.dayISO === dayISO).map((segment) => ({ booking, segment })))
           .sort((a, b) => a.segment.startMinutes - b.segment.startMinutes);
@@ -348,42 +395,41 @@ function MultiDayAgenda({
           blackout.segments.filter((segment) => segment.dayISO === dayISO).map((segment) => ({ blackout, segment })),
         );
         return (
-          <section key={dayISO} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-            <header className="flex items-baseline justify-between border-b border-slate-100 pb-2">
-              <h3 className="text-sm font-bold text-slate-700">{dayHeading(dayISO)}</h3>
-              <span className="text-[11px] font-semibold text-slate-400">{dayBookings.length}</span>
-            </header>
-            <div className="mt-2 space-y-1.5">
-              {dayBookings.length === 0 && dayBlackouts.length === 0 ? <p className="py-4 text-center text-[11px] text-slate-300">Kosong</p> : null}
+          <section key={dayISO} className={`relative min-w-0 flex-1 border-r border-slate-100 last:border-r-0 ${dayISO === todayISO ? "bg-emerald-50/20" : ""}`}>
+              {markers.map((minute) => <span key={minute} aria-hidden className="absolute inset-x-0 border-t border-slate-100" style={{ top: `${((minute - bounds.startMinutes) / (bounds.endMinutes - bounds.startMinutes)) * 100}%` }} />)}
               {dayBookings.map(({ booking, segment }) => {
                 const active = booking.id === activeBookingId;
+                const position = positionWithin(segment, bounds);
+                if (!position) return null;
                 return (
                   <button
                     key={`${booking.id}:${segment.dayISO}`}
                     type="button"
                     onClick={() => onOpen(booking.id)}
-                    className={`w-full rounded-xl border px-2.5 py-2 text-left transition ${active ? "border-emerald-500 bg-emerald-100" : booking.status === "canceled" || booking.status === "no_show" ? "border-slate-200 bg-slate-50 opacity-70" : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/50"}`}
+                    style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%` }}
+                    className={`absolute inset-x-1 z-10 overflow-hidden rounded-lg border px-2 py-1 text-left shadow-sm transition ${active ? "border-emerald-500 bg-emerald-100" : booking.status === "canceled" || booking.status === "no_show" ? "border-slate-200 bg-slate-50 opacity-70" : "border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50"}`}
                   >
-                    <p className="truncate text-xs font-bold text-slate-800">
-                      {segment.continuesBefore ? "◂ " : ""}{booking.startLabel}–{booking.endLabel}{segment.continuesAfter ? " ▸" : ""} {booking.customerName}
-                    </p>
-                    <p className="truncate text-[11px] text-slate-500">{booking.pets.map((pet) => pet.petName).join(", ") || "Tanpa hewan"}</p>
+                    <p className="truncate text-[10px] font-bold text-slate-500">{segment.continuesBefore ? "◂ " : ""}{booking.startLabel}–{booking.endLabel}{segment.continuesAfter ? " ▸" : ""}</p>
+                    <p className="truncate text-xs font-extrabold text-slate-800">{booking.customerName}</p>
+                    <p className="truncate text-[10px] text-slate-500">{booking.pets.map((pet) => pet.petName).join(", ") || "Tanpa hewan"}</p>
                     {booking.resourceIds.length > 0 ? (
-                      <p className="mt-1 truncate text-[10px] font-semibold text-emerald-700">{booking.resourceIds.map((id) => resourceNames.get(id) ?? "Groomer").join(" · ")}</p>
+                      <p className="truncate text-[10px] font-semibold text-emerald-700">{booking.resourceIds.map((id) => resourceNames.get(id) ?? "Groomer").join(" · ")}</p>
                     ) : null}
+                    {booking.locationLabel ? <p className="truncate text-[9px] text-slate-400">{booking.locationLabel}</p> : null}
+                    <BookingBadges booking={booking} compact />
                   </button>
                 );
               })}
-              {dayBlackouts.map(({ blackout, segment }) => (
-                <div key={`${blackout.id}:${segment.dayISO}`} className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-2.5 py-2">
-                  <p className="truncate text-[11px] font-bold text-slate-500">{minutesToLabel(segment.startMinutes)}–{minutesToLabel(segment.endMinutes)} tidak tersedia</p>
-                  <p className="truncate text-[10px] text-slate-400">{resourceNames.get(blackout.resourceId) ?? "Groomer"}{blackout.reason ? ` · ${blackout.reason}` : ""}</p>
-                </div>
-              ))}
-            </div>
+              {dayBlackouts.map(({ blackout, segment }) => {
+                const position = positionWithin(segment, bounds);
+                if (!position) return null;
+                return <div key={`${blackout.id}:${segment.dayISO}`} title={blackout.reason ?? "Tidak tersedia"} className="absolute inset-x-1 overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-100/80 px-2 py-1" style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%` }}><p className="truncate text-[10px] font-bold text-slate-500">{resourceNames.get(blackout.resourceId) ?? "Groomer"} · tidak tersedia</p></div>;
+              })}
           </section>
         );
       })}
+        </div>
+      </div>
     </div>
   );
 }
