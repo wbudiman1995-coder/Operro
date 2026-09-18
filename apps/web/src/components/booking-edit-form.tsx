@@ -25,7 +25,7 @@
 import { useActionState, useState } from "react";
 
 import { ActionSubmitButton } from "@/components/action-submit-button";
-import { cancelBookingAction, rescheduleBookingAction } from "@/app/schedule/actions";
+import { cancelBookingAction, createBookingSeriesAction, rescheduleBookingAction } from "@/app/schedule/actions";
 import { IDLE_STATE } from "@/lib/schedule/idle_state";
 import { FULFILLMENT_MODES } from "@/lib/booking-mutations";
 import type { BookingDetail, ScheduleResource } from "@/lib/schedule";
@@ -194,6 +194,34 @@ export function BookingCancelForm({ bookingId }: { bookingId: string }) {
           Kembali
         </button>
       </div>
+    </form>
+  );
+}
+
+export function BookingSeriesForm({ detail }: { detail: BookingDetail }) {
+  const [state, action] = useActionState(createBookingSeriesAction, IDLE_STATE);
+  const [open, setOpen] = useState(false);
+
+  if (detail.seriesId) {
+    return (
+      <div className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-800">
+        <p className="font-bold">Booking rutin · urutan {detail.recurrenceSequence ?? "–"}</p>
+        <p className="mt-1 text-[11px]">Perubahan seri dan pembatalan mendatang tetap tercatat melalui riwayat booking.</p>
+      </div>
+    );
+  }
+  if (!open) {
+    return <button type="button" onClick={() => setOpen(true)} className="w-full rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs font-bold text-violet-700 hover:bg-violet-100">Jadikan jadwal rutin</button>;
+  }
+  return (
+    <form action={action} className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
+      <input type="hidden" name="bookingId" value={detail.id} />
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-600">Buat seri dari booking ini</p>
+      <label className="block"><span className="mb-1 block text-[11px] font-semibold text-slate-600">Frekuensi</span><select name="frequency" defaultValue="weekly" className="h-10 w-full rounded-xl border border-violet-200 bg-white px-2 text-sm"><option value="weekly">Setiap minggu</option><option value="biweekly">Setiap 2 minggu</option><option value="monthly">Setiap bulan</option></select></label>
+      <label className="block"><span className="mb-1 block text-[11px] font-semibold text-slate-600">Jumlah booking termasuk booking ini</span><input name="occurrences" type="number" min={2} max={52} defaultValue={4} required className="h-10 w-full rounded-xl border border-violet-200 bg-white px-3 text-sm" /></label>
+      <label className="block"><span className="mb-1 block text-[11px] font-semibold text-slate-600">Jika groomer bentrok</span><select name="conflictMode" defaultValue="skip" className="h-10 w-full rounded-xl border border-violet-200 bg-white px-2 text-sm"><option value="skip">Lewati tanggal yang bentrok</option><option value="stop">Batalkan seluruh pembuatan seri</option></select></label>
+      <Feedback error={state.error} success={state.success} />
+      <div className="flex gap-2"><ActionSubmitButton type="submit" pendingLabel="Membuat…" className="flex-1 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white disabled:bg-slate-300">Buat seri</ActionSubmitButton><button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-xs font-bold text-violet-700">Batal</button></div>
     </form>
   );
 }

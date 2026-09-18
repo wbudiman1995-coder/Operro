@@ -61,8 +61,8 @@ test("every export from actions.ts is an async function declaration", () => {
 
   assert.deepEqual(
     exportedFunctionNames.sort(),
-    ["cancelBookingAction", "createBlackoutAction", "removeBlackoutAction", "rescheduleBookingAction", "updateBlackoutAction"].sort(),
-    "actions.ts should export exactly the five booking/blackout server actions",
+    ["cancelBookingAction", "createBlackoutAction", "createBookingSeriesAction", "removeBlackoutAction", "rescheduleBookingAction", "updateBlackoutAction"].sort(),
+    "actions.ts should export exactly the booking, series, and blackout server actions",
   );
 });
 

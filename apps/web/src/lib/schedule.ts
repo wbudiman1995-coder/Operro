@@ -393,6 +393,8 @@ export interface BookingResourceSnapshot {
 
 export interface BookingDetail {
   id: string;
+  seriesId: string | null;
+  recurrenceSequence: number | null;
   branchId: string;
   status: string;
   fulfillmentMode: string;
@@ -444,7 +446,7 @@ export async function loadBookingDetail(
   const result = await supabase
     .from("bookings")
     .select(
-      "id,branch_id,status,fulfillment_mode,starts_at,ends_at,notes,updated_at,customer_id,customers(display_name,phone),booking_resources(resource_id,during,is_active,updated_at),grooming_jobs(groomer_notes,grooming_job_pets(id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot,duration_minutes)))",
+      "id,branch_id,status,fulfillment_mode,starts_at,ends_at,notes,updated_at,customer_id,booking_recurrence_id,recurrence_sequence,customers(display_name,phone),booking_resources(resource_id,during,is_active,updated_at),grooming_jobs(groomer_notes,grooming_job_pets(id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot,duration_minutes)))",
     )
     .eq("organization_id", organizationId)
     .eq("branch_id", branchId)
@@ -493,6 +495,8 @@ export async function loadBookingDetail(
   );
   return {
     id: row.id,
+    seriesId: typeof row.booking_recurrence_id === "string" ? row.booking_recurrence_id : null,
+    recurrenceSequence: typeof row.recurrence_sequence === "number" ? row.recurrence_sequence : null,
     branchId: row.branch_id,
     status: row.status,
     fulfillmentMode: row.fulfillment_mode,

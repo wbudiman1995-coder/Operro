@@ -19,7 +19,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { BlackoutManager } from "@/components/blackout-manager";
-import { BookingCancelForm, BookingEditForm } from "@/components/booking-edit-form";
+import { BookingCancelForm, BookingEditForm, BookingSeriesForm } from "@/components/booking-edit-form";
 import { StatusBadge } from "@/components/pilot-ui";
 import { isCancellable, isReschedulable } from "@/lib/booking-mutations";
 import { SCHEDULE_ROW_LIMIT, type BookingDetail, type ScheduleWorkspace } from "@/lib/schedule";
@@ -526,6 +526,7 @@ function BookingDrawer({
               </p>
             ) : null}
             {canCancelBooking && isCancellable(detail.status) ? <BookingCancelForm bookingId={detail.id} /> : null}
+            {canUpdateBooking && isReschedulable(detail.status) ? <BookingSeriesForm detail={detail} /> : null}
             {!canUpdateBooking && !canCancelBooking ? (
               <p className="rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-4 text-slate-500">
                 Izin Anda hanya mencakup melihat booking pada workspace ini.
