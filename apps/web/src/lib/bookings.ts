@@ -5,7 +5,8 @@ export interface CustomerOption { id: string; name: string; phone: string | null
 export interface PetOption { id: string; customerId: string; name: string; breed: string | null }
 export interface ServiceOption { id: string; name: string; durationMinutes: number; basePrice: number; currency: string }
 export interface ResourceOption { id: string; branchId: string; name: string }
-export interface AddressOption { id: string; customerId: string; label: string; formattedLine: string; kecamatan: string | null; kabupatenKota: string | null; isDefault: boolean }
+export interface AddressOption { id: string; customerId: string; label: string; formattedLine: string; kecamatan: string | null; kabupatenKota: string | null; latitude: number | null; longitude: number | null; isDefault: boolean }
+export interface ServiceAreaOption { branchId: string; kecamatan: string | null; kabupatenKota: string; travelFee: number; estimatedTravelMinutes: number }
 export interface BookingListItem {
   id: string;
   branchId: string;
@@ -23,6 +24,7 @@ export interface BookingWorkspaceData {
   services: ServiceOption[];
   resources: ResourceOption[];
   addresses: AddressOption[];
+  serviceAreas: ServiceAreaOption[];
   bookings: BookingListItem[];
 }
 
@@ -48,17 +50,18 @@ export async function loadBookingWorkspace(
   from: string,
   to: string,
 ): Promise<BookingWorkspaceData> {
-  const [branchResult, customerResult, petResult, serviceResult, resourceResult, addressResult, bookingResult] = await Promise.all([
+  const [branchResult, customerResult, petResult, serviceResult, resourceResult, addressResult, serviceAreaResult, bookingResult] = await Promise.all([
     supabase.from("branches").select("id,name,timezone").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("customers").select("id,display_name,phone").eq("organization_id", organizationId).in("status", ["lead", "active"]).is("deleted_at", null).order("display_name"),
     supabase.from("pets").select("id,customer_id,name,breed").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("service_catalog").select("id,name,duration_minutes,base_price,currency").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,name").eq("organization_id", organizationId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).order("name"),
-    supabase.from("customer_addresses").select("id,customer_id,label,line1,line2,kecamatan,kabupaten_kota,province,postal_code,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
+    supabase.from("customer_addresses").select("id,customer_id,label,line1,line2,kecamatan,kabupaten_kota,province,postal_code,latitude,longitude,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
+    supabase.from("branch_service_areas").select("branch_id,kecamatan,kabupaten_kota,travel_fee,estimated_travel_minutes").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null),
     supabase.from("bookings").select("id,branch_id,customer_id,starts_at,ends_at,status,fulfillment_mode,grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", from).lt("starts_at", to).is("deleted_at", null).order("starts_at"),
   ]);
 
-  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["addresses", addressResult], ["bookings", bookingResult]] as const) {
+  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["addresses", addressResult], ["service_areas", serviceAreaResult], ["bookings", bookingResult]] as const) {
     if (result.error) fail(scope, result.error.message);
   }
 
@@ -79,7 +82,16 @@ export async function loadBookingWorkspace(
       formattedLine: [row.line1, row.line2, row.kecamatan, row.kabupaten_kota, row.province, row.postal_code].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(", "),
       kecamatan: row.kecamatan,
       kabupatenKota: row.kabupaten_kota,
+      latitude: row.latitude === null ? null : Number(row.latitude),
+      longitude: row.longitude === null ? null : Number(row.longitude),
       isDefault: row.is_default,
+    })),
+    serviceAreas: (serviceAreaResult.data ?? []).map((row) => ({
+      branchId: row.branch_id,
+      kecamatan: row.kecamatan,
+      kabupatenKota: row.kabupaten_kota,
+      travelFee: Number(row.travel_fee),
+      estimatedTravelMinutes: row.estimated_travel_minutes,
     })),
     bookings: bookingRows.map((row) => ({
       id: row.id,

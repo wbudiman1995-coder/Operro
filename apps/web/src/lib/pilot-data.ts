@@ -70,19 +70,37 @@ export async function loadDashboardData(supabase: SupabaseClient, organizationId
 }
 
 export interface CustomerWorkspace {
-  customers: Array<{ id: string; name: string; phone: string | null; status: string; source: string | null; notes: string | null; pets: Array<{ id: string; name: string; species: string; breed: string | null; temperament: string | null }>; packages: Array<{ name: string; remaining: number; expiresAt: string | null }> }>;
+  customers: Array<{
+    id: string; name: string; phone: string | null; status: string; source: string | null; notes: string | null;
+    pets: Array<{ id: string; name: string; species: string; breed: string | null; temperament: string | null }>;
+    packages: Array<{ name: string; remaining: number; expiresAt: string | null }>;
+    addresses: Array<{ id: string; label: string; formattedLine: string; latitude: number | null; longitude: number | null; isDefault: boolean }>;
+  }>;
 }
 
 export async function loadCustomerWorkspace(supabase: SupabaseClient, organizationId: string): Promise<CustomerWorkspace> {
-  const [customers, pets, customerPackages, packages] = await Promise.all([
+  const [customers, pets, customerPackages, packages, addresses] = await Promise.all([
     supabase.from("customers").select("id,display_name,phone,status,source,notes").eq("organization_id", organizationId).is("deleted_at", null).order("display_name"),
     supabase.from("pets").select("id,customer_id,name,species,breed,temperament").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("customer_packages").select("customer_id,package_id,sessions_remaining,expires_at,status").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("packages").select("id,name").eq("organization_id", organizationId).is("deleted_at", null),
+    supabase.from("customer_addresses").select("id,customer_id,label,line1,line2,kecamatan,kabupaten_kota,province,postal_code,latitude,longitude,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
   ]);
-  for (const [scope, result] of [["customers", customers], ["pets", pets], ["customer_packages", customerPackages], ["packages", packages]] as const) assertResult(scope, result.error);
+  for (const [scope, result] of [["customers", customers], ["pets", pets], ["customer_packages", customerPackages], ["packages", packages], ["customer_addresses", addresses]] as const) assertResult(scope, result.error);
   const packageMap = new Map((packages.data ?? []).map((row) => [row.id, row.name]));
-  return { customers: (customers.data ?? []).map((customer) => ({ id: customer.id, name: customer.display_name, phone: customer.phone, status: customer.status, source: customer.source, notes: customer.notes, pets: (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name, species: pet.species, breed: pet.breed, temperament: pet.temperament })), packages: (customerPackages.data ?? []).filter((item) => item.customer_id === customer.id).map((item) => ({ name: packageMap.get(item.package_id) ?? "Paket", remaining: item.sessions_remaining, expiresAt: item.expires_at })) })) };
+  return { customers: (customers.data ?? []).map((customer) => ({
+    id: customer.id, name: customer.display_name, phone: customer.phone, status: customer.status, source: customer.source, notes: customer.notes,
+    pets: (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name, species: pet.species, breed: pet.breed, temperament: pet.temperament })),
+    packages: (customerPackages.data ?? []).filter((item) => item.customer_id === customer.id).map((item) => ({ name: packageMap.get(item.package_id) ?? "Paket", remaining: item.sessions_remaining, expiresAt: item.expires_at })),
+    addresses: (addresses.data ?? []).filter((address) => address.customer_id === customer.id).map((address) => ({
+      id: address.id,
+      label: address.label,
+      formattedLine: [address.line1, address.line2, address.kecamatan, address.kabupaten_kota, address.province, address.postal_code].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(", "),
+      latitude: address.latitude === null ? null : Number(address.latitude),
+      longitude: address.longitude === null ? null : Number(address.longitude),
+      isDefault: address.is_default,
+    })),
+  })) };
 }
 
 export interface TaskWorkspace {

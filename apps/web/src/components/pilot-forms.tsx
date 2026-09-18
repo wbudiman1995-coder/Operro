@@ -19,6 +19,7 @@ import {
   sellPackageAction,
 } from "@/app/pilot-actions";
 import type { PilotActionState } from "@/app/pilot-actions";
+import { MapsCoordinateFields } from "@/components/customer-address-forms";
 
 const initialPilotActionState: PilotActionState = { error: null, success: null };
 
@@ -54,7 +55,7 @@ export function CustomerForm() {
           <input className={inputClass} name="postalCode" placeholder="Kode pos" />
         </div>
         <textarea className={`${inputClass} h-auto py-2`} name="accessNotes" placeholder="Catatan akses (pagar, parkir, keamanan)" rows={2} />
-        <div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="latitude" placeholder="Latitude (opsional)" /><input className={inputClass} name="longitude" placeholder="Longitude (opsional)" /></div>
+        <MapsCoordinateFields />
       </div>
     </details>
     <div className="flex flex-wrap items-center justify-between gap-3"><ActionMessage state={state} /><button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Tambah pelanggan"}</button></div></form>;

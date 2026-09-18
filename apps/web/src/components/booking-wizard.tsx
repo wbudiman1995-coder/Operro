@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 
 import { createBookingAction, type CreateBookingState } from "@/app/bookings/actions";
-import type { AddressOption, BranchOption, CustomerOption, PetOption, ResourceOption, ServiceOption } from "@/lib/bookings";
+import type { AddressOption, BranchOption, CustomerOption, PetOption, ResourceOption, ServiceAreaOption, ServiceOption } from "@/lib/bookings";
 import type { FulfillmentMode } from "@/lib/booking-validation";
 
 interface Props {
@@ -13,6 +13,7 @@ interface Props {
   services: ServiceOption[];
   resources: ResourceOption[];
   addresses: AddressOption[];
+  serviceAreas: ServiceAreaOption[];
   defaultStart: string;
   /**
    * Server-validated preselected customer. The page only passes a value after reading the
@@ -32,24 +33,29 @@ function addMinutes(localDateTime: string, minutes: number) {
   return new Date(date.valueOf() - offset * 60_000).toISOString().slice(0, 16);
 }
 
-export function BookingWizard({ branches, customers, pets, services, resources, addresses, defaultStart, preselectedCustomerId }: Props) {
+export function BookingWizard({ branches, customers, pets, services, resources, addresses, serviceAreas, defaultStart, preselectedCustomerId }: Props) {
   const [state, action, pending] = useActionState(createBookingAction, initialState);
   const [step, setStep] = useState(1);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   // Only honored when the id is actually in the loaded, organization-scoped option list,
   // so a stale or unauthorized value simply opens the wizard unselected.
-  const [customerId, setCustomerId] = useState(
-    preselectedCustomerId && customers.some((customer) => customer.id === preselectedCustomerId) ? preselectedCustomerId : "",
-  );
+  const initialCustomerId = preselectedCustomerId && customers.some((customer) => customer.id === preselectedCustomerId) ? preselectedCustomerId : "";
+  const [customerId, setCustomerId] = useState(initialCustomerId);
   const [startsAt, setStartsAt] = useState(defaultStart);
   const [endsAt, setEndsAt] = useState(addMinutes(defaultStart, 60));
   const [fulfillmentMode, setFulfillmentMode] = useState<FulfillmentMode>("home");
   const [notes, setNotes] = useState("");
   const [selectedPets, setSelectedPets] = useState<PetSelection[]>([]);
-  const [customerAddressId, setCustomerAddressId] = useState("");
+  const [customerAddressId, setCustomerAddressId] = useState(addresses.find((address) => address.customerId === initialCustomerId && address.isDefault)?.id ?? "");
 
   const customerPets = useMemo(() => pets.filter((pet) => pet.customerId === customerId), [customerId, pets]);
   const customerAddresses = useMemo(() => addresses.filter((address) => address.customerId === customerId), [customerId, addresses]);
+  const selectedAddress = customerAddresses.find((address) => address.id === customerAddressId);
+  const branchAreas = serviceAreas.filter((area) => area.branchId === branchId);
+  const matchedArea = selectedAddress ? branchAreas
+    .filter((area) => area.kabupatenKota === selectedAddress.kabupatenKota && (area.kecamatan === null || area.kecamatan === selectedAddress.kecamatan))
+    .sort((left, right) => Number(right.kecamatan !== null) - Number(left.kecamatan !== null))[0] : undefined;
+  const coverage = !selectedAddress ? null : branchAreas.length === 0 ? { allowed: true, fee: 0, minutes: 0, unconfigured: true } : matchedArea ? { allowed: true, fee: matchedArea.travelFee, minutes: matchedArea.estimatedTravelMinutes, unconfigured: false } : { allowed: false, fee: 0, minutes: 0, unconfigured: false };
   const branchResources = resources.filter((resource) => resource.branchId === branchId);
   const duration = Math.max(60, ...selectedPets.flatMap((pet) => pet.serviceIds.map((id) => services.find((service) => service.id === id)?.durationMinutes ?? 60)));
   const payload = JSON.stringify({ branchId, customerId, startsAt, endsAt, fulfillmentMode, notes, pets: selectedPets, ...(fulfillmentMode === "home" && customerAddressId ? { customerAddressId } : {}) });
@@ -74,7 +80,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   function canContinue() {
     if (step === 1) return Boolean(branchId && customerId && selectedPets.length);
     if (step === 2) return selectedPets.every((pet) => pet.serviceIds.length > 0 && pet.resourceId);
-    if (step === 3) return Boolean(startsAt && endsAt && new Date(endsAt) > new Date(startsAt) && (fulfillmentMode !== "home" || customerAddressId));
+    if (step === 3) return Boolean(startsAt && endsAt && new Date(endsAt) > new Date(startsAt) && (fulfillmentMode !== "home" || (customerAddressId && coverage?.allowed)));
     return true;
   }
 
@@ -110,10 +116,13 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
               {customerAddresses.length === 0 ? (
                 <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">Pelanggan ini belum memiliki alamat tersimpan. Tambahkan alamat pada tab Alamat di Profil 360 pelanggan sebelum membuat booking home service.</p>
               ) : (
-                <select value={customerAddressId} onChange={(event) => setCustomerAddressId(event.target.value)} className="field">
+                <><select value={customerAddressId} onChange={(event) => setCustomerAddressId(event.target.value)} className="field">
                   <option value="">Pilih alamat</option>
                   {customerAddresses.map((address) => <option key={address.id} value={address.id}>{address.label} · {address.formattedLine}{address.isDefault ? " (utama)" : ""}</option>)}
                 </select>
+                {selectedAddress ? <div className={`mt-2 rounded-xl border p-3 text-xs ${coverage?.allowed ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"}`}>
+                  {coverage?.allowed ? <><p className="font-bold">Area dapat dilayani{coverage.unconfigured ? " · area cabang belum dibatasi" : ""}</p><p className="mt-1">Estimasi perjalanan {coverage.minutes} menit · biaya transport {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(coverage.fee)}</p>{selectedAddress.latitude === null || selectedAddress.longitude === null ? <p className="mt-1 font-semibold text-amber-700">Koordinat belum lengkap. Tambahkan link Maps di Profil 360 agar perencanaan rute akurat.</p> : null}</> : <p className="font-bold">Alamat ini belum termasuk area layanan cabang yang dipilih.</p>}
+                </div> : null}</>
               )}
             </Field>
           ) : null}
@@ -122,7 +131,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
 
         {step === 4 ? <div className="space-y-6">
           <WizardTitle title="Periksa dan konfirmasi" helper="Booking akan langsung dikonfirmasi setelah semua bagian berhasil disimpan." />
-          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={new Date(startsAt).toLocaleString("id-ID")} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} />{fulfillmentMode === "home" ? <Summary label="Alamat" value={customerAddresses.find((address) => address.id === customerAddressId)?.formattedLine ?? "—"} /> : null}</dl>
+          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={new Date(startsAt).toLocaleString("id-ID")} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} />{fulfillmentMode === "home" ? <><Summary label="Alamat" value={selectedAddress?.formattedLine ?? "—"} /><Summary label="Perjalanan" value={coverage?.allowed ? `${coverage.minutes} menit · ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(coverage.fee)}` : "Di luar area layanan"} /></> : null}</dl>
           {state.error ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{state.error}</p> : null}
         </div> : null}
       </div>
