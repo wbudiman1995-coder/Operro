@@ -23,6 +23,17 @@ interface Props {
 }
 
 interface PetSelection { petId: string; resourceId: string; serviceIds: string[] }
+interface SlotRecommendation {
+  startsAt: string;
+  endsAt: string;
+  dateISO: string;
+  startTime: string;
+  endTime: string;
+  travelKm: number | null;
+  travelMinutes: number;
+  trafficFactor: number;
+  routeOrigin: "previous_stop" | "branch_base" | "unknown";
+}
 const initialState: CreateBookingState = { error: null };
 
 function addMinutes(localDateTime: string, minutes: number) {
@@ -47,6 +58,9 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   const [notes, setNotes] = useState("");
   const [selectedPets, setSelectedPets] = useState<PetSelection[]>([]);
   const [customerAddressId, setCustomerAddressId] = useState(addresses.find((address) => address.customerId === initialCustomerId && address.isDefault)?.id ?? "");
+  const [slotStatus, setSlotStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [slotError, setSlotError] = useState("");
+  const [slotRecommendations, setSlotRecommendations] = useState<SlotRecommendation[]>([]);
 
   const customerPets = useMemo(() => pets.filter((pet) => pet.customerId === customerId), [customerId, pets]);
   const customerAddresses = useMemo(() => addresses.filter((address) => address.customerId === customerId), [customerId, addresses]);
@@ -76,6 +90,38 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
     const pet = selectedPets.find((candidate) => candidate.petId === petId);
     if (!pet) return;
     updatePet(petId, { serviceIds: pet.serviceIds.includes(serviceId) ? pet.serviceIds.filter((id) => id !== serviceId) : [...pet.serviceIds, serviceId] });
+  }
+  async function findRecommendedSlots() {
+    setSlotStatus("loading");
+    setSlotError("");
+    setSlotRecommendations([]);
+    try {
+      const response = await fetch("/api/availability/slots", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          branchId,
+          resourceIds: [...new Set(selectedPets.map((pet) => pet.resourceId).filter(Boolean))],
+          durationMinutes: duration,
+          fromDateISO: startsAt.slice(0, 10),
+          destination: fulfillmentMode === "home" && selectedAddress && selectedAddress.latitude !== null && selectedAddress.longitude !== null
+            ? { latitude: selectedAddress.latitude, longitude: selectedAddress.longitude }
+            : null,
+        }),
+      });
+      const result = await response.json() as { slots?: SlotRecommendation[]; error?: string };
+      if (!response.ok) throw new Error(result.error ?? "slot_recommendations_failed");
+      setSlotRecommendations(result.slots ?? []);
+      setSlotStatus("ready");
+    } catch (error) {
+      console.error("slot_recommendations_request_failed", error);
+      setSlotError("Slot terbaik belum dapat dimuat. Waktu tetap dapat dipilih secara manual.");
+      setSlotStatus("error");
+    }
+  }
+  function chooseRecommendedSlot(slot: SlotRecommendation) {
+    setStartsAt(`${slot.dateISO}T${slot.startTime}`);
+    setEndsAt(`${slot.dateISO}T${slot.endTime}`);
   }
   function canContinue() {
     if (step === 1) return Boolean(branchId && customerId && selectedPets.length);
@@ -126,6 +172,24 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
               )}
             </Field>
           ) : null}
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><h3 className="text-sm font-bold text-emerald-950">Rekomendasi slot 7 hari</h3><p className="mt-1 max-w-2xl text-xs leading-5 text-emerald-800">Mencari waktu kosong bersama untuk semua groomer terpilih, lalu mengurutkannya berdasarkan jadwal dan estimasi perjalanan.</p></div>
+              <button type="button" onClick={findRecommendedSlots} disabled={slotStatus === "loading" || selectedPets.some((pet) => !pet.resourceId)} className="h-10 rounded-xl bg-emerald-700 px-4 text-xs font-bold text-white disabled:opacity-50">{slotStatus === "loading" ? "Mencari…" : "Cari slot terbaik"}</button>
+            </div>
+            {fulfillmentMode === "home" && selectedAddress && (selectedAddress.latitude === null || selectedAddress.longitude === null) ? <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Slot tetap dapat dicari, tetapi peringkat rute belum akurat karena alamat ini belum memiliki koordinat Maps.</p> : null}
+            {slotError ? <p role="alert" className="mt-3 text-xs font-semibold text-rose-700">{slotError}</p> : null}
+            {slotStatus === "ready" && slotRecommendations.length === 0 ? <p className="mt-3 text-xs font-semibold text-slate-600">Tidak ada slot bersama yang tersedia dalam 7 hari. Ubah groomer, tanggal awal, atau waktu secara manual.</p> : null}
+            {slotRecommendations.length > 0 ? <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{slotRecommendations.slice(0, 6).map((slot) => {
+              const selected = startsAt === `${slot.dateISO}T${slot.startTime}`;
+              const origin = slot.routeOrigin === "previous_stop" ? "dari kunjungan sebelumnya" : slot.routeOrigin === "branch_base" ? "dari cabang" : "rute belum tersedia";
+              return <button type="button" key={slot.startsAt} onClick={() => chooseRecommendedSlot(slot)} className={`rounded-xl border p-3 text-left transition ${selected ? "border-emerald-600 bg-white ring-2 ring-emerald-200" : "border-emerald-100 bg-white hover:border-emerald-400"}`}>
+                <span className="block text-sm font-bold text-slate-900">{new Date(`${slot.dateISO}T00:00:00`).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })} · {slot.startTime}–{slot.endTime}</span>
+                <span className="mt-1 block text-xs text-slate-600">{slot.travelKm === null ? "Jarak belum dihitung" : `${slot.travelKm} km · sekitar ${slot.travelMinutes} menit`} · {origin}</span>
+                {slot.trafficFactor > 1.2 ? <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">Jam sibuk</span> : null}
+              </button>;
+            })}</div> : null}
+          </section>
           <Field label="Catatan (opsional)"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} rows={4} className="field h-auto py-3" placeholder="Instruksi operasional yang aman dan relevan" /></Field>
         </div> : null}
 

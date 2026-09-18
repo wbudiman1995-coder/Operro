@@ -136,6 +136,14 @@ export interface ScheduleBlackout {
   reason: string | null;
 }
 
+export interface WeeklyAvailability {
+  id: string;
+  resourceId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
 export interface ScheduleWorkspace {
   branches: ScheduleBranch[];
   activeBranch: ScheduleBranch;
@@ -148,6 +156,7 @@ export interface ScheduleWorkspace {
   days: string[];
   bookings: ScheduleBooking[];
   blackouts: ScheduleBlackout[];
+  weeklyAvailability: WeeklyAvailability[];
   truncated: boolean;
 }
 
@@ -269,12 +278,25 @@ export async function loadScheduleWorkspace(
     .in("resource_id", blackoutResourceIds)
     .order("starts_at");
 
-  const [bookingResult, blackoutResult] = await Promise.all([
+  const weeklyAvailabilityQuery = supabase
+    .from("resource_availability")
+    .select("id,resource_id,day_of_week,start_time,end_time")
+    .eq("organization_id", organizationId)
+    .eq("branch_id", activeBranch.id)
+    .eq("kind", "available")
+    .is("deleted_at", null)
+    .not("day_of_week", "is", null)
+    .in("resource_id", [...branchResourceIds])
+    .order("day_of_week");
+
+  const [bookingResult, blackoutResult, weeklyAvailabilityResult] = await Promise.all([
     bookingQuery.order("starts_at").limit(SCHEDULE_ROW_LIMIT + 1),
     blackoutResourceIds.length > 0 ? blackoutQuery : Promise.resolve({ data: [], error: null }),
+    branchResourceIds.size > 0 ? weeklyAvailabilityQuery : Promise.resolve({ data: [], error: null }),
   ]);
   assertResult("schedule_bookings", bookingResult.error);
   assertResult("schedule_blackouts", blackoutResult.error);
+  assertResult("schedule_weekly_availability", weeklyAvailabilityResult.error);
 
   const bookingRows = bookingResult.data ?? [];
   const truncated = bookingRows.length > SCHEDULE_ROW_LIMIT;
@@ -359,10 +381,16 @@ export async function loadScheduleWorkspace(
     ];
   });
 
+  const weeklyAvailability: WeeklyAvailability[] = (weeklyAvailabilityResult.data ?? []).flatMap((row) =>
+    typeof row.resource_id === "string" && typeof row.day_of_week === "number" && typeof row.start_time === "string" && typeof row.end_time === "string"
+      ? [{ id: row.id, resourceId: row.resource_id, dayOfWeek: row.day_of_week, startTime: row.start_time.slice(0, 5), endTime: row.end_time.slice(0, 5) }]
+      : [],
+  );
+
   // Selected groomers control which columns render, not only which bookings show.
   const resources = filtering ? branchResources.filter((resource) => appliedResourceIds.includes(resource.id)) : branchResources;
 
-  return { branches, activeBranch, resources, branchResources, appliedResourceIds, days, bookings, blackouts, truncated };
+  return { branches, activeBranch, resources, branchResources, appliedResourceIds, days, bookings, blackouts, weeklyAvailability, truncated };
 }
 
 export interface BookingDetailPet {

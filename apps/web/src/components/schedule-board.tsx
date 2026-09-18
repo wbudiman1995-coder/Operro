@@ -21,6 +21,7 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import { BlackoutManager } from "@/components/blackout-manager";
 import { BookingCancelForm, BookingEditForm, BookingSeriesForm } from "@/components/booking-edit-form";
 import { StatusBadge } from "@/components/pilot-ui";
+import { WeeklyAvailabilityManager } from "@/components/weekly-availability-manager";
 import { isCancellable, isReschedulable } from "@/lib/booking-mutations";
 import { SCHEDULE_ROW_LIMIT, type BookingDetail, type ScheduleWorkspace } from "@/lib/schedule";
 import {
@@ -202,13 +203,10 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
       )}
 
       {canManageResources ? (
-        <BlackoutManager
-          branchId={data.activeBranch.id}
-          timeZone={data.activeBranch.timezone}
-          resources={data.branchResources}
-          blackouts={data.blackouts}
-          defaultDateISO={data.days[0]}
-        />
+        <>
+          <WeeklyAvailabilityManager resources={data.branchResources} availability={data.weeklyAvailability} timeZone={data.activeBranch.timezone} />
+          <BlackoutManager branchId={data.activeBranch.id} timeZone={data.activeBranch.timezone} resources={data.branchResources} blackouts={data.blackouts} defaultDateISO={data.days[0]} />
+        </>
       ) : null}
 
       {detail && drawerOpen ? (

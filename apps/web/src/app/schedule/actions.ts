@@ -683,3 +683,33 @@ export async function createBookingSeriesAction(_previous: MutationState, formDa
     return { error: GENERIC_ERROR, success: null };
   }
 }
+
+export async function replaceWeeklyAvailabilityAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
+  try {
+    const resourceId = String(formData.get("resourceId") ?? "");
+    if (!UUID_PATTERN.test(resourceId)) return { error: "Pilih groomer yang valid.", success: null };
+    let windows: unknown;
+    try { windows = JSON.parse(String(formData.get("windows") ?? "[]")); } catch { return { error: "Jadwal mingguan tidak valid.", success: null }; }
+    if (!Array.isArray(windows) || windows.length > 14) return { error: "Jadwal mingguan tidak valid.", success: null };
+    for (const window of windows) {
+      if (!window || typeof window !== "object") return { error: "Jadwal mingguan tidak valid.", success: null };
+      const item = window as Record<string, unknown>;
+      if (!Number.isInteger(item.dayOfWeek) || Number(item.dayOfWeek) < 0 || Number(item.dayOfWeek) > 6 || !/^\d{2}:\d{2}$/.test(String(item.startTime)) || !/^\d{2}:\d{2}$/.test(String(item.endTime)) || String(item.endTime) <= String(item.startTime)) return { error: "Pastikan setiap jam selesai berada setelah jam mulai.", success: null };
+    }
+    const supabase = await createClient();
+    const auth = await loadAuthContext(supabase);
+    if (!auth?.activeOrganizationId) return { error: "Sesi Anda berakhir. Silakan masuk kembali.", success: null };
+    const result = await supabase.schema("app").rpc("replace_resource_weekly_availability", { p_resource: resourceId, p_windows: windows });
+    if (result.error) {
+      if (/not_authorized|42501/i.test(result.error.message)) return { error: "Izin Anda tidak mencukupi untuk mengubah jadwal groomer.", success: null };
+      console.error("replace_weekly_availability_failed", result.error);
+      return { error: GENERIC_ERROR, success: null };
+    }
+    revalidatePath("/schedule");
+    revalidatePath("/bookings");
+    return { error: null, success: `${Number(result.data ?? windows.length)} rentang kerja mingguan disimpan.` };
+  } catch (error) {
+    console.error("replace_weekly_availability_unexpected", error);
+    return { error: GENERIC_ERROR, success: null };
+  }
+}
