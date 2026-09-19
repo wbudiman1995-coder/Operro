@@ -122,6 +122,11 @@ export async function createBookingAction(
     }
     const { error: confirmError } = await app.rpc("transition_booking_status", { p_booking: booking.id, p_to: "confirmed" });
     if (confirmError) throw confirmError;
+    // The RPC locks the customer's active one-use offer, calculates immutable
+    // per-service discounts, snapshots them onto this booking, and consumes the
+    // offer in one transaction. A null result simply means no offer is active.
+    const { error: discountError } = await app.rpc("consume_customer_next_discount", { p_booking: booking.id });
+    if (discountError) throw discountError;
   } catch (error) {
     await cancelDraft(supabase, booking.id);
     const message = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? "unknown");

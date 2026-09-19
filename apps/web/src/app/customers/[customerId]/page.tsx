@@ -25,6 +25,7 @@ import { notFound } from "next/navigation";
 
 import { Customer360Notes, Customer360Header, Customer360Tabs } from "@/components/customer-360";
 import { CustomerAddressActions, CustomerAddressForm } from "@/components/customer-address-forms";
+import { CustomerNextDiscount } from "@/components/customer-next-discount";
 import { EmptyState, StatusBadge } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
@@ -37,6 +38,7 @@ import {
   loadCustomerBookings,
   loadCustomerHistory,
   loadCustomerInvoices,
+  loadCustomerNextDiscount,
   loadCustomerOverview,
   loadCustomerPackages,
   loadCustomerStylingReferences,
@@ -72,7 +74,10 @@ export default async function CustomerDetailPage({
     loadBranchTimezones(workspace.supabase, organizationId),
   ]);
 
-  const overview = await loadCustomerOverview(workspace.supabase, organizationId, customerId, capabilities);
+  const [overview, nextDiscount] = await Promise.all([
+    loadCustomerOverview(workspace.supabase, organizationId, customerId, capabilities),
+    loadCustomerNextDiscount(workspace.supabase, organizationId, customerId),
+  ]);
   // A customer outside the active organization is filtered out by RLS, so this is the
   // cross-tenant deny path as well as the genuine not-found path.
   if (!overview) notFound();
@@ -112,6 +117,7 @@ export default async function CustomerDetailPage({
   return (
     <WorkspaceShell {...workspace} activePath="/customers">
       <Customer360Header overview={overview} />
+      {capabilities["customer.manage"] ? <CustomerNextDiscount customerId={customerId} offer={nextDiscount} /> : null}
       <Customer360Tabs customerId={customerId} activeTab={tab} tabs={permittedTabs} />
 
       <div className="mt-5">
@@ -253,6 +259,7 @@ export default async function CustomerDetailPage({
                         Terbit {formatZonedDate(invoice.issuedAt, zone)}
                         {invoice.paidAt ? ` · lunas ${formatZonedDate(invoice.paidAt, zone)}` : outstanding > 0 ? ` · sisa ${formatMoney(outstanding, invoice.currency)}` : ""}
                       </p>
+                      {invoice.discountTotal > 0 ? <p className="mt-1 text-xs font-bold text-violet-700">Diskon {formatMoney(invoice.discountTotal, invoice.currency)}</p> : null}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-bold text-slate-900">{formatMoney(invoice.total, invoice.currency)}</span>
@@ -262,7 +269,7 @@ export default async function CustomerDetailPage({
                       <ul className="mt-3 w-full space-y-1 border-t border-slate-100 pt-3">
                         {invoice.lines.map((line) => (
                           <li key={line.id} className="flex items-center justify-between gap-3 text-xs text-slate-600">
-                            <span className="truncate">{line.name} × {line.quantity}</span>
+                            <span className="truncate">{line.name} × {line.quantity}{line.discountAmount > 0 ? ` · diskon ${formatMoney(line.discountAmount, invoice.currency)}` : ""}</span>
                             <span className="font-semibold text-slate-800">{formatMoney(line.lineTotal, invoice.currency)}</span>
                           </li>
                         ))}

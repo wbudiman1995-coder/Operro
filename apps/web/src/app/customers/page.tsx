@@ -5,7 +5,7 @@ import { CustomerForm } from "@/components/pilot-forms";
 import { FastCustomerImport } from "@/components/fast-customer-import";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
-import { loadCustomerWorkspace } from "@/lib/pilot-data";
+import { formatRupiah, loadCustomerWorkspace } from "@/lib/pilot-data";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 
 export const metadata = { title: "Pelanggan" };
@@ -25,9 +25,10 @@ export default async function CustomersPage() {
         const coordinatesReady = address?.latitude !== null && address?.longitude !== null;
         return <article key={customer.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><div className="flex items-center gap-2"><Link href={`/customers/${customer.id}`} className="font-bold hover:text-emerald-700">{customer.name}</Link><StatusBadge status={customer.status} /></div><p className="mt-1 text-sm text-slate-500">{customer.phone ?? "Nomor belum diisi"}{customer.source ? ` · ${customer.source}` : ""}</p></div>
+            <div><div className="flex flex-wrap items-center gap-2"><Link href={`/customers/${customer.id}`} className="font-bold hover:text-emerald-700">{customer.name}</Link><StatusBadge status={customer.status} />{customer.nextDiscount ? <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-violet-700">Diskon booking berikutnya</span> : null}</div><p className="mt-1 text-sm text-slate-500">{customer.phone ?? "Nomor belum diisi"}{customer.source ? ` · ${customer.source}` : ""}</p></div>
             <div className="flex flex-wrap gap-2"><Link href={`/customers/${customer.id}`} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">Profil 360</Link>{customer.phone ? <a className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700" href={`https://wa.me/${customer.phone.replace(/\D/g, "").replace(/^0/, "62")}`} target="_blank" rel="noreferrer">WhatsApp</a> : null}</div>
           </div>
+          {customer.nextDiscount ? <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-900"><p className="font-bold">{customer.nextDiscount.label}</p><p className="mt-1">{Object.entries(customer.nextDiscount.rules).map(([scope, rule]) => `${scope.replaceAll("_", " ")}: ${rule.type === "percent" ? `${rule.value}%` : formatRupiah(rule.value)}`).join(" · ")}{customer.nextDiscount.expiresAt ? ` · sampai ${new Date(customer.nextDiscount.expiresAt).toLocaleDateString("id-ID")}` : ""}</p></div> : null}
           <div className={`mt-4 rounded-xl border p-3 text-xs ${address ? coordinatesReady ? "border-emerald-100 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900" : "border-rose-200 bg-rose-50 text-rose-800"}`}>
             {address ? <div className="flex flex-wrap items-center justify-between gap-2"><span><strong>{address.label}:</strong> {address.formattedLine}</span><span className="font-bold">{coordinatesReady ? "Koordinat siap" : "Koordinat belum ada"}</span></div> : <span className="font-bold">Alamat home service belum ditambahkan.</span>}
           </div>

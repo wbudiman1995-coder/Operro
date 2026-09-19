@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 
 import { createBookingAction, type CreateBookingState } from "@/app/bookings/actions";
-import type { AddressOption, BranchOption, CustomerOption, PetOption, ResourceOption, ServiceAreaOption, ServiceOption } from "@/lib/bookings";
+import type { AddressOption, BranchOption, CustomerOption, NextDiscountOption, PetOption, ResourceOption, ServiceAreaOption, ServiceOption } from "@/lib/bookings";
 import type { FulfillmentMode } from "@/lib/booking-validation";
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   resources: ResourceOption[];
   addresses: AddressOption[];
   serviceAreas: ServiceAreaOption[];
+  nextDiscounts: NextDiscountOption[];
   defaultStart: string;
   /**
    * Server-validated preselected customer. The page only passes a value after reading the
@@ -44,7 +45,7 @@ function addMinutes(localDateTime: string, minutes: number) {
   return new Date(date.valueOf() - offset * 60_000).toISOString().slice(0, 16);
 }
 
-export function BookingWizard({ branches, customers, pets, services, resources, addresses, serviceAreas, defaultStart, preselectedCustomerId }: Props) {
+export function BookingWizard({ branches, customers, pets, services, resources, addresses, serviceAreas, nextDiscounts, defaultStart, preselectedCustomerId }: Props) {
   const [state, action, pending] = useActionState(createBookingAction, initialState);
   const [step, setStep] = useState(1);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
@@ -63,6 +64,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   const [slotRecommendations, setSlotRecommendations] = useState<SlotRecommendation[]>([]);
 
   const customerPets = useMemo(() => pets.filter((pet) => pet.customerId === customerId), [customerId, pets]);
+  const nextDiscount = nextDiscounts.find((offer) => offer.customerId === customerId);
   const customerAddresses = useMemo(() => addresses.filter((address) => address.customerId === customerId), [customerId, addresses]);
   const selectedAddress = customerAddresses.find((address) => address.id === customerAddressId);
   const branchAreas = serviceAreas.filter((area) => area.branchId === branchId);
@@ -145,6 +147,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
           <WizardTitle title="Pelanggan dan hewan" helper="Pilih satu pelanggan, lalu satu atau beberapa hewan dalam booking yang sama." />
           <Field label="Cabang"><select value={branchId} onChange={(event) => { setBranchId(event.target.value); setSelectedPets((current) => current.map((pet) => ({ ...pet, resourceId: "" }))); }} className="field"><option value="">Pilih cabang</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></Field>
           <Field label="Pelanggan"><select value={customerId} onChange={(event) => chooseCustomer(event.target.value)} className="field"><option value="">Pilih pelanggan</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ""}</option>)}</select></Field>
+          {nextDiscount ? <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-900"><p className="font-bold">Diskon booking berikutnya aktif · {nextDiscount.label}</p><p className="mt-1">Akan diterapkan otomatis ke layanan yang cocok setelah booking berhasil dibuat.</p></div> : null}
           {customerId ? <div><p className="mb-2 text-sm font-semibold text-slate-700">Hewan</p><div className="grid gap-2 sm:grid-cols-2">{customerPets.map((pet) => <button type="button" key={pet.id} onClick={() => togglePet(pet.id)} className={`rounded-2xl border p-4 text-left transition ${selectedPets.some((item) => item.petId === pet.id) ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-emerald-300"}`}><span className="font-bold">{pet.name}</span><span className="mt-1 block text-xs text-slate-500">{pet.breed ?? "Ras tidak dicatat"}</span></button>)}{customerPets.length === 0 ? <p className="text-sm text-slate-500">Pelanggan ini belum memiliki hewan aktif.</p> : null}</div></div> : null}
         </div> : null}
 
@@ -195,7 +198,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
 
         {step === 4 ? <div className="space-y-6">
           <WizardTitle title="Periksa dan konfirmasi" helper="Booking akan langsung dikonfirmasi setelah semua bagian berhasil disimpan." />
-          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={new Date(startsAt).toLocaleString("id-ID")} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} />{fulfillmentMode === "home" ? <><Summary label="Alamat" value={selectedAddress?.formattedLine ?? "—"} /><Summary label="Perjalanan" value={coverage?.allowed ? `${coverage.minutes} menit · ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(coverage.fee)}` : "Di luar area layanan"} /></> : null}</dl>
+          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={new Date(startsAt).toLocaleString("id-ID")} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} />{nextDiscount ? <Summary label="Penawaran" value={`${nextDiscount.label} · otomatis satu kali`} /> : null}{fulfillmentMode === "home" ? <><Summary label="Alamat" value={selectedAddress?.formattedLine ?? "—"} /><Summary label="Perjalanan" value={coverage?.allowed ? `${coverage.minutes} menit · ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(coverage.fee)}` : "Di luar area layanan"} /></> : null}</dl>
           {state.error ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{state.error}</p> : null}
         </div> : null}
       </div>

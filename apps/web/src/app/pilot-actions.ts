@@ -13,6 +13,7 @@
  * - adjustInventoryAction: appends an inventory adjustment movement.
  * - recordPaymentAction / recordExpenseAction: records manual financial activity.
  * - sellPackageAction: sells a catalog package to a customer and records the payment.
+ * - setCustomerNextDiscountAction / revokeCustomerNextDiscountAction: manages a customer's one-use next-booking offer.
  * - recomputePayrollRunAction / approvePayrollRunAction / markPayrollRunPaidAction: payroll lifecycle.
  */
 import "server-only";
@@ -53,6 +54,41 @@ async function workspace() {
 
 function databaseError(scope: string, message: string) {
   return { error: `${scope}: ${message}`, success: null };
+}
+
+export async function setCustomerNextDiscountAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  const customerId = idValue(formData, "customerId");
+  if (!customerId) return databaseError("Diskon", "pelanggan tidak valid");
+  const rules: Record<string, { type: string; value: number }> = {};
+  for (const [scope, prefix] of [["basic_grooming", "basic"], ["styling", "styling"], ["other", "other"]] as const) {
+    const type = textValue(formData, `${prefix}Type`, 10);
+    const value = numberValue(formData, `${prefix}Value`);
+    if (value !== null && value > 0) rules[scope] = { type: type === "fixed" ? "fixed" : "percent", value };
+  }
+  if (Object.keys(rules).length === 0) return databaseError("Diskon", "isi minimal satu aturan diskon");
+  const expiresDate = textValue(formData, "expiresAt", 10);
+  const expiresAt = expiresDate ? new Date(`${expiresDate}T23:59:59+07:00`).toISOString() : null;
+  const result = await context.supabase.schema("app").rpc("set_customer_next_discount", {
+    p_customer: customerId,
+    p_rules: rules,
+    p_expires_at: expiresAt,
+    p_note: textValue(formData, "note", 500) || null,
+    p_label: textValue(formData, "label", 120) || "Complimentary next appointment",
+  });
+  if (result.error) return databaseError("Diskon gagal disimpan", result.error.message);
+  revalidatePath("/customers"); revalidatePath(`/customers/${customerId}`); revalidatePath("/bookings");
+  return { error: null, success: "Diskon satu kali siap dipakai otomatis pada booking berikutnya." };
+}
+
+export async function revokeCustomerNextDiscountAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  const customerId = idValue(formData, "customerId"); const offerId = idValue(formData, "offerId");
+  if (!customerId || !offerId) return databaseError("Diskon", "penawaran tidak valid");
+  const result = await context.supabase.schema("app").rpc("revoke_customer_next_discount", { p_offer: offerId });
+  if (result.error) return databaseError("Diskon gagal dicabut", result.error.message);
+  revalidatePath("/customers"); revalidatePath(`/customers/${customerId}`); revalidatePath("/bookings");
+  return { error: null, success: "Diskon booking berikutnya dicabut." };
 }
 
 const PHONE_PATTERN = /^\+?[0-9][0-9 .\-()]{6,19}$/;
@@ -368,7 +404,7 @@ export async function updateGroomingChecklistAction(formData: FormData) {
 export async function issueInvoiceForBookingAction(formData: FormData) {
   const context = await workspace(); if (!context) return;
   const bookingId = idValue(formData, "bookingId"); if (!bookingId) return;
-  const { data: booking } = await context.supabase.from("bookings").select("id,branch_id,customer_id,status").eq("organization_id", context.organizationId).eq("id", bookingId).eq("status", "completed").maybeSingle();
+  const { data: booking } = await context.supabase.from("bookings").select("id,branch_id,customer_id,status,metadata").eq("organization_id", context.organizationId).eq("id", bookingId).eq("status", "completed").maybeSingle();
   if (!booking) return;
   const { data: existingOrders } = await context.supabase.from("orders").select("id").eq("organization_id", context.organizationId).eq("booking_id", bookingId).is("deleted_at", null);
   if ((existingOrders ?? []).length) {
@@ -377,18 +413,27 @@ export async function issueInvoiceForBookingAction(formData: FormData) {
   }
   const { data: jobPets } = await context.supabase.from("grooming_job_pets").select("id").eq("organization_id", context.organizationId).eq("grooming_job_id", bookingId).is("deleted_at", null);
   const jobPetIds = (jobPets ?? []).map((row) => row.id); if (!jobPetIds.length) return;
-  const { data: lines } = await context.supabase.from("grooming_job_pet_services").select("service_id,service_name_snapshot,quantity,unit_price_snapshot,currency").eq("organization_id", context.organizationId).in("grooming_job_pet_id", jobPetIds).is("deleted_at", null);
+  const { data: lines } = await context.supabase.from("grooming_job_pet_services").select("id,service_id,service_name_snapshot,quantity,unit_price_snapshot,currency").eq("organization_id", context.organizationId).in("grooming_job_pet_id", jobPetIds).is("deleted_at", null);
   if (!lines?.length) return;
+  const bookingMetadata = booking.metadata && typeof booking.metadata === "object" && !Array.isArray(booking.metadata) ? booking.metadata as Record<string, unknown> : {};
+  const offer = bookingMetadata.complimentary_next_discount && typeof bookingMetadata.complimentary_next_discount === "object" && !Array.isArray(bookingMetadata.complimentary_next_discount) ? bookingMetadata.complimentary_next_discount as Record<string, unknown> : {};
+  const lineDiscounts = offer.lineDiscounts && typeof offer.lineDiscounts === "object" && !Array.isArray(offer.lineDiscounts) ? offer.lineDiscounts as Record<string, unknown> : {};
+  const pricedLines = lines.map((line) => {
+    const gross = Number(line.unit_price_snapshot) * Number(line.quantity);
+    const detail = lineDiscounts[line.id] && typeof lineDiscounts[line.id] === "object" && !Array.isArray(lineDiscounts[line.id]) ? lineDiscounts[line.id] as Record<string, unknown> : {};
+    const discount = Math.max(0, Math.min(gross, Number(detail.amount) || 0));
+    return { ...line, gross, discount, discountDetail: detail };
+  });
   const { data: order, error: orderError } = await context.supabase.from("orders").insert({ organization_id: context.organizationId, branch_id: booking.branch_id, customer_id: booking.customer_id, booking_id: booking.id, status: "confirmed", currency: "IDR", metadata: { created_from: "homepaw_pilot" } }).select("id").single();
   if (orderError || !order) return;
-  const { error: itemError } = await context.supabase.from("order_items").insert(lines.map((line) => ({ organization_id: context.organizationId, order_id: order.id, item_type: "service", service_id: line.service_id, name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, line_total: Number(line.unit_price_snapshot) * Number(line.quantity), pricing_breakdown: { source: "grooming_job_line" }, metadata: { created_from: "homepaw_pilot" } })));
+  const { error: itemError } = await context.supabase.from("order_items").insert(pricedLines.map((line) => ({ organization_id: context.organizationId, order_id: order.id, item_type: "service", service_id: line.service_id, name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, discount_amount: line.discount, line_total: line.gross - line.discount, pricing_breakdown: { source: "grooming_job_line", ...(line.discount > 0 ? { complimentary_next_discount: line.discountDetail } : {}) }, metadata: { created_from: "homepaw_pilot", grooming_job_pet_service_id: line.id } })));
   if (itemError) { await context.supabase.from("orders").update({ status: "canceled" }).eq("id", order.id); return; }
   const { data: pricedOrder } = await context.supabase.from("orders").select("subtotal,discount_total,tax_total,total,currency").eq("organization_id", context.organizationId).eq("id", order.id).single();
   if (!pricedOrder) return;
   const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${Date.now().toString().slice(-6)}`;
   const { data: invoice, error: invoiceError } = await context.supabase.from("invoices").insert({ organization_id: context.organizationId, branch_id: booking.branch_id, customer_id: booking.customer_id, order_id: order.id, invoice_number: invoiceNumber, status: "issued", currency: pricedOrder.currency, subtotal: pricedOrder.subtotal, discount_total: pricedOrder.discount_total, tax_total: pricedOrder.tax_total, total: pricedOrder.total, due_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), metadata: { created_from: "homepaw_pilot", booking_id: booking.id } }).select("id").single();
   if (invoiceError || !invoice) return;
-  await context.supabase.from("invoice_lines").insert(lines.map((line) => ({ organization_id: context.organizationId, invoice_id: invoice.id, item_type: "service", name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, line_total: Number(line.unit_price_snapshot) * Number(line.quantity), pricing_breakdown: { source: "grooming_job_line" } })));
+  await context.supabase.from("invoice_lines").insert(pricedLines.map((line) => ({ organization_id: context.organizationId, invoice_id: invoice.id, item_type: "service", name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, discount_amount: line.discount, line_total: line.gross - line.discount, pricing_breakdown: { source: "grooming_job_line", ...(line.discount > 0 ? { complimentary_next_discount: line.discountDetail } : {}) } })));
   revalidatePath("/operations"); revalidatePath("/finance"); revalidatePath("/reports");
 }
 

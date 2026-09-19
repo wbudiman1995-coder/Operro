@@ -438,6 +438,7 @@ export interface CustomerInvoiceLineRow {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  discountAmount: number;
 }
 
 export interface CustomerInvoiceRow {
@@ -446,6 +447,7 @@ export interface CustomerInvoiceRow {
   branchId: string;
   status: string;
   total: number;
+  discountTotal: number;
   currency: string;
   issuedAt: string;
   dueAt: string | null;
@@ -461,7 +463,7 @@ export async function loadCustomerInvoices(
 ): Promise<CustomerInvoiceRow[]> {
   const invoiceResult = await supabase
     .from("invoices")
-    .select("id,invoice_number,branch_id,status,total,currency,issued_at,due_at,paid_at")
+    .select("id,invoice_number,branch_id,status,total,discount_total,currency,issued_at,due_at,paid_at")
     .eq("organization_id", organizationId)
     .eq("customer_id", customerId)
     .order("issued_at", { ascending: false })
@@ -479,7 +481,7 @@ export async function loadCustomerInvoices(
       .in("invoice_id", invoices.map((invoice) => invoice.id)),
     supabase
       .from("invoice_lines")
-      .select("id,invoice_id,name_snapshot,quantity,unit_price,line_total")
+      .select("id,invoice_id,name_snapshot,quantity,unit_price,discount_amount,line_total")
       .eq("organization_id", organizationId)
       .in("invoice_id", invoices.map((invoice) => invoice.id))
       .order("created_at"),
@@ -504,6 +506,7 @@ export async function loadCustomerInvoices(
     branchId: invoice.branch_id,
     status: invoice.status,
     total: Number(invoice.total),
+    discountTotal: Number(invoice.discount_total),
     currency: invoice.currency,
     issuedAt: invoice.issued_at,
     dueAt: invoice.due_at,
@@ -511,7 +514,7 @@ export async function loadCustomerInvoices(
     paidAmount: paidByInvoice.get(invoice.id) ?? 0,
     lines: (lineResult.data ?? [])
       .filter((line) => line.invoice_id === invoice.id)
-      .map((line) => ({ id: line.id, name: line.name_snapshot, quantity: Number(line.quantity), unitPrice: Number(line.unit_price), lineTotal: Number(line.line_total) })),
+      .map((line) => ({ id: line.id, name: line.name_snapshot, quantity: Number(line.quantity), unitPrice: Number(line.unit_price), lineTotal: Number(line.line_total), discountAmount: Number(line.discount_amount) })),
   }));
 }
 
@@ -522,6 +525,33 @@ export interface CustomerPackageRow {
   status: string;
   purchasedAt: string;
   expiresAt: string | null;
+}
+
+export interface CustomerNextDiscountRow {
+  id: string;
+  label: string;
+  rules: Record<string, { type: string; value: number }>;
+  expiresAt: string | null;
+  note: string | null;
+}
+
+export async function loadCustomerNextDiscount(
+  supabase: SupabaseClient,
+  organizationId: string,
+  customerId: string,
+): Promise<CustomerNextDiscountRow | null> {
+  const result = await supabase.from("customer_next_discounts").select("id,label,rules,expires_at,note")
+    .eq("organization_id", organizationId).eq("customer_id", customerId).eq("status", "active")
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).maybeSingle();
+  assertResult("customer_next_discount", result.error);
+  if (!result.data) return null;
+  const raw = result.data.rules && typeof result.data.rules === "object" && !Array.isArray(result.data.rules) ? result.data.rules as Record<string, unknown> : {};
+  const rules = Object.fromEntries(Object.entries(raw).flatMap(([scope, value]) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    const rule = value as Record<string, unknown>; const amount = Number(rule.value);
+    return typeof rule.type === "string" && Number.isFinite(amount) ? [[scope, { type: rule.type, value: amount }]] : [];
+  }));
+  return { id: result.data.id, label: result.data.label, rules, expiresAt: result.data.expires_at, note: result.data.note };
 }
 
 export async function loadCustomerPackages(

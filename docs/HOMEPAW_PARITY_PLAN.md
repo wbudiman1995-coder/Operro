@@ -17,7 +17,7 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 5 | Styling references | Implemented foundation | Private tenant storage, browser compression, expiry, Customer 360 upload/delete and groomer schedule visibility exist; add public onboarding upload and automated expired-byte cleanup |
 | 6 | Fast customer entry | Implemented foundation | Booking-chat parser, editable multi-pet preview, Maps expansion, duplicate-phone guard and tenant-scoped import are live; expand fuzzy city dictionaries as real templates require |
 | 7 | Customer self-onboarding | Implemented | Hashed two-day single-use links, public multi-pet form, token-scoped private styling uploads, configurable WhatsApp template, duplicate warning, approve/merge, reject and revoke exist |
-| 8 | Complimentary next appointment | Missing | One-use discount rule and atomic consumption |
+| 8 | Complimentary next appointment | Implemented | One-use percent/fixed rules for Basic Grooming, Styling and Other; atomic next-booking consumption, immutable invoice-line discounts, CRM indicator and recurring-series protection |
 | 9 | Advanced calendar | Partial+ | Real day/3-day/week time grid, filters, mobile layout and refresh exist; add grouped drag/drop, mass actions and source badges |
 | 10 | Booking wizard | Partial+ | Multi-pet/service/groomer, fulfillment, coverage/travel preview and ranked seven-day slots exist; add category discounts, distinct note types and package allocation |
 | 11 | Recurring appointments | Partial+ | Series materialization for weekly/biweekly/monthly patterns and skip/stop collision handling exists; add alternative-time and series-aware deletion UI |

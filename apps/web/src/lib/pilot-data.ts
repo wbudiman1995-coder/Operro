@@ -75,23 +75,36 @@ export interface CustomerWorkspace {
     pets: Array<{ id: string; name: string; species: string; breed: string | null; temperament: string | null }>;
     packages: Array<{ name: string; remaining: number; expiresAt: string | null }>;
     addresses: Array<{ id: string; label: string; formattedLine: string; latitude: number | null; longitude: number | null; isDefault: boolean }>;
+    nextDiscount: { id: string; label: string; rules: Record<string, { type: string; value: number }>; expiresAt: string | null } | null;
   }>;
 }
 
 export async function loadCustomerWorkspace(supabase: SupabaseClient, organizationId: string): Promise<CustomerWorkspace> {
-  const [customers, pets, customerPackages, packages, addresses] = await Promise.all([
+  const [customers, pets, customerPackages, packages, addresses, nextDiscounts] = await Promise.all([
     supabase.from("customers").select("id,display_name,phone,status,source,notes").eq("organization_id", organizationId).is("deleted_at", null).order("display_name"),
     supabase.from("pets").select("id,customer_id,name,species,breed,temperament").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("customer_packages").select("customer_id,package_id,sessions_remaining,expires_at,status").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("packages").select("id,name").eq("organization_id", organizationId).is("deleted_at", null),
     supabase.from("customer_addresses").select("id,customer_id,label,line1,line2,kecamatan,kabupaten_kota,province,postal_code,latitude,longitude,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
+    supabase.from("customer_next_discounts").select("id,customer_id,label,rules,expires_at").eq("organization_id", organizationId).eq("status", "active").or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
   ]);
-  for (const [scope, result] of [["customers", customers], ["pets", pets], ["customer_packages", customerPackages], ["packages", packages], ["customer_addresses", addresses]] as const) assertResult(scope, result.error);
+  for (const [scope, result] of [["customers", customers], ["pets", pets], ["customer_packages", customerPackages], ["packages", packages], ["customer_addresses", addresses], ["customer_next_discounts", nextDiscounts]] as const) assertResult(scope, result.error);
   const packageMap = new Map((packages.data ?? []).map((row) => [row.id, row.name]));
   return { customers: (customers.data ?? []).map((customer) => ({
     id: customer.id, name: customer.display_name, phone: customer.phone, status: customer.status, source: customer.source, notes: customer.notes,
     pets: (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name, species: pet.species, breed: pet.breed, temperament: pet.temperament })),
     packages: (customerPackages.data ?? []).filter((item) => item.customer_id === customer.id).map((item) => ({ name: packageMap.get(item.package_id) ?? "Paket", remaining: item.sessions_remaining, expiresAt: item.expires_at })),
+    nextDiscount: (() => {
+      const offer = (nextDiscounts.data ?? []).find((item) => item.customer_id === customer.id);
+      if (!offer) return null;
+      const raw = offer.rules && typeof offer.rules === "object" && !Array.isArray(offer.rules) ? offer.rules as Record<string, unknown> : {};
+      const rules = Object.fromEntries(Object.entries(raw).flatMap(([scope, value]) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+        const rule = value as Record<string, unknown>; const amount = Number(rule.value);
+        return typeof rule.type === "string" && Number.isFinite(amount) ? [[scope, { type: rule.type, value: amount }]] : [];
+      }));
+      return { id: offer.id, label: offer.label, rules, expiresAt: offer.expires_at };
+    })(),
     addresses: (addresses.data ?? []).filter((address) => address.customer_id === customer.id).map((address) => ({
       id: address.id,
       label: address.label,
