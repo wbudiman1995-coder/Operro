@@ -5,10 +5,9 @@
  * - BookingEditForm: explicit reschedule form — date, times, per-pet groomer, mode, notes.
  * - BookingCancelForm: two-step cancel with explicit confirmation.
  *
- * Explicit submission only. There is no drag-and-drop in this batch: the reschedule is a
- * non-transactional write sequence behind a database exclusion constraint, and a gesture
- * that fires it on every pointer release would multiply conflict and compensation cases
- * for no operational gain.
+ * This drawer remains the detailed edit path for times, mode, notes and per-pet groomers.
+ * The calendar also offers transactional drag/drop for a shared time offset; that path is
+ * backed by one database RPC and does not use this compensated multi-step form.
  *
  * Times are plain `date` and `time` inputs rather than `datetime-local` because the value
  * must be interpreted in the BRANCH time zone on the server. A `datetime-local` value

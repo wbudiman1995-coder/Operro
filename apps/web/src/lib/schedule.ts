@@ -52,9 +52,24 @@ export const SCHEDULE_ROW_LIMIT = 400;
  * the unfiltered calendar entirely.
  */
 export const BOOKING_SELECT_ALL =
-  "id,customer_id,starts_at,ends_at,status,fulfillment_mode,dispatch_stage,address_snapshot,travel_fee,travel_minutes_snapshot,service_area_matched,notes,customers(display_name),booking_resources(resource_id,is_active),grooming_jobs(grooming_job_pets(pet_id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot)))";
+  "id,customer_id,starts_at,ends_at,status,fulfillment_mode,dispatch_stage,address_snapshot,travel_fee,travel_minutes_snapshot,service_area_matched,notes,metadata,customers(display_name),booking_resources(resource_id,is_active),grooming_jobs(grooming_job_pets(pet_id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot,package_reservations(status))))";
 export const BOOKING_SELECT_FILTERED =
-  "id,customer_id,starts_at,ends_at,status,fulfillment_mode,dispatch_stage,address_snapshot,travel_fee,travel_minutes_snapshot,service_area_matched,notes,customers(display_name),booking_resources!inner(resource_id,is_active),grooming_jobs(grooming_job_pets(pet_id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot)))";
+  "id,customer_id,starts_at,ends_at,status,fulfillment_mode,dispatch_stage,address_snapshot,travel_fee,travel_minutes_snapshot,service_area_matched,notes,metadata,customers(display_name),booking_resources!inner(resource_id,is_active),grooming_jobs(grooming_job_pets(pet_id,status,assigned_resource_id,pets(name),grooming_job_pet_services(service_name_snapshot,package_reservations(status))))";
+
+export type BookingSourceBadge = "subscription" | "prepaid" | "free" | null;
+
+/** Classifies the commercial source without trusting a display label from the browser. */
+export function classifyBookingSource(metadata: unknown, hasPackageReservation: boolean): BookingSourceBadge {
+  const value = typeof metadata === "object" && metadata !== null ? (metadata as Record<string, unknown>) : {};
+  const source = [value.source, value.booking_source, value.payment_source]
+    .filter((item): item is string => typeof item === "string")
+    .join(" ")
+    .toLowerCase();
+  if (/subscription|membership|langganan/.test(source)) return "subscription";
+  if (/free|complimentary|gratis/.test(source)) return "free";
+  if (hasPackageReservation || /prepaid|package|paket|token/.test(source)) return "prepaid";
+  return null;
+}
 
 /**
  * Derives the groomer columns a booking occupies.
@@ -110,6 +125,8 @@ export interface SchedulePetLine {
 
 export interface ScheduleBooking {
   id: string;
+  startsAt: string;
+  endsAt: string;
   segments: DaySegment[];
   startLabel: string;
   endLabel: string;
@@ -125,6 +142,7 @@ export interface ScheduleBooking {
   resourceIds: string[];
   pets: SchedulePetLine[];
   notes: string | null;
+  sourceBadge: BookingSourceBadge;
 }
 
 export interface ScheduleBlackout {
@@ -321,6 +339,11 @@ export async function loadScheduleWorkspace(
           typeof line.service_name_snapshot === "string" ? [line.service_name_snapshot] : [],
         ),
       }));
+    const hasPackageReservation = relationRows(row.grooming_jobs)
+      .flatMap((job) => relationRows(job.grooming_job_pets))
+      .flatMap((jobPet) => relationRows(jobPet.grooming_job_pet_services))
+      .flatMap((line) => relationRows(line.package_reservations))
+      .some((reservation) => reservation.status === "reserved" || reservation.status === "consumed");
     // Defensive second line of defence: even if the embedded is_active filter above were
     // ever relaxed or behaved differently, a released assignment cannot reach resourceIds.
     const resourceIds = deriveAssignedResourceIds(
@@ -332,6 +355,8 @@ export async function loadScheduleWorkspace(
     return [
       {
         id: row.id,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
         segments,
         startLabel: formatZonedTime(starts, timeZone),
         endLabel: formatZonedTime(ends, timeZone),
@@ -357,6 +382,7 @@ export async function loadScheduleWorkspace(
         resourceIds,
         pets,
         notes: typeof row.notes === "string" && row.notes.length > 0 ? row.notes : null,
+        sourceBadge: classifyBookingSource(row.metadata, hasPackageReservation),
       },
     ];
   });

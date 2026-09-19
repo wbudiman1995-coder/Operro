@@ -56,6 +56,7 @@ import {
 import { loadBookingDetail } from "@/lib/schedule";
 import type { MutationState } from "@/lib/schedule/idle_state";
 import { createClient } from "@/lib/supabase/server";
+import { isValidDateISO, zonedDateTimeToUtc } from "@/lib/timezone";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -92,6 +93,17 @@ function revalidateBookingSurfaces(customerId?: string) {
   revalidatePath("/dashboard");
   revalidatePath("/operations");
   if (customerId) revalidatePath(`/customers/${customerId}`);
+}
+
+function parseBookingIds(value: FormDataEntryValue | null): string[] | null {
+  try {
+    const parsed: unknown = JSON.parse(String(value ?? "[]"));
+    if (!Array.isArray(parsed)) return null;
+    const ids = [...new Set(parsed.filter((item): item is string => typeof item === "string" && UUID_PATTERN.test(item)))];
+    return ids.length === parsed.length && ids.length >= 1 && ids.length <= 50 ? ids : null;
+  } catch {
+    return null;
+  }
 }
 
 async function resolveWorkspace() {
@@ -380,6 +392,89 @@ export async function cancelBookingAction(_previous: MutationState, formData: Fo
     return { error: null, success: "Booking dibatalkan. Sesi paket dan slot groomer telah dilepas." };
   } catch (error) {
     console.error("cancel_booking_unexpected", error);
+    return { error: GENERIC_ERROR, success: null };
+  }
+}
+
+/** Atomic drag/drop and grouped calendar move backed by app.move_schedule_bookings. */
+export async function moveScheduleBookingsAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
+  try {
+    const bookingIds = parseBookingIds(formData.get("bookingIds"));
+    if (!bookingIds) return { error: "Pilih 1 sampai 50 booking yang valid.", success: null };
+
+    const targetDateISO = String(formData.get("targetDateISO") ?? "");
+    const targetMinutesInput = String(formData.get("targetMinutes") ?? "");
+    const anchorBookingInput = String(formData.get("anchorBookingId") ?? bookingIds[0]);
+    const anchorBookingId = UUID_PATTERN.test(anchorBookingInput) && bookingIds.includes(anchorBookingInput) ? anchorBookingInput : null;
+    if (!anchorBookingId) return { error: "Booking acuan untuk pemindahan tidak valid.", success: null };
+    const targetResourceInput = String(formData.get("targetResourceId") ?? "");
+    const targetResourceId = targetResourceInput && UUID_PATTERN.test(targetResourceInput) ? targetResourceInput : null;
+    if (targetResourceInput && !targetResourceId) return { error: "Groomer tujuan tidak valid.", success: null };
+    if (targetResourceId && bookingIds.length !== 1) return { error: "Pergantian groomer hanya dapat dilakukan untuk satu booking.", success: null };
+
+    const loaded = await loadMutableBooking(anchorBookingId);
+    if (!loaded.ok) return { error: loaded.error, success: null };
+    if (!loaded.capabilities["booking.update"]) return { error: "Anda tidak memiliki izin mengubah jadwal booking.", success: null };
+
+    let deltaMinutes: number;
+    if (targetDateISO || targetMinutesInput) {
+      if (!isValidDateISO(targetDateISO)) return { error: "Tujuan drag booking tidak valid.", success: null };
+      const targetMinutes = Number(targetMinutesInput);
+      if (!Number.isInteger(targetMinutes) || targetMinutes < 0 || targetMinutes >= 1440) return { error: "Jam tujuan tidak valid.", success: null };
+      const target = zonedDateTimeToUtc(targetDateISO, targetMinutes, loaded.timeZone);
+      deltaMinutes = Math.round((target.getTime() - new Date(loaded.detail.startsAtIso).getTime()) / 60_000);
+    } else {
+      deltaMinutes = Number(formData.get("deltaMinutes"));
+    }
+    if (!Number.isInteger(deltaMinutes) || deltaMinutes === 0 || Math.abs(deltaMinutes) > 43_200) {
+      return { error: "Pergeseran jadwal harus antara 1 menit dan 30 hari.", success: null };
+    }
+
+    const result = await loaded.supabase.schema("app").rpc("move_schedule_bookings", {
+      p_bookings: bookingIds,
+      p_delta_minutes: deltaMinutes,
+      p_target_resource: targetResourceId,
+    });
+    if (result.error) {
+      const message = result.error.message ?? "";
+      if (/blackout|exclusion|overlap|23P01/i.test(message)) return { error: "Slot tujuan bentrok dengan booking atau waktu tidak tersedia.", success: null };
+      if (/not_reschedulable|invalid_selection|selection_must_share_branch|target_resource/i.test(message)) return { error: "Pilihan booking tidak dapat dipindahkan bersama. Muat ulang kalender lalu coba lagi.", success: null };
+      if (/not_authorized|42501/i.test(message)) return { error: "Izin atau akses cabang Anda tidak mencukupi.", success: null };
+      console.error("move_schedule_bookings_failed", result.error);
+      return { error: GENERIC_ERROR, success: null };
+    }
+    revalidateBookingSurfaces();
+    return { error: null, success: `${bookingIds.length} booking berhasil dipindahkan.` };
+  } catch (error) {
+    console.error("move_schedule_bookings_unexpected", error);
+    return { error: GENERIC_ERROR, success: null };
+  }
+}
+
+/** Mass cancellation retains the canonical state machine, package release, and audit trail. */
+export async function cancelScheduleBookingsAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
+  try {
+    const bookingIds = parseBookingIds(formData.get("bookingIds"));
+    if (!bookingIds) return { error: "Pilih 1 sampai 50 booking yang valid.", success: null };
+    if (String(formData.get("confirm") ?? "") !== "yes") return { error: "Konfirmasi pembatalan diperlukan.", success: null };
+
+    const loaded = await loadMutableBooking(bookingIds[0]);
+    if (!loaded.ok) return { error: loaded.error, success: null };
+    if (!loaded.capabilities["booking.cancel"] || !loaded.capabilities["booking.update"]) {
+      return { error: "Izin Anda tidak mencukupi untuk membatalkan pilihan ini.", success: null };
+    }
+    const result = await loaded.supabase.schema("app").rpc("cancel_schedule_bookings", { p_bookings: bookingIds });
+    if (result.error) {
+      const message = result.error.message ?? "";
+      if (/not_cancellable|invalid_transition/i.test(message)) return { error: "Salah satu booking sudah tidak dapat dibatalkan. Muat ulang kalender.", success: null };
+      if (/not_authorized|42501/i.test(message)) return { error: "Izin atau akses cabang Anda tidak mencukupi.", success: null };
+      console.error("cancel_schedule_bookings_failed", result.error);
+      return { error: GENERIC_ERROR, success: null };
+    }
+    revalidateBookingSurfaces();
+    return { error: null, success: `${bookingIds.length} booking dibatalkan dan seluruh slot dilepas.` };
+  } catch (error) {
+    console.error("cancel_schedule_bookings_unexpected", error);
     return { error: GENERIC_ERROR, success: null };
   }
 }

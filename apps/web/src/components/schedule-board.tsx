@@ -11,19 +11,21 @@
  * 3-day and week views use day columns instead, because groomers × 7 days is unusable at
  * any realistic width. This is a deliberate departure from the HomePaw grid.
  *
- * Calendar mutations stay behind the explicit reschedule/cancel forms and the database
- * exclusion constraint. The visual board never writes booking rows directly.
+ * Calendar drag/drop and mass actions call transactional app-schema RPCs. Resource
+ * collisions, blackouts and status changes roll the whole operation back together.
  */
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { type DragEvent, useCallback, useMemo, useState, useTransition } from "react";
 
+import { cancelScheduleBookingsAction, moveScheduleBookingsAction } from "@/app/schedule/actions";
 import { BlackoutManager } from "@/components/blackout-manager";
 import { BookingCancelForm, BookingEditForm, BookingSeriesForm } from "@/components/booking-edit-form";
 import { StatusBadge } from "@/components/pilot-ui";
 import { WeeklyAvailabilityManager } from "@/components/weekly-availability-manager";
 import { isCancellable, isReschedulable } from "@/lib/booking-mutations";
 import { SCHEDULE_ROW_LIMIT, type BookingDetail, type ScheduleWorkspace } from "@/lib/schedule";
+import { IDLE_STATE, type MutationState } from "@/lib/schedule/idle_state";
 import {
   SCHEDULE_VIEWS,
   SCHEDULE_VIEW_LABELS,
@@ -55,12 +57,28 @@ function dayHeading(dayISO: string) {
   );
 }
 
+function readDraggedBooking(event: DragEvent<HTMLElement>): string | null {
+  const value = event.dataTransfer.getData("application/x-operro-booking") || event.dataTransfer.getData("text/plain");
+  return value || null;
+}
+
+function minuteAtDrop(event: DragEvent<HTMLElement>, bounds: { startMinutes: number; endMinutes: number }): number {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (event.clientY - rect.top) / Math.max(rect.height, 1)));
+  const raw = bounds.startMinutes + ratio * (bounds.endMinutes - bounds.startMinutes);
+  return Math.max(0, Math.min(1439, Math.round(raw / 15) * 15));
+}
+
 export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canReadFinance, canUpdateBooking, canCancelBooking, canManageResources }: ScheduleBoardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [drawerOpen, setDrawerOpen] = useState(detail !== null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [feedback, setFeedback] = useState<MutationState>(IDLE_STATE);
+  const [cancelArmed, setCancelArmed] = useState(false);
 
   const pushParams = useCallback(
     (mutate: (params: URLSearchParams) => void) => {
@@ -98,6 +116,74 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
   function closeDrawer() {
     setDrawerOpen(false);
     pushParams((params) => params.delete("booking"));
+  }
+
+  function toggleBooking(bookingId: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(bookingId)) next.delete(bookingId); else next.add(bookingId);
+      return next;
+    });
+    setCancelArmed(false);
+  }
+
+  function activateBooking(bookingId: string, additive = false) {
+    if (selectionMode || additive) {
+      if (!selectionMode) setSelectionMode(true);
+      toggleBooking(bookingId);
+      return;
+    }
+    openBooking(bookingId);
+  }
+
+  function runAction(action: typeof moveScheduleBookingsAction | typeof cancelScheduleBookingsAction, formData: FormData) {
+    setFeedback(IDLE_STATE);
+    startTransition(async () => {
+      const result = await action(IDLE_STATE, formData);
+      setFeedback(result);
+      if (result.success) {
+        setSelectedIds(new Set());
+        setSelectionMode(false);
+        setCancelArmed(false);
+        router.refresh();
+      }
+    });
+  }
+
+  function moveSelected(deltaMinutes: number) {
+    const formData = new FormData();
+    formData.set("bookingIds", JSON.stringify([...selectedIds]));
+    formData.set("deltaMinutes", String(deltaMinutes));
+    runAction(moveScheduleBookingsAction, formData);
+  }
+
+  function cancelSelected() {
+    if (!cancelArmed) {
+      setCancelArmed(true);
+      return;
+    }
+    const formData = new FormData();
+    formData.set("bookingIds", JSON.stringify([...selectedIds]));
+    formData.set("confirm", "yes");
+    runAction(cancelScheduleBookingsAction, formData);
+  }
+
+  function dropBooking(anchorBookingId: string, targetDateISO: string, targetMinutes: number, targetResourceId?: string) {
+    const bookingIds = selectedIds.has(anchorBookingId) ? [...selectedIds] : [anchorBookingId];
+    const anchorBooking = visibleBookings.find((booking) => booking.id === anchorBookingId);
+    // A multi-groomer booking can represent independent pet assignments. A drop must not
+    // silently collapse all pets onto one groomer; use the detail editor for that case.
+    const safeTargetResource =
+      bookingIds.length === 1 && targetResourceId && anchorBooking && anchorBooking.resourceIds.length <= 1 && !anchorBooking.resourceIds.includes(targetResourceId)
+        ? targetResourceId
+        : undefined;
+    const formData = new FormData();
+    formData.set("bookingIds", JSON.stringify(bookingIds));
+    formData.set("anchorBookingId", anchorBookingId);
+    formData.set("targetDateISO", targetDateISO);
+    formData.set("targetMinutes", String(targetMinutes));
+    if (safeTargetResource) formData.set("targetResourceId", safeTargetResource);
+    runAction(moveScheduleBookingsAction, formData);
   }
 
   return (
@@ -148,6 +234,16 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
           >
             {pending ? "Memuat…" : "Segarkan"}
           </button>
+          {canUpdateBooking ? (
+            <button
+              type="button"
+              aria-pressed={selectionMode}
+              onClick={() => { setSelectionMode((value) => !value); setSelectedIds(new Set()); setCancelArmed(false); }}
+              className={`h-9 rounded-xl px-3 text-xs font-bold transition ${selectionMode ? "bg-slate-900 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+            >
+              {selectionMode ? "Selesai memilih" : "Pilih beberapa"}
+            </button>
+          ) : null}
         </div>
 
         {data.branchResources.length > 0 ? (
@@ -191,15 +287,31 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
         </p>
       ) : null}
 
+      {selectedIds.size > 0 ? (
+        <div className="sticky top-3 z-30 mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-900 p-3 text-white shadow-xl">
+          <span className="mr-1 text-xs font-extrabold">{selectedIds.size} booking dipilih</span>
+          {canUpdateBooking ? <>
+            <button type="button" disabled={pending} onClick={() => moveSelected(-1440)} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/20 disabled:opacity-40">−1 hari</button>
+            <button type="button" disabled={pending} onClick={() => moveSelected(-30)} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/20 disabled:opacity-40">−30 menit</button>
+            <button type="button" disabled={pending} onClick={() => moveSelected(30)} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/20 disabled:opacity-40">+30 menit</button>
+            <button type="button" disabled={pending} onClick={() => moveSelected(1440)} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/20 disabled:opacity-40">+1 hari</button>
+          </> : null}
+          {canCancelBooking ? <button type="button" disabled={pending} onClick={cancelSelected} className={`rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 ${cancelArmed ? "bg-rose-500 text-white" : "bg-white/10 hover:bg-white/20"}`}>{cancelArmed ? "Klik lagi: batalkan semua" : "Batalkan pilihan"}</button> : null}
+          <button type="button" onClick={() => { setSelectedIds(new Set()); setCancelArmed(false); }} className="ml-auto rounded-lg px-3 py-2 text-xs font-bold text-slate-300 hover:bg-white/10">Kosongkan</button>
+        </div>
+      ) : null}
+
+      {feedback.error || feedback.success ? <p role="status" className={`mt-3 rounded-xl px-4 py-3 text-xs font-semibold ${feedback.error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}>{feedback.error ?? feedback.success}</p> : null}
+
       {data.branchResources.length === 0 ? (
         <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 py-12 text-center">
           <p className="font-bold text-slate-700">Belum ada groomer aktif di cabang ini</p>
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Tambahkan sumber daya bertipe staf pada menu Layanan &amp; tim agar kalender dapat menampilkan kolom groomer.</p>
         </div>
       ) : view === "day" ? (
-        <DayResourceGrid data={data} bookings={visibleBookings} bounds={bounds} dayISO={data.days[0]} onOpen={openBooking} activeBookingId={detail?.id ?? null} />
+        <DayResourceGrid data={data} bookings={visibleBookings} bounds={bounds} dayISO={data.days[0]} onActivate={activateBooking} onDropBooking={dropBooking} selectedIds={selectedIds} canMove={canUpdateBooking && !pending} activeBookingId={detail?.id ?? null} />
       ) : (
-        <MultiDayCalendar data={data} bookings={visibleBookings} bounds={bounds} todayISO={todayISO} onOpen={openBooking} activeBookingId={detail?.id ?? null} />
+        <MultiDayCalendar data={data} bookings={visibleBookings} bounds={bounds} todayISO={todayISO} onActivate={activateBooking} onDropBooking={dropBooking} selectedIds={selectedIds} canMove={canUpdateBooking && !pending} activeBookingId={detail?.id ?? null} />
       )}
 
       {canManageResources ? (
@@ -229,14 +341,20 @@ function DayResourceGrid({
   bookings,
   bounds,
   dayISO,
-  onOpen,
+  onActivate,
+  onDropBooking,
+  selectedIds,
+  canMove,
   activeBookingId,
 }: {
   data: ScheduleWorkspace;
   bookings: ScheduleWorkspace["bookings"];
   bounds: { startMinutes: number; endMinutes: number };
   dayISO: string;
-  onOpen: (id: string) => void;
+  onActivate: (id: string, additive?: boolean) => void;
+  onDropBooking: (id: string, dayISO: string, minutes: number, resourceId?: string) => void;
+  selectedIds: ReadonlySet<string>;
+  canMove: boolean;
   activeBookingId: string | null;
 }) {
   const markers = slotMarkers(bounds);
@@ -274,7 +392,12 @@ function DayResourceGrid({
           </div>
 
           {data.resources.map((resource) => (
-            <div key={resource.id} className="relative flex-1 border-r border-slate-100 last:border-r-0">
+            <div
+              key={resource.id}
+              className="relative flex-1 border-r border-slate-100 last:border-r-0"
+              onDragOver={canMove ? (event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } : undefined}
+              onDrop={canMove ? (event) => { event.preventDefault(); const id = readDraggedBooking(event); if (id) onDropBooking(id, dayISO, minuteAtDrop(event, bounds), resource.id); } : undefined}
+            >
               {markers.map((minute) => (
                 <span
                   key={minute}
@@ -309,13 +432,19 @@ function DayResourceGrid({
                   const position = positionWithin(segment, bounds);
                   if (!position) return null;
                   const active = booking.id === activeBookingId;
+                  const selected = selectedIds.has(booking.id);
+                  const movable = canMove && isReschedulable(booking.status);
                   return (
                     <button
                       key={`${booking.id}:${segment.dayISO}`}
                       type="button"
-                      onClick={() => onOpen(booking.id)}
+                      draggable={movable}
+                      aria-pressed={selected}
+                      onDragStart={(event) => { event.dataTransfer.setData("application/x-operro-booking", booking.id); event.dataTransfer.setData("text/plain", booking.id); event.dataTransfer.effectAllowed = "move"; }}
+                      onClick={(event) => onActivate(booking.id, event.shiftKey)}
+                      onContextMenu={(event) => { if (movable) { event.preventDefault(); onActivate(booking.id, true); } }}
                       style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%` }}
-                      className={`absolute inset-x-1 overflow-hidden rounded-lg border px-2 py-1 text-left transition ${active ? "border-emerald-500 bg-emerald-100" : booking.status === "canceled" || booking.status === "no_show" ? "border-slate-200 bg-slate-50 opacity-70" : "border-emerald-200 bg-emerald-50 hover:border-emerald-400"}`}
+                      className={`absolute inset-x-1 z-10 overflow-hidden rounded-lg border px-2 py-1 text-left transition ${selected ? "ring-2 ring-sky-500 ring-offset-1" : ""} ${movable ? "cursor-grab active:cursor-grabbing" : ""} ${active ? "border-emerald-500 bg-emerald-100" : booking.status === "canceled" || booking.status === "no_show" ? "border-slate-200 bg-slate-50 opacity-70" : "border-emerald-200 bg-emerald-50 hover:border-emerald-400"}`}
                     >
                       <p className="truncate text-[11px] font-bold text-emerald-900">
                         {segment.continuesBefore ? "◂ " : ""}{booking.startLabel} {booking.customerName}{segment.continuesAfter ? " ▸" : ""}
@@ -342,6 +471,9 @@ function BookingBadges({ booking, compact = false }: { booking: ScheduleWorkspac
       {booking.dispatchStage ? <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] font-extrabold text-amber-700">{booking.dispatchStage.replaceAll("_", " ")}</span> : null}
       {booking.travelMinutes ? <span className="rounded bg-cyan-50 px-1 py-0.5 text-[9px] font-bold text-cyan-700">{booking.travelMinutes} mnt jalan</span> : null}
       {booking.serviceAreaMatched === false ? <span className="rounded bg-rose-100 px-1 py-0.5 text-[9px] font-extrabold text-rose-700">Di luar area</span> : null}
+      {booking.sourceBadge === "subscription" ? <span className="rounded bg-fuchsia-100 px-1 py-0.5 text-[9px] font-extrabold text-fuchsia-700">Langganan</span> : null}
+      {booking.sourceBadge === "prepaid" ? <span className="rounded bg-indigo-100 px-1 py-0.5 text-[9px] font-extrabold text-indigo-700">Paket prabayar</span> : null}
+      {booking.sourceBadge === "free" ? <span className="rounded bg-lime-100 px-1 py-0.5 text-[9px] font-extrabold text-lime-800">Gratis</span> : null}
     </span>
   );
 }
@@ -351,14 +483,20 @@ function MultiDayCalendar({
   bookings,
   bounds,
   todayISO,
-  onOpen,
+  onActivate,
+  onDropBooking,
+  selectedIds,
+  canMove,
   activeBookingId,
 }: {
   data: ScheduleWorkspace;
   bookings: ScheduleWorkspace["bookings"];
   bounds: { startMinutes: number; endMinutes: number };
   todayISO: string;
-  onOpen: (id: string) => void;
+  onActivate: (id: string, additive?: boolean) => void;
+  onDropBooking: (id: string, dayISO: string, minutes: number) => void;
+  selectedIds: ReadonlySet<string>;
+  canMove: boolean;
   activeBookingId: string | null;
 }) {
   const resourceNames = new Map(data.resources.map((resource) => [resource.id, resource.name]));
@@ -393,19 +531,30 @@ function MultiDayCalendar({
           blackout.segments.filter((segment) => segment.dayISO === dayISO).map((segment) => ({ blackout, segment })),
         );
         return (
-          <section key={dayISO} className={`relative min-w-0 flex-1 border-r border-slate-100 last:border-r-0 ${dayISO === todayISO ? "bg-emerald-50/20" : ""}`}>
+          <section
+            key={dayISO}
+            className={`relative min-w-0 flex-1 border-r border-slate-100 last:border-r-0 ${dayISO === todayISO ? "bg-emerald-50/20" : ""}`}
+            onDragOver={canMove ? (event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } : undefined}
+            onDrop={canMove ? (event) => { event.preventDefault(); const id = readDraggedBooking(event); if (id) onDropBooking(id, dayISO, minuteAtDrop(event, bounds)); } : undefined}
+          >
               {markers.map((minute) => <span key={minute} aria-hidden className="absolute inset-x-0 border-t border-slate-100" style={{ top: `${((minute - bounds.startMinutes) / (bounds.endMinutes - bounds.startMinutes)) * 100}%` }} />)}
               {dayBookings.map(({ booking, segment }) => {
                 const active = booking.id === activeBookingId;
+                const selected = selectedIds.has(booking.id);
+                const movable = canMove && isReschedulable(booking.status);
                 const position = positionWithin(segment, bounds);
                 if (!position) return null;
                 return (
                   <button
                     key={`${booking.id}:${segment.dayISO}`}
                     type="button"
-                    onClick={() => onOpen(booking.id)}
+                    draggable={movable}
+                    aria-pressed={selected}
+                    onDragStart={(event) => { event.dataTransfer.setData("application/x-operro-booking", booking.id); event.dataTransfer.setData("text/plain", booking.id); event.dataTransfer.effectAllowed = "move"; }}
+                    onClick={(event) => onActivate(booking.id, event.shiftKey)}
+                    onContextMenu={(event) => { if (movable) { event.preventDefault(); onActivate(booking.id, true); } }}
                     style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%` }}
-                    className={`absolute inset-x-1 z-10 overflow-hidden rounded-lg border px-2 py-1 text-left shadow-sm transition ${active ? "border-emerald-500 bg-emerald-100" : booking.status === "canceled" || booking.status === "no_show" ? "border-slate-200 bg-slate-50 opacity-70" : "border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50"}`}
+                    className={`absolute inset-x-1 z-10 overflow-hidden rounded-lg border px-2 py-1 text-left shadow-sm transition ${selected ? "ring-2 ring-sky-500 ring-offset-1" : ""} ${movable ? "cursor-grab active:cursor-grabbing" : ""} ${active ? "border-emerald-500 bg-emerald-100" : booking.status === "canceled" || booking.status === "no_show" ? "border-slate-200 bg-slate-50 opacity-70" : "border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50"}`}
                   >
                     <p className="truncate text-[10px] font-bold text-slate-500">{segment.continuesBefore ? "◂ " : ""}{booking.startLabel}–{booking.endLabel}{segment.continuesAfter ? " ▸" : ""}</p>
                     <p className="truncate text-xs font-extrabold text-slate-800">{booking.customerName}</p>
