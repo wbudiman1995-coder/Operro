@@ -16,7 +16,7 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 4 | Pet database | Partial | Add pet CRUD UI, coat/profile fields, wash counters and last-groomed automation |
 | 5 | Styling references | Implemented foundation | Private tenant storage, browser compression, expiry, Customer 360 upload/delete and groomer schedule visibility exist; add public onboarding upload and automated expired-byte cleanup |
 | 6 | Fast customer entry | Implemented foundation | Booking-chat parser, editable multi-pet preview, Maps expansion, duplicate-phone guard and tenant-scoped import are live; expand fuzzy city dictionaries as real templates require |
-| 7 | Customer self-onboarding | Implemented foundation+ | Hashed two-day single-use links, public multi-pet form, token-scoped private styling uploads, duplicate warning, approve/merge, reject and revoke exist; add configurable invitation templates and orphan-file cleanup |
+| 7 | Customer self-onboarding | Implemented | Hashed two-day single-use links, public multi-pet form, token-scoped private styling uploads, configurable WhatsApp template, duplicate warning, approve/merge, reject and revoke exist |
 | 8 | Complimentary next appointment | Missing | One-use discount rule and atomic consumption |
 | 9 | Advanced calendar | Partial+ | Real day/3-day/week time grid, filters, mobile layout and refresh exist; add grouped drag/drop, mass actions and source badges |
 | 10 | Booking wizard | Partial+ | Multi-pet/service/groomer, fulfillment, coverage/travel preview and ranked seven-day slots exist; add category discounts, distinct note types and package allocation |
@@ -52,7 +52,7 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 40 | Custom fields | Schema metadata only | Admin builder and customer/pet rendering/editor |
 | 41 | Accounts and permissions | Implemented foundation | Multi-org membership and capabilities exist; add staff invitation and role-management UI |
 | 42 | Personal preferences | Partial | Responsive shell exists; add language, landing page, calendar and dashboard preferences |
-| 43 | Storage and maintenance | Partial | Private tenant-partitioned evidence bucket exists; add usage view, cleanup and retention controls |
+| 43 | Storage and maintenance | Partial+ | Private tenant-partitioned evidence buckets, per-org reference retention and bounded orphan/expiry cleanup exist; add usage charts and scheduled cleanup |
 | 44 | Reliability and safeguards | Partial+ | RLS, audit, immutable snapshots, state RPCs and tests exist; add idempotency for remaining financial writes, monitoring and recovery UI |
 
 ## Delivery order
