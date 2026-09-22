@@ -449,6 +449,8 @@ export interface BookingDetail {
   id: string;
   seriesId: string | null;
   recurrenceSequence: number | null;
+  seriesCancellableFuture: number;
+  seriesCancellableAll: number;
   branchId: string;
   status: string;
   fulfillmentMode: string;
@@ -547,10 +549,30 @@ export async function loadBookingDetail(
         ]
       : [],
   );
+  const seriesId = typeof row.booking_recurrence_id === "string" ? row.booking_recurrence_id : null;
+  const recurrenceSequence = typeof row.recurrence_sequence === "number" ? row.recurrence_sequence : null;
+  let seriesCancellableAll = 0;
+  let seriesCancellableFuture = 0;
+  if (seriesId) {
+    const seriesResult = await supabase
+      .from("bookings")
+      .select("recurrence_sequence,status")
+      .eq("organization_id", organizationId)
+      .eq("branch_id", branchId)
+      .eq("booking_recurrence_id", seriesId)
+      .is("deleted_at", null);
+    assertResult("booking_detail_series", seriesResult.error);
+    const cancellable = new Set(["draft", "pending", "confirmed", "checked_in", "in_progress"]);
+    const activeOccurrences = (seriesResult.data ?? []).filter((item) => cancellable.has(item.status));
+    seriesCancellableAll = activeOccurrences.length;
+    seriesCancellableFuture = activeOccurrences.filter((item) => recurrenceSequence === null || Number(item.recurrence_sequence) >= recurrenceSequence).length;
+  }
   return {
     id: row.id,
-    seriesId: typeof row.booking_recurrence_id === "string" ? row.booking_recurrence_id : null,
-    recurrenceSequence: typeof row.recurrence_sequence === "number" ? row.recurrence_sequence : null,
+    seriesId,
+    recurrenceSequence,
+    seriesCancellableFuture,
+    seriesCancellableAll,
     branchId: row.branch_id,
     status: row.status,
     fulfillmentMode: row.fulfillment_mode,

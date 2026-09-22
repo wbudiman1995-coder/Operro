@@ -748,7 +748,7 @@ export async function createBookingSeriesAction(_previous: MutationState, formDa
     if (!UUID_PATTERN.test(bookingId)) return { error: STALE_ERROR, success: null };
     if (!["weekly", "biweekly", "monthly"].includes(frequency)) return { error: "Frekuensi jadwal tidak valid.", success: null };
     if (!Number.isInteger(occurrences) || occurrences < 2 || occurrences > 52) return { error: "Jumlah pertemuan harus antara 2 dan 52.", success: null };
-    if (!["skip", "stop"].includes(conflictMode)) return { error: "Aturan bentrok tidak valid.", success: null };
+    if (!["skip", "stop", "next_available"].includes(conflictMode)) return { error: "Aturan bentrok tidak valid.", success: null };
 
     const supabase = await createClient();
     const auth = await loadAuthContext(supabase);
@@ -770,11 +770,46 @@ export async function createBookingSeriesAction(_previous: MutationState, formDa
     const payload = result.data && typeof result.data === "object" ? result.data as Record<string, unknown> : {};
     const created = Number(payload.created_count ?? 0);
     const skipped = Array.isArray(payload.skipped_sequences) ? payload.skipped_sequences.length : 0;
+    const alternatives = payload.alternative_minutes && typeof payload.alternative_minutes === "object" && !Array.isArray(payload.alternative_minutes)
+      ? Object.keys(payload.alternative_minutes as Record<string, unknown>).length
+      : 0;
     revalidatePath("/schedule");
     revalidatePath("/bookings");
-    return { error: null, success: `Seri rutin dibuat: ${created} booking${skipped ? `, ${skipped} jadwal bentrok dilewati` : ""}.` };
+    return { error: null, success: `Seri rutin dibuat: ${created} booking${alternatives ? `, ${alternatives} dipindah ke waktu alternatif` : ""}${skipped ? `, ${skipped} jadwal bentrok dilewati` : ""}.` };
   } catch (error) {
     console.error("create_booking_series_unexpected", error);
+    return { error: GENERIC_ERROR, success: null };
+  }
+}
+
+export async function cancelBookingSeriesAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
+  try {
+    const bookingId = String(formData.get("bookingId") ?? "");
+    const scope = String(formData.get("scope") ?? "current");
+    if (!UUID_PATTERN.test(bookingId)) return { error: STALE_ERROR, success: null };
+    if (!["current", "future", "all"].includes(scope)) return { error: "Cakupan pembatalan tidak valid.", success: null };
+    if (String(formData.get("confirm") ?? "") !== "yes") return { error: "Konfirmasi pembatalan diperlukan.", success: null };
+
+    const loaded = await loadMutableBooking(bookingId);
+    if (!loaded.ok) return { error: loaded.error, success: null };
+    if (!loaded.capabilities["booking.cancel"] || !loaded.capabilities["booking.update"]) return { error: "Izin Anda tidak mencukupi untuk membatalkan seri ini.", success: null };
+    if (!loaded.detail.seriesId && scope !== "current") return { error: "Booking ini bukan bagian dari seri rutin.", success: null };
+
+    const result = await loaded.supabase.schema("app").rpc("cancel_booking_series_scope", { p_booking: bookingId, p_scope: scope });
+    if (result.error) {
+      const message = result.error.message ?? "";
+      if (/invalid_scope|booking_not_in_series/i.test(message)) return { error: "Cakupan seri berubah. Muat ulang kalender.", success: null };
+      if (/invalid_transition/i.test(message)) return { error: "Salah satu booking tidak lagi dapat dibatalkan. Muat ulang kalender.", success: null };
+      if (/not_authorized|42501/i.test(message)) return { error: "Izin atau akses cabang Anda tidak mencukupi.", success: null };
+      console.error("cancel_booking_series_failed", result.error);
+      return { error: GENERIC_ERROR, success: null };
+    }
+    const payload = result.data && typeof result.data === "object" ? result.data as Record<string, unknown> : {};
+    const canceled = Number(payload.canceled_count ?? 0);
+    revalidateBookingSurfaces(loaded.detail.customerId);
+    return { error: null, success: `${canceled} booking rutin dibatalkan. Sesi paket dan slot groomer telah dilepas.` };
+  } catch (error) {
+    console.error("cancel_booking_series_unexpected", error);
     return { error: GENERIC_ERROR, success: null };
   }
 }

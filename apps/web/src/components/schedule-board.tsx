@@ -672,7 +672,7 @@ function BookingDrawer({
                 Booking berstatus <strong>{detail.status}</strong> tidak dapat dijadwalkan ulang.
               </p>
             ) : null}
-            {canCancelBooking && isCancellable(detail.status) ? <BookingCancelForm bookingId={detail.id} /> : null}
+            {canCancelBooking && isCancellable(detail.status) ? <BookingCancelForm detail={detail} /> : null}
             {canUpdateBooking && isReschedulable(detail.status) ? <BookingSeriesForm detail={detail} /> : null}
             {!canUpdateBooking && !canCancelBooking ? (
               <p className="rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-4 text-slate-500">

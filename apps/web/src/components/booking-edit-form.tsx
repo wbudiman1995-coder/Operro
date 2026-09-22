@@ -24,7 +24,7 @@
 import { useActionState, useState } from "react";
 
 import { ActionSubmitButton } from "@/components/action-submit-button";
-import { cancelBookingAction, createBookingSeriesAction, rescheduleBookingAction } from "@/app/schedule/actions";
+import { cancelBookingAction, cancelBookingSeriesAction, createBookingSeriesAction, rescheduleBookingAction } from "@/app/schedule/actions";
 import { IDLE_STATE } from "@/lib/schedule/idle_state";
 import { FULFILLMENT_MODES } from "@/lib/booking-mutations";
 import type { BookingDetail, ScheduleResource } from "@/lib/schedule";
@@ -154,9 +154,10 @@ export function BookingEditForm({
   );
 }
 
-export function BookingCancelForm({ bookingId }: { bookingId: string }) {
-  const [state, action] = useActionState(cancelBookingAction, IDLE_STATE);
+export function BookingCancelForm({ detail }: { detail: BookingDetail }) {
+  const [state, action] = useActionState(detail.seriesId ? cancelBookingSeriesAction : cancelBookingAction, IDLE_STATE);
   const [confirming, setConfirming] = useState(false);
+  const [scope, setScope] = useState<"current" | "future" | "all">("current");
 
   if (!confirming) {
     return (
@@ -175,10 +176,11 @@ export function BookingCancelForm({ bookingId }: { bookingId: string }) {
 
   return (
     <form action={action} className="space-y-2 rounded-2xl border border-rose-200 bg-rose-50 p-3">
-      <input type="hidden" name="bookingId" value={bookingId} />
+      <input type="hidden" name="bookingId" value={detail.id} />
       <input type="hidden" name="confirm" value="yes" />
+      {detail.seriesId ? <label className="block"><span className="mb-1 block text-[11px] font-bold text-rose-800">Booking mana yang dibatalkan?</span><select name="scope" value={scope} onChange={(event) => setScope(event.target.value as "current" | "future" | "all")} className="h-10 w-full rounded-xl border border-rose-200 bg-white px-2 text-xs font-semibold"><option value="current">Hanya booking ini (1)</option><option value="future">Ini dan yang akan datang ({detail.seriesCancellableFuture})</option><option value="all">Seluruh seri aktif ({detail.seriesCancellableAll})</option></select></label> : null}
       <p className="text-xs font-semibold leading-5 text-rose-800">
-        Batalkan booking ini? Sesi paket yang sedang ditahan akan dilepas dan slot groomer dibebaskan. Booking tidak dihapus, hanya berubah status.
+        {detail.seriesId && scope !== "current" ? `Batalkan ${scope === "future" ? detail.seriesCancellableFuture : detail.seriesCancellableAll} booking rutin? ` : "Batalkan booking ini? "}Sesi paket yang sedang ditahan akan dilepas dan slot groomer dibebaskan. Booking tidak dihapus, hanya berubah status.
       </p>
       <Feedback error={state.error} success={state.success} />
       <div className="flex gap-2">
@@ -218,7 +220,7 @@ export function BookingSeriesForm({ detail }: { detail: BookingDetail }) {
       <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-600">Buat seri dari booking ini</p>
       <label className="block"><span className="mb-1 block text-[11px] font-semibold text-slate-600">Frekuensi</span><select name="frequency" defaultValue="weekly" className="h-10 w-full rounded-xl border border-violet-200 bg-white px-2 text-sm"><option value="weekly">Setiap minggu</option><option value="biweekly">Setiap 2 minggu</option><option value="monthly">Setiap bulan</option></select></label>
       <label className="block"><span className="mb-1 block text-[11px] font-semibold text-slate-600">Jumlah booking termasuk booking ini</span><input name="occurrences" type="number" min={2} max={52} defaultValue={4} required className="h-10 w-full rounded-xl border border-violet-200 bg-white px-3 text-sm" /></label>
-      <label className="block"><span className="mb-1 block text-[11px] font-semibold text-slate-600">Jika groomer bentrok</span><select name="conflictMode" defaultValue="skip" className="h-10 w-full rounded-xl border border-violet-200 bg-white px-2 text-sm"><option value="skip">Lewati tanggal yang bentrok</option><option value="stop">Batalkan seluruh pembuatan seri</option></select></label>
+      <label className="block"><span className="mb-1 block text-[11px] font-semibold text-slate-600">Jika groomer bentrok</span><select name="conflictMode" defaultValue="next_available" className="h-10 w-full rounded-xl border border-violet-200 bg-white px-2 text-sm"><option value="next_available">Cari waktu berikutnya (maks. 4 jam)</option><option value="skip">Lewati tanggal yang bentrok</option><option value="stop">Batalkan seluruh pembuatan seri</option></select></label>
       <Feedback error={state.error} success={state.success} />
       <div className="flex gap-2"><ActionSubmitButton type="submit" pendingLabel="Membuat…" className="flex-1 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white disabled:bg-slate-300">Buat seri</ActionSubmitButton><button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-xs font-bold text-violet-700">Batal</button></div>
     </form>
