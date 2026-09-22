@@ -113,6 +113,7 @@ export interface ScheduleBranch {
 export interface ScheduleResource {
   id: string;
   name: string;
+  color: string;
 }
 
 export interface SchedulePetLine {
@@ -242,7 +243,7 @@ export async function loadScheduleWorkspace(
 
   const resourceResult = await supabase
     .from("resources")
-    .select("id,name")
+    .select("id,name,settings")
     .eq("organization_id", organizationId)
     .eq("branch_id", activeBranch.id)
     .eq("kind", "staff")
@@ -251,7 +252,11 @@ export async function loadScheduleWorkspace(
     .order("name");
   assertResult("schedule_resources", resourceResult.error);
 
-  const branchResources: ScheduleResource[] = (resourceResult.data ?? []).map((row) => ({ id: row.id, name: row.name }));
+  const branchResources: ScheduleResource[] = (resourceResult.data ?? []).map((row) => {
+    const settings = row.settings && typeof row.settings === "object" && !Array.isArray(row.settings) ? row.settings as Record<string, unknown> : {};
+    const color = typeof settings.calendar_color === "string" && /^#[0-9a-f]{6}$/i.test(settings.calendar_color) ? settings.calendar_color : "#0f766e";
+    return { id: row.id, name: row.name, color };
+  });
   const branchResourceIds = new Set(branchResources.map((resource) => resource.id));
   // Requested groomer ids are only honored when they are active staff of this branch, so a
   // crafted query parameter cannot reference another branch's or another tenant's resource.

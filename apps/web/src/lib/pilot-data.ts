@@ -169,24 +169,41 @@ export async function loadOperationsWorkspace(supabase: SupabaseClient, organiza
 export interface CatalogWorkspace {
   branches: Array<{ id: string; name: string }>;
   services: Array<{ id: string; name: string; duration: number; price: number; active: boolean }>;
-  resources: Array<{ id: string; name: string; branchName: string; status: string; skills: unknown }>;
+  memberships: Array<{ id: string; name: string }>;
+  resources: Array<{
+    id: string; branchId: string; membershipId: string | null; name: string; branchName: string; status: string; skills: unknown;
+    phone: string | null; color: string; baseLabel: string | null; latitude: number | null; longitude: number | null;
+    appointmentCount: number; joinDate: string; baseSalary: number | null; payType: string | null;
+  }>;
   packages: Array<{ id: string; name: string; sessions: number; price: number; active: boolean }>;
   products: Array<{ id: string; name: string; sku: string | null; stock: number }>;
 }
 
 export async function loadCatalogWorkspace(supabase: SupabaseClient, organizationId: string): Promise<CatalogWorkspace> {
-  const [branches, services, resources, packages, products, levels] = await Promise.all([
+  const [branches, services, resources, packages, products, levels, memberships, assignments, compensation] = await Promise.all([
     supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("service_catalog").select("id,name,duration_minutes,base_price,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
-    supabase.from("resources").select("id,branch_id,name,status,skills").eq("organization_id", organizationId).eq("kind", "staff").is("deleted_at", null).order("name"),
+    supabase.from("resources").select("id,branch_id,membership_id,name,status,skills,settings,created_at").eq("organization_id", organizationId).eq("kind", "staff").is("deleted_at", null).order("name"),
     supabase.from("packages").select("id,name,total_sessions,price,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("product_catalog").select("id,name,sku").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("inventory_levels").select("product_id,quantity").eq("organization_id", organizationId),
+    supabase.from("memberships").select("id,users(full_name,email)").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
+    supabase.from("booking_resources").select("resource_id,booking_id").eq("organization_id", organizationId),
+    supabase.from("staff_compensation").select("membership_id,pay_type,base_amount,effective_from").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("effective_from", { ascending: false }),
   ]);
-  for (const [scope, result] of [["catalog_branches", branches], ["catalog_services", services], ["catalog_resources", resources], ["catalog_packages", packages], ["catalog_products", products], ["catalog_levels", levels]] as const) assertResult(scope, result.error);
+  for (const [scope, result] of [["catalog_branches", branches], ["catalog_services", services], ["catalog_resources", resources], ["catalog_packages", packages], ["catalog_products", products], ["catalog_levels", levels], ["catalog_memberships", memberships], ["catalog_assignments", assignments], ["catalog_compensation", compensation]] as const) assertResult(scope, result.error);
   const branchMap = new Map((branches.data ?? []).map((row) => [row.id, row.name]));
   const stock = new Map<string, number>(); for (const row of levels.data ?? []) stock.set(row.product_id, (stock.get(row.product_id) ?? 0) + Number(row.quantity));
-  return { branches: branches.data ?? [], services: (services.data ?? []).map((row) => ({ id: row.id, name: row.name, duration: row.duration_minutes, price: Number(row.base_price), active: row.is_active })), resources: (resources.data ?? []).map((row) => ({ id: row.id, name: row.name, branchName: branchMap.get(row.branch_id) ?? "Cabang", status: row.status, skills: row.skills })), packages: (packages.data ?? []).map((row) => ({ id: row.id, name: row.name, sessions: row.total_sessions, price: Number(row.price), active: row.is_active })), products: (products.data ?? []).map((row) => ({ id: row.id, name: row.name, sku: row.sku, stock: stock.get(row.id) ?? 0 })) };
+  const membershipOptions = (memberships.data ?? []).map((row) => {
+    const user = relationRows(row.users)[0];
+    return { id: row.id, name: String(user?.full_name ?? user?.email ?? "Staf") };
+  });
+  return { branches: branches.data ?? [], memberships: membershipOptions, services: (services.data ?? []).map((row) => ({ id: row.id, name: row.name, duration: row.duration_minutes, price: Number(row.base_price), active: row.is_active })), resources: (resources.data ?? []).map((row) => {
+    const settings = row.settings && typeof row.settings === "object" && !Array.isArray(row.settings) ? row.settings as Record<string, unknown> : {};
+    const base = settings.base_location && typeof settings.base_location === "object" && !Array.isArray(settings.base_location) ? settings.base_location as Record<string, unknown> : {};
+    const pay = (compensation.data ?? []).find((item) => item.membership_id === row.membership_id);
+    return { id: row.id, branchId: row.branch_id, membershipId: row.membership_id, name: row.name, branchName: branchMap.get(row.branch_id) ?? "Cabang", status: row.status, skills: row.skills, phone: typeof settings.phone === "string" ? settings.phone : null, color: typeof settings.calendar_color === "string" ? settings.calendar_color : "#0f766e", baseLabel: typeof base.label === "string" ? base.label : null, latitude: base.latitude !== null && base.latitude !== undefined && Number.isFinite(Number(base.latitude)) ? Number(base.latitude) : null, longitude: base.longitude !== null && base.longitude !== undefined && Number.isFinite(Number(base.longitude)) ? Number(base.longitude) : null, appointmentCount: new Set((assignments.data ?? []).filter((item) => item.resource_id === row.id).map((item) => item.booking_id)).size, joinDate: row.created_at, baseSalary: pay ? Number(pay.base_amount) : null, payType: pay?.pay_type ?? null };
+  }), packages: (packages.data ?? []).map((row) => ({ id: row.id, name: row.name, sessions: row.total_sessions, price: Number(row.price), active: row.is_active })), products: (products.data ?? []).map((row) => ({ id: row.id, name: row.name, sku: row.sku, stock: stock.get(row.id) ?? 0 })) };
 }
 
 export interface FinanceWorkspace {

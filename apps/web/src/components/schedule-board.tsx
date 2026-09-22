@@ -376,7 +376,7 @@ function DayResourceGrid({
           <div className="w-16 shrink-0 border-r border-slate-100 px-2 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">Jam</div>
           {data.resources.map((resource) => (
             <div key={resource.id} className="flex-1 border-r border-slate-100 px-3 py-3 last:border-r-0">
-              <p className="truncate text-sm font-bold text-slate-700">{resource.name}</p>
+              <p className="flex items-center gap-2 truncate text-sm font-bold text-slate-700"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: resource.color }} />{resource.name}</p>
               <p className="text-[11px] text-slate-400">{dayEntries.filter((entry) => entry.booking.resourceIds.includes(resource.id)).length} booking</p>
             </div>
           ))}
@@ -422,7 +422,7 @@ function DayResourceGrid({
                       key={`${blackout.id}:${segment.dayISO}`}
                       title={blackout.reason ? `Tidak tersedia — ${blackout.reason}` : "Tidak tersedia"}
                       className="absolute inset-x-1 rounded-lg border border-slate-200 bg-[repeating-linear-gradient(45deg,#f1f5f9_0,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] px-2 py-1"
-                      style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%` }}
+                      style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%`, borderLeftColor: resource.color, borderLeftWidth: 4 }}
                     >
                       <p className="truncate text-[10px] font-bold text-slate-500">Tidak tersedia</p>
                       {blackout.reason ? <p className="truncate text-[10px] text-slate-400">{blackout.reason}</p> : null}

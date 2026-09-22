@@ -24,7 +24,7 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 12 | Route-aware scheduling | Implemented | Seven-day common-slot search ranks by Haversine travel, previous stop or branch base, traffic and workload; staff can choose a geocoded customer as route anchor, and same-city groomer days rank above incompatible city commitments with visible warnings |
 | 13 | Availability and blocked days | Implemented | Weekly per-groomer schedules and one-off blackouts are joined by dated served-city planning and branch-wide closure windows; closures appear on the calendar, remove slots from recommendations, and database triggers reject booking/closure races in both directions |
 | 14 | Safe deletion | Implemented | Series-scoped archive preview and current/future/all actions refuse financial links, soft-delete linked visit rows, release occupied slots, atomically reverse or release package reservations, and record an audited timeline event |
-| 15 | Groomer management | Partial | Basic resource management exists; add phone, color, base location, active toggle and schedule-link management |
+| 15 | Groomer management | Implemented foundation | Add/edit/status/archive, phone, personal calendar color, Maps/base coordinates, membership link, appointment count, join date, compensation, weekly/city schedule access and copyable filtered calendar links exist; late counts bind to attendance in section 16 |
 | 16 | Attendance | Missing | GPS/photo check-in, lateness classification, waiver and cycle summary |
 | 17 | Groomer performance | Partial | Revenue/activity views exist; add retention, duration, documentation and complaints metrics |
 | 18 | Leaderboard | Partial | Ranking route exists; expand metrics and drill-down |

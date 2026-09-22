@@ -38,6 +38,7 @@ export const CAPABILITY_KEYS = [
   "inventory.read",
   "membership.read",
   "payroll.read",
+  "payroll.manage",
   "reports.view",
   "service.manage",
   "task.manage",

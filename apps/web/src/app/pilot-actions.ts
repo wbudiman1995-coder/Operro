@@ -9,7 +9,7 @@
  * - setDispatchStageAction: advances a home-service booking's dispatch stage (scheduled/en_route/arrived/in_service), independent of bookings.status.
  * - uploadGroomingEvidenceAction: stores private, booking-linked grooming evidence for an assigned groomer.
  * - updateGroomingChecklistAction / issueInvoiceForBookingAction: closes the service-to-cash loop.
- * - createServiceAction / createResourceAction: configures the operating catalog.
+ * - createServiceAction / createResourceAction / updateResourceAction / archiveResourceAction: configures the operating catalog.
  * - adjustInventoryAction: appends an inventory adjustment movement.
  * - recordPaymentAction / recordExpenseAction: records manual financial activity.
  * - sellPackageAction: sells a catalog package to a customer and records the payment.
@@ -463,15 +463,85 @@ export async function createServiceAction(_previous: PilotActionState, formData:
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil ditambahkan." };
 }
 
+function resourceSettings(formData: FormData) {
+  const latitudeText = textValue(formData, "latitude", 30);
+  const longitudeText = textValue(formData, "longitude", 30);
+  const latitude = latitudeText ? Number(latitudeText) : null;
+  const longitude = longitudeText ? Number(longitudeText) : null;
+  const color = textValue(formData, "color", 7);
+  return {
+    phone: textValue(formData, "phone", 30) || null,
+    calendar_color: /^#[0-9a-f]{6}$/i.test(color) ? color : "#0f766e",
+    base_location: {
+      label: textValue(formData, "baseLabel", 160) || null,
+      latitude: latitude !== null && Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 ? latitude : null,
+      longitude: longitude !== null && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 ? longitude : null,
+    },
+  };
+}
+
+async function validateResourceBranchAndMembership(context: NonNullable<Awaited<ReturnType<typeof workspace>>>, branchId: string, membershipId: string | null) {
+  const [branch, membership] = await Promise.all([
+    context.supabase.from("branches").select("id").eq("organization_id", context.organizationId).eq("id", branchId).eq("status", "active").is("deleted_at", null).maybeSingle(),
+    membershipId ? context.supabase.from("memberships").select("id").eq("organization_id", context.organizationId).eq("id", membershipId).eq("status", "active").is("deleted_at", null).maybeSingle() : Promise.resolve({ data: { id: null }, error: null }),
+  ]);
+  return Boolean(branch.data && membership.data);
+}
+
 export async function createResourceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
-  const branchId = idValue(formData, "branchId"); const name = textValue(formData, "name", 100);
+  if (!(await loadCapabilities(context.supabase))["resource.manage"]) return databaseError("Groomer", "izin resource.manage diperlukan");
+  const branchId = idValue(formData, "branchId"); const membershipId = idValue(formData, "membershipId"); const name = textValue(formData, "name", 100);
   if (!branchId || name.length < 2) return databaseError("Groomer", "nama dan cabang wajib diisi");
-  const { data: branch } = await context.supabase.from("branches").select("id").eq("organization_id", context.organizationId).eq("id", branchId).eq("status", "active").maybeSingle();
-  if (!branch) return databaseError("Groomer", "cabang tidak dapat diakses");
-  const { error } = await context.supabase.from("resources").insert({ organization_id: context.organizationId, branch_id: branchId, kind: "staff", name, capacity: 1, skills: ["grooming"], status: "active", metadata: { created_from: "homepaw_pilot" } });
+  if (!(await validateResourceBranchAndMembership(context, branchId, membershipId))) return databaseError("Groomer", "cabang atau akun staf tidak dapat diakses");
+  const { error } = await context.supabase.from("resources").insert({ organization_id: context.organizationId, branch_id: branchId, membership_id: membershipId, kind: "staff", name, capacity: 1, skills: ["grooming"], status: "active", settings: resourceSettings(formData), metadata: { created_from: "homepaw_pilot" } });
   if (error) return databaseError("Groomer gagal dibuat", error.message);
-  revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Groomer berhasil ditambahkan." };
+  revalidatePath("/catalog"); revalidatePath("/bookings"); revalidatePath("/schedule"); return { error: null, success: "Groomer berhasil ditambahkan." };
+}
+
+export async function updateResourceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  if (!(await loadCapabilities(context.supabase))["resource.manage"]) return databaseError("Groomer", "izin resource.manage diperlukan");
+  const resourceId = idValue(formData, "resourceId"); const branchId = idValue(formData, "branchId"); const membershipId = idValue(formData, "membershipId");
+  const name = textValue(formData, "name", 100); const status = textValue(formData, "status", 20);
+  if (!resourceId || !branchId || name.length < 2 || !["active", "maintenance", "retired"].includes(status)) return databaseError("Groomer", "data perubahan tidak valid");
+  if (!(await validateResourceBranchAndMembership(context, branchId, membershipId))) return databaseError("Groomer", "cabang atau akun staf tidak dapat diakses");
+  const current = await context.supabase.from("resources").select("settings").eq("organization_id", context.organizationId).eq("id", resourceId).eq("kind", "staff").is("deleted_at", null).maybeSingle();
+  if (!current.data) return databaseError("Groomer", "profil tidak ditemukan");
+  const existingSettings = current.data.settings && typeof current.data.settings === "object" && !Array.isArray(current.data.settings) ? current.data.settings as Record<string, unknown> : {};
+  const { error } = await context.supabase.from("resources").update({ branch_id: branchId, membership_id: membershipId, name, status, settings: { ...existingSettings, ...resourceSettings(formData) } }).eq("organization_id", context.organizationId).eq("id", resourceId).eq("kind", "staff").is("deleted_at", null);
+  if (error) return databaseError("Groomer gagal diperbarui", error.message);
+  revalidatePath("/catalog"); revalidatePath("/bookings"); revalidatePath("/schedule"); return { error: null, success: "Profil groomer diperbarui." };
+}
+
+export async function archiveResourceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  if (!(await loadCapabilities(context.supabase))["resource.manage"]) return databaseError("Groomer", "izin resource.manage diperlukan");
+  const resourceId = idValue(formData, "resourceId");
+  if (!resourceId || textValue(formData, "confirm", 10) !== "yes") return databaseError("Groomer", "konfirmasi arsip tidak valid");
+  const now = new Date().toISOString();
+  const { data: future } = await context.supabase.from("booking_resources").select("booking_id,bookings!inner(starts_at,status,deleted_at)").eq("organization_id", context.organizationId).eq("resource_id", resourceId).eq("is_active", true).gt("bookings.starts_at", now).is("bookings.deleted_at", null).not("bookings.status", "in", "(canceled,no_show,completed)").limit(1);
+  if (future?.length) return databaseError("Groomer", "masih memiliki booking aktif mendatang; pindahkan booking sebelum mengarsipkan");
+  const { error } = await context.supabase.from("resources").update({ status: "retired", deleted_at: now }).eq("organization_id", context.organizationId).eq("id", resourceId).eq("kind", "staff").is("deleted_at", null);
+  if (error) return databaseError("Groomer gagal diarsipkan", error.message);
+  revalidatePath("/catalog"); revalidatePath("/bookings"); revalidatePath("/schedule"); return { error: null, success: "Groomer diarsipkan dengan aman." };
+}
+
+export async function updateResourceCompensationAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  const resourceId = idValue(formData, "resourceId"); const membershipId = idValue(formData, "membershipId");
+  const payType = textValue(formData, "payType", 20); const baseAmount = numberValue(formData, "baseAmount");
+  if (!resourceId || !membershipId || !["salary", "hourly"].includes(payType) || baseAmount === null || baseAmount < 0) return databaseError("Kompensasi", "data gaji tidak valid");
+  const capabilities = await loadCapabilities(context.supabase);
+  if (!capabilities["payroll.manage"]) return databaseError("Kompensasi", "izin payroll.manage diperlukan");
+  const { data: resource } = await context.supabase.from("resources").select("id").eq("organization_id", context.organizationId).eq("id", resourceId).eq("membership_id", membershipId).eq("kind", "staff").is("deleted_at", null).maybeSingle();
+  if (!resource) return databaseError("Kompensasi", "groomer belum terhubung ke akun staf aktif");
+  const current = await context.supabase.from("staff_compensation").select("id").eq("organization_id", context.organizationId).eq("membership_id", membershipId).eq("is_active", true).is("deleted_at", null).order("effective_from", { ascending: false }).limit(1).maybeSingle();
+  const write = current.data
+    ? await context.supabase.from("staff_compensation").update({ pay_type: payType, base_amount: baseAmount, currency: "IDR" }).eq("organization_id", context.organizationId).eq("id", current.data.id)
+    : await context.supabase.from("staff_compensation").insert({ organization_id: context.organizationId, membership_id: membershipId, pay_type: payType, base_amount: baseAmount, currency: "IDR", is_active: true, metadata: { created_from: "groomer_management" } });
+  if (write.error) return databaseError("Kompensasi gagal disimpan", write.error.message);
+  revalidatePath("/catalog"); revalidatePath("/payroll"); return { error: null, success: "Kompensasi groomer disimpan." };
 }
 
 export async function adjustInventoryAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
