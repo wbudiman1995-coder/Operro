@@ -21,7 +21,7 @@ import { type DragEvent, useCallback, useMemo, useState, useTransition } from "r
 import { cancelScheduleBookingsAction, moveScheduleBookingsAction } from "@/app/schedule/actions";
 import { BlackoutManager } from "@/components/blackout-manager";
 import { BranchAvailabilityManager } from "@/components/branch-availability-manager";
-import { BookingCancelForm, BookingEditForm, BookingSeriesForm } from "@/components/booking-edit-form";
+import { BookingArchiveForm, BookingCancelForm, BookingEditForm, BookingSeriesForm } from "@/components/booking-edit-form";
 import { StatusBadge } from "@/components/pilot-ui";
 import { WeeklyAvailabilityManager } from "@/components/weekly-availability-manager";
 import { isCancellable, isReschedulable } from "@/lib/booking-mutations";
@@ -677,6 +677,7 @@ function BookingDrawer({
               </p>
             ) : null}
             {canCancelBooking && isCancellable(detail.status) ? <BookingCancelForm detail={detail} /> : null}
+            {canCancelBooking && canUpdateBooking ? <BookingArchiveForm detail={detail} /> : null}
             {canUpdateBooking && isReschedulable(detail.status) ? <BookingSeriesForm detail={detail} /> : null}
             {!canUpdateBooking && !canCancelBooking ? (
               <p className="rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-4 text-slate-500">

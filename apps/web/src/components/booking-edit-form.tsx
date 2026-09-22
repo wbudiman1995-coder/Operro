@@ -24,7 +24,7 @@
 import { useActionState, useState } from "react";
 
 import { ActionSubmitButton } from "@/components/action-submit-button";
-import { cancelBookingAction, cancelBookingSeriesAction, createBookingSeriesAction, rescheduleBookingAction } from "@/app/schedule/actions";
+import { archiveBookingAction, cancelBookingAction, cancelBookingSeriesAction, createBookingSeriesAction, rescheduleBookingAction } from "@/app/schedule/actions";
 import { IDLE_STATE } from "@/lib/schedule/idle_state";
 import { FULFILLMENT_MODES } from "@/lib/booking-mutations";
 import type { BookingDetail, ScheduleResource } from "@/lib/schedule";
@@ -223,6 +223,58 @@ export function BookingSeriesForm({ detail }: { detail: BookingDetail }) {
       <label className="block"><span className="mb-1 block text-[11px] font-semibold text-slate-600">Jika groomer bentrok</span><select name="conflictMode" defaultValue="next_available" className="h-10 w-full rounded-xl border border-violet-200 bg-white px-2 text-sm"><option value="next_available">Cari waktu berikutnya (maks. 4 jam)</option><option value="skip">Lewati tanggal yang bentrok</option><option value="stop">Batalkan seluruh pembuatan seri</option></select></label>
       <Feedback error={state.error} success={state.success} />
       <div className="flex gap-2"><ActionSubmitButton type="submit" pendingLabel="Membuat…" className="flex-1 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white disabled:bg-slate-300">Buat seri</ActionSubmitButton><button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-xs font-bold text-violet-700">Batal</button></div>
+    </form>
+  );
+}
+
+export function BookingArchiveForm({ detail }: { detail: BookingDetail }) {
+  const [state, action] = useActionState(archiveBookingAction, IDLE_STATE);
+  const [open, setOpen] = useState(false);
+  const [scope, setScope] = useState<"current" | "future" | "all">("current");
+
+  if (!["draft", "canceled", "no_show"].includes(detail.status)) return null;
+  if (!open) {
+    return (
+      <div className="space-y-2">
+        <button type="button" onClick={() => setOpen(true)} className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700">
+          Arsipkan booking
+        </button>
+        <Feedback error={state.error} success={state.success} />
+      </div>
+    );
+  }
+
+  return (
+    <form action={action} className="space-y-2 rounded-2xl border border-slate-300 bg-slate-50 p-3">
+      <input type="hidden" name="bookingId" value={detail.id} />
+      <input type="hidden" name="confirm" value="yes" />
+      {detail.seriesId ? (
+        <label className="block text-[11px] font-bold text-slate-700">
+          Cakupan arsip
+          <select
+            name="scope"
+            value={scope}
+            onChange={(event) => setScope(event.target.value as "current" | "future" | "all")}
+            className="mt-1 h-10 w-full rounded-xl border bg-white px-2 text-xs"
+          >
+            <option value="current">Hanya booking ini</option>
+            <option value="future">Ini dan berikutnya ({detail.seriesArchivableFuture})</option>
+            <option value="all">Seluruh seri yang dapat diarsipkan ({detail.seriesArchivableAll})</option>
+          </select>
+        </label>
+      ) : <input type="hidden" name="scope" value="current" />}
+      <p className="text-[11px] leading-5 text-slate-600">
+        Kunjungan dan baris layanan terkait akan disembunyikan, slot dilepas, dan penghitung paket direkonsiliasi. Booking dengan invoice tidak dapat diarsipkan.
+      </p>
+      <Feedback error={state.error} success={state.success} />
+      <div className="flex gap-2">
+        <ActionSubmitButton pendingLabel="Mengarsipkan…" className="flex-1 rounded-xl bg-slate-800 px-3 py-2 text-xs font-bold text-white">
+          Ya, arsipkan
+        </ActionSubmitButton>
+        <button type="button" onClick={() => setOpen(false)} className="rounded-xl border bg-white px-3 py-2 text-xs font-bold">
+          Batal
+        </button>
+      </div>
     </form>
   );
 }

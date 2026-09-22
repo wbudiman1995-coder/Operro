@@ -465,6 +465,8 @@ export interface BookingDetail {
   recurrenceSequence: number | null;
   seriesCancellableFuture: number;
   seriesCancellableAll: number;
+  seriesArchivableFuture: number;
+  seriesArchivableAll: number;
   branchId: string;
   status: string;
   fulfillmentMode: string;
@@ -567,6 +569,8 @@ export async function loadBookingDetail(
   const recurrenceSequence = typeof row.recurrence_sequence === "number" ? row.recurrence_sequence : null;
   let seriesCancellableAll = 0;
   let seriesCancellableFuture = 0;
+  let seriesArchivableAll = ["draft", "canceled", "no_show"].includes(row.status) ? 1 : 0;
+  let seriesArchivableFuture = seriesArchivableAll;
   if (seriesId) {
     const seriesResult = await supabase
       .from("bookings")
@@ -580,6 +584,9 @@ export async function loadBookingDetail(
     const activeOccurrences = (seriesResult.data ?? []).filter((item) => cancellable.has(item.status));
     seriesCancellableAll = activeOccurrences.length;
     seriesCancellableFuture = activeOccurrences.filter((item) => recurrenceSequence === null || Number(item.recurrence_sequence) >= recurrenceSequence).length;
+    const archivableOccurrences = (seriesResult.data ?? []).filter((item) => ["draft", "canceled", "no_show"].includes(item.status));
+    seriesArchivableAll = archivableOccurrences.length;
+    seriesArchivableFuture = archivableOccurrences.filter((item) => recurrenceSequence === null || Number(item.recurrence_sequence) >= recurrenceSequence).length;
   }
   return {
     id: row.id,
@@ -587,6 +594,8 @@ export async function loadBookingDetail(
     recurrenceSequence,
     seriesCancellableFuture,
     seriesCancellableAll,
+    seriesArchivableFuture,
+    seriesArchivableAll,
     branchId: row.branch_id,
     status: row.status,
     fulfillmentMode: row.fulfillment_mode,

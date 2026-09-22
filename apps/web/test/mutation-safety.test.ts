@@ -127,7 +127,7 @@ test("identifiers arriving from the form are shape-validated", () => {
 
 test("all cancellation and availability-removal actions require an explicit confirmation token", () => {
   const confirmations = ACTIONS.match(/formData\.get\("confirm"\)\s*\?\?\s*""\)\s*!==\s*"yes"/g) ?? [];
-  assert.equal(confirmations.length, 6, "booking cancellation and every availability removal confirm");
+  assert.equal(confirmations.length, 7, "booking cancellation/archive and every availability removal confirm");
 });
 
 // ---------- error disclosure (Correction 4: exception containment) ----------

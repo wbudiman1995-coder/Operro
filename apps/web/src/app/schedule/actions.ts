@@ -873,6 +873,56 @@ export async function cancelBookingSeriesAction(_previous: MutationState, formDa
   }
 }
 
+export async function archiveBookingAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
+  try {
+    const bookingId = String(formData.get("bookingId") ?? "");
+    const scope = String(formData.get("scope") ?? "current");
+
+    if (
+      !UUID_PATTERN.test(bookingId)
+      || !["current", "future", "all"].includes(scope)
+      || String(formData.get("confirm") ?? "") !== "yes"
+    ) {
+      return { error: "Konfirmasi arsip tidak valid.", success: null };
+    }
+
+    const loaded = await loadMutableBooking(bookingId);
+    if (!loaded.ok) return { error: loaded.error, success: null };
+    if (!loaded.capabilities["booking.cancel"] || !loaded.capabilities["booking.update"]) {
+      return { error: "Izin Anda tidak mencukupi untuk mengarsipkan booking.", success: null };
+    }
+
+    const result = await loaded.supabase.schema("app").rpc("archive_booking_scope", {
+      p_booking: bookingId,
+      p_scope: scope,
+    });
+    if (result.error) {
+      const message = result.error.message ?? "";
+      if (/linked_financial_record/i.test(message)) {
+        return { error: "Booking memiliki transaksi keuangan dan tidak boleh diarsipkan.", success: null };
+      }
+      if (/booking_not_archivable|booking_not_in_series|invalid_scope/i.test(message)) {
+        return { error: "Booking atau cakupan seri tidak lagi dapat diarsipkan.", success: null };
+      }
+      if (/not_authorized|42501/i.test(message)) {
+        return { error: "Izin atau akses cabang Anda tidak mencukupi.", success: null };
+      }
+      console.error("archive_booking_failed", result.error);
+      return { error: GENERIC_ERROR, success: null };
+    }
+
+    const payload = result.data && typeof result.data === "object"
+      ? result.data as Record<string, unknown>
+      : {};
+    const count = Number(payload.archived_count ?? 0);
+    revalidateBookingSurfaces(loaded.detail.customerId);
+    return { error: null, success: `${count} booking dan kunjungan terkait diarsipkan dengan aman.` };
+  } catch (error) {
+    console.error("archive_booking_unexpected", error);
+    return { error: GENERIC_ERROR, success: null };
+  }
+}
+
 export async function replaceWeeklyAvailabilityAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
   try {
     const resourceId = String(formData.get("resourceId") ?? "");
