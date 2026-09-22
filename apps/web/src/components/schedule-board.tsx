@@ -20,6 +20,7 @@ import { type DragEvent, useCallback, useMemo, useState, useTransition } from "r
 
 import { cancelScheduleBookingsAction, moveScheduleBookingsAction } from "@/app/schedule/actions";
 import { BlackoutManager } from "@/components/blackout-manager";
+import { BranchAvailabilityManager } from "@/components/branch-availability-manager";
 import { BookingCancelForm, BookingEditForm, BookingSeriesForm } from "@/components/booking-edit-form";
 import { StatusBadge } from "@/components/pilot-ui";
 import { WeeklyAvailabilityManager } from "@/components/weekly-availability-manager";
@@ -303,6 +304,8 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
 
       {feedback.error || feedback.success ? <p role="status" className={`mt-3 rounded-xl px-4 py-3 text-xs font-semibold ${feedback.error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}>{feedback.error ?? feedback.success}</p> : null}
 
+      {data.branchBlocks.length > 0 || data.servedCityDates.length > 0 ? <div className="mt-3 flex flex-wrap gap-2">{data.branchBlocks.map((item) => <span key={item.id} className="rounded-full bg-rose-100 px-3 py-1.5 text-[11px] font-bold text-rose-800">Cabang tutup · {item.dateISO} {item.startLabel}–{item.endLabel}{item.reason ? ` · ${item.reason}` : ""}</span>)}{data.servedCityDates.map((item) => <span key={item.id} className="rounded-full bg-cyan-100 px-3 py-1.5 text-[11px] font-bold text-cyan-800">Home service · {item.serviceDate} · {item.city}</span>)}</div> : null}
+
       {data.branchResources.length === 0 ? (
         <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 py-12 text-center">
           <p className="font-bold text-slate-700">Belum ada groomer aktif di cabang ini</p>
@@ -317,6 +320,7 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
       {canManageResources ? (
         <>
           <WeeklyAvailabilityManager resources={data.branchResources} availability={data.weeklyAvailability} timeZone={data.activeBranch.timezone} />
+          <BranchAvailabilityManager branchId={data.activeBranch.id} defaultDateISO={data.days[0]} timeZone={data.activeBranch.timezone} blocks={data.branchBlocks} servedCities={data.servedCityDates} />
           <BlackoutManager branchId={data.activeBranch.id} timeZone={data.activeBranch.timezone} resources={data.branchResources} blackouts={data.blackouts} defaultDateISO={data.days[0]} />
         </>
       ) : null}

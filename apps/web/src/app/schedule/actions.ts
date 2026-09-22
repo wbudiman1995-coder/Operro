@@ -739,6 +739,65 @@ export async function removeBlackoutAction(_previous: MutationState, formData: F
   }
 }
 
+export async function createBranchBlockAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
+  try {
+    const loaded = await resolveBlackoutWorkspace(formData.get("branchId"));
+    if (!loaded.ok) return { error: loaded.error, success: null };
+    const dateISO = String(formData.get("dateISO") ?? "");
+    const startTime = String(formData.get("startTime") ?? "");
+    const endTime = String(formData.get("endTime") ?? "");
+    const reason = String(formData.get("reason") ?? "").trim().slice(0, 500);
+    if (!isValidDateISO(dateISO) || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) return { error: "Tanggal atau waktu penutupan tidak valid.", success: null };
+    const startMinutes = Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3));
+    const endMinutes = Number(endTime.slice(0, 2)) * 60 + Number(endTime.slice(3));
+    if (endMinutes <= startMinutes) return { error: "Waktu selesai harus setelah waktu mulai.", success: null };
+    const startsAt = zonedDateTimeToUtc(dateISO, startMinutes, loaded.timeZone).toISOString();
+    const endsAt = zonedDateTimeToUtc(dateISO, endMinutes, loaded.timeZone).toISOString();
+    const result = await loaded.supabase.from("branch_availability_blocks").insert({ organization_id: loaded.organizationId, branch_id: loaded.branchId, starts_at: startsAt, ends_at: endsAt, reason: reason || null, metadata: { source: "schedule_branch_block" } });
+    if (result.error) {
+      if (/branch_block_booking_conflict|23P01/i.test(result.error.message)) return { error: "Cabang masih memiliki booking aktif pada waktu tersebut.", success: null };
+      console.error("branch_block_insert_failed", result.error); return { error: GENERIC_ERROR, success: null };
+    }
+    revalidatePath("/schedule"); revalidatePath("/bookings");
+    return { error: null, success: "Penutupan seluruh cabang ditambahkan." };
+  } catch (error) { console.error("create_branch_block_unexpected", error); return { error: GENERIC_ERROR, success: null }; }
+}
+
+export async function removeBranchBlockAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
+  try {
+    const id = String(formData.get("blockId") ?? "");
+    if (!UUID_PATTERN.test(id) || String(formData.get("confirm") ?? "") !== "yes") return { error: "Konfirmasi penutupan tidak valid.", success: null };
+    const loaded = await resolveBlackoutWorkspace(formData.get("branchId")); if (!loaded.ok) return { error: loaded.error, success: null };
+    const result = await loaded.supabase.from("branch_availability_blocks").update({ deleted_at: new Date().toISOString() }).eq("organization_id", loaded.organizationId).eq("branch_id", loaded.branchId).eq("id", id).is("deleted_at", null).select("id");
+    if (result.error || result.data?.length !== 1) return { error: STALE_ERROR, success: null };
+    revalidatePath("/schedule"); return { error: null, success: "Penutupan cabang dihapus dari kalender." };
+  } catch (error) { console.error("remove_branch_block_unexpected", error); return { error: GENERIC_ERROR, success: null }; }
+}
+
+export async function createServedCityDateAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
+  try {
+    const loaded = await resolveBlackoutWorkspace(formData.get("branchId")); if (!loaded.ok) return { error: loaded.error, success: null };
+    const serviceDate = String(formData.get("serviceDate") ?? "");
+    const city = String(formData.get("city") ?? "").trim().slice(0, 120);
+    const notes = String(formData.get("notes") ?? "").trim().slice(0, 500);
+    if (!isValidDateISO(serviceDate) || city.length < 2) return { error: "Tanggal dan kota layanan wajib diisi.", success: null };
+    const result = await loaded.supabase.from("branch_served_city_dates").insert({ organization_id: loaded.organizationId, branch_id: loaded.branchId, service_date: serviceDate, kabupaten_kota: city, notes: notes || null });
+    if (result.error) { if (/duplicate|23505/i.test(result.error.message)) return { error: "Kota tersebut sudah dijadwalkan pada tanggal ini.", success: null }; console.error("served_city_insert_failed", result.error); return { error: GENERIC_ERROR, success: null }; }
+    revalidatePath("/schedule"); revalidatePath("/bookings"); return { error: null, success: "Kota layanan harian ditambahkan." };
+  } catch (error) { console.error("create_served_city_unexpected", error); return { error: GENERIC_ERROR, success: null }; }
+}
+
+export async function removeServedCityDateAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
+  try {
+    const id = String(formData.get("servedCityId") ?? "");
+    if (!UUID_PATTERN.test(id) || String(formData.get("confirm") ?? "") !== "yes") return { error: "Konfirmasi kota layanan tidak valid.", success: null };
+    const loaded = await resolveBlackoutWorkspace(formData.get("branchId")); if (!loaded.ok) return { error: loaded.error, success: null };
+    const result = await loaded.supabase.from("branch_served_city_dates").update({ deleted_at: new Date().toISOString() }).eq("organization_id", loaded.organizationId).eq("branch_id", loaded.branchId).eq("id", id).is("deleted_at", null).select("id");
+    if (result.error || result.data?.length !== 1) return { error: STALE_ERROR, success: null };
+    revalidatePath("/schedule"); return { error: null, success: "Kota layanan dihapus dari tanggal tersebut." };
+  } catch (error) { console.error("remove_served_city_unexpected", error); return { error: GENERIC_ERROR, success: null }; }
+}
+
 export async function createBookingSeriesAction(_previous: MutationState, formData: FormData): Promise<MutationState> {
   try {
     const bookingId = String(formData.get("bookingId") ?? "");

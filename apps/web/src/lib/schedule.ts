@@ -162,6 +162,9 @@ export interface WeeklyAvailability {
   endTime: string;
 }
 
+export interface BranchAvailabilityBlock { id: string; startsAt: string; endsAt: string; startLabel: string; endLabel: string; dateISO: string; reason: string | null }
+export interface ServedCityDate { id: string; serviceDate: string; city: string; notes: string | null }
+
 export interface ScheduleWorkspace {
   branches: ScheduleBranch[];
   activeBranch: ScheduleBranch;
@@ -175,6 +178,8 @@ export interface ScheduleWorkspace {
   bookings: ScheduleBooking[];
   blackouts: ScheduleBlackout[];
   weeklyAvailability: WeeklyAvailability[];
+  branchBlocks: BranchAvailabilityBlock[];
+  servedCityDates: ServedCityDate[];
   truncated: boolean;
 }
 
@@ -307,14 +312,21 @@ export async function loadScheduleWorkspace(
     .in("resource_id", [...branchResourceIds])
     .order("day_of_week");
 
-  const [bookingResult, blackoutResult, weeklyAvailabilityResult] = await Promise.all([
+  const branchBlocksQuery = supabase.from("branch_availability_blocks").select("id,starts_at,ends_at,reason").eq("organization_id", organizationId).eq("branch_id", activeBranch.id).is("deleted_at", null).lt("starts_at", windowEnd).gt("ends_at", windowStart).order("starts_at");
+  const servedCityDatesQuery = supabase.from("branch_served_city_dates").select("id,service_date,kabupaten_kota,notes").eq("organization_id", organizationId).eq("branch_id", activeBranch.id).is("deleted_at", null).gte("service_date", days[0]).lte("service_date", days[days.length - 1]).order("service_date");
+
+  const [bookingResult, blackoutResult, weeklyAvailabilityResult, branchBlocksResult, servedCityDatesResult] = await Promise.all([
     bookingQuery.order("starts_at").limit(SCHEDULE_ROW_LIMIT + 1),
     blackoutResourceIds.length > 0 ? blackoutQuery : Promise.resolve({ data: [], error: null }),
     branchResourceIds.size > 0 ? weeklyAvailabilityQuery : Promise.resolve({ data: [], error: null }),
+    branchBlocksQuery,
+    servedCityDatesQuery,
   ]);
   assertResult("schedule_bookings", bookingResult.error);
   assertResult("schedule_blackouts", blackoutResult.error);
   assertResult("schedule_weekly_availability", weeklyAvailabilityResult.error);
+  assertResult("schedule_branch_blocks", branchBlocksResult.error);
+  assertResult("schedule_served_city_dates", servedCityDatesResult.error);
 
   const bookingRows = bookingResult.data ?? [];
   const truncated = bookingRows.length > SCHEDULE_ROW_LIMIT;
@@ -412,11 +424,13 @@ export async function loadScheduleWorkspace(
       ? [{ id: row.id, resourceId: row.resource_id, dayOfWeek: row.day_of_week, startTime: row.start_time.slice(0, 5), endTime: row.end_time.slice(0, 5) }]
       : [],
   );
+  const branchBlocks: BranchAvailabilityBlock[] = (branchBlocksResult.data ?? []).map((row) => ({ id: row.id, startsAt: row.starts_at, endsAt: row.ends_at, startLabel: formatZonedTime(new Date(row.starts_at), timeZone), endLabel: formatZonedTime(new Date(row.ends_at), timeZone), dateISO: zonedDayISO(new Date(row.starts_at), timeZone), reason: row.reason }));
+  const servedCityDates: ServedCityDate[] = (servedCityDatesResult.data ?? []).map((row) => ({ id: row.id, serviceDate: row.service_date, city: row.kabupaten_kota, notes: row.notes }));
 
   // Selected groomers control which columns render, not only which bookings show.
   const resources = filtering ? branchResources.filter((resource) => appliedResourceIds.includes(resource.id)) : branchResources;
 
-  return { branches, activeBranch, resources, branchResources, appliedResourceIds, days, bookings, blackouts, weeklyAvailability, truncated };
+  return { branches, activeBranch, resources, branchResources, appliedResourceIds, days, bookings, blackouts, weeklyAvailability, branchBlocks, servedCityDates, truncated };
 }
 
 export interface BookingDetailPet {

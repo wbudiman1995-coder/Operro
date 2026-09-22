@@ -125,9 +125,9 @@ test("identifiers arriving from the form are shape-validated", () => {
 
 // ---------- destructive actions require confirmation ----------
 
-test("single cancel, series cancel, mass cancel, and blackout removal require an explicit confirmation token", () => {
+test("all cancellation and availability-removal actions require an explicit confirmation token", () => {
   const confirmations = ACTIONS.match(/formData\.get\("confirm"\)\s*\?\?\s*""\)\s*!==\s*"yes"/g) ?? [];
-  assert.equal(confirmations.length, 4, "all three cancel paths and blackout removal confirm");
+  assert.equal(confirmations.length, 6, "booking cancellation and every availability removal confirm");
 });
 
 // ---------- error disclosure (Correction 4: exception containment) ----------

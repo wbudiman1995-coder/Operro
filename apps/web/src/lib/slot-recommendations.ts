@@ -3,6 +3,7 @@ import { addDaysISO, zonedDateTimeToUtc } from "@/lib/timezone";
 export interface Coordinates { latitude: number; longitude: number }
 export interface AvailabilityWindow { resourceId: string; dayOfWeek: number; startMinutes: number; endMinutes: number }
 export interface OccupiedWindow { resourceId: string; startsAt: string; endsAt: string; coordinates: Coordinates | null; city?: string | null }
+export interface ServedCityPlan { dateISO: string; city: string }
 export interface SlotRecommendation {
   startsAt: string;
   endsAt: string;
@@ -54,6 +55,7 @@ export function recommendSlots(options: {
   branchBase: Coordinates | null;
   selectedAnchor?: Coordinates | null;
   destinationCity?: string | null;
+  servedCities?: readonly ServedCityPlan[];
   fallbackStartMinutes?: number;
   fallbackEndMinutes?: number;
   limit?: number;
@@ -97,7 +99,7 @@ export function recommendSlots(options: {
       const dayStart = zonedDateTimeToUtc(dateISO, 0, options.timeZone).toISOString();
       const dayEnd = zonedDateTimeToUtc(addDaysISO(dateISO, 1), 0, options.timeZone).toISOString();
       const dayVisits = options.occupied.filter((row) => resourceIds.includes(row.resourceId) && row.startsAt >= dayStart && row.startsAt < dayEnd);
-      const dayCities = [...new Set(dayVisits.map((row) => row.city?.trim()).filter((city): city is string => Boolean(city)))];
+      const dayCities = [...new Set([...dayVisits.map((row) => row.city?.trim()), ...(options.servedCities ?? []).filter((item) => item.dateISO === dateISO).map((item) => item.city.trim())].filter((city): city is string => Boolean(city)))];
       const cityCompatible = options.destinationCity ? dayCities.length === 0 ? null : dayCities.some((city) => city.toLowerCase() === options.destinationCity!.trim().toLowerCase()) : null;
       const workload = dayVisits.length;
       results.push({ startsAt: starts.toISOString(), endsAt: ends.toISOString(), dateISO, startTime: minuteLabel(minute), endTime: minuteLabel(minute + duration), travelKm: travelKm === null ? null : Math.round(travelKm * 10) / 10, travelMinutes, trafficFactor, routeOrigin, cityCompatible, dayCities, score: travelMinutes * 10 + workload * 5 + dayOffset + (cityCompatible === false ? 600 : 0) });

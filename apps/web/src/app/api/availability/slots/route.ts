@@ -50,11 +50,13 @@ export async function POST(request: Request) {
     const timeZone = branchResult.data.timezone;
     const rangeStart = zonedDateTimeToUtc(fromDateISO, 0, timeZone).toISOString();
     const rangeEnd = zonedDateTimeToUtc(addDaysISO(fromDateISO, 8), 0, timeZone).toISOString();
-    const [availabilityResult, occupiedResult] = await Promise.all([
+    const [availabilityResult, occupiedResult, branchBlockResult, servedCityResult] = await Promise.all([
       supabase.from("resource_availability").select("resource_id,kind,day_of_week,start_time,end_time,starts_at,ends_at").eq("organization_id", organizationId).eq("branch_id", branchId).is("deleted_at", null).in("resource_id", resourceIds),
       supabase.from("booking_resources").select("resource_id,bookings!inner(starts_at,ends_at,status,address_snapshot,deleted_at)").eq("organization_id", organizationId).eq("is_active", true).in("resource_id", resourceIds).lt("bookings.starts_at", rangeEnd).gt("bookings.ends_at", rangeStart).is("bookings.deleted_at", null),
+      supabase.from("branch_availability_blocks").select("starts_at,ends_at").eq("organization_id", organizationId).eq("branch_id", branchId).is("deleted_at", null).lt("starts_at", rangeEnd).gt("ends_at", rangeStart),
+      supabase.from("branch_served_city_dates").select("service_date,kabupaten_kota").eq("organization_id", organizationId).eq("branch_id", branchId).is("deleted_at", null).gte("service_date", fromDateISO).lte("service_date", addDaysISO(fromDateISO, 7)),
     ]);
-    if (availabilityResult.error || occupiedResult.error) throw availabilityResult.error ?? occupiedResult.error;
+    if (availabilityResult.error || occupiedResult.error || branchBlockResult.error || servedCityResult.error) throw availabilityResult.error ?? occupiedResult.error ?? branchBlockResult.error ?? servedCityResult.error;
 
     const occupied: OccupiedWindow[] = (occupiedResult.data ?? []).flatMap((item) => {
       const booking = relation(item.bookings);
@@ -65,6 +67,7 @@ export async function POST(request: Request) {
     for (const row of availabilityResult.data ?? []) {
       if (row.kind === "blackout" && typeof row.starts_at === "string" && typeof row.ends_at === "string") occupied.push({ resourceId: row.resource_id, startsAt: row.starts_at, endsAt: row.ends_at, coordinates: null });
     }
+    for (const row of branchBlockResult.data ?? []) for (const resourceId of resourceIds) occupied.push({ resourceId, startsAt: row.starts_at, endsAt: row.ends_at, coordinates: null });
     const availability = (availabilityResult.data ?? []).flatMap((row) => {
       const startMinutes = clockMinutes(row.start_time); const endMinutes = clockMinutes(row.end_time);
       return row.kind === "available" && typeof row.day_of_week === "number" && startMinutes !== null && endMinutes !== null ? [{ resourceId: row.resource_id, dayOfWeek: row.day_of_week, startMinutes, endMinutes }] : [];
@@ -75,7 +78,8 @@ export async function POST(request: Request) {
     const destination = coordinates(body.destination);
     const selectedAnchor = coordinates(body.selectedAnchor);
     const destinationCity = typeof body.destinationCity === "string" ? body.destinationCity.trim().slice(0, 120) : null;
-    const slots = recommendSlots({ fromDateISO, days: 7, timeZone, durationMinutes, resourceIds, availability, occupied, destination, branchBase, selectedAnchor, destinationCity, fallbackStartMinutes: Number(schedule.dayStartMinutes) || 8 * 60, fallbackEndMinutes: Number(schedule.dayEndMinutes) || 18 * 60, limit: 12 });
+    const servedCities = (servedCityResult.data ?? []).map((row) => ({ dateISO: row.service_date, city: row.kabupaten_kota }));
+    const slots = recommendSlots({ fromDateISO, days: 7, timeZone, durationMinutes, resourceIds, availability, occupied, destination, branchBase, selectedAnchor, destinationCity, servedCities, fallbackStartMinutes: Number(schedule.dayStartMinutes) || 8 * 60, fallbackEndMinutes: Number(schedule.dayEndMinutes) || 18 * 60, limit: 12 });
     return NextResponse.json({ slots, timeZone }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     console.error("slot_recommendations_failed", error);
