@@ -37,3 +37,33 @@ test("uses the previous stop before branch base for route scoring", () => {
   assert.equal(slots[0]?.routeOrigin, "previous_stop");
   assert.ok((slots[0]?.travelKm ?? 99) < 2);
 });
+
+test("an explicitly selected customer anchor overrides the previous stop", () => {
+  const slots = recommendSlots({
+    fromDateISO: "2026-09-21", days: 1, timeZone: "Asia/Jakarta", durationMinutes: 60,
+    resourceIds: ["r1"], availability: [{ resourceId: "r1", dayOfWeek: 1, startMinutes: 10 * 60, endMinutes: 11 * 60 }],
+    occupied: [{ resourceId: "r1", startsAt: "2026-09-21T01:00:00.000Z", endsAt: "2026-09-21T02:00:00.000Z", coordinates: { latitude: -7, longitude: 107 } }],
+    destination: { latitude: -6.21, longitude: 106.82 }, branchBase: null, selectedAnchor: { latitude: -6.2, longitude: 106.816 }, now: new Date("2026-09-20T00:00:00.000Z"), limit: 1,
+  });
+  assert.equal(slots[0]?.routeOrigin, "selected_anchor");
+  assert.ok((slots[0]?.travelKm ?? 99) < 2);
+});
+
+test("same-city days rank above a groomer day already committed to another city", () => {
+  const slots = recommendSlots({
+    fromDateISO: "2026-09-21", days: 2, timeZone: "Asia/Jakarta", durationMinutes: 60,
+    resourceIds: ["r1"],
+    availability: [
+      { resourceId: "r1", dayOfWeek: 1, startMinutes: 10 * 60, endMinutes: 11 * 60 },
+      { resourceId: "r1", dayOfWeek: 2, startMinutes: 10 * 60, endMinutes: 11 * 60 },
+    ],
+    occupied: [
+      { resourceId: "r1", startsAt: "2026-09-21T01:00:00.000Z", endsAt: "2026-09-21T02:00:00.000Z", coordinates: null, city: "Depok" },
+      { resourceId: "r1", startsAt: "2026-09-22T01:00:00.000Z", endsAt: "2026-09-22T02:00:00.000Z", coordinates: null, city: "Jakarta Selatan" },
+    ],
+    destination: null, destinationCity: "Jakarta Selatan", branchBase: null, now: new Date("2026-09-20T00:00:00.000Z"), limit: 2,
+  });
+  assert.equal(slots[0]?.dateISO, "2026-09-22");
+  assert.equal(slots[0]?.cityCompatible, true);
+  assert.equal(slots[1]?.cityCompatible, false);
+});

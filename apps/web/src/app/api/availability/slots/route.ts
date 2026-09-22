@@ -59,7 +59,8 @@ export async function POST(request: Request) {
     const occupied: OccupiedWindow[] = (occupiedResult.data ?? []).flatMap((item) => {
       const booking = relation(item.bookings);
       if (!booking || typeof booking.starts_at !== "string" || typeof booking.ends_at !== "string" || ["canceled", "no_show"].includes(String(booking.status))) return [];
-      return [{ resourceId: item.resource_id, startsAt: booking.starts_at, endsAt: booking.ends_at, coordinates: coordinates(booking.address_snapshot) }];
+      const snapshot = relation(booking.address_snapshot) ?? {};
+      return [{ resourceId: item.resource_id, startsAt: booking.starts_at, endsAt: booking.ends_at, coordinates: coordinates(snapshot), city: typeof snapshot.kabupaten_kota === "string" ? snapshot.kabupaten_kota : null }];
     });
     for (const row of availabilityResult.data ?? []) {
       if (row.kind === "blackout" && typeof row.starts_at === "string" && typeof row.ends_at === "string") occupied.push({ resourceId: row.resource_id, startsAt: row.starts_at, endsAt: row.ends_at, coordinates: null });
@@ -72,7 +73,9 @@ export async function POST(request: Request) {
     const schedule = relation(settings.schedule) ?? {};
     const branchBase = coordinates(relation(settings.location) ?? settings);
     const destination = coordinates(body.destination);
-    const slots = recommendSlots({ fromDateISO, days: 7, timeZone, durationMinutes, resourceIds, availability, occupied, destination, branchBase, fallbackStartMinutes: Number(schedule.dayStartMinutes) || 8 * 60, fallbackEndMinutes: Number(schedule.dayEndMinutes) || 18 * 60, limit: 12 });
+    const selectedAnchor = coordinates(body.selectedAnchor);
+    const destinationCity = typeof body.destinationCity === "string" ? body.destinationCity.trim().slice(0, 120) : null;
+    const slots = recommendSlots({ fromDateISO, days: 7, timeZone, durationMinutes, resourceIds, availability, occupied, destination, branchBase, selectedAnchor, destinationCity, fallbackStartMinutes: Number(schedule.dayStartMinutes) || 8 * 60, fallbackEndMinutes: Number(schedule.dayEndMinutes) || 18 * 60, limit: 12 });
     return NextResponse.json({ slots, timeZone }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     console.error("slot_recommendations_failed", error);

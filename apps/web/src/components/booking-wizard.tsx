@@ -34,7 +34,9 @@ interface SlotRecommendation {
   travelKm: number | null;
   travelMinutes: number;
   trafficFactor: number;
-  routeOrigin: "previous_stop" | "branch_base" | "unknown";
+  routeOrigin: "selected_anchor" | "previous_stop" | "branch_base" | "unknown";
+  cityCompatible: boolean | null;
+  dayCities: string[];
 }
 const initialState: CreateBookingState = { error: null };
 
@@ -66,11 +68,14 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   const [slotStatus, setSlotStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [slotError, setSlotError] = useState("");
   const [slotRecommendations, setSlotRecommendations] = useState<SlotRecommendation[]>([]);
+  const [routeAnchorAddressId, setRouteAnchorAddressId] = useState("");
 
   const customerPets = useMemo(() => pets.filter((pet) => pet.customerId === customerId), [customerId, pets]);
   const nextDiscount = nextDiscounts.find((offer) => offer.customerId === customerId);
   const customerAddresses = useMemo(() => addresses.filter((address) => address.customerId === customerId), [customerId, addresses]);
   const selectedAddress = customerAddresses.find((address) => address.id === customerAddressId);
+  const routeAnchorAddress = addresses.find((address) => address.id === routeAnchorAddressId);
+  const routeAnchorOptions = addresses.filter((address) => address.latitude !== null && address.longitude !== null && address.id !== customerAddressId);
   const branchAreas = serviceAreas.filter((area) => area.branchId === branchId);
   const matchedArea = selectedAddress ? branchAreas
     .filter((area) => area.kabupatenKota === selectedAddress.kabupatenKota && (area.kecamatan === null || area.kecamatan === selectedAddress.kecamatan))
@@ -126,6 +131,10 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
           fromDateISO: startsAt.slice(0, 10),
           destination: fulfillmentMode === "home" && selectedAddress && selectedAddress.latitude !== null && selectedAddress.longitude !== null
             ? { latitude: selectedAddress.latitude, longitude: selectedAddress.longitude }
+            : null,
+          destinationCity: fulfillmentMode === "home" ? selectedAddress?.kabupatenKota ?? null : null,
+          selectedAnchor: routeAnchorAddress && routeAnchorAddress.latitude !== null && routeAnchorAddress.longitude !== null
+            ? { latitude: routeAnchorAddress.latitude, longitude: routeAnchorAddress.longitude }
             : null,
         }),
       });
@@ -225,16 +234,18 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
               <div><h3 className="text-sm font-bold text-emerald-950">Rekomendasi slot 7 hari</h3><p className="mt-1 max-w-2xl text-xs leading-5 text-emerald-800">Mencari waktu kosong bersama untuk semua groomer terpilih, lalu mengurutkannya berdasarkan jadwal dan estimasi perjalanan.</p></div>
               <button type="button" onClick={findRecommendedSlots} disabled={slotStatus === "loading" || selectedPets.some((pet) => !pet.resourceId)} className="h-10 rounded-xl bg-emerald-700 px-4 text-xs font-bold text-white disabled:opacity-50">{slotStatus === "loading" ? "Mencari…" : "Cari slot terbaik"}</button>
             </div>
+            {fulfillmentMode === "home" ? <label className="mt-3 block text-xs font-bold text-emerald-900">Pelanggan acuan rute (opsional)<select value={routeAnchorAddressId} onChange={(event) => setRouteAnchorAddressId(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-emerald-200 bg-white px-3 text-xs font-semibold text-slate-700"><option value="">Otomatis · kunjungan sebelumnya atau cabang</option>{routeAnchorOptions.map((address) => <option key={address.id} value={address.id}>{customers.find((item) => item.id === address.customerId)?.name ?? "Pelanggan"} · {address.label} · {address.kabupatenKota ?? address.formattedLine}</option>)}</select></label> : null}
             {fulfillmentMode === "home" && selectedAddress && (selectedAddress.latitude === null || selectedAddress.longitude === null) ? <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Slot tetap dapat dicari, tetapi peringkat rute belum akurat karena alamat ini belum memiliki koordinat Maps.</p> : null}
             {slotError ? <p role="alert" className="mt-3 text-xs font-semibold text-rose-700">{slotError}</p> : null}
             {slotStatus === "ready" && slotRecommendations.length === 0 ? <p className="mt-3 text-xs font-semibold text-slate-600">Tidak ada slot bersama yang tersedia dalam 7 hari. Ubah groomer, tanggal awal, atau waktu secara manual.</p> : null}
             {slotRecommendations.length > 0 ? <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{slotRecommendations.slice(0, 6).map((slot) => {
               const selected = startsAt === `${slot.dateISO}T${slot.startTime}`;
-              const origin = slot.routeOrigin === "previous_stop" ? "dari kunjungan sebelumnya" : slot.routeOrigin === "branch_base" ? "dari cabang" : "rute belum tersedia";
+              const origin = slot.routeOrigin === "selected_anchor" ? "dari pelanggan acuan" : slot.routeOrigin === "previous_stop" ? "dari kunjungan sebelumnya" : slot.routeOrigin === "branch_base" ? "dari cabang" : "rute belum tersedia";
               return <button type="button" key={slot.startsAt} onClick={() => chooseRecommendedSlot(slot)} className={`rounded-xl border p-3 text-left transition ${selected ? "border-emerald-600 bg-white ring-2 ring-emerald-200" : "border-emerald-100 bg-white hover:border-emerald-400"}`}>
                 <span className="block text-sm font-bold text-slate-900">{new Date(`${slot.dateISO}T00:00:00`).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })} · {slot.startTime}–{slot.endTime}</span>
                 <span className="mt-1 block text-xs text-slate-600">{slot.travelKm === null ? "Jarak belum dihitung" : `${slot.travelKm} km · sekitar ${slot.travelMinutes} menit`} · {origin}</span>
                 {slot.trafficFactor > 1.2 ? <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">Jam sibuk</span> : null}
+                {slot.cityCompatible === true ? <span className="mt-2 ml-1 inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">Kota searah</span> : slot.cityCompatible === false ? <span className="mt-2 ml-1 inline-flex rounded-full bg-rose-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-rose-800">Beda kota · {slot.dayCities.join(", ")}</span> : null}
               </button>;
             })}</div> : null}
           </section>

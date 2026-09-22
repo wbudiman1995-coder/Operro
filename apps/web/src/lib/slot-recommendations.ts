@@ -2,7 +2,7 @@ import { addDaysISO, zonedDateTimeToUtc } from "@/lib/timezone";
 
 export interface Coordinates { latitude: number; longitude: number }
 export interface AvailabilityWindow { resourceId: string; dayOfWeek: number; startMinutes: number; endMinutes: number }
-export interface OccupiedWindow { resourceId: string; startsAt: string; endsAt: string; coordinates: Coordinates | null }
+export interface OccupiedWindow { resourceId: string; startsAt: string; endsAt: string; coordinates: Coordinates | null; city?: string | null }
 export interface SlotRecommendation {
   startsAt: string;
   endsAt: string;
@@ -12,7 +12,9 @@ export interface SlotRecommendation {
   travelKm: number | null;
   travelMinutes: number;
   trafficFactor: number;
-  routeOrigin: "previous_stop" | "branch_base" | "unknown";
+  routeOrigin: "selected_anchor" | "previous_stop" | "branch_base" | "unknown";
+  cityCompatible: boolean | null;
+  dayCities: string[];
   score: number;
 }
 
@@ -50,6 +52,8 @@ export function recommendSlots(options: {
   occupied: readonly OccupiedWindow[];
   destination: Coordinates | null;
   branchBase: Coordinates | null;
+  selectedAnchor?: Coordinates | null;
+  destinationCity?: string | null;
   fallbackStartMinutes?: number;
   fallbackEndMinutes?: number;
   limit?: number;
@@ -85,13 +89,18 @@ export function recommendSlots(options: {
       const previous = options.occupied
         .filter((row) => resourceIds.includes(row.resourceId) && row.coordinates && new Date(row.endsAt).getTime() <= starts.getTime())
         .sort((left, right) => new Date(right.endsAt).getTime() - new Date(left.endsAt).getTime())[0];
-      const origin = previous?.coordinates ?? options.branchBase;
-      const routeOrigin = previous?.coordinates ? "previous_stop" : options.branchBase ? "branch_base" : "unknown";
+      const origin = options.selectedAnchor ?? previous?.coordinates ?? options.branchBase;
+      const routeOrigin = options.selectedAnchor ? "selected_anchor" : previous?.coordinates ? "previous_stop" : options.branchBase ? "branch_base" : "unknown";
       const trafficFactor = trafficFactorForMinute(minute);
       const travelKm = origin && options.destination ? haversineKm(origin, options.destination) : null;
       const travelMinutes = travelKm === null ? 0 : Math.max(5, Math.round((travelKm / 24) * 60 * trafficFactor));
-      const workload = options.occupied.filter((row) => resourceIds.includes(row.resourceId) && row.startsAt.slice(0, 10) === starts.toISOString().slice(0, 10)).length;
-      results.push({ startsAt: starts.toISOString(), endsAt: ends.toISOString(), dateISO, startTime: minuteLabel(minute), endTime: minuteLabel(minute + duration), travelKm: travelKm === null ? null : Math.round(travelKm * 10) / 10, travelMinutes, trafficFactor, routeOrigin, score: travelMinutes * 10 + workload * 5 + dayOffset });
+      const dayStart = zonedDateTimeToUtc(dateISO, 0, options.timeZone).toISOString();
+      const dayEnd = zonedDateTimeToUtc(addDaysISO(dateISO, 1), 0, options.timeZone).toISOString();
+      const dayVisits = options.occupied.filter((row) => resourceIds.includes(row.resourceId) && row.startsAt >= dayStart && row.startsAt < dayEnd);
+      const dayCities = [...new Set(dayVisits.map((row) => row.city?.trim()).filter((city): city is string => Boolean(city)))];
+      const cityCompatible = options.destinationCity ? dayCities.length === 0 ? null : dayCities.some((city) => city.toLowerCase() === options.destinationCity!.trim().toLowerCase()) : null;
+      const workload = dayVisits.length;
+      results.push({ startsAt: starts.toISOString(), endsAt: ends.toISOString(), dateISO, startTime: minuteLabel(minute), endTime: minuteLabel(minute + duration), travelKm: travelKm === null ? null : Math.round(travelKm * 10) / 10, travelMinutes, trafficFactor, routeOrigin, cityCompatible, dayCities, score: travelMinutes * 10 + workload * 5 + dayOffset + (cityCompatible === false ? 600 : 0) });
     }
   }
   return results.sort((left, right) => left.score - right.score || left.startsAt.localeCompare(right.startsAt)).slice(0, options.limit ?? 12);
