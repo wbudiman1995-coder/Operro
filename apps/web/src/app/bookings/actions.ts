@@ -34,12 +34,35 @@ export async function createBookingAction(
     supabase.from("branches").select("id").eq("organization_id", organizationId).eq("id", draft.branchId).eq("status", "active").is("deleted_at", null).maybeSingle(),
     supabase.from("customers").select("id").eq("organization_id", organizationId).eq("id", draft.customerId).is("deleted_at", null).maybeSingle(),
     supabase.from("pets").select("id,customer_id").eq("organization_id", organizationId).in("id", draft.pets.map((pet) => pet.petId)).is("deleted_at", null),
-    supabase.from("service_catalog").select("id").eq("organization_id", organizationId).in("id", draft.pets.flatMap((pet) => pet.serviceIds)).eq("is_active", true).is("deleted_at", null),
+    supabase.from("service_catalog").select("id,category").eq("organization_id", organizationId).in("id", draft.pets.flatMap((pet) => pet.serviceIds)).eq("is_active", true).is("deleted_at", null),
     supabase.from("resources").select("id,branch_id").eq("organization_id", organizationId).in("id", draft.pets.map((pet) => pet.resourceId)).eq("status", "active").is("deleted_at", null),
   ]);
   const requestedServiceIds = new Set(draft.pets.flatMap((pet) => pet.serviceIds));
   if (!branch || !customer || pets?.length !== draft.pets.length || pets.some((pet) => pet.customer_id !== draft.customerId) || services?.length !== requestedServiceIds.size || resources?.some((resource) => resource.branch_id !== draft.branchId) || new Set(resources?.map((resource) => resource.id)).size !== new Set(draft.pets.map((pet) => pet.resourceId)).size) {
     return { error: "Pilihan booking berubah atau tidak dapat diakses. Muat ulang halaman lalu coba lagi." };
+  }
+  const serviceCategoryById = new Map((services ?? []).map((service) => [service.id, service.category?.trim() || "Lainnya"]));
+  const requestedCategories = new Set(serviceCategoryById.values());
+  if (draft.categoryDiscounts.some((discount) => !requestedCategories.has(discount.category))) {
+    return { error: "Kategori diskon tidak cocok dengan layanan yang dipilih." };
+  }
+
+  const selectedPackageIds = [...new Set(draft.pets.flatMap((pet) => Object.values(pet.packageByService)))];
+  const packageRows = selectedPackageIds.length > 0
+    ? await supabase.from("customer_packages").select("id,customer_id,service_id,sessions_remaining,status,expires_at").eq("organization_id", organizationId).in("id", selectedPackageIds).is("deleted_at", null)
+    : { data: [], error: null };
+  if (packageRows.error || packageRows.data?.length !== selectedPackageIds.length) return { error: "Paket pelanggan berubah atau tidak dapat diakses." };
+  const packageById = new Map((packageRows.data ?? []).map((item) => [item.id, item]));
+  const packageUsage = new Map<string, number>();
+  for (const pet of draft.pets) for (const [serviceId, packageId] of Object.entries(pet.packageByService)) {
+    const item = packageById.get(packageId);
+    packageUsage.set(packageId, (packageUsage.get(packageId) ?? 0) + 1);
+    if (!item || item.customer_id !== draft.customerId || item.status !== "active" || (item.expires_at && new Date(item.expires_at) <= new Date()) || (item.service_id && item.service_id !== serviceId)) {
+      return { error: "Paket yang dipilih tidak aktif atau tidak berlaku untuk layanan ini." };
+    }
+  }
+  if ([...packageUsage].some(([id, count]) => Number(packageById.get(id)?.sessions_remaining ?? 0) < count)) {
+    return { error: "Sesi paket tidak cukup untuk semua layanan yang dialokasikan." };
   }
 
   // Home-service bookings carry an immutable location snapshot: the full address, contact
@@ -87,7 +110,14 @@ export async function createBookingAction(
     fulfillment_mode: draft.fulfillmentMode,
     starts_at: draft.startsAt,
     ends_at: draft.endsAt,
-    notes: draft.notes || null,
+    notes: draft.customerNotes || null,
+    metadata: {
+      ...(draft.internalNotes ? { internal_notes: draft.internalNotes } : {}),
+      category_discounts: {
+        rules: draft.categoryDiscounts,
+        service_categories: Object.fromEntries(serviceCategoryById),
+      },
+    },
     customer_address_id: draft.fulfillmentMode === "home" ? draft.customerAddressId : null,
     address_snapshot: addressSnapshot,
     travel_fee: travelFee,
@@ -98,7 +128,7 @@ export async function createBookingAction(
   if (bookingError || !booking) return { error: `Booking tidak dapat dibuat: ${bookingError?.message ?? "unknown"}` };
 
   try {
-    const { error: jobError } = await supabase.from("grooming_jobs").insert({ booking_id: booking.id, organization_id: organizationId });
+    const { error: jobError } = await supabase.from("grooming_jobs").insert({ booking_id: booking.id, organization_id: organizationId, groomer_notes: draft.groomerNotes || null });
     if (jobError) throw jobError;
 
     const uniqueResources = [...new Set(draft.pets.map((pet) => pet.resourceId))];
@@ -116,8 +146,13 @@ export async function createBookingAction(
       const { error: resourceError } = await app.rpc("assembly_assign_pet_resource", { p_pet: jobPetId, p_resource: pet.resourceId });
       if (resourceError) throw resourceError;
       for (const serviceId of pet.serviceIds) {
-        const { error: lineError } = await app.rpc("assembly_add_line", { p_pet: jobPetId, p_service: serviceId, p_quantity: 1 });
-        if (lineError) throw lineError;
+        const { data: lineId, error: lineError } = await app.rpc("assembly_add_line", { p_pet: jobPetId, p_service: serviceId, p_quantity: 1 });
+        if (lineError || !lineId) throw lineError ?? new Error("service_line_missing");
+        const packageId = pet.packageByService[serviceId];
+        if (packageId) {
+          const { error: packageError } = await app.rpc("reserve_package_session", { p_line: lineId, p_customer_package: packageId, p_expires_at: null });
+          if (packageError) throw packageError;
+        }
       }
     }
     const { error: confirmError } = await app.rpc("transition_booking_status", { p_booking: booking.id, p_to: "confirmed" });

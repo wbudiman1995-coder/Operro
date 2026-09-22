@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 
 import { createBookingAction, type CreateBookingState } from "@/app/bookings/actions";
-import type { AddressOption, BranchOption, CustomerOption, NextDiscountOption, PetOption, ResourceOption, ServiceAreaOption, ServiceOption } from "@/lib/bookings";
+import type { AddressOption, BranchOption, CustomerOption, CustomerPackageOption, NextDiscountOption, PetOption, ResourceOption, ServiceAreaOption, ServiceOption } from "@/lib/bookings";
 import type { FulfillmentMode } from "@/lib/booking-validation";
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
   addresses: AddressOption[];
   serviceAreas: ServiceAreaOption[];
   nextDiscounts: NextDiscountOption[];
+  customerPackages: CustomerPackageOption[];
   defaultStart: string;
   /**
    * Server-validated preselected customer. The page only passes a value after reading the
@@ -23,7 +24,7 @@ interface Props {
   preselectedCustomerId?: string;
 }
 
-interface PetSelection { petId: string; resourceId: string; serviceIds: string[] }
+interface PetSelection { petId: string; resourceId: string; serviceIds: string[]; packageByService: Record<string, string> }
 interface SlotRecommendation {
   startsAt: string;
   endsAt: string;
@@ -45,7 +46,7 @@ function addMinutes(localDateTime: string, minutes: number) {
   return new Date(date.valueOf() - offset * 60_000).toISOString().slice(0, 16);
 }
 
-export function BookingWizard({ branches, customers, pets, services, resources, addresses, serviceAreas, nextDiscounts, defaultStart, preselectedCustomerId }: Props) {
+export function BookingWizard({ branches, customers, pets, services, resources, addresses, serviceAreas, nextDiscounts, customerPackages, defaultStart, preselectedCustomerId }: Props) {
   const [state, action, pending] = useActionState(createBookingAction, initialState);
   const [step, setStep] = useState(1);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
@@ -56,7 +57,10 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   const [startsAt, setStartsAt] = useState(defaultStart);
   const [endsAt, setEndsAt] = useState(addMinutes(defaultStart, 60));
   const [fulfillmentMode, setFulfillmentMode] = useState<FulfillmentMode>("home");
-  const [notes, setNotes] = useState("");
+  const [customerNotes, setCustomerNotes] = useState("");
+  const [groomerNotes, setGroomerNotes] = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
+  const [categoryDiscounts, setCategoryDiscounts] = useState<Record<string, { type: "percent" | "fixed"; value: string }>>({});
   const [selectedPets, setSelectedPets] = useState<PetSelection[]>([]);
   const [customerAddressId, setCustomerAddressId] = useState(addresses.find((address) => address.customerId === initialCustomerId && address.isDefault)?.id ?? "");
   const [slotStatus, setSlotStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -73,8 +77,13 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
     .sort((left, right) => Number(right.kecamatan !== null) - Number(left.kecamatan !== null))[0] : undefined;
   const coverage = !selectedAddress ? null : branchAreas.length === 0 ? { allowed: true, fee: 0, minutes: 0, unconfigured: true } : matchedArea ? { allowed: true, fee: matchedArea.travelFee, minutes: matchedArea.estimatedTravelMinutes, unconfigured: false } : { allowed: false, fee: 0, minutes: 0, unconfigured: false };
   const branchResources = resources.filter((resource) => resource.branchId === branchId);
+  const selectedCategories = [...new Set(selectedPets.flatMap((pet) => pet.serviceIds.map((id) => services.find((service) => service.id === id)?.category).filter((value): value is string => Boolean(value))))];
   const duration = Math.max(60, ...selectedPets.flatMap((pet) => pet.serviceIds.map((id) => services.find((service) => service.id === id)?.durationMinutes ?? 60)));
-  const payload = JSON.stringify({ branchId, customerId, startsAt, endsAt, fulfillmentMode, notes, pets: selectedPets, ...(fulfillmentMode === "home" && customerAddressId ? { customerAddressId } : {}) });
+  const payload = JSON.stringify({
+    branchId, customerId, startsAt, endsAt, fulfillmentMode, customerNotes, groomerNotes, internalNotes, pets: selectedPets,
+    categoryDiscounts: selectedCategories.flatMap((category) => { const rule = categoryDiscounts[category]; const value = Number(rule?.value); return rule && Number.isFinite(value) && value > 0 ? [{ category, type: rule.type, value }] : []; }),
+    ...(fulfillmentMode === "home" && customerAddressId ? { customerAddressId } : {}),
+  });
 
   function chooseCustomer(id: string) {
     setCustomerId(id);
@@ -83,7 +92,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
     setCustomerAddressId(defaultAddress?.id ?? "");
   }
   function togglePet(petId: string) {
-    setSelectedPets((current) => current.some((pet) => pet.petId === petId) ? current.filter((pet) => pet.petId !== petId) : [...current, { petId, resourceId: branchResources[0]?.id ?? "", serviceIds: [] }]);
+    setSelectedPets((current) => current.some((pet) => pet.petId === petId) ? current.filter((pet) => pet.petId !== petId) : [...current, { petId, resourceId: branchResources[0]?.id ?? "", serviceIds: [], packageByService: {} }]);
   }
   function updatePet(petId: string, patch: Partial<PetSelection>) {
     setSelectedPets((current) => current.map((pet) => pet.petId === petId ? { ...pet, ...patch } : pet));
@@ -91,7 +100,16 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   function toggleService(petId: string, serviceId: string) {
     const pet = selectedPets.find((candidate) => candidate.petId === petId);
     if (!pet) return;
-    updatePet(petId, { serviceIds: pet.serviceIds.includes(serviceId) ? pet.serviceIds.filter((id) => id !== serviceId) : [...pet.serviceIds, serviceId] });
+    if (pet.serviceIds.includes(serviceId)) {
+      const packageByService = { ...pet.packageByService }; delete packageByService[serviceId];
+      updatePet(petId, { serviceIds: pet.serviceIds.filter((id) => id !== serviceId), packageByService });
+    } else updatePet(petId, { serviceIds: [...pet.serviceIds, serviceId] });
+  }
+  function choosePackage(petId: string, serviceId: string, packageId: string) {
+    const pet = selectedPets.find((candidate) => candidate.petId === petId); if (!pet) return;
+    const packageByService = { ...pet.packageByService };
+    if (packageId) packageByService[serviceId] = packageId; else delete packageByService[serviceId];
+    updatePet(petId, { packageByService });
   }
   async function findRecommendedSlots() {
     setSlotStatus("loading");
@@ -153,7 +171,34 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
 
         {step === 2 ? <div className="space-y-6">
           <WizardTitle title="Layanan dan groomer" helper="Atur layanan dan groomer untuk setiap hewan." />
-          {selectedPets.map((selection) => { const pet = pets.find((item) => item.id === selection.petId); return <section key={selection.petId} className="rounded-2xl border border-slate-200 p-4 sm:p-5"><h3 className="font-bold">{pet?.name}</h3><div className="mt-4 grid gap-2 sm:grid-cols-2">{services.map((service) => <label key={service.id} className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3"><input type="checkbox" checked={selection.serviceIds.includes(service.id)} onChange={() => toggleService(selection.petId, service.id)} className="mt-1 accent-emerald-700" /><span><span className="block text-sm font-semibold">{service.name}</span><span className="text-xs text-slate-500">{service.durationMinutes} menit · {new Intl.NumberFormat("id-ID", { style: "currency", currency: service.currency, maximumFractionDigits: 0 }).format(service.basePrice)}</span></span></label>)}</div><Field label="Groomer"><select value={selection.resourceId} onChange={(event) => updatePet(selection.petId, { resourceId: event.target.value })} className="field"><option value="">Pilih groomer</option>{branchResources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}</select></Field></section>; })}
+          {selectedPets.map((selection) => {
+            const pet = pets.find((item) => item.id === selection.petId);
+            return <section key={selection.petId} className="rounded-2xl border border-slate-200 p-4 sm:p-5">
+              <h3 className="font-bold">{pet?.name}</h3>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">{services.map((service) => {
+                const checked = selection.serviceIds.includes(service.id);
+                const eligiblePackages = customerPackages.filter((item) => item.customerId === customerId && (item.serviceId === null || item.serviceId === service.id));
+                return <div key={service.id} className={`rounded-xl border p-3 ${checked ? "border-emerald-200 bg-emerald-50/60" : "border-transparent bg-slate-50"}`}>
+                  <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={checked} onChange={() => toggleService(selection.petId, service.id)} className="mt-1 accent-emerald-700" /><span><span className="block text-sm font-semibold">{service.name}</span><span className="text-xs text-slate-500">{service.category} · {service.durationMinutes} menit · {new Intl.NumberFormat("id-ID", { style: "currency", currency: service.currency, maximumFractionDigits: 0 }).format(service.basePrice)}</span></span></label>
+                  {checked && eligiblePackages.length > 0 ? <label className="mt-3 block text-[11px] font-bold text-indigo-800">Bayar dengan paket
+                    <select value={selection.packageByService[service.id] ?? ""} onChange={(event) => choosePackage(selection.petId, service.id, event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-indigo-200 bg-white px-2 text-xs text-slate-700">
+                      <option value="">Tidak memakai paket</option>
+                      {eligiblePackages.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.sessionsRemaining} sesi tersisa{item.expiresAt ? ` · s.d. ${new Date(item.expiresAt).toLocaleDateString("id-ID")}` : ""}</option>)}
+                    </select>
+                  </label> : null}
+                </div>;
+              })}</div>
+              <Field label="Groomer"><select value={selection.resourceId} onChange={(event) => updatePet(selection.petId, { resourceId: event.target.value })} className="field"><option value="">Pilih groomer</option>{branchResources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}</select></Field>
+            </section>;
+          })}
+          {selectedCategories.length > 0 ? <section className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 sm:p-5">
+            <h3 className="font-bold text-amber-950">Diskon per kategori (opsional)</h3>
+            <p className="mt-1 text-xs leading-5 text-amber-800">Diskon disimpan sebagai snapshot booking dan diterapkan pada invoice. Layanan yang dibayar dengan paket tetap bernilai nol.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">{selectedCategories.map((category) => {
+              const rule = categoryDiscounts[category] ?? { type: "percent" as const, value: "" };
+              return <div key={category} className="rounded-xl border border-amber-200 bg-white p-3"><p className="text-xs font-bold text-slate-700">{category}</p><div className="mt-2 grid grid-cols-[110px_1fr] gap-2"><select value={rule.type} onChange={(event) => setCategoryDiscounts((current) => ({ ...current, [category]: { ...rule, type: event.target.value as "percent" | "fixed" } }))} className="h-9 rounded-lg border px-2 text-xs"><option value="percent">Persen</option><option value="fixed">Nominal</option></select><input type="number" min="0" max={rule.type === "percent" ? 100 : 1_000_000_000} step={rule.type === "percent" ? 1 : 1000} value={rule.value} onChange={(event) => setCategoryDiscounts((current) => ({ ...current, [category]: { ...rule, value: event.target.value } }))} placeholder={rule.type === "percent" ? "Contoh: 10" : "Contoh: 50000"} className="h-9 rounded-lg border px-2 text-xs" /></div></div>;
+            })}</div>
+          </section> : null}
         </div> : null}
 
         {step === 3 ? <div className="space-y-6">
@@ -193,12 +238,16 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
               </button>;
             })}</div> : null}
           </section>
-          <Field label="Catatan (opsional)"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} rows={4} className="field h-auto py-3" placeholder="Instruksi operasional yang aman dan relevan" /></Field>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Field label="Catatan pelanggan"><textarea value={customerNotes} onChange={(event) => setCustomerNotes(event.target.value)} maxLength={1000} rows={4} className="field h-auto py-3" placeholder="Permintaan yang boleh terlihat dalam konteks pelanggan" /></Field>
+            <Field label="Instruksi untuk groomer"><textarea value={groomerNotes} onChange={(event) => setGroomerNotes(event.target.value)} maxLength={1000} rows={4} className="field h-auto py-3" placeholder="Kondisi hewan, gaya, dan instruksi lapangan" /></Field>
+            <Field label="Catatan internal"><textarea value={internalNotes} onChange={(event) => setInternalNotes(event.target.value)} maxLength={1000} rows={4} className="field h-auto py-3" placeholder="Hanya untuk operasional dan manajemen" /></Field>
+          </div>
         </div> : null}
 
         {step === 4 ? <div className="space-y-6">
           <WizardTitle title="Periksa dan konfirmasi" helper="Booking akan langsung dikonfirmasi setelah semua bagian berhasil disimpan." />
-          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={new Date(startsAt).toLocaleString("id-ID")} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} />{nextDiscount ? <Summary label="Penawaran" value={`${nextDiscount.label} · otomatis satu kali`} /> : null}{fulfillmentMode === "home" ? <><Summary label="Alamat" value={selectedAddress?.formattedLine ?? "—"} /><Summary label="Perjalanan" value={coverage?.allowed ? `${coverage.minutes} menit · ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(coverage.fee)}` : "Di luar area layanan"} /></> : null}</dl>
+          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={new Date(startsAt).toLocaleString("id-ID")} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} /><Summary label="Paket dialokasikan" value={`${selectedPets.reduce((count, pet) => count + Object.keys(pet.packageByService).length, 0)} layanan`} /><Summary label="Diskon kategori" value={selectedCategories.filter((category) => Number(categoryDiscounts[category]?.value) > 0).join(", ") || "Tidak ada"} />{nextDiscount ? <Summary label="Penawaran" value={`${nextDiscount.label} · otomatis satu kali`} /> : null}{fulfillmentMode === "home" ? <><Summary label="Alamat" value={selectedAddress?.formattedLine ?? "—"} /><Summary label="Perjalanan" value={coverage?.allowed ? `${coverage.minutes} menit · ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(coverage.fee)}` : "Di luar area layanan"} /></> : null}</dl>
           {state.error ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{state.error}</p> : null}
         </div> : null}
       </div>

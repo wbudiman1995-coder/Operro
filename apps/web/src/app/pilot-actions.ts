@@ -413,27 +413,44 @@ export async function issueInvoiceForBookingAction(formData: FormData) {
   }
   const { data: jobPets } = await context.supabase.from("grooming_job_pets").select("id").eq("organization_id", context.organizationId).eq("grooming_job_id", bookingId).is("deleted_at", null);
   const jobPetIds = (jobPets ?? []).map((row) => row.id); if (!jobPetIds.length) return;
-  const { data: lines } = await context.supabase.from("grooming_job_pet_services").select("id,service_id,service_name_snapshot,quantity,unit_price_snapshot,currency").eq("organization_id", context.organizationId).in("grooming_job_pet_id", jobPetIds).is("deleted_at", null);
+  const { data: lines } = await context.supabase.from("grooming_job_pet_services").select("id,service_id,service_name_snapshot,quantity,unit_price_snapshot,currency").eq("organization_id", context.organizationId).in("grooming_job_pet_id", jobPetIds).is("deleted_at", null).order("id");
   if (!lines?.length) return;
+  const { data: packageReservations, error: packageCoverageError } = await context.supabase.schema("app").rpc("list_booking_package_coverage", { p_booking: bookingId });
+  if (packageCoverageError) {
+    console.error("booking_package_coverage_failed", packageCoverageError);
+    return;
+  }
+  const packageByLine = new Map((packageReservations ?? []).map((item: { line_id: string; customer_package_id: string }) => [item.line_id, item.customer_package_id]));
   const bookingMetadata = booking.metadata && typeof booking.metadata === "object" && !Array.isArray(booking.metadata) ? booking.metadata as Record<string, unknown> : {};
   const offer = bookingMetadata.complimentary_next_discount && typeof bookingMetadata.complimentary_next_discount === "object" && !Array.isArray(bookingMetadata.complimentary_next_discount) ? bookingMetadata.complimentary_next_discount as Record<string, unknown> : {};
   const lineDiscounts = offer.lineDiscounts && typeof offer.lineDiscounts === "object" && !Array.isArray(offer.lineDiscounts) ? offer.lineDiscounts as Record<string, unknown> : {};
+  const categorySnapshot = bookingMetadata.category_discounts && typeof bookingMetadata.category_discounts === "object" && !Array.isArray(bookingMetadata.category_discounts) ? bookingMetadata.category_discounts as Record<string, unknown> : {};
+  const categoryRules = Array.isArray(categorySnapshot.rules) ? categorySnapshot.rules.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : [];
+  const serviceCategories = categorySnapshot.service_categories && typeof categorySnapshot.service_categories === "object" && !Array.isArray(categorySnapshot.service_categories) ? categorySnapshot.service_categories as Record<string, unknown> : {};
+  const fixedRemaining = new Map(categoryRules.filter((rule) => rule.type === "fixed" && typeof rule.category === "string").map((rule) => [String(rule.category), Number(rule.value) || 0]));
   const pricedLines = lines.map((line) => {
     const gross = Number(line.unit_price_snapshot) * Number(line.quantity);
     const detail = lineDiscounts[line.id] && typeof lineDiscounts[line.id] === "object" && !Array.isArray(lineDiscounts[line.id]) ? lineDiscounts[line.id] as Record<string, unknown> : {};
-    const discount = Math.max(0, Math.min(gross, Number(detail.amount) || 0));
-    return { ...line, gross, discount, discountDetail: detail };
+    const complimentaryDiscount = Math.max(0, Number(detail.amount) || 0);
+    const category = typeof serviceCategories[line.service_id] === "string" ? String(serviceCategories[line.service_id]) : "Lainnya";
+    const rule = categoryRules.find((item) => item.category === category);
+    let categoryDiscount = 0;
+    if (rule?.type === "percent") categoryDiscount = gross * Math.min(100, Math.max(0, Number(rule.value) || 0)) / 100;
+    if (rule?.type === "fixed") { categoryDiscount = Math.min(gross, fixedRemaining.get(category) ?? 0); fixedRemaining.set(category, Math.max(0, (fixedRemaining.get(category) ?? 0) - categoryDiscount)); }
+    const packageId = packageByLine.get(line.id) ?? null;
+    const discount = packageId ? gross : Math.max(0, Math.min(gross, complimentaryDiscount + categoryDiscount));
+    return { ...line, gross, discount, discountDetail: detail, category, categoryDiscount, packageId };
   });
   const { data: order, error: orderError } = await context.supabase.from("orders").insert({ organization_id: context.organizationId, branch_id: booking.branch_id, customer_id: booking.customer_id, booking_id: booking.id, status: "confirmed", currency: "IDR", metadata: { created_from: "homepaw_pilot" } }).select("id").single();
   if (orderError || !order) return;
-  const { error: itemError } = await context.supabase.from("order_items").insert(pricedLines.map((line) => ({ organization_id: context.organizationId, order_id: order.id, item_type: "service", service_id: line.service_id, name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, discount_amount: line.discount, line_total: line.gross - line.discount, pricing_breakdown: { source: "grooming_job_line", ...(line.discount > 0 ? { complimentary_next_discount: line.discountDetail } : {}) }, metadata: { created_from: "homepaw_pilot", grooming_job_pet_service_id: line.id } })));
+  const { error: itemError } = await context.supabase.from("order_items").insert(pricedLines.map((line) => ({ organization_id: context.organizationId, order_id: order.id, item_type: "service", service_id: line.service_id, name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, discount_amount: line.discount, line_total: line.gross - line.discount, pricing_breakdown: { source: "grooming_job_line", ...(Number(line.discountDetail.amount) > 0 ? { complimentary_next_discount: line.discountDetail } : {}), ...(line.categoryDiscount > 0 ? { category_discount: { category: line.category, amount: line.categoryDiscount } } : {}), ...(line.packageId ? { package_coverage: { customer_package_id: line.packageId } } : {}) }, metadata: { created_from: "homepaw_pilot", grooming_job_pet_service_id: line.id } })));
   if (itemError) { await context.supabase.from("orders").update({ status: "canceled" }).eq("id", order.id); return; }
   const { data: pricedOrder } = await context.supabase.from("orders").select("subtotal,discount_total,tax_total,total,currency").eq("organization_id", context.organizationId).eq("id", order.id).single();
   if (!pricedOrder) return;
   const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${Date.now().toString().slice(-6)}`;
   const { data: invoice, error: invoiceError } = await context.supabase.from("invoices").insert({ organization_id: context.organizationId, branch_id: booking.branch_id, customer_id: booking.customer_id, order_id: order.id, invoice_number: invoiceNumber, status: "issued", currency: pricedOrder.currency, subtotal: pricedOrder.subtotal, discount_total: pricedOrder.discount_total, tax_total: pricedOrder.tax_total, total: pricedOrder.total, due_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), metadata: { created_from: "homepaw_pilot", booking_id: booking.id } }).select("id").single();
   if (invoiceError || !invoice) return;
-  await context.supabase.from("invoice_lines").insert(pricedLines.map((line) => ({ organization_id: context.organizationId, invoice_id: invoice.id, item_type: "service", name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, discount_amount: line.discount, line_total: line.gross - line.discount, pricing_breakdown: { source: "grooming_job_line", ...(line.discount > 0 ? { complimentary_next_discount: line.discountDetail } : {}) } })));
+  await context.supabase.from("invoice_lines").insert(pricedLines.map((line) => ({ organization_id: context.organizationId, invoice_id: invoice.id, item_type: "service", name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, discount_amount: line.discount, line_total: line.gross - line.discount, pricing_breakdown: { source: "grooming_job_line", ...(Number(line.discountDetail.amount) > 0 ? { complimentary_next_discount: line.discountDetail } : {}), ...(line.categoryDiscount > 0 ? { category_discount: { category: line.category, amount: line.categoryDiscount } } : {}), ...(line.packageId ? { package_coverage: { customer_package_id: line.packageId } } : {}) } })));
   revalidatePath("/operations"); revalidatePath("/finance"); revalidatePath("/reports");
 }
 

@@ -3,8 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export interface BranchOption { id: string; name: string; timezone: string }
 export interface CustomerOption { id: string; name: string; phone: string | null }
 export interface PetOption { id: string; customerId: string; name: string; breed: string | null }
-export interface ServiceOption { id: string; name: string; durationMinutes: number; basePrice: number; currency: string }
+export interface ServiceOption { id: string; name: string; category: string; durationMinutes: number; basePrice: number; currency: string }
 export interface ResourceOption { id: string; branchId: string; name: string }
+export interface CustomerPackageOption { id: string; customerId: string; name: string; serviceId: string | null; sessionsRemaining: number; expiresAt: string | null }
 export interface AddressOption { id: string; customerId: string; label: string; formattedLine: string; kecamatan: string | null; kabupatenKota: string | null; latitude: number | null; longitude: number | null; isDefault: boolean }
 export interface ServiceAreaOption { branchId: string; kecamatan: string | null; kabupatenKota: string; travelFee: number; estimatedTravelMinutes: number }
 export interface NextDiscountOption { customerId: string; label: string; rules: Record<string, { type: string; value: number }>; expiresAt: string | null }
@@ -27,6 +28,7 @@ export interface BookingWorkspaceData {
   addresses: AddressOption[];
   serviceAreas: ServiceAreaOption[];
   nextDiscounts: NextDiscountOption[];
+  customerPackages: CustomerPackageOption[];
   bookings: BookingListItem[];
 }
 
@@ -52,19 +54,20 @@ export async function loadBookingWorkspace(
   from: string,
   to: string,
 ): Promise<BookingWorkspaceData> {
-  const [branchResult, customerResult, petResult, serviceResult, resourceResult, addressResult, serviceAreaResult, nextDiscountResult, bookingResult] = await Promise.all([
+  const [branchResult, customerResult, petResult, serviceResult, resourceResult, addressResult, serviceAreaResult, nextDiscountResult, packageResult, bookingResult] = await Promise.all([
     supabase.from("branches").select("id,name,timezone").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("customers").select("id,display_name,phone").eq("organization_id", organizationId).in("status", ["lead", "active"]).is("deleted_at", null).order("display_name"),
     supabase.from("pets").select("id,customer_id,name,breed").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
-    supabase.from("service_catalog").select("id,name,duration_minutes,base_price,currency").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
+    supabase.from("service_catalog").select("id,name,category,duration_minutes,base_price,currency").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,name").eq("organization_id", organizationId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("customer_addresses").select("id,customer_id,label,line1,line2,kecamatan,kabupaten_kota,province,postal_code,latitude,longitude,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
     supabase.from("branch_service_areas").select("branch_id,kecamatan,kabupaten_kota,travel_fee,estimated_travel_minutes").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null),
     supabase.from("customer_next_discounts").select("customer_id,label,rules,expires_at").eq("organization_id", organizationId).eq("status", "active").or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
+    supabase.from("customer_packages").select("id,customer_id,service_id,sessions_remaining,expires_at,packages(name)").eq("organization_id", organizationId).eq("status", "active").gt("sessions_remaining", 0).is("deleted_at", null).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
     supabase.from("bookings").select("id,branch_id,customer_id,starts_at,ends_at,status,fulfillment_mode,grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", from).lt("starts_at", to).is("deleted_at", null).order("starts_at"),
   ]);
 
-  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["addresses", addressResult], ["service_areas", serviceAreaResult], ["next_discounts", nextDiscountResult], ["bookings", bookingResult]] as const) {
+  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["addresses", addressResult], ["service_areas", serviceAreaResult], ["next_discounts", nextDiscountResult], ["customer_packages", packageResult], ["bookings", bookingResult]] as const) {
     if (result.error) fail(scope, result.error.message);
   }
 
@@ -76,7 +79,7 @@ export async function loadBookingWorkspace(
     branches: (branchResult.data ?? []).map((row) => ({ id: row.id, name: row.name, timezone: row.timezone })),
     customers,
     pets: (petResult.data ?? []).map((row) => ({ id: row.id, customerId: row.customer_id, name: row.name, breed: row.breed })),
-    services: (serviceResult.data ?? []).map((row) => ({ id: row.id, name: row.name, durationMinutes: row.duration_minutes, basePrice: Number(row.base_price), currency: row.currency })),
+    services: (serviceResult.data ?? []).map((row) => ({ id: row.id, name: row.name, category: row.category?.trim() || "Lainnya", durationMinutes: row.duration_minutes, basePrice: Number(row.base_price), currency: row.currency })),
     resources: (resourceResult.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, name: row.name })),
     nextDiscounts: (nextDiscountResult.data ?? []).map((row) => {
       const raw = row.rules && typeof row.rules === "object" && !Array.isArray(row.rules) ? row.rules as Record<string, unknown> : {};
@@ -87,6 +90,14 @@ export async function loadBookingWorkspace(
       }));
       return { customerId: row.customer_id, label: row.label, rules, expiresAt: row.expires_at };
     }),
+    customerPackages: (packageResult.data ?? []).map((row) => ({
+      id: row.id,
+      customerId: row.customer_id,
+      name: (() => { const value = relationRows(row.packages)[0]?.name; return typeof value === "string" ? value : "Paket"; })(),
+      serviceId: row.service_id,
+      sessionsRemaining: row.sessions_remaining,
+      expiresAt: row.expires_at,
+    })),
     addresses: (addressResult.data ?? []).map((row) => ({
       id: row.id,
       customerId: row.customer_id,

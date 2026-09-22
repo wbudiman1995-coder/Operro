@@ -5,6 +5,13 @@ export interface BookingPetDraft {
   petId: string;
   resourceId: string;
   serviceIds: string[];
+  packageByService: Record<string, string>;
+}
+
+export interface BookingCategoryDiscount {
+  category: string;
+  type: "percent" | "fixed";
+  value: number;
 }
 
 export interface BookingDraft {
@@ -13,7 +20,10 @@ export interface BookingDraft {
   startsAt: string;
   endsAt: string;
   fulfillmentMode: FulfillmentMode;
-  notes: string;
+  customerNotes: string;
+  groomerNotes: string;
+  internalNotes: string;
+  categoryDiscounts: BookingCategoryDiscount[];
   pets: BookingPetDraft[];
   /**
    * Structurally optional here — a UUID if present, nothing enforced about *when* it must
@@ -59,7 +69,15 @@ export function parseBookingDraft(raw: unknown): BookingDraft {
     if (!Array.isArray(pet.serviceIds) || pet.serviceIds.length === 0 || pet.serviceIds.some((id) => typeof id !== "string" || !UUID.test(id))) {
       throw new Error("Pilih minimal satu layanan untuk setiap hewan.");
     }
-    return { petId: pet.petId, resourceId: pet.resourceId, serviceIds: [...new Set(pet.serviceIds as string[])] };
+    const serviceIds = [...new Set(pet.serviceIds as string[])];
+    const rawPackages = pet.packageByService && typeof pet.packageByService === "object" && !Array.isArray(pet.packageByService)
+      ? pet.packageByService as Record<string, unknown>
+      : {};
+    const packageByService = Object.fromEntries(Object.entries(rawPackages).flatMap(([serviceId, packageId]) => {
+      if (!serviceIds.includes(serviceId) || typeof packageId !== "string" || !UUID.test(packageId)) throw new Error("Alokasi paket tidak valid.");
+      return [[serviceId, packageId]];
+    }));
+    return { petId: pet.petId, resourceId: pet.resourceId, serviceIds, packageByService };
   });
 
   if (new Set(normalizedPets.map((pet) => pet.petId)).size !== normalizedPets.length) {
@@ -70,13 +88,31 @@ export function parseBookingDraft(raw: unknown): BookingDraft {
     throw new Error("Alamat pelanggan tidak valid.");
   }
 
+  const categoryDiscounts = (Array.isArray(value.categoryDiscounts) ? value.categoryDiscounts : []).map((entry) => {
+    if (!entry || typeof entry !== "object") throw new Error("Diskon kategori tidak valid.");
+    const discount = entry as Record<string, unknown>;
+    const category = typeof discount.category === "string" ? discount.category.trim().slice(0, 80) : "";
+    const type = discount.type;
+    const amount = Number(discount.value);
+    if (!category || (type !== "percent" && type !== "fixed") || !Number.isFinite(amount) || amount <= 0 || (type === "percent" && amount > 100) || (type === "fixed" && amount > 1_000_000_000)) {
+      throw new Error("Diskon kategori tidak valid.");
+    }
+    return { category, type, value: amount } as BookingCategoryDiscount;
+  });
+  if (categoryDiscounts.length > 20 || new Set(categoryDiscounts.map((item) => item.category.toLowerCase())).size !== categoryDiscounts.length) {
+    throw new Error("Setiap kategori hanya boleh memiliki satu diskon.");
+  }
+
   return {
     branchId: value.branchId as string,
     customerId: value.customerId as string,
     startsAt: startsAt.toISOString(),
     endsAt: endsAt.toISOString(),
     fulfillmentMode: value.fulfillmentMode as FulfillmentMode,
-    notes: typeof value.notes === "string" ? value.notes.trim().slice(0, 1000) : "",
+    customerNotes: typeof value.customerNotes === "string" ? value.customerNotes.trim().slice(0, 1000) : typeof value.notes === "string" ? value.notes.trim().slice(0, 1000) : "",
+    groomerNotes: typeof value.groomerNotes === "string" ? value.groomerNotes.trim().slice(0, 1000) : "",
+    internalNotes: typeof value.internalNotes === "string" ? value.internalNotes.trim().slice(0, 1000) : "",
+    categoryDiscounts,
     pets: normalizedPets,
     ...(typeof value.customerAddressId === "string" ? { customerAddressId: value.customerAddressId } : {}),
   };
