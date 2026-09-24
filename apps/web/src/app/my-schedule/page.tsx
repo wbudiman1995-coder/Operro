@@ -6,6 +6,7 @@
  */
 import { setDispatchStageAction, updatePetJobStatusAction } from "@/app/pilot-actions";
 import { ActionSubmitButton } from "@/components/action-submit-button";
+import { AttendanceCheckinForm } from "@/components/attendance-checkin-form";
 import { buildWhatsAppUrl } from "@/components/customer-360";
 import { GroomingEvidenceForm, GroomingEvidenceGallery } from "@/components/grooming-evidence-form";
 import { StylingReferenceGallery } from "@/components/styling-references";
@@ -35,6 +36,7 @@ export default async function MySchedulePage() {
           </div>
           <p className="mt-2 text-xs text-slate-500">{job.startsAt ? new Date(job.startsAt).toLocaleString("id-ID", { dateStyle: "full", timeStyle: "short" }) : "Waktu belum ditentukan"}</p>
           <p className="mt-2 text-sm font-semibold text-emerald-700">{job.services.length > 0 ? job.services.join(", ") : "Belum ada layanan"}</p>
+          {job.attendance ? <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-semibold ${job.attendance.classification === "late" && !job.attendance.waived ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}><p>{job.attendance.classification === "late" ? `Terlambat ${job.attendance.lateMinutes} menit${job.attendance.waived ? " · di-waive" : ""}` : "Hadir tepat waktu"}</p><p className="mt-1 text-[10px] font-normal">Check-in {new Date(job.attendance.checkedInAt).toLocaleString("id-ID")}</p></div> : <AttendanceCheckinForm bookingId={job.bookingId} resourceId={job.resourceId} />}
           {job.fulfillmentMode === "home" ? (() => {
             const whatsappUrl = buildWhatsAppUrl(job.customerPhone, `Halo ${job.customerName}, saya dari tim grooming Operro untuk booking ${job.petName}.`);
             const nextStage = nextDispatchStage[job.dispatchStage ?? "scheduled"];

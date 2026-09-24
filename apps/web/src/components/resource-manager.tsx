@@ -33,6 +33,7 @@ export function ResourceManager({ resource, branches, memberships, canManageReso
         <div className="flex items-center gap-2"><span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: resource.color }} /><p className="truncate font-bold">{resource.name}</p></div>
         <p className="mt-1 text-xs text-slate-500">{resource.branchName} · {resource.phone ?? "Telepon belum diisi"}</p>
         <p className="mt-1 text-[11px] text-slate-400">Bergabung {new Date(resource.joinDate).toLocaleDateString("id-ID")} · {resource.appointmentCount} booking</p>
+        <p className={`mt-1 text-[11px] font-semibold ${resource.lateCount || resource.missingPhotoCount ? "text-amber-700" : "text-emerald-700"}`}>Bulan ini: {resource.lateCount} terlambat · {resource.missingPhotoCount} tanpa foto</p>
         {resource.baseLabel ? <p className="mt-1 text-[11px] text-slate-500">Base: {resource.baseLabel}</p> : null}
         {resource.baseSalary !== null ? <p className="mt-1 text-[11px] font-semibold text-slate-600">Kompensasi {resource.payType}: Rp{resource.baseSalary.toLocaleString("id-ID")}</p> : null}
       </div>

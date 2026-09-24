@@ -392,6 +392,63 @@ export async function uploadGroomingEvidenceAction(_previous: PilotActionState, 
   return { error: null, success: "Foto berhasil disimpan." };
 }
 
+export async function recordAttendanceCheckinAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace();
+  if (!context) return databaseError("Kehadiran", "sesi atau workspace aktif tidak tersedia");
+  const bookingId = idValue(formData, "bookingId"); const resourceId = idValue(formData, "resourceId");
+  const latitudeRaw = String(formData.get("latitude") ?? "").trim(); const longitudeRaw = String(formData.get("longitude") ?? "").trim(); const accuracyRaw = String(formData.get("accuracy") ?? "").trim();
+  const latitude = Number(latitudeRaw); const longitude = Number(longitudeRaw); const accuracy = accuracyRaw ? Number(accuracyRaw) : Number.NaN;
+  const lateReason = textValue(formData, "lateReason", 500); const file = formData.get("photo");
+  if (!bookingId || !resourceId || !latitudeRaw || !longitudeRaw || !Number.isFinite(latitude) || Math.abs(latitude) > 90 || !Number.isFinite(longitude) || Math.abs(longitude) > 180) return databaseError("Kehadiran", "GPS wajib diaktifkan sebelum check-in");
+  if (!(file instanceof File) || file.size === 0) return databaseError("Kehadiran", "foto check-in wajib diambil");
+  const extension = evidenceMimeExtensions[file.type];
+  if (!extension || file.size > 4 * 1024 * 1024) return databaseError("Kehadiran", "foto harus JPG, PNG, atau WebP maksimum 4 MB");
+  const membership = await context.supabase.from("memberships").select("id").eq("organization_id", context.organizationId).eq("user_id", context.userId).eq("status", "active").is("deleted_at", null).maybeSingle();
+  if (!membership.data) return databaseError("Kehadiran", "membership aktif tidak ditemukan");
+  const resource = await context.supabase.from("resources").select("id").eq("organization_id", context.organizationId).eq("id", resourceId).eq("membership_id", membership.data.id).eq("status", "active").is("deleted_at", null).maybeSingle();
+  if (!resource.data) return databaseError("Kehadiran", "profil groomer tidak terhubung ke akun ini");
+  const assigned = await context.supabase.from("grooming_job_pets").select("id").eq("organization_id", context.organizationId).eq("grooming_job_id", bookingId).eq("assigned_resource_id", resourceId).is("deleted_at", null).limit(1);
+  if (!(assigned.data ?? []).length) return databaseError("Kehadiran", "booking tidak ditugaskan kepada groomer ini");
+
+  const storagePath = `${context.organizationId}/${bookingId}/attendance/${crypto.randomUUID()}.${extension}`;
+  const upload = await context.supabase.storage.from("attachments").upload(storagePath, file, { contentType: file.type, upsert: false });
+  if (upload.error) return databaseError("Foto check-in gagal diunggah", upload.error.message);
+  const attachment = await context.supabase.from("attachments").insert({ organization_id: context.organizationId, storage_bucket: "attachments", storage_path: storagePath, filename: file.name.slice(0, 200) || `attendance.${extension}`, mime_type: file.type, size_bytes: file.size, uploaded_by: context.userId, metadata: { category: "attendance", resource_id: resourceId, latitude, longitude, accuracy_meters: Number.isFinite(accuracy) ? accuracy : null } }).select("id").single();
+  if (!attachment.data) { await context.supabase.storage.from("attachments").remove([storagePath]); return databaseError("Metadata check-in gagal", attachment.error?.message ?? "unknown"); }
+  const link = await context.supabase.from("attachment_links").insert({ organization_id: context.organizationId, attachment_id: attachment.data.id, subject_type: "booking", subject_id: bookingId });
+  if (link.error) { await context.supabase.storage.from("attachments").remove([storagePath]); return databaseError("Foto check-in gagal ditautkan", link.error.message); }
+  const result = await context.supabase.schema("app").rpc("record_attendance_checkin", { p_booking: bookingId, p_resource: resourceId, p_attachment: attachment.data.id, p_latitude: latitude, p_longitude: longitude, p_accuracy: Number.isFinite(accuracy) ? accuracy : null, p_late_reason: lateReason || null });
+  if (result.error) {
+    await context.supabase.storage.from("attachments").remove([storagePath]);
+    if (/already_recorded|23505/i.test(result.error.message)) return databaseError("Kehadiran", "check-in untuk booking ini sudah tercatat");
+    if (/photo_required|location_required|not_assigned|not_owned|membership_not_found/i.test(result.error.message)) return databaseError("Check-in gagal", "data foto, GPS, atau penugasan tidak valid");
+    console.error("attendance check-in RPC failed", { code: result.error.code, message: result.error.message });
+    return databaseError("Check-in gagal", "server tidak dapat mencatat kehadiran. Coba lagi.");
+  }
+  revalidatePath("/my-schedule"); revalidatePath("/attendance"); revalidatePath("/payroll"); revalidatePath("/catalog");
+  return { error: null, success: "Check-in GPS dan foto berhasil dicatat." };
+}
+
+export async function waiveAttendanceLatenessAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Kehadiran", "workspace aktif tidak tersedia");
+  const attendanceId = idValue(formData, "attendanceId"); const reason = textValue(formData, "reason", 500);
+  if (!attendanceId || reason.length < 3) return databaseError("Kehadiran", "alasan waiver wajib diisi");
+  const result = await context.supabase.schema("app").rpc("waive_attendance_lateness", { p_attendance: attendanceId, p_reason: reason });
+  if (result.error) return databaseError("Waiver gagal", /not_authorized|42501/i.test(result.error.message) ? "izin payroll.manage diperlukan" : result.error.message);
+  revalidatePath("/attendance"); revalidatePath("/payroll"); revalidatePath("/catalog");
+  return { error: null, success: "Keterlambatan di-waive dan audit tersimpan." };
+}
+
+export async function syncMissingAttendanceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Kehadiran", "workspace aktif tidak tersedia");
+  const from = textValue(formData, "from", 10); const to = textValue(formData, "to", 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return databaseError("Kehadiran", "rentang cycle tidak valid");
+  const result = await context.supabase.schema("app").rpc("materialize_missing_attendance", { p_from: `${from}T00:00:00+07:00`, p_to: `${to}T00:00:00+07:00` });
+  if (result.error) return databaseError("Sinkronisasi gagal", /not_authorized|42501/i.test(result.error.message) ? "izin payroll.manage diperlukan" : result.error.message);
+  revalidatePath("/attendance"); revalidatePath("/payroll"); revalidatePath("/catalog");
+  return { error: null, success: `${Number(result.data ?? 0)} ketidakhadiran tanpa foto ditambahkan.` };
+}
+
 export async function updateGroomingChecklistAction(formData: FormData) {
   const context = await workspace(); if (!context) return;
   const bookingId = idValue(formData, "bookingId"); if (!bookingId) return;
@@ -605,9 +662,8 @@ export async function sellPackageAction(_previous: PilotActionState, formData: F
 /**
  * Payroll lifecycle. payroll_items are insert-only once written (DB trigger blocks direct
  * update), so "recompute" deletes and reinserts while the run is still draft. Base pay
- * comes from staff_compensation as-is — there is no hours-worked/attendance table in this
- * schema, so hourly pay_type cannot be computed from real hours; this is a genuine gap,
- * not a bug.
+ * comes from staff_compensation as-is. Attendance exceptions are reviewed separately;
+ * #32 will add explicit hours and adjustment rules before they affect net pay.
  */
 export async function recomputePayrollRunAction(formData: FormData) {
   const context = await workspace(); if (!context) return;

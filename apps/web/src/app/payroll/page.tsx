@@ -1,9 +1,10 @@
 /**
  * Payroll route for the HomePaw pilot.
  *
- * No hours-worked/attendance table exists anywhere in this schema, so hourly pay_type
- * cannot be computed from real hours — staff_compensation.base_amount is used as-is.
+ * Attendance exceptions are shown beside compensation so payroll review can resolve
+ * late and missing-photo records before approval.
  */
+import Link from "next/link";
 import { approvePayrollRunAction, markPayrollRunPaidAction, recomputePayrollRunAction } from "@/app/pilot-actions";
 import { ActionSubmitButton } from "@/components/action-submit-button";
 import { EmptyState, PageHeader, StatCard } from "@/components/pilot-ui";
@@ -36,6 +37,7 @@ export default async function PayrollPage() {
     </div>
 
     <div className="mt-7 flex flex-wrap gap-2">
+      <Link href={`/attendance?month=${period.start.slice(0, 7)}`} className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-800">Periksa kehadiran</Link>
       {!data.run || data.run.status === "draft" ? (
         <form action={recomputePayrollRunAction}>
           <input type="hidden" name="periodStart" value={period.start} />
@@ -63,7 +65,7 @@ export default async function PayrollPage() {
       ) : (
         <div className="divide-y">{data.staff.map((s) => (
           <div key={s.membershipId} className="flex items-center justify-between gap-4 p-5">
-            <div><p className="font-bold">{s.name}</p><p className="mt-1 text-xs text-slate-500">Pokok {formatRupiah(s.basePay)} · Komisi {formatRupiah(s.commissionTotal)}</p></div>
+            <div><p className="font-bold">{s.name}</p><p className="mt-1 text-xs text-slate-500">Pokok {formatRupiah(s.basePay)} · Komisi {formatRupiah(s.commissionTotal)}</p><p className={`mt-1 text-xs font-semibold ${s.lateCount || s.missingPhotoCount ? "text-amber-700" : "text-emerald-700"}`}>{s.attendanceTotal} kehadiran · {s.lateCount} terlambat ({s.lateMinutes} menit) · {s.missingPhotoCount} tanpa foto · {s.waivedCount} waiver</p></div>
             <p className="text-lg font-bold text-emerald-700">{formatRupiah(s.grossPay)}</p>
           </div>
         ))}</div>

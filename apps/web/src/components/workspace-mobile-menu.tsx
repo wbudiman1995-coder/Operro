@@ -52,6 +52,7 @@ const sections: { label: string; items: MenuItem[] }[] = [
       { label: "Inventaris", href: "/inventory", icon: InventoryIcon, permission: "inventory.read" },
       { label: "Keuangan", href: "/finance", icon: FinanceIcon, permission: "finance.read" },
       { label: "Payroll", href: "/payroll", icon: PayrollIcon, permission: "payroll.read" },
+      { label: "Kehadiran", href: "/attendance", icon: MyScheduleIcon, anyPermission: ["payroll.read", "resource.manage"] },
       { label: "Laporan", href: "/reports", icon: ReportsIcon, permission: "reports.view" },
       { label: "Leaderboard", href: "/leaderboard", icon: LeaderboardIcon, permission: "booking.read" },
       { label: "Follow-up", href: "/followups", icon: FollowupIcon, permission: "customer.read" },

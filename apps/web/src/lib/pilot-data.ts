@@ -173,14 +173,15 @@ export interface CatalogWorkspace {
   resources: Array<{
     id: string; branchId: string; membershipId: string | null; name: string; branchName: string; status: string; skills: unknown;
     phone: string | null; color: string; baseLabel: string | null; latitude: number | null; longitude: number | null;
-    appointmentCount: number; joinDate: string; baseSalary: number | null; payType: string | null;
+    appointmentCount: number; lateCount: number; missingPhotoCount: number; joinDate: string; baseSalary: number | null; payType: string | null;
   }>;
   packages: Array<{ id: string; name: string; sessions: number; price: number; active: boolean }>;
   products: Array<{ id: string; name: string; sku: string | null; stock: number }>;
 }
 
 export async function loadCatalogWorkspace(supabase: SupabaseClient, organizationId: string): Promise<CatalogWorkspace> {
-  const [branches, services, resources, packages, products, levels, memberships, assignments, compensation] = await Promise.all([
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  const [branches, services, resources, packages, products, levels, memberships, assignments, compensation, attendance] = await Promise.all([
     supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("service_catalog").select("id,name,duration_minutes,base_price,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,membership_id,name,status,skills,settings,created_at").eq("organization_id", organizationId).eq("kind", "staff").is("deleted_at", null).order("name"),
@@ -190,8 +191,9 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
     supabase.from("memberships").select("id,users(full_name,email)").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("booking_resources").select("resource_id,booking_id").eq("organization_id", organizationId),
     supabase.from("staff_compensation").select("membership_id,pay_type,base_amount,effective_from").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("effective_from", { ascending: false }),
+    supabase.from("attendance_records").select("resource_id,classification,waived_at").eq("organization_id", organizationId).gte("scheduled_at", monthStart.toISOString()).is("deleted_at", null),
   ]);
-  for (const [scope, result] of [["catalog_branches", branches], ["catalog_services", services], ["catalog_resources", resources], ["catalog_packages", packages], ["catalog_products", products], ["catalog_levels", levels], ["catalog_memberships", memberships], ["catalog_assignments", assignments], ["catalog_compensation", compensation]] as const) assertResult(scope, result.error);
+  for (const [scope, result] of [["catalog_branches", branches], ["catalog_services", services], ["catalog_resources", resources], ["catalog_packages", packages], ["catalog_products", products], ["catalog_levels", levels], ["catalog_memberships", memberships], ["catalog_assignments", assignments], ["catalog_compensation", compensation], ["catalog_attendance", attendance]] as const) assertResult(scope, result.error);
   const branchMap = new Map((branches.data ?? []).map((row) => [row.id, row.name]));
   const stock = new Map<string, number>(); for (const row of levels.data ?? []) stock.set(row.product_id, (stock.get(row.product_id) ?? 0) + Number(row.quantity));
   const membershipOptions = (memberships.data ?? []).map((row) => {
@@ -202,7 +204,8 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
     const settings = row.settings && typeof row.settings === "object" && !Array.isArray(row.settings) ? row.settings as Record<string, unknown> : {};
     const base = settings.base_location && typeof settings.base_location === "object" && !Array.isArray(settings.base_location) ? settings.base_location as Record<string, unknown> : {};
     const pay = (compensation.data ?? []).find((item) => item.membership_id === row.membership_id);
-    return { id: row.id, branchId: row.branch_id, membershipId: row.membership_id, name: row.name, branchName: branchMap.get(row.branch_id) ?? "Cabang", status: row.status, skills: row.skills, phone: typeof settings.phone === "string" ? settings.phone : null, color: typeof settings.calendar_color === "string" ? settings.calendar_color : "#0f766e", baseLabel: typeof base.label === "string" ? base.label : null, latitude: base.latitude !== null && base.latitude !== undefined && Number.isFinite(Number(base.latitude)) ? Number(base.latitude) : null, longitude: base.longitude !== null && base.longitude !== undefined && Number.isFinite(Number(base.longitude)) ? Number(base.longitude) : null, appointmentCount: new Set((assignments.data ?? []).filter((item) => item.resource_id === row.id).map((item) => item.booking_id)).size, joinDate: row.created_at, baseSalary: pay ? Number(pay.base_amount) : null, payType: pay?.pay_type ?? null };
+    const ownAttendance = (attendance.data ?? []).filter((item) => item.resource_id === row.id);
+    return { id: row.id, branchId: row.branch_id, membershipId: row.membership_id, name: row.name, branchName: branchMap.get(row.branch_id) ?? "Cabang", status: row.status, skills: row.skills, phone: typeof settings.phone === "string" ? settings.phone : null, color: typeof settings.calendar_color === "string" ? settings.calendar_color : "#0f766e", baseLabel: typeof base.label === "string" ? base.label : null, latitude: base.latitude !== null && base.latitude !== undefined && Number.isFinite(Number(base.latitude)) ? Number(base.latitude) : null, longitude: base.longitude !== null && base.longitude !== undefined && Number.isFinite(Number(base.longitude)) ? Number(base.longitude) : null, appointmentCount: new Set((assignments.data ?? []).filter((item) => item.resource_id === row.id).map((item) => item.booking_id)).size, lateCount: ownAttendance.filter((item) => item.classification === "late" && !item.waived_at).length, missingPhotoCount: ownAttendance.filter((item) => item.classification === "missing_photo").length, joinDate: row.created_at, baseSalary: pay ? Number(pay.base_amount) : null, payType: pay?.pay_type ?? null };
   }), packages: (packages.data ?? []).map((row) => ({ id: row.id, name: row.name, sessions: row.total_sessions, price: Number(row.price), active: row.is_active })), products: (products.data ?? []).map((row) => ({ id: row.id, name: row.name, sku: row.sku, stock: stock.get(row.id) ?? 0 })) };
 }
 
@@ -246,30 +249,52 @@ function embeddedStaffName(value: unknown) {
   return typeof name === "string" && name.length > 0 ? name : "Staf";
 }
 
-// No hours-worked/attendance table exists in this schema, so hourly pay_type cannot be
-// computed from real hours worked — base_amount is used as-is for every pay_type.
 export interface PayrollWorkspace {
   run: { id: string; status: string; totalGross: number; totalNet: number } | null;
-  staff: Array<{ membershipId: string; name: string; basePay: number; commissionTotal: number; grossPay: number; currency: string }>;
+  staff: Array<{ membershipId: string; name: string; basePay: number; commissionTotal: number; grossPay: number; currency: string; attendanceTotal: number; lateCount: number; missingPhotoCount: number; waivedCount: number; lateMinutes: number }>;
 }
 
 export async function loadPayrollWorkspace(supabase: SupabaseClient, organizationId: string, periodStart: string, periodEnd: string): Promise<PayrollWorkspace> {
-  const [staff, commissions, run] = await Promise.all([
+  const [staff, commissions, run, attendance] = await Promise.all([
     supabase.from("staff_compensation").select("membership_id,base_amount,currency,memberships(users(email,full_name))").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null),
     supabase.from("commission_entries").select("membership_id,commission_amount").eq("organization_id", organizationId).eq("status", "accrued").gte("occurred_at", periodStart).lt("occurred_at", periodEnd),
     supabase.from("payroll_runs").select("id,status,total_gross,total_net").eq("organization_id", organizationId).eq("period_start", periodStart).eq("period_end", periodEnd).maybeSingle(),
+    supabase.from("attendance_records").select("membership_id,classification,late_minutes,waived_at").eq("organization_id", organizationId).gte("scheduled_at", periodStart).lt("scheduled_at", periodEnd).is("deleted_at", null),
   ]);
-  assertResult("payroll_staff", staff.error); assertResult("payroll_commissions", commissions.error); assertResult("payroll_run", run.error);
+  assertResult("payroll_staff", staff.error); assertResult("payroll_commissions", commissions.error); assertResult("payroll_run", run.error); assertResult("payroll_attendance", attendance.error);
   const commissionByMembership = new Map<string, number>(); for (const row of commissions.data ?? []) commissionByMembership.set(row.membership_id, (commissionByMembership.get(row.membership_id) ?? 0) + Number(row.commission_amount));
   return {
     run: run.data ? { id: run.data.id, status: run.data.status, totalGross: Number(run.data.total_gross), totalNet: Number(run.data.total_net) } : null,
-    staff: (staff.data ?? []).map((row) => { const basePay = Number(row.base_amount); const commissionTotal = commissionByMembership.get(row.membership_id) ?? 0; return { membershipId: row.membership_id, name: embeddedStaffName(row.memberships), basePay, commissionTotal, grossPay: Math.round((basePay + commissionTotal) * 100) / 100, currency: row.currency }; }),
+    staff: (staff.data ?? []).map((row) => { const basePay = Number(row.base_amount); const commissionTotal = commissionByMembership.get(row.membership_id) ?? 0; const ownAttendance = (attendance.data ?? []).filter((item) => item.membership_id === row.membership_id); return { membershipId: row.membership_id, name: embeddedStaffName(row.memberships), basePay, commissionTotal, grossPay: Math.round((basePay + commissionTotal) * 100) / 100, currency: row.currency, attendanceTotal: ownAttendance.length, lateCount: ownAttendance.filter((item) => item.classification === "late" && !item.waived_at).length, missingPhotoCount: ownAttendance.filter((item) => item.classification === "missing_photo").length, waivedCount: ownAttendance.filter((item) => Boolean(item.waived_at)).length, lateMinutes: ownAttendance.filter((item) => item.classification === "late" && !item.waived_at).reduce((sum, item) => sum + item.late_minutes, 0) }; }),
   };
+}
+
+export interface AttendanceWorkspace {
+  rows: Array<{ id: string; resourceId: string; resourceName: string; bookingId: string; scheduledAt: string; checkedInAt: string; classification: string; lateMinutes: number; lateReason: string | null; waivedAt: string | null; waiverReason: string | null; latitude: number | null; longitude: number | null; photoUrl: string | null }>;
+  summary: Array<{ resourceId: string; resourceName: string; total: number; onTime: number; late: number; missingPhoto: number; waived: number; lateMinutes: number }>;
+}
+
+export async function loadAttendanceWorkspace(supabase: SupabaseClient, organizationId: string, periodStart: string, periodEnd: string): Promise<AttendanceWorkspace> {
+  const [records, resources] = await Promise.all([
+    supabase.from("attendance_records").select("id,booking_id,resource_id,scheduled_at,checked_in_at,classification,late_minutes,late_reason,waived_at,waiver_reason,latitude,longitude,photo_attachment_id").eq("organization_id", organizationId).gte("scheduled_at", periodStart).lt("scheduled_at", periodEnd).is("deleted_at", null).order("scheduled_at", { ascending: false }),
+    supabase.from("resources").select("id,name").eq("organization_id", organizationId).eq("kind", "staff"),
+  ]);
+  assertResult("attendance_records", records.error); assertResult("attendance_resources", resources.error);
+  const resourceNames = new Map((resources.data ?? []).map((row) => [row.id, row.name]));
+  const attachmentIds = (records.data ?? []).map((row) => row.photo_attachment_id).filter((id): id is string => Boolean(id));
+  const attachments = attachmentIds.length ? await supabase.from("attachments").select("id,storage_bucket,storage_path").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null) : { data: [], error: null };
+  assertResult("attendance_photos", attachments.error);
+  const photoUrls = new Map<string, string>();
+  await Promise.all((attachments.data ?? []).map(async (attachment) => { const signed = await supabase.storage.from(attachment.storage_bucket).createSignedUrl(attachment.storage_path, 1800); if (signed.data?.signedUrl) photoUrls.set(attachment.id, signed.data.signedUrl); }));
+  const rows = (records.data ?? []).map((row) => ({ id: row.id, resourceId: row.resource_id, resourceName: resourceNames.get(row.resource_id) ?? "Groomer", bookingId: row.booking_id, scheduledAt: row.scheduled_at, checkedInAt: row.checked_in_at, classification: row.classification, lateMinutes: row.late_minutes, lateReason: row.late_reason, waivedAt: row.waived_at, waiverReason: row.waiver_reason, latitude: row.latitude === null ? null : Number(row.latitude), longitude: row.longitude === null ? null : Number(row.longitude), photoUrl: row.photo_attachment_id ? photoUrls.get(row.photo_attachment_id) ?? null : null }));
+  const summary = [...new Set(rows.map((row) => row.resourceId))].map((resourceId) => { const own = rows.filter((row) => row.resourceId === resourceId); return { resourceId, resourceName: resourceNames.get(resourceId) ?? "Groomer", total: own.length, onTime: own.filter((row) => row.classification === "on_time").length, late: own.filter((row) => row.classification === "late" && !row.waivedAt).length, missingPhoto: own.filter((row) => row.classification === "missing_photo").length, waived: own.filter((row) => Boolean(row.waivedAt)).length, lateMinutes: own.filter((row) => row.classification === "late" && !row.waivedAt).reduce((sum, row) => sum + row.lateMinutes, 0) }; }).sort((a, b) => b.late + b.missingPhoto - (a.late + a.missingPhoto));
+  return { rows, summary };
 }
 
 export interface MyScheduleJob {
   groomingJobPetId: string;
   bookingId: string;
+  resourceId: string;
   startsAt: string;
   customerName: string;
   customerPhone: string | null;
@@ -278,6 +303,7 @@ export interface MyScheduleJob {
   status: string;
   fulfillmentMode: string;
   dispatchStage: string | null;
+  attendance: { classification: string; checkedInAt: string; lateMinutes: number; waived: boolean } | null;
   evidence: Array<{ id: string; category: string; filename: string; url: string; createdAt: string }>;
   stylingReferences: Array<{ id: string; petId: string; filename: string; caption: string | null; url: string; expiresAt: string; createdAt: string }>;
   /** Immutable booking-time snapshot — never the customer's current saved address. */
@@ -317,16 +343,17 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
   const bookings = await supabase.from("bookings").select("id,starts_at,fulfillment_mode,dispatch_stage,address_snapshot,customers(display_name,phone)").eq("organization_id", organizationId).gte("starts_at", from.toISOString()).lt("starts_at", to.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null).order("starts_at");
   assertResult("my_schedule_bookings", bookings.error); const bookingIds = (bookings.data ?? []).map((row) => row.id); if (!bookingIds.length) return [];
 
-  const gjps = await supabase.from("grooming_job_pets").select("id,grooming_job_id,pet_id,status").in("assigned_resource_id", resourceIds).in("grooming_job_id", bookingIds).neq("status", "complete").is("deleted_at", null);
+  const gjps = await supabase.from("grooming_job_pets").select("id,grooming_job_id,pet_id,status,assigned_resource_id").in("assigned_resource_id", resourceIds).in("grooming_job_id", bookingIds).neq("status", "complete").is("deleted_at", null);
   assertResult("my_schedule_gjps", gjps.error); if (!(gjps.data ?? []).length) return [];
   const petIds = [...new Set((gjps.data ?? []).map((row) => row.pet_id))]; const gjpIds = (gjps.data ?? []).map((row) => row.id);
-  const [pets, lines, evidenceLinks, stylingLinks] = await Promise.all([
+  const [pets, lines, evidenceLinks, stylingLinks, attendance] = await Promise.all([
     supabase.from("pets").select("id,name").eq("organization_id", organizationId).in("id", petIds),
     supabase.from("grooming_job_pet_services").select("grooming_job_pet_id,service_name_snapshot").eq("organization_id", organizationId).in("grooming_job_pet_id", gjpIds).is("deleted_at", null),
     supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", bookingIds),
     supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "pet").in("subject_id", petIds),
+    supabase.from("attendance_records").select("booking_id,resource_id,classification,checked_in_at,late_minutes,waived_at").eq("organization_id", organizationId).in("booking_id", bookingIds).in("resource_id", resourceIds).is("deleted_at", null),
   ]);
-  assertResult("my_schedule_pets", pets.error); assertResult("my_schedule_lines", lines.error); assertResult("my_schedule_evidence_links", evidenceLinks.error); assertResult("my_schedule_styling_links", stylingLinks.error);
+  assertResult("my_schedule_pets", pets.error); assertResult("my_schedule_lines", lines.error); assertResult("my_schedule_evidence_links", evidenceLinks.error); assertResult("my_schedule_styling_links", stylingLinks.error); assertResult("my_schedule_attendance", attendance.error);
   const attachmentIds = [...new Set((evidenceLinks.data ?? []).map((link) => link.attachment_id))];
   const evidenceResult = attachmentIds.length > 0
     ? await supabase.from("attachments").select("id,storage_bucket,storage_path,filename,metadata,created_at").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null)
@@ -369,6 +396,7 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
     return {
       groomingJobPetId: row.id,
       bookingId: row.grooming_job_id,
+      resourceId: row.assigned_resource_id ?? "",
       startsAt: booking?.starts_at ?? "",
       customerName: embeddedCustomerName(booking?.customers),
       customerPhone: typeof customer?.phone === "string" ? customer.phone : null,
@@ -377,6 +405,7 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
       status: row.status,
       fulfillmentMode: booking?.fulfillment_mode ?? "in_store",
       dispatchStage: booking?.dispatch_stage ?? null,
+      attendance: (() => { const item = (attendance.data ?? []).find((entry) => entry.booking_id === row.grooming_job_id && entry.resource_id === row.assigned_resource_id); return item ? { classification: item.classification, checkedInAt: item.checked_in_at, lateMinutes: item.late_minutes, waived: Boolean(item.waived_at) } : null; })(),
       evidence: (evidenceByPetJob.get(row.id) ?? []).sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
       stylingReferences: (stylingByPet.get(row.pet_id) ?? []).sort((left,right)=>right.createdAt.localeCompare(left.createdAt)),
       address: readAddressSnapshot(booking?.address_snapshot),
