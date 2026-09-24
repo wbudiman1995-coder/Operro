@@ -415,23 +415,29 @@ export async function loadMyScheduleWorkspace(supabase: SupabaseClient, organiza
 
 // Revenue-per-groomer is deliberately not shown: an invoice is per booking, a booking can
 // have multiple groomers on different pets, and this schema defines no rule for splitting
-// an invoice total across them. Dogs groomed and commission earned are both cleanly
-// attributable per staff member, so the leaderboard ranks on those instead.
-export interface LeaderboardRow { resourceId: string; name: string; dogsGroomed: number; commissionTotal: number; currency: string }
+// an invoice total across them. The metrics below use only attributable pet assignments,
+// commissions, immutable timeline events, evidence links and complaint-tagged tasks.
+export interface LeaderboardRow {
+  resourceId: string; name: string; dogsGroomed: number; commissionTotal: number; currency: string;
+  retainedCustomers: number; customerCount: number; retentionRate: number; averageDurationMinutes: number | null;
+  documentedVisits: number; documentationRate: number; complaints: number;
+}
 
 export async function loadLeaderboardWorkspace(supabase: SupabaseClient, organizationId: string, periodStart: string, periodEnd: string): Promise<LeaderboardRow[]> {
-  const resources = await supabase.from("resources").select("id,name,membership_id").eq("organization_id", organizationId).eq("kind", "staff").is("deleted_at", null);
+  const resources = await supabase.from("resources").select("id,name,membership_id").eq("organization_id", organizationId).eq("kind", "staff").eq("status", "active").is("deleted_at", null);
   assertResult("leaderboard_resources", resources.error); if (!(resources.data ?? []).length) return [];
 
-  const bookings = await supabase.from("bookings").select("id").eq("organization_id", organizationId).eq("status", "completed").gte("starts_at", periodStart).lt("starts_at", periodEnd);
-  assertResult("leaderboard_bookings", bookings.error); const bookingIds = (bookings.data ?? []).map((row) => row.id);
-
-  const dogsByResource = new Map<string, number>();
-  if (bookingIds.length) {
-    const gjps = await supabase.from("grooming_job_pets").select("assigned_resource_id").eq("organization_id", organizationId).eq("status", "complete").in("grooming_job_id", bookingIds).not("assigned_resource_id", "is", null);
-    assertResult("leaderboard_gjps", gjps.error);
-    for (const row of gjps.data ?? []) if (row.assigned_resource_id) dogsByResource.set(row.assigned_resource_id, (dogsByResource.get(row.assigned_resource_id) ?? 0) + 1);
-  }
+  const currentBookingResult = await supabase.from("bookings").select("id,customer_id,starts_at").eq("organization_id", organizationId).eq("status", "completed").gte("starts_at", periodStart).lt("starts_at", periodEnd).is("deleted_at", null).order("starts_at", { ascending: false });
+  assertResult("leaderboard_bookings", currentBookingResult.error); const currentBookings = currentBookingResult.data ?? []; const currentBookingIds = currentBookings.map((row) => row.id);
+  const currentPetJobResult = currentBookingIds.length ? await supabase.from("grooming_job_pets").select("id,grooming_job_id,assigned_resource_id,updated_at").eq("organization_id", organizationId).eq("status", "complete").in("grooming_job_id", currentBookingIds).not("assigned_resource_id", "is", null).is("deleted_at", null) : { data: [], error: null };
+  assertResult("leaderboard_gjps", currentPetJobResult.error); const currentPetJobs = currentPetJobResult.data ?? [];
+  const currentCustomerIds = [...new Set(currentBookings.map((row) => row.customer_id))];
+  const historicalBookingResult = currentCustomerIds.length ? await supabase.from("bookings").select("id,customer_id,starts_at").eq("organization_id", organizationId).eq("status", "completed").in("customer_id", currentCustomerIds).lt("starts_at", periodStart).is("deleted_at", null).order("starts_at", { ascending: false }).limit(5000) : { data: [], error: null };
+  assertResult("leaderboard_historical_bookings", historicalBookingResult.error); const historicalBookings = historicalBookingResult.data ?? []; const historicalBookingIds = historicalBookings.map((row) => row.id);
+  const historicalPetJobResult = historicalBookingIds.length ? await supabase.from("grooming_job_pets").select("id,grooming_job_id,assigned_resource_id,updated_at").eq("organization_id", organizationId).eq("status", "complete").in("grooming_job_id", historicalBookingIds).not("assigned_resource_id", "is", null).is("deleted_at", null) : { data: [], error: null };
+  assertResult("leaderboard_historical_gjps", historicalPetJobResult.error); const allPetJobs = [...currentPetJobs, ...(historicalPetJobResult.data ?? [])];
+  const bookings = [...currentBookings, ...historicalBookings]; const dogsByResource = new Map<string, number>();
+  for (const row of currentPetJobs) if (row.assigned_resource_id) dogsByResource.set(row.assigned_resource_id, (dogsByResource.get(row.assigned_resource_id) ?? 0) + 1);
 
   const membershipIds = [...new Set((resources.data ?? []).map((row) => row.membership_id).filter((id): id is string => Boolean(id)))];
   const commissionByMembership = new Map<string, number>(); let currency = "IDR";
@@ -441,7 +447,38 @@ export async function loadLeaderboardWorkspace(supabase: SupabaseClient, organiz
     for (const row of commissions.data ?? []) { currency = row.currency; commissionByMembership.set(row.membership_id, (commissionByMembership.get(row.membership_id) ?? 0) + Number(row.commission_amount)); }
   }
 
-  return (resources.data ?? []).map((row) => ({ resourceId: row.id, name: row.name, dogsGroomed: dogsByResource.get(row.id) ?? 0, commissionTotal: row.membership_id ? (commissionByMembership.get(row.membership_id) ?? 0) : 0, currency })).sort((a, b) => b.dogsGroomed - a.dogsGroomed);
+  const [events, evidenceLinks, complaints] = await Promise.all([
+    currentBookingIds.length ? supabase.from("timeline_events").select("subject_id,event_type,data,occurred_at").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", currentBookingIds).in("event_type", ["booking.status_changed", "booking.completed"]).order("occurred_at") : Promise.resolve({ data: [], error: null }),
+    currentBookingIds.length ? supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", currentBookingIds) : Promise.resolve({ data: [], error: null }),
+    membershipIds.length ? supabase.from("tasks").select("assigned_membership_id,booking_id,metadata,status").eq("organization_id", organizationId).in("assigned_membership_id", membershipIds).gte("created_at", periodStart).lt("created_at", periodEnd).contains("metadata", { category: "complaint" }).is("deleted_at", null) : Promise.resolve({ data: [], error: null }),
+  ]);
+  assertResult("leaderboard_events", events.error); assertResult("leaderboard_evidence_links", evidenceLinks.error); assertResult("leaderboard_complaints", complaints.error);
+  const attachmentIds = (evidenceLinks.data ?? []).map((row) => row.attachment_id);
+  const attachments = attachmentIds.length ? await supabase.from("attachments").select("id,metadata").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null) : { data: [], error: null };
+  assertResult("leaderboard_evidence", attachments.error);
+  const categoryByAttachment = new Map((attachments.data ?? []).map((row) => [row.id, typeof row.metadata?.category === "string" ? row.metadata.category : "other"]));
+  const documentedBookings = new Set<string>();
+  for (const bookingId of currentBookingIds) { const categories = new Set((evidenceLinks.data ?? []).filter((link) => link.subject_id === bookingId).map((link) => categoryByAttachment.get(link.attachment_id))); if (categories.has("before") && categories.has("after")) documentedBookings.add(bookingId); }
+  const bookingMap = new Map(bookings.map((row) => [row.id, row]));
+
+  function actualDuration(bookingId: string) {
+    const own = (events.data ?? []).filter((event) => event.subject_id === bookingId);
+    const started = own.find((event) => event.event_type === "booking.status_changed" && event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).to === "in_progress");
+    const completed = own.find((event) => event.event_type === "booking.completed");
+    if (!started || !completed) return null;
+    const minutes = Math.round((new Date(completed.occurred_at).getTime() - new Date(started.occurred_at).getTime()) / 60000);
+    return minutes >= 0 && minutes <= 1440 ? minutes : null;
+  }
+
+  return (resources.data ?? []).map((row) => {
+    const ownCurrent = currentPetJobs.filter((petJob) => petJob.assigned_resource_id === row.id); const ownBookingIds = [...new Set(ownCurrent.map((petJob) => petJob.grooming_job_id))];
+    const customerIds = [...new Set(ownBookingIds.map((id) => bookingMap.get(id)?.customer_id).filter((id): id is string => Boolean(id)))];
+    const retainedCustomers = customerIds.filter((customerId) => ownCurrent.some((petJob) => { const current = bookingMap.get(petJob.grooming_job_id); return current?.customer_id === customerId && allPetJobs.some((historical) => historical.assigned_resource_id === row.id && bookingMap.get(historical.grooming_job_id)?.customer_id === customerId && (bookingMap.get(historical.grooming_job_id)?.starts_at ?? "") < (current?.starts_at ?? "")); })).length;
+    const actualDurations = ownBookingIds.map(actualDuration).filter((value): value is number => value !== null);
+    const documentedVisits = ownBookingIds.filter((id) => documentedBookings.has(id)).length;
+    const complaintCount = row.membership_id ? (complaints.data ?? []).filter((task) => task.assigned_membership_id === row.membership_id && task.status !== "canceled").length : 0;
+    return { resourceId: row.id, name: row.name, dogsGroomed: dogsByResource.get(row.id) ?? 0, commissionTotal: row.membership_id ? (commissionByMembership.get(row.membership_id) ?? 0) : 0, currency, retainedCustomers, customerCount: customerIds.length, retentionRate: customerIds.length ? Math.round(retainedCustomers / customerIds.length * 100) : 0, averageDurationMinutes: actualDurations.length ? Math.round(actualDurations.reduce((sum, value) => sum + value, 0) / actualDurations.length) : null, documentedVisits, documentationRate: ownBookingIds.length ? Math.round(documentedVisits / ownBookingIds.length * 100) : 0, complaints: complaintCount };
+  }).sort((a, b) => b.dogsGroomed - a.dogsGroomed || b.retentionRate - a.retentionRate || a.complaints - b.complaints);
 }
 
 // "Last groomed" comes from completed grooming_job_pets (pet-level), not bookings.pet_id —
