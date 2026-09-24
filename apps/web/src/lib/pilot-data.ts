@@ -291,6 +291,37 @@ export async function loadAttendanceWorkspace(supabase: SupabaseClient, organiza
   return { rows, summary };
 }
 
+export interface ComplaintWorkspace {
+  rows: Array<{ id: string; referenceCode: string; branchId: string; branchName: string; customerId: string; customerName: string; bookingId: string | null; petId: string | null; petName: string | null; resourceId: string | null; resourceName: string | null; category: string; severity: string; status: string; title: string; description: string; resolutionNotes: string | null; recoveryAction: string | null; reportedAt: string; resolvedAt: string | null; closedAt: string | null; history: Array<{ type: string; summary: string | null; occurredAt: string; data: unknown }> }>;
+  branches: Array<{ id: string; name: string }>;
+  customers: Array<{ id: string; name: string }>;
+  bookings: Array<{ id: string; customerId: string; branchId: string; label: string }>;
+  pets: Array<{ id: string; customerId: string; name: string }>;
+  resources: Array<{ id: string; branchId: string; name: string }>;
+}
+
+export async function loadComplaintWorkspace(supabase: SupabaseClient, organizationId: string, filters: { status?: string; severity?: string } = {}): Promise<ComplaintWorkspace> {
+  let complaintQuery = supabase.from("complaints").select("id,reference_code,branch_id,customer_id,booking_id,pet_id,assigned_resource_id,category,severity,status,title,description,resolution_notes,recovery_action,reported_at,resolved_at,closed_at").eq("organization_id", organizationId).is("deleted_at", null).order("reported_at", { ascending: false }).limit(500);
+  if (["open", "investigating", "resolved", "closed"].includes(filters.status ?? "")) complaintQuery = complaintQuery.eq("status", filters.status!);
+  if (["low", "medium", "high", "critical"].includes(filters.severity ?? "")) complaintQuery = complaintQuery.eq("severity", filters.severity!);
+  const [complaints, branches, customers, bookings, pets, resources] = await Promise.all([
+    complaintQuery,
+    supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
+    supabase.from("customers").select("id,display_name").eq("organization_id", organizationId).is("deleted_at", null).order("display_name").limit(2000),
+    supabase.from("bookings").select("id,customer_id,branch_id,starts_at").eq("organization_id", organizationId).is("deleted_at", null).order("starts_at", { ascending: false }).limit(500),
+    supabase.from("pets").select("id,customer_id,name").eq("organization_id", organizationId).is("deleted_at", null).order("name").limit(3000),
+    supabase.from("resources").select("id,branch_id,name").eq("organization_id", organizationId).eq("kind", "staff").is("deleted_at", null).order("name"),
+  ]);
+  for (const [scope, result] of [["complaints", complaints], ["complaint_branches", branches], ["complaint_customers", customers], ["complaint_bookings", bookings], ["complaint_pets", pets], ["complaint_resources", resources]] as const) assertResult(scope, result.error);
+  const ids = (complaints.data ?? []).map((row) => row.id); const events = ids.length ? await supabase.from("timeline_events").select("subject_id,event_type,summary,data,occurred_at").eq("organization_id", organizationId).eq("subject_type", "complaint").in("subject_id", ids).order("occurred_at", { ascending: false }) : { data: [], error: null };
+  assertResult("complaint_history", events.error);
+  const branchNames = new Map((branches.data ?? []).map((row) => [row.id, row.name])); const customerNames = new Map((customers.data ?? []).map((row) => [row.id, row.display_name])); const petNames = new Map((pets.data ?? []).map((row) => [row.id, row.name])); const resourceNames = new Map((resources.data ?? []).map((row) => [row.id, row.name]));
+  return {
+    rows: (complaints.data ?? []).map((row) => ({ id: row.id, referenceCode: row.reference_code, branchId: row.branch_id, branchName: branchNames.get(row.branch_id) ?? "Cabang", customerId: row.customer_id, customerName: customerNames.get(row.customer_id) ?? "Pelanggan", bookingId: row.booking_id, petId: row.pet_id, petName: row.pet_id ? petNames.get(row.pet_id) ?? "Hewan" : null, resourceId: row.assigned_resource_id, resourceName: row.assigned_resource_id ? resourceNames.get(row.assigned_resource_id) ?? "Groomer" : null, category: row.category, severity: row.severity, status: row.status, title: row.title, description: row.description, resolutionNotes: row.resolution_notes, recoveryAction: row.recovery_action, reportedAt: row.reported_at, resolvedAt: row.resolved_at, closedAt: row.closed_at, history: (events.data ?? []).filter((event) => event.subject_id === row.id).map((event) => ({ type: event.event_type, summary: event.summary, occurredAt: event.occurred_at, data: event.data })) })),
+    branches: branches.data ?? [], customers: (customers.data ?? []).map((row) => ({ id: row.id, name: row.display_name })), bookings: (bookings.data ?? []).map((row) => ({ id: row.id, customerId: row.customer_id, branchId: row.branch_id, label: new Date(row.starts_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) })), pets: (pets.data ?? []).map((row) => ({ id: row.id, customerId: row.customer_id, name: row.name })), resources: (resources.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, name: row.name })),
+  };
+}
+
 export interface MyScheduleJob {
   groomingJobPetId: string;
   bookingId: string;
@@ -450,7 +481,7 @@ export async function loadLeaderboardWorkspace(supabase: SupabaseClient, organiz
   const [events, evidenceLinks, complaints] = await Promise.all([
     currentBookingIds.length ? supabase.from("timeline_events").select("subject_id,event_type,data,occurred_at").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", currentBookingIds).in("event_type", ["booking.status_changed", "booking.completed"]).order("occurred_at") : Promise.resolve({ data: [], error: null }),
     currentBookingIds.length ? supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", currentBookingIds) : Promise.resolve({ data: [], error: null }),
-    membershipIds.length ? supabase.from("tasks").select("assigned_membership_id,booking_id,metadata,status").eq("organization_id", organizationId).in("assigned_membership_id", membershipIds).gte("created_at", periodStart).lt("created_at", periodEnd).contains("metadata", { category: "complaint" }).is("deleted_at", null) : Promise.resolve({ data: [], error: null }),
+    supabase.from("complaints").select("assigned_resource_id,status").eq("organization_id", organizationId).gte("reported_at", periodStart).lt("reported_at", periodEnd).is("deleted_at", null),
   ]);
   assertResult("leaderboard_events", events.error); assertResult("leaderboard_evidence_links", evidenceLinks.error); assertResult("leaderboard_complaints", complaints.error);
   const attachmentIds = (evidenceLinks.data ?? []).map((row) => row.attachment_id);
@@ -476,7 +507,7 @@ export async function loadLeaderboardWorkspace(supabase: SupabaseClient, organiz
     const retainedCustomers = customerIds.filter((customerId) => ownCurrent.some((petJob) => { const current = bookingMap.get(petJob.grooming_job_id); return current?.customer_id === customerId && allPetJobs.some((historical) => historical.assigned_resource_id === row.id && bookingMap.get(historical.grooming_job_id)?.customer_id === customerId && (bookingMap.get(historical.grooming_job_id)?.starts_at ?? "") < (current?.starts_at ?? "")); })).length;
     const actualDurations = ownBookingIds.map(actualDuration).filter((value): value is number => value !== null);
     const documentedVisits = ownBookingIds.filter((id) => documentedBookings.has(id)).length;
-    const complaintCount = row.membership_id ? (complaints.data ?? []).filter((task) => task.assigned_membership_id === row.membership_id && task.status !== "canceled").length : 0;
+    const complaintCount = (complaints.data ?? []).filter((complaint) => complaint.assigned_resource_id === row.id).length;
     return { resourceId: row.id, name: row.name, dogsGroomed: dogsByResource.get(row.id) ?? 0, commissionTotal: row.membership_id ? (commissionByMembership.get(row.membership_id) ?? 0) : 0, currency, retainedCustomers, customerCount: customerIds.length, retentionRate: customerIds.length ? Math.round(retainedCustomers / customerIds.length * 100) : 0, averageDurationMinutes: actualDurations.length ? Math.round(actualDurations.reduce((sum, value) => sum + value, 0) / actualDurations.length) : null, documentedVisits, documentationRate: ownBookingIds.length ? Math.round(documentedVisits / ownBookingIds.length * 100) : 0, complaints: complaintCount };
   }).sort((a, b) => b.dogsGroomed - a.dogsGroomed || b.retentionRate - a.retentionRate || a.complaints - b.complaints);
 }

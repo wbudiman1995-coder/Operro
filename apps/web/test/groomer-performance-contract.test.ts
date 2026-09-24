@@ -23,9 +23,9 @@ test("retention and duration come from bounded booking history and timeline actu
   assert.match(data, /averageDurationMinutes/);
 });
 
-test("documentation and complaint metrics use real evidence and tagged task records", () => {
+test("documentation and complaint metrics use real evidence and complaint records", () => {
   assert.match(data, /categories\.has\("before"\).*categories\.has\("after"\)/);
-  assert.match(data, /contains\("metadata", \{ category: "complaint" \}\)/);
+  assert.match(data, /from\("complaints"\).*assigned_resource_id/);
   assert.match(page, /Dokumentasi/);
   assert.match(page, /Keluhan/);
 });

@@ -56,6 +56,7 @@ const sections: { label: string; items: MenuItem[] }[] = [
       { label: "Laporan", href: "/reports", icon: ReportsIcon, permission: "reports.view" },
       { label: "Leaderboard", href: "/leaderboard", icon: LeaderboardIcon, permission: "booking.read" },
       { label: "Follow-up", href: "/followups", icon: FollowupIcon, permission: "customer.read" },
+      { label: "Keluhan", href: "/complaints", icon: TasksIcon, anyPermission: ["customer.read", "task.manage", "reports.view"] },
     ],
   },
 ];
