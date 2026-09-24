@@ -47,6 +47,7 @@ create trigger trg_complaints_cols before insert or update on public.complaints 
 create trigger trg_complaints_audit after insert or update or delete on public.complaints for each row execute function app.tg_write_audit();
 
 alter table public.complaints enable row level security;
+revoke insert,update,delete on public.complaints from anon,authenticated;
 grant select on public.complaints to authenticated;
 create policy complaints_read on public.complaints for select to authenticated using (
   organization_id=app.fn_active_organization() and app.has_membership() and app.has_module('crm')

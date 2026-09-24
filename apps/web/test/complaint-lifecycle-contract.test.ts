@@ -5,6 +5,7 @@ import test from "node:test";
 
 const root = path.join(__dirname, "../../..");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/20260924100000_complaint_lifecycle.sql"), "utf8");
+const grantsMigration = fs.readFileSync(path.join(root, "supabase/migrations/20260924110000_complaint_rpc_only_writes.sql"), "utf8");
 const actions = fs.readFileSync(path.join(root, "apps/web/src/app/complaints/actions.ts"), "utf8");
 const page = fs.readFileSync(path.join(root, "apps/web/src/app/complaints/page.tsx"), "utf8");
 const exporter = fs.readFileSync(path.join(root, "apps/web/src/app/api/complaints/export/route.ts"), "utf8");
@@ -14,6 +15,8 @@ test("complaints are tenant and branch isolated with no browser table writes", (
   assert.match(migration, /organization_id=app\.fn_active_organization\(\)/);
   assert.match(migration, /app\.has_branch\(branch_id\)/);
   assert.match(migration, /grant select on public\.complaints to authenticated/);
+  assert.match(migration, /revoke insert,update,delete on public\.complaints from anon,authenticated/);
+  assert.match(grantsMigration, /revoke insert,update,delete on public\.complaints from anon,authenticated/);
   assert.doesNotMatch(migration, /grant (insert|update|delete).*complaints.*authenticated/i);
 });
 
