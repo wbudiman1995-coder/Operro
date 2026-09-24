@@ -28,7 +28,7 @@ export function ServiceManager({ service, canManageService }: { service: Catalog
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <p className="truncate font-bold">{service.name}</p>
-        <p className="mt-1 text-xs text-slate-500">{service.duration} menit{service.additionalDuration > 0 ? ` (+${service.additionalDuration} menit/unit tambahan)` : ""} · {formatRupiah(service.price)}</p>
+        <p className="mt-1 text-xs text-slate-500">{service.category ? `${service.category} · ` : ""}{service.duration} menit{service.additionalDuration > 0 ? ` (+${service.additionalDuration} menit/unit tambahan)` : ""} · {formatRupiah(service.price)}</p>
         <p className="mt-1 text-[11px] text-slate-400">
           {SIZE_FIELDS.map(([key, , label]) => `${label}: ${service[key] === null ? "pakai harga dasar" : formatRupiah(service[key] as number)}`).join(" · ")}
         </p>
@@ -41,6 +41,9 @@ export function ServiceManager({ service, canManageService }: { service: Catalog
     {editing ? <form action={action} className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4">
       <input type="hidden" name="serviceId" value={service.id} />
       <input className={field} name="name" defaultValue={service.name} required />
+      <select className={field} name="category" defaultValue={service.category ?? ""} aria-label="Kategori layanan">
+        <option value="">Kategori (opsional)</option><option value="Basic Grooming">Basic Grooming</option><option value="Styling">Styling</option><option value="Special Charges">Special Charges</option><option value="Other Fees">Other Fees</option>
+      </select>
       <div className="grid gap-3 sm:grid-cols-2">
         <input className={field} type="number" min="15" step="15" name="duration" defaultValue={service.duration} aria-label="Durasi menit" required />
         <input className={field} type="number" min="0" step="5" name="additionalDuration" defaultValue={service.additionalDuration} aria-label="Durasi tambahan per unit" placeholder="Menit tambahan/unit" />

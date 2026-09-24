@@ -8,7 +8,7 @@
  * - transitionBookingAction / updatePetJobStatusAction: advances grooming work.
  * - setDispatchStageAction: advances a home-service booking's dispatch stage (scheduled/en_route/arrived/in_service), independent of bookings.status.
  * - uploadGroomingEvidenceAction: stores private, booking-linked grooming evidence for an assigned groomer.
- * - updateGroomingChecklistAction / issueInvoiceForBookingAction: closes the service-to-cash loop.
+ * - updateGroomingChecklistAction / issueInvoiceForBookingAction / previewInvoiceDiscountsAction: closes the service-to-cash loop, including section-22 invoice/pet/service/category discounts, transport fee, and a pre-issuance preview.
  * - createServiceAction / updateServiceAction / overrideGroomingLinePriceAction / createResourceAction / updateResourceAction / archiveResourceAction: configures the operating catalog.
  * - adjustInventoryAction: appends an inventory adjustment movement.
  * - recordPaymentAction / recordExpenseAction: records manual financial activity.
@@ -22,6 +22,7 @@ import { revalidatePath } from "next/cache";
 
 import { loadAuthContext } from "@/lib/auth-context";
 import { loadCapabilities } from "@/lib/authorization";
+import { INVOICE_DISCOUNT_CATEGORIES } from "@/lib/invoice-discount-categories";
 import { createClient } from "@/lib/supabase/server";
 
 export interface PilotActionState { error: string | null; success: string | null }
@@ -460,77 +461,98 @@ export async function updateGroomingChecklistAction(formData: FormData) {
   revalidatePath("/operations");
 }
 
+function invoiceLevelDiscount(formData: FormData): { type: string; value: number; basicGroomingOnly: boolean } | null {
+  const type = textValue(formData, "invoiceDiscountType", 10);
+  if (type !== "percent" && type !== "fixed") return null;
+  const value = numberValue(formData, "invoiceDiscountValue");
+  if (value === null || value <= 0) return null;
+  return { type, value, basicGroomingOnly: formData.get("invoiceDiscountBasicOnly") === "on" };
+}
+
+function categoryDiscounts(formData: FormData): Array<{ category: string; type: string; value: number }> {
+  const rules: Array<{ category: string; type: string; value: number }> = [];
+  for (const [slug, label] of INVOICE_DISCOUNT_CATEGORIES) {
+    const type = textValue(formData, `categoryDiscountType_${slug}`, 10);
+    if (type !== "percent" && type !== "fixed") continue;
+    const value = numberValue(formData, `categoryDiscountValue_${slug}`);
+    if (value === null || value <= 0) continue;
+    rules.push({ category: label, type, value });
+  }
+  return rules;
+}
+
+/** Reads parallel getAll() arrays (one row per pet/service the staff set a discount on) into typed rule objects. */
+function keyedDiscounts(formData: FormData, idKey: string, typeKey: string, valueKey: string, idField: string): Array<Record<string, string | number>> {
+  const ids = formData.getAll(idKey).map(String);
+  const types = formData.getAll(typeKey).map(String);
+  const values = formData.getAll(valueKey).map(String);
+  const rules: Array<Record<string, string | number>> = [];
+  for (let i = 0; i < ids.length; i += 1) {
+    const type = types[i]; const value = Number(values[i]);
+    if (!ids[i] || (type !== "percent" && type !== "fixed") || !Number.isFinite(value) || value <= 0) continue;
+    rules.push({ [idField]: ids[i], type, value });
+  }
+  return rules;
+}
+
+function invoiceDiscountInputs(formData: FormData) {
+  return {
+    invoice: invoiceLevelDiscount(formData),
+    pets: keyedDiscounts(formData, "petDiscountId", "petDiscountType", "petDiscountValue", "grooming_job_pet_id"),
+    services: keyedDiscounts(formData, "serviceDiscountId", "serviceDiscountType", "serviceDiscountValue", "service_id"),
+    categories: categoryDiscounts(formData),
+  };
+}
+
+/**
+ * Issues an invoice for a completed booking. All pricing -- package coverage, the
+ * complimentary next-appointment offer, the booking-time category rules, and the new
+ * section-22 invoice/pet/service/category discounts and transport fee -- is resolved
+ * and written atomically by app.issue_invoice_for_booking; nothing here trusts a
+ * client-supplied amount, only discount RULES (type/value/target), each range-checked
+ * again inside the RPC.
+ */
 export async function issueInvoiceForBookingAction(formData: FormData) {
   const context = await workspace(); if (!context) return;
-  if (!(await loadCapabilities(context.supabase))["invoice.issue"]) return;
   const bookingId = idValue(formData, "bookingId"); if (!bookingId) return;
-  const { data: booking } = await context.supabase.from("bookings").select("id,branch_id,customer_id,status,metadata").eq("organization_id", context.organizationId).eq("id", bookingId).eq("status", "completed").maybeSingle();
-  if (!booking) return;
-  const { data: existingOrders } = await context.supabase.from("orders").select("id").eq("organization_id", context.organizationId).eq("booking_id", bookingId).is("deleted_at", null);
-  if ((existingOrders ?? []).length) {
-    const { data: existingInvoice } = await context.supabase.from("invoices").select("id").eq("organization_id", context.organizationId).in("order_id", existingOrders!.map((row) => row.id)).limit(1).maybeSingle();
-    if (existingInvoice) return;
-  }
-  const { data: jobPets } = await context.supabase.from("grooming_job_pets").select("id,assigned_resource_id").eq("organization_id", context.organizationId).eq("grooming_job_id", bookingId).is("deleted_at", null);
-  const jobPetIds = (jobPets ?? []).map((row) => row.id); if (!jobPetIds.length) return;
-  const { data: lines } = await context.supabase.from("grooming_job_pet_services").select("id,service_id,service_name_snapshot,quantity,unit_price_snapshot,currency").eq("organization_id", context.organizationId).in("grooming_job_pet_id", jobPetIds).is("deleted_at", null).order("id");
-  if (!lines?.length) return;
-  const { data: packageReservations, error: packageCoverageError } = await context.supabase.schema("app").rpc("list_booking_package_coverage", { p_booking: bookingId });
-  if (packageCoverageError) {
-    console.error("booking_package_coverage_failed", packageCoverageError);
-    return;
-  }
-  const packageByLine = new Map((packageReservations ?? []).map((item: { line_id: string; customer_package_id: string }) => [item.line_id, item.customer_package_id]));
-  const bookingMetadata = booking.metadata && typeof booking.metadata === "object" && !Array.isArray(booking.metadata) ? booking.metadata as Record<string, unknown> : {};
-  const offer = bookingMetadata.complimentary_next_discount && typeof bookingMetadata.complimentary_next_discount === "object" && !Array.isArray(bookingMetadata.complimentary_next_discount) ? bookingMetadata.complimentary_next_discount as Record<string, unknown> : {};
-  const lineDiscounts = offer.lineDiscounts && typeof offer.lineDiscounts === "object" && !Array.isArray(offer.lineDiscounts) ? offer.lineDiscounts as Record<string, unknown> : {};
-  const categorySnapshot = bookingMetadata.category_discounts && typeof bookingMetadata.category_discounts === "object" && !Array.isArray(bookingMetadata.category_discounts) ? bookingMetadata.category_discounts as Record<string, unknown> : {};
-  const categoryRules = Array.isArray(categorySnapshot.rules) ? categorySnapshot.rules.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : [];
-  const serviceCategories = categorySnapshot.service_categories && typeof categorySnapshot.service_categories === "object" && !Array.isArray(categorySnapshot.service_categories) ? categorySnapshot.service_categories as Record<string, unknown> : {};
-  const fixedRemaining = new Map(categoryRules.filter((rule) => rule.type === "fixed" && typeof rule.category === "string").map((rule) => [String(rule.category), Number(rule.value) || 0]));
-  const pricedLines = lines.map((line) => {
-    const gross = Number(line.unit_price_snapshot) * Number(line.quantity);
-    const detail = lineDiscounts[line.id] && typeof lineDiscounts[line.id] === "object" && !Array.isArray(lineDiscounts[line.id]) ? lineDiscounts[line.id] as Record<string, unknown> : {};
-    const complimentaryDiscount = Math.max(0, Number(detail.amount) || 0);
-    const category = typeof serviceCategories[line.service_id] === "string" ? String(serviceCategories[line.service_id]) : "Lainnya";
-    const rule = categoryRules.find((item) => item.category === category);
-    let categoryDiscount = 0;
-    if (rule?.type === "percent") categoryDiscount = gross * Math.min(100, Math.max(0, Number(rule.value) || 0)) / 100;
-    if (rule?.type === "fixed") { categoryDiscount = Math.min(gross, fixedRemaining.get(category) ?? 0); fixedRemaining.set(category, Math.max(0, (fixedRemaining.get(category) ?? 0) - categoryDiscount)); }
-    const packageId = packageByLine.get(line.id) ?? null;
-    const discount = packageId ? gross : Math.max(0, Math.min(gross, complimentaryDiscount + categoryDiscount));
-    return { ...line, gross, discount, discountDetail: detail, category, categoryDiscount, packageId };
+  const discounts = invoiceDiscountInputs(formData);
+  const result = await context.supabase.schema("app").rpc("issue_invoice_for_booking", {
+    p_booking: bookingId, p_invoice_discount: discounts.invoice, p_pet_discounts: discounts.pets,
+    p_service_discounts: discounts.services, p_category_discounts: discounts.categories,
   });
-  const { data: order, error: orderError } = await context.supabase.from("orders").insert({ organization_id: context.organizationId, branch_id: booking.branch_id, customer_id: booking.customer_id, booking_id: booking.id, status: "confirmed", currency: "IDR", metadata: { created_from: "homepaw_pilot" } }).select("id").single();
-  if (orderError || !order) return;
-  const { error: itemError } = await context.supabase.from("order_items").insert(pricedLines.map((line) => ({ organization_id: context.organizationId, order_id: order.id, item_type: "service", service_id: line.service_id, name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, discount_amount: line.discount, line_total: line.gross - line.discount, pricing_breakdown: { source: "grooming_job_line", ...(Number(line.discountDetail.amount) > 0 ? { complimentary_next_discount: line.discountDetail } : {}), ...(line.categoryDiscount > 0 ? { category_discount: { category: line.category, amount: line.categoryDiscount } } : {}), ...(line.packageId ? { package_coverage: { customer_package_id: line.packageId } } : {}) }, metadata: { created_from: "homepaw_pilot", grooming_job_pet_service_id: line.id } })));
-  if (itemError) { await context.supabase.from("orders").update({ status: "canceled" }).eq("id", order.id); return; }
-  const { data: pricedOrder } = await context.supabase.from("orders").select("subtotal,discount_total,tax_total,total,currency").eq("organization_id", context.organizationId).eq("id", order.id).single();
-  if (!pricedOrder) return;
-  const invoiceDate = textValue(formData, "invoiceDate", 10);
-  const issuedAt = invoiceDate ? new Date(`${invoiceDate}T09:00:00+07:00`) : new Date();
-  if (Number.isNaN(issuedAt.getTime())) return;
-  const dueDate = textValue(formData, "dueDate", 10);
-  const dueAt = dueDate ? new Date(`${dueDate}T23:59:59+07:00`) : new Date(issuedAt.getTime() + 24 * 60 * 60 * 1000);
-  if (Number.isNaN(dueAt.getTime()) || dueAt < issuedAt) return;
-  let groomerId = idValue(formData, "groomerId");
-  let groomerName = textValue(formData, "manualGroomer", 160) || null;
-  if (!groomerId && !groomerName) {
-    const assigned = [...new Set((jobPets ?? []).map((row) => row.assigned_resource_id).filter((item): item is string => typeof item === "string"))];
-    if (assigned.length === 1) groomerId = assigned[0];
-  }
-  if (groomerId) {
-    const groomer = await context.supabase.from("resources").select("name").eq("organization_id", context.organizationId).eq("branch_id", booking.branch_id).eq("id", groomerId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).maybeSingle();
-    if (!groomer.data) return;
-    groomerName = groomer.data.name;
-  }
-  const requestedDocumentType = textValue(formData, "documentType", 30);
-  const documentType = ["invoice", "service_report"].includes(requestedDocumentType) ? requestedDocumentType : Number(pricedOrder.total) === 0 ? "service_report" : "invoice";
-  const invoiceNumber = `INV-${issuedAt.toISOString().slice(0, 10).replaceAll("-", "")}-${Date.now().toString().slice(-6)}`;
-  const { data: invoice, error: invoiceError } = await context.supabase.from("invoices").insert({ organization_id: context.organizationId, branch_id: booking.branch_id, customer_id: booking.customer_id, order_id: order.id, invoice_number: invoiceNumber, status: "issued", currency: pricedOrder.currency, subtotal: pricedOrder.subtotal, discount_total: pricedOrder.discount_total, tax_total: pricedOrder.tax_total, total: pricedOrder.total, issued_at: issuedAt.toISOString(), due_at: dueAt.toISOString(), billing_mode: "after_visit", document_type: documentType, groomer_resource_id: groomerId, groomer_name_snapshot: groomerName, admin_notes: textValue(formData, "adminNotes", 2000) || null, metadata: { created_from: "homepaw_pilot", booking_id: booking.id } }).select("id").single();
-  if (invoiceError || !invoice) return;
-  await context.supabase.from("invoice_lines").insert(pricedLines.map((line) => ({ organization_id: context.organizationId, invoice_id: invoice.id, item_type: "service", name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, discount_amount: line.discount, line_total: line.gross - line.discount, pricing_breakdown: { source: "grooming_job_line", ...(Number(line.discountDetail.amount) > 0 ? { complimentary_next_discount: line.discountDetail } : {}), ...(line.categoryDiscount > 0 ? { category_discount: { category: line.category, amount: line.categoryDiscount } } : {}), ...(line.packageId ? { package_coverage: { customer_package_id: line.packageId } } : {}) } })));
+  if (result.error) { console.error("issue_invoice_failed", result.error); return; }
   revalidatePath("/operations"); revalidatePath("/finance"); revalidatePath("/reports");
+}
+
+export interface InvoicePreviewLine {
+  lineId: string | null; name: string; quantity: number; unitPrice: number; gross: number;
+  discountAmount: number; lineTotal: number; category: string; pricingBreakdown: Record<string, unknown>;
+}
+export interface InvoicePreview { lines: InvoicePreviewLine[]; transportFee: number; subtotal: number; discountTotal: number; total: number }
+export interface InvoicePreviewResult { error: string | null; preview: InvoicePreview | null }
+
+/** Read-only: lets staff see exactly what issuing would produce before committing (section 22, item 8). */
+export async function previewInvoiceDiscountsAction(formData: FormData): Promise<InvoicePreviewResult> {
+  const context = await workspace(); if (!context) return { error: "workspace aktif tidak tersedia", preview: null };
+  const bookingId = idValue(formData, "bookingId"); if (!bookingId) return { error: "booking tidak valid", preview: null };
+  const discounts = invoiceDiscountInputs(formData);
+  const result = await context.supabase.schema("app").rpc("preview_invoice_pricing", {
+    p_booking: bookingId, p_invoice_discount: discounts.invoice, p_pet_discounts: discounts.pets,
+    p_service_discounts: discounts.services, p_category_discounts: discounts.categories,
+  });
+  if (result.error) return { error: result.error.message, preview: null };
+  const data = result.data as { lines: Array<Record<string, unknown>>; transport_fee: number; subtotal: number; discount_total: number; total: number };
+  return {
+    error: null,
+    preview: {
+      lines: data.lines.map((line) => ({
+        lineId: (line.line_id as string | null) ?? null, name: String(line.name), quantity: Number(line.quantity), unitPrice: Number(line.unit_price),
+        gross: Number(line.gross), discountAmount: Number(line.discount_amount), lineTotal: Number(line.line_total), category: String(line.category),
+        pricingBreakdown: (line.pricing_breakdown as Record<string, unknown>) ?? {},
+      })),
+      transportFee: Number(data.transport_fee), subtotal: Number(data.subtotal), discountTotal: Number(data.discount_total), total: Number(data.total),
+    },
+  };
 }
 
 const SERVICE_SIZE_KEYS = ["small", "medium", "large", "extraLarge"] as const;
@@ -564,6 +586,14 @@ function serviceFulfillmentModes(formData: FormData): string[] {
   return modes.length ? [...new Set(modes)] : ["home", "in_store"];
 }
 
+const SERVICE_CATEGORIES = new Set(["Basic Grooming", "Styling", "Special Charges", "Other Fees"]);
+
+/** Drives the section-22 per-category invoice discount; blank/unset falls back to "Other Fees" at discount time. */
+function serviceCategory(formData: FormData): string | null {
+  const value = textValue(formData, "category", 40);
+  return SERVICE_CATEGORIES.has(value) ? value : null;
+}
+
 export async function createServiceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Layanan", "izin service.manage diperlukan");
@@ -572,7 +602,7 @@ export async function createServiceAction(_previous: PilotActionState, formData:
   if (name.length < 2 || !duration || duration < 15 || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
   const priceMatrix = servicePriceMatrix(formData);
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
-  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), metadata: { created_from: "homepaw_pilot" }, ...priceMatrix });
+  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), metadata: { created_from: "homepaw_pilot" }, ...priceMatrix });
   if (error) return databaseError("Layanan gagal dibuat", error.message);
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil ditambahkan." };
 }
@@ -587,7 +617,7 @@ export async function updateServiceAction(_previous: PilotActionState, formData:
   const priceMatrix = servicePriceMatrix(formData);
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
   const isActive = formData.get("isActive") === "on";
-  const { error } = await context.supabase.from("service_catalog").update({ name, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), is_active: isActive, ...priceMatrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
+  const { error } = await context.supabase.from("service_catalog").update({ name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), is_active: isActive, ...priceMatrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
   if (error) return databaseError("Layanan gagal diperbarui", error.message);
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil diperbarui." };
 }

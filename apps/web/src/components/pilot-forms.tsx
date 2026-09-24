@@ -77,6 +77,9 @@ export function ServiceForm() {
   const [state, action, pending] = useActionState(createServiceAction, initialPilotActionState);
   return <form action={action} className="space-y-3">
     <input className={inputClass} name="name" placeholder="Nama layanan" required />
+    <select className={inputClass} name="category" defaultValue="" aria-label="Kategori layanan">
+      <option value="">Kategori (opsional)</option><option value="Basic Grooming">Basic Grooming</option><option value="Styling">Styling</option><option value="Special Charges">Special Charges</option><option value="Other Fees">Other Fees</option>
+    </select>
     <div className="grid gap-3 sm:grid-cols-2">
       <input className={inputClass} type="number" min="15" step="15" name="duration" defaultValue="60" aria-label="Durasi menit" />
       <input className={inputClass} type="number" min="0" step="1000" name="price" placeholder="Harga dasar Rp" required />

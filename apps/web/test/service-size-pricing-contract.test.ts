@@ -114,7 +114,7 @@ test("catalog admin UI exposes size prices, additional duration and fulfillment-
 });
 
 test("operations pricing data snapshots price_source per line so overridden lines are distinguishable", () => {
-  assert.match(pilotData, /select\("id,grooming_job_pet_id,service_name_snapshot,unit_price_snapshot,price_source"\)/);
+  assert.match(pilotData, /select\("id,grooming_job_pet_id,service_id,service_name_snapshot,unit_price_snapshot,price_source"\)/);
   assert.match(pilotData, /priceSource: line\.price_source/);
 });
 
