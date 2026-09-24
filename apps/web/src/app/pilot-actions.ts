@@ -9,7 +9,7 @@
  * - setDispatchStageAction: advances a home-service booking's dispatch stage (scheduled/en_route/arrived/in_service), independent of bookings.status.
  * - uploadGroomingEvidenceAction: stores private, booking-linked grooming evidence for an assigned groomer.
  * - updateGroomingChecklistAction / issueInvoiceForBookingAction: closes the service-to-cash loop.
- * - createServiceAction / createResourceAction / updateResourceAction / archiveResourceAction: configures the operating catalog.
+ * - createServiceAction / updateServiceAction / overrideGroomingLinePriceAction / createResourceAction / updateResourceAction / archiveResourceAction: configures the operating catalog.
  * - adjustInventoryAction: appends an inventory adjustment movement.
  * - recordPaymentAction / recordExpenseAction: records manual financial activity.
  * - sellPackageAction: sells a catalog package to a customer and records the payment.
@@ -161,6 +161,8 @@ export async function createCustomerAction(_previous: PilotActionState, formData
   const petName = textValue(formData, "petName", 80);
   const breed = textValue(formData, "breed", 100);
   const species = textValue(formData, "species", 30) || "dog";
+  const sizeRaw = textValue(formData, "size", 20);
+  const size = ["small", "medium", "large", "extra_large"].includes(sizeRaw) ? sizeRaw : null;
   if (name.length < 2) return databaseError("Pelanggan", "nama wajib diisi");
 
   const address = addressFields(formData);
@@ -169,7 +171,7 @@ export async function createCustomerAction(_previous: PilotActionState, formData
   const { data: customer, error } = await context.supabase.from("customers").insert({ organization_id: context.organizationId, display_name: name, phone: phone || null, status: "active", source: "Operro", metadata: { created_from: "homepaw_pilot" } }).select("id").single();
   if (error || !customer) return databaseError("Pelanggan gagal dibuat", error?.message ?? "unknown");
   if (petName) {
-    const { error: petError } = await context.supabase.from("pets").insert({ organization_id: context.organizationId, customer_id: customer.id, name: petName, species, breed: breed || null, status: "active", metadata: { created_from: "homepaw_pilot" } });
+    const { error: petError } = await context.supabase.from("pets").insert({ organization_id: context.organizationId, customer_id: customer.id, name: petName, species, breed: breed || null, size, status: "active", metadata: { created_from: "homepaw_pilot" } });
     if (petError) {
       await context.supabase.from("customers").update({ deleted_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("id", customer.id);
       return databaseError("Hewan gagal dibuat", petError.message);
@@ -531,13 +533,75 @@ export async function issueInvoiceForBookingAction(formData: FormData) {
   revalidatePath("/operations"); revalidatePath("/finance"); revalidatePath("/reports");
 }
 
+const SERVICE_SIZE_KEYS = ["small", "medium", "large", "extraLarge"] as const;
+const SERVICE_SIZE_COLUMNS: Record<(typeof SERVICE_SIZE_KEYS)[number], string> = {
+  small: "price_small", medium: "price_medium", large: "price_large", extraLarge: "price_extra_large",
+};
+const FULFILLMENT_MODES = new Set(["home", "in_store"]);
+
+/** Blank means "no override for this size" (falls back to base_price); numberValue() would coerce blank to 0. */
+function optionalPriceValue(formData: FormData, key: string): number | null | "invalid" {
+  const raw = String(formData.get(key) ?? "").trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : "invalid";
+}
+
+interface ServicePriceMatrix { price_small: number | null; price_medium: number | null; price_large: number | null; price_extra_large: number | null }
+
+function servicePriceMatrix(formData: FormData): ServicePriceMatrix | { invalid: string } {
+  const matrix: Record<string, number | null> = {};
+  for (const key of SERVICE_SIZE_KEYS) {
+    const value = optionalPriceValue(formData, `price_${key}`);
+    if (value === "invalid") return { invalid: `harga untuk ukuran ${key} tidak valid` };
+    matrix[SERVICE_SIZE_COLUMNS[key]] = value;
+  }
+  return matrix as unknown as ServicePriceMatrix;
+}
+
+function serviceFulfillmentModes(formData: FormData): string[] {
+  const modes = formData.getAll("fulfillmentModes").map((value) => String(value)).filter((value) => FULFILLMENT_MODES.has(value));
+  return modes.length ? [...new Set(modes)] : ["home", "in_store"];
+}
+
 export async function createServiceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Layanan", "izin service.manage diperlukan");
   const name = textValue(formData, "name", 100); const duration = numberValue(formData, "duration"); const price = numberValue(formData, "price");
-  if (name.length < 2 || !duration || duration < 15 || price === null || price < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
-  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, duration_minutes: duration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: ["home", "in_store"], metadata: { created_from: "homepaw_pilot" } });
+  const additionalDuration = numberValue(formData, "additionalDuration") ?? 0;
+  if (name.length < 2 || !duration || duration < 15 || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
+  const priceMatrix = servicePriceMatrix(formData);
+  if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
+  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), metadata: { created_from: "homepaw_pilot" }, ...priceMatrix });
   if (error) return databaseError("Layanan gagal dibuat", error.message);
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil ditambahkan." };
+}
+
+export async function updateServiceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Layanan", "izin service.manage diperlukan");
+  const serviceId = idValue(formData, "serviceId"); if (!serviceId) return databaseError("Layanan", "layanan tidak valid");
+  const name = textValue(formData, "name", 100); const duration = numberValue(formData, "duration"); const price = numberValue(formData, "price");
+  const additionalDuration = numberValue(formData, "additionalDuration") ?? 0;
+  if (name.length < 2 || !duration || duration < 15 || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
+  const priceMatrix = servicePriceMatrix(formData);
+  if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
+  const isActive = formData.get("isActive") === "on";
+  const { error } = await context.supabase.from("service_catalog").update({ name, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), is_active: isActive, ...priceMatrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
+  if (error) return databaseError("Layanan gagal diperbarui", error.message);
+  revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil diperbarui." };
+}
+
+export async function overrideGroomingLinePriceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  const lineId = idValue(formData, "lineId"); const price = numberValue(formData, "price");
+  const reason = textValue(formData, "reason", 300);
+  if (!lineId || price === null || price < 0) return databaseError("Harga layanan", "harga tidak valid");
+  if (reason.length < 3) return databaseError("Harga layanan", "alasan override wajib diisi");
+  const result = await context.supabase.schema("app").rpc("override_grooming_line_price", { p_line: lineId, p_price: price, p_reason: reason });
+  if (result.error) return databaseError("Harga tidak dapat diubah", /insufficient_privilege|42501/i.test(result.error.message) ? "izin service.manage diperlukan" : result.error.message);
+  revalidatePath("/operations"); revalidatePath("/finance");
+  return { error: null, success: "Harga layanan berhasil diperbarui." };
 }
 
 function resourceSettings(formData: FormData) {

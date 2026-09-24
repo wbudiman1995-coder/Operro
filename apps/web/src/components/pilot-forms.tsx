@@ -33,7 +33,7 @@ function ActionMessage({ state }: { state: PilotActionState }) {
 
 export function CustomerForm() {
   const [state, action, pending] = useActionState(createCustomerAction, initialPilotActionState);
-  return <form action={action} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="name" placeholder="Nama pelanggan" required /><input className={inputClass} name="phone" placeholder="WhatsApp, contoh 0812..." /></div><div className="grid gap-3 sm:grid-cols-3"><input className={inputClass} name="petName" placeholder="Nama hewan" /><select className={inputClass} name="species" defaultValue="dog"><option value="dog">Anjing</option><option value="cat">Kucing</option><option value="rabbit">Kelinci</option></select><input className={inputClass} name="breed" placeholder="Ras" /></div>
+  return <form action={action} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="name" placeholder="Nama pelanggan" required /><input className={inputClass} name="phone" placeholder="WhatsApp, contoh 0812..." /></div><div className="grid gap-3 sm:grid-cols-4"><input className={inputClass} name="petName" placeholder="Nama hewan" /><select className={inputClass} name="species" defaultValue="dog"><option value="dog">Anjing</option><option value="cat">Kucing</option><option value="rabbit">Kelinci</option></select><input className={inputClass} name="breed" placeholder="Ras" /><select className={inputClass} name="size" defaultValue="" aria-label="Ukuran hewan"><option value="">Ukuran (opsional)</option><option value="small">Kecil</option><option value="medium">Sedang</option><option value="large">Besar</option><option value="extra_large">Extra besar</option></select></div>
     <details className="rounded-xl border border-slate-200 p-3">
       <summary className="cursor-pointer text-sm font-semibold text-slate-700">Alamat (opsional, untuk layanan home service)</summary>
       <div className="mt-3 space-y-3">
@@ -66,9 +66,35 @@ export function TaskForm({ branches }: { branches: Array<{ id: string; name: str
   return <form action={action} className="space-y-3"><input className={inputClass} name="title" placeholder="Contoh: follow-up booking Bubu" required /><div className="grid gap-3 sm:grid-cols-3"><select className={inputClass} name="branchId" required>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><select className={inputClass} name="priority" defaultValue="normal"><option value="low">Rendah</option><option value="normal">Normal</option><option value="high">Tinggi</option><option value="urgent">Mendesak</option></select><input className={inputClass} type="datetime-local" name="dueAt" /></div><div className="flex flex-wrap items-center justify-between gap-3"><ActionMessage state={state} /><button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Buat tugas"}</button></div></form>;
 }
 
+const SERVICE_SIZE_FIELDS = [
+  ["small", "Kecil"],
+  ["medium", "Sedang"],
+  ["large", "Besar"],
+  ["extraLarge", "Extra besar"],
+] as const;
+
 export function ServiceForm() {
   const [state, action, pending] = useActionState(createServiceAction, initialPilotActionState);
-  return <form action={action} className="space-y-3"><input className={inputClass} name="name" placeholder="Nama layanan" required /><div className="grid grid-cols-2 gap-3"><input className={inputClass} type="number" min="15" step="15" name="duration" defaultValue="60" aria-label="Durasi menit" /><input className={inputClass} type="number" min="0" step="1000" name="price" placeholder="Harga Rp" required /></div><ActionMessage state={state} /><button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Tambah layanan"}</button></form>;
+  return <form action={action} className="space-y-3">
+    <input className={inputClass} name="name" placeholder="Nama layanan" required />
+    <div className="grid gap-3 sm:grid-cols-2">
+      <input className={inputClass} type="number" min="15" step="15" name="duration" defaultValue="60" aria-label="Durasi menit" />
+      <input className={inputClass} type="number" min="0" step="1000" name="price" placeholder="Harga dasar Rp" required />
+    </div>
+    <input className={inputClass} type="number" min="0" step="5" name="additionalDuration" placeholder="Menit tambahan per unit ekstra (opsional)" />
+    <div>
+      <p className="mb-2 text-xs font-semibold text-slate-500">Harga per ukuran hewan (opsional, kosongkan untuk pakai harga dasar)</p>
+      <div className="grid gap-3 sm:grid-cols-4">
+        {SERVICE_SIZE_FIELDS.map(([size, label]) => <input key={size} className={inputClass} type="number" min="0" step="1000" name={`price_${size}`} placeholder={label} aria-label={`Harga ${label}`} />)}
+      </div>
+    </div>
+    <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-700">
+      <label className="flex items-center gap-2"><input type="checkbox" name="fulfillmentModes" value="home" defaultChecked />Home service</label>
+      <label className="flex items-center gap-2"><input type="checkbox" name="fulfillmentModes" value="in_store" defaultChecked />Di toko</label>
+    </div>
+    <ActionMessage state={state} />
+    <button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Tambah layanan"}</button>
+  </form>;
 }
 
 export function ResourceForm({ branches, memberships }: { branches: Array<{ id: string; name: string }>; memberships: Array<{ id: string; name: string }> }) {

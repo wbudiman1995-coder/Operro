@@ -132,7 +132,7 @@ export async function loadTaskWorkspace(supabase: SupabaseClient, organizationId
 }
 
 export interface OperationsWorkspace {
-  jobs: Array<{ id: string; startsAt: string; status: string; mode: string; customerName: string; checklist: Record<string, boolean>; groomerNotes: string | null; invoiceNumber: string | null; pets: Array<{ id: string; name: string; status: string; groomer: string; services: string[] }> }>;
+  jobs: Array<{ id: string; startsAt: string; status: string; mode: string; customerName: string; checklist: Record<string, boolean>; groomerNotes: string | null; invoiceNumber: string | null; pets: Array<{ id: string; name: string; status: string; groomer: string; services: string[]; serviceLines: Array<{ id: string; name: string; unitPrice: number; priceSource: string }> }> }>;
 }
 
 export async function loadOperationsWorkspace(supabase: SupabaseClient, organizationId: string): Promise<OperationsWorkspace> {
@@ -156,19 +156,19 @@ export async function loadOperationsWorkspace(supabase: SupabaseClient, organiza
   const orderIds = (orders.data ?? []).map((row) => row.id);
   const [pets, lines, invoices] = await Promise.all([
     petIds.length ? supabase.from("pets").select("id,name").in("id", petIds) : Promise.resolve({ data: [], error: null }),
-    jobPetIds.length ? supabase.from("grooming_job_pet_services").select("grooming_job_pet_id,service_name_snapshot").in("grooming_job_pet_id", jobPetIds).is("deleted_at", null) : Promise.resolve({ data: [], error: null }),
+    jobPetIds.length ? supabase.from("grooming_job_pet_services").select("id,grooming_job_pet_id,service_name_snapshot,unit_price_snapshot,price_source").in("grooming_job_pet_id", jobPetIds).is("deleted_at", null) : Promise.resolve({ data: [], error: null }),
     orderIds.length ? supabase.from("invoices").select("order_id,invoice_number").eq("organization_id", organizationId).in("order_id", orderIds) : Promise.resolve({ data: [], error: null }),
   ]);
   assertResult("operations_pet_names", pets.error); assertResult("operations_lines", lines.error); assertResult("operations_invoices", invoices.error);
   const customerMap = new Map((customers.data ?? []).map((row) => [row.id, row.display_name]));
   const petMap = new Map((pets.data ?? []).map((row) => [row.id, row.name]));
   const resourceMap = new Map((resources.data ?? []).map((row) => [row.id, row.name]));
-  return { jobs: (bookings.data ?? []).map((booking) => { const job = (groomingJobs.data ?? []).find((item) => item.booking_id === booking.id); const order = (orders.data ?? []).find((item) => item.booking_id === booking.id); const invoice = order ? (invoices.data ?? []).find((item) => item.order_id === order.id) : null; return { id: booking.id, startsAt: booking.starts_at, status: booking.status, mode: booking.fulfillment_mode, customerName: customerMap.get(booking.customer_id) ?? "Pelanggan", checklist: (job?.checklist && typeof job.checklist === "object" ? job.checklist : {}) as Record<string, boolean>, groomerNotes: job?.groomer_notes ?? null, invoiceNumber: invoice?.invoice_number ?? null, pets: (jobPets.data ?? []).filter((pet) => pet.grooming_job_id === booking.id).map((pet) => ({ id: pet.id, name: petMap.get(pet.pet_id) ?? "Hewan", status: pet.status, groomer: resourceMap.get(pet.assigned_resource_id) ?? "Belum ditugaskan", services: (lines.data ?? []).filter((line) => line.grooming_job_pet_id === pet.id).map((line) => line.service_name_snapshot) })) }; }) };
+  return { jobs: (bookings.data ?? []).map((booking) => { const job = (groomingJobs.data ?? []).find((item) => item.booking_id === booking.id); const order = (orders.data ?? []).find((item) => item.booking_id === booking.id); const invoice = order ? (invoices.data ?? []).find((item) => item.order_id === order.id) : null; return { id: booking.id, startsAt: booking.starts_at, status: booking.status, mode: booking.fulfillment_mode, customerName: customerMap.get(booking.customer_id) ?? "Pelanggan", checklist: (job?.checklist && typeof job.checklist === "object" ? job.checklist : {}) as Record<string, boolean>, groomerNotes: job?.groomer_notes ?? null, invoiceNumber: invoice?.invoice_number ?? null, pets: (jobPets.data ?? []).filter((pet) => pet.grooming_job_id === booking.id).map((pet) => ({ id: pet.id, name: petMap.get(pet.pet_id) ?? "Hewan", status: pet.status, groomer: resourceMap.get(pet.assigned_resource_id) ?? "Belum ditugaskan", services: (lines.data ?? []).filter((line) => line.grooming_job_pet_id === pet.id).map((line) => line.service_name_snapshot), serviceLines: (lines.data ?? []).filter((line) => line.grooming_job_pet_id === pet.id).map((line) => ({ id: line.id, name: line.service_name_snapshot, unitPrice: Number(line.unit_price_snapshot), priceSource: line.price_source })) })) }; }) };
 }
 
 export interface CatalogWorkspace {
   branches: Array<{ id: string; name: string }>;
-  services: Array<{ id: string; name: string; duration: number; price: number; active: boolean }>;
+  services: Array<{ id: string; name: string; duration: number; additionalDuration: number; price: number; priceSmall: number | null; priceMedium: number | null; priceLarge: number | null; priceExtraLarge: number | null; fulfillmentModes: string[]; active: boolean }>;
   memberships: Array<{ id: string; name: string }>;
   resources: Array<{
     id: string; branchId: string; membershipId: string | null; name: string; branchName: string; status: string; skills: unknown;
@@ -183,7 +183,7 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
   const [branches, services, resources, packages, products, levels, memberships, assignments, compensation, attendance] = await Promise.all([
     supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
-    supabase.from("service_catalog").select("id,name,duration_minutes,base_price,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
+    supabase.from("service_catalog").select("id,name,duration_minutes,additional_duration_minutes,base_price,price_small,price_medium,price_large,price_extra_large,fulfillment_modes,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,membership_id,name,status,skills,settings,created_at").eq("organization_id", organizationId).eq("kind", "staff").is("deleted_at", null).order("name"),
     supabase.from("packages").select("id,name,total_sessions,price,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("product_catalog").select("id,name,sku").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
@@ -200,7 +200,7 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
     const user = relationRows(row.users)[0];
     return { id: row.id, name: String(user?.full_name ?? user?.email ?? "Staf") };
   });
-  return { branches: branches.data ?? [], memberships: membershipOptions, services: (services.data ?? []).map((row) => ({ id: row.id, name: row.name, duration: row.duration_minutes, price: Number(row.base_price), active: row.is_active })), resources: (resources.data ?? []).map((row) => {
+  return { branches: branches.data ?? [], memberships: membershipOptions, services: (services.data ?? []).map((row) => ({ id: row.id, name: row.name, duration: row.duration_minutes, additionalDuration: Number(row.additional_duration_minutes ?? 0), price: Number(row.base_price), priceSmall: row.price_small === null ? null : Number(row.price_small), priceMedium: row.price_medium === null ? null : Number(row.price_medium), priceLarge: row.price_large === null ? null : Number(row.price_large), priceExtraLarge: row.price_extra_large === null ? null : Number(row.price_extra_large), fulfillmentModes: Array.isArray(row.fulfillment_modes) ? row.fulfillment_modes as string[] : ["home", "in_store"], active: row.is_active })), resources: (resources.data ?? []).map((row) => {
     const settings = row.settings && typeof row.settings === "object" && !Array.isArray(row.settings) ? row.settings as Record<string, unknown> : {};
     const base = settings.base_location && typeof settings.base_location === "object" && !Array.isArray(settings.base_location) ? settings.base_location as Record<string, unknown> : {};
     const pay = (compensation.data ?? []).find((item) => item.membership_id === row.membership_id);
