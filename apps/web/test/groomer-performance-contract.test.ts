@@ -6,6 +6,7 @@ import test from "node:test";
 const root = path.join(__dirname, "../../..");
 const data = fs.readFileSync(path.join(root, "apps/web/src/lib/pilot-data.ts"), "utf8");
 const page = fs.readFileSync(path.join(root, "apps/web/src/app/leaderboard/page.tsx"), "utf8");
+const detail = fs.readFileSync(path.join(root, "apps/web/src/app/leaderboard/[resourceId]/page.tsx"), "utf8");
 
 test("performance keeps invoice revenue unsplit and uses attributable activity", () => {
   assert.match(data, /Revenue-per-groomer is deliberately not shown/);
@@ -33,4 +34,11 @@ test("performance cycles can move backward and forward by month", () => {
   assert.match(page, /Sebelumnya/);
   assert.match(page, /Berikutnya/);
   assert.match(page, /searchParams/);
+});
+
+test("leaderboard links each groomer to a visit-level evidence drill-down", () => {
+  assert.match(page, /\/leaderboard\/\$\{row\.resourceId\}/);
+  assert.match(data, /loadGroomerPerformanceDetail/);
+  assert.match(detail, /Visit yang dihitung/);
+  assert.match(detail, /Dokumentasi belum lengkap/);
 });

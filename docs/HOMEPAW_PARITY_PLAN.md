@@ -27,7 +27,7 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 15 | Groomer management | Implemented | Add/edit/status/archive, phone, personal calendar color, Maps/base coordinates, membership link, appointment and current-month lateness counts, join date, compensation, weekly/city schedule access and copyable filtered calendar links |
 | 16 | Attendance | Implemented | Assigned groomers check in with compressed photo and GPS; server time and configurable grace classify lateness; missing-photo materialization, reasons, audited payroll waiver, cycle navigation, per-groomer summaries, signed photos and GPS history are included |
 | 17 | Groomer performance | Implemented | Monthly cycle view combines attributable completed pets and commission with repeat-customer retention, timeline-derived actual duration, before/after documentation rate and complaint-tagged task count; no invoice revenue is falsely split across multi-groomer bookings |
-| 18 | Leaderboard | Partial | Ranking route exists; expand metrics and drill-down |
+| 18 | Leaderboard | Implemented | Monthly ranking combines pet volume, retention, duration, documentation, complaints and commission; each groomer opens a visit-level drill-down with lifecycle duration and evidence completeness |
 | 19 | Complaints | Missing | Complaint lifecycle, links, severity, recovery notes, audit and export |
 | 20 | Service and invoice creation | Partial | Completion-to-invoice works; add billing modes, invoice edit protections, manual groomer and due-date workflow |
 | 21 | Catalog and pricing | Partial | Services/duration/base prices exist; add size-based price matrix and standard HomePaw templates |

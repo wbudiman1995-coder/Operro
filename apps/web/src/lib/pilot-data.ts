@@ -481,6 +481,38 @@ export async function loadLeaderboardWorkspace(supabase: SupabaseClient, organiz
   }).sort((a, b) => b.dogsGroomed - a.dogsGroomed || b.retentionRate - a.retentionRate || a.complaints - b.complaints);
 }
 
+export interface GroomerPerformanceDetail {
+  summary: LeaderboardRow;
+  visits: Array<{ bookingId: string; startsAt: string; customerName: string; petNames: string[]; actualDurationMinutes: number | null; documented: boolean; evidenceCount: number }>;
+}
+
+export async function loadGroomerPerformanceDetail(supabase: SupabaseClient, organizationId: string, resourceId: string, periodStart: string, periodEnd: string): Promise<GroomerPerformanceDetail | null> {
+  const summary = (await loadLeaderboardWorkspace(supabase, organizationId, periodStart, periodEnd)).find((row) => row.resourceId === resourceId);
+  if (!summary) return null;
+  const bookings = await supabase.from("bookings").select("id,customer_id,starts_at").eq("organization_id", organizationId).eq("status", "completed").gte("starts_at", periodStart).lt("starts_at", periodEnd).is("deleted_at", null).order("starts_at", { ascending: false });
+  assertResult("groomer_detail_bookings", bookings.error); const bookingIds = (bookings.data ?? []).map((row) => row.id); if (!bookingIds.length) return { summary, visits: [] };
+  const petJobs = await supabase.from("grooming_job_pets").select("grooming_job_id,pet_id").eq("organization_id", organizationId).eq("assigned_resource_id", resourceId).eq("status", "complete").in("grooming_job_id", bookingIds).is("deleted_at", null);
+  assertResult("groomer_detail_pet_jobs", petJobs.error); const ownBookingIds = [...new Set((petJobs.data ?? []).map((row) => row.grooming_job_id))]; if (!ownBookingIds.length) return { summary, visits: [] };
+  const ownBookings = (bookings.data ?? []).filter((row) => ownBookingIds.includes(row.id)); const petIds = [...new Set((petJobs.data ?? []).map((row) => row.pet_id))]; const customerIds = [...new Set(ownBookings.map((row) => row.customer_id))];
+  const [pets, customers, events, links] = await Promise.all([
+    supabase.from("pets").select("id,name").eq("organization_id", organizationId).in("id", petIds),
+    supabase.from("customers").select("id,display_name").eq("organization_id", organizationId).in("id", customerIds),
+    supabase.from("timeline_events").select("subject_id,event_type,data,occurred_at").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", ownBookingIds).in("event_type", ["booking.status_changed", "booking.completed"]).order("occurred_at"),
+    supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", ownBookingIds),
+  ]);
+  assertResult("groomer_detail_pets", pets.error); assertResult("groomer_detail_customers", customers.error); assertResult("groomer_detail_events", events.error); assertResult("groomer_detail_links", links.error);
+  const attachmentIds = (links.data ?? []).map((link) => link.attachment_id); const attachments = attachmentIds.length ? await supabase.from("attachments").select("id,metadata").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null) : { data: [], error: null };
+  assertResult("groomer_detail_attachments", attachments.error); const categories = new Map((attachments.data ?? []).map((row) => [row.id, row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) && typeof row.metadata.category === "string" ? row.metadata.category : "other"]));
+  const petNames = new Map((pets.data ?? []).map((pet) => [pet.id, pet.name])); const customerNames = new Map((customers.data ?? []).map((customer) => [customer.id, customer.display_name]));
+  const visits = ownBookings.map((booking) => {
+    const ownEvents = (events.data ?? []).filter((event) => event.subject_id === booking.id); const started = ownEvents.find((event) => event.event_type === "booking.status_changed" && event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).to === "in_progress"); const completed = ownEvents.find((event) => event.event_type === "booking.completed");
+    const rawMinutes = started && completed ? Math.round((new Date(completed.occurred_at).getTime() - new Date(started.occurred_at).getTime()) / 60000) : null; const actualDurationMinutes = rawMinutes !== null && rawMinutes >= 0 && rawMinutes <= 1440 ? rawMinutes : null;
+    const ownLinks = (links.data ?? []).filter((link) => link.subject_id === booking.id); const ownCategories = new Set(ownLinks.map((link) => categories.get(link.attachment_id)));
+    return { bookingId: booking.id, startsAt: booking.starts_at, customerName: customerNames.get(booking.customer_id) ?? "Pelanggan", petNames: (petJobs.data ?? []).filter((petJob) => petJob.grooming_job_id === booking.id).map((petJob) => petNames.get(petJob.pet_id) ?? "Hewan"), actualDurationMinutes, documented: ownCategories.has("before") && ownCategories.has("after"), evidenceCount: ownLinks.length };
+  });
+  return { summary, visits };
+}
+
 // "Last groomed" comes from completed grooming_job_pets (pet-level), not bookings.pet_id —
 // this vertical treats bookings.pet_id as non-authoritative (see packages/sdk's grooming
 // domain model). A pet with no completed grooming at all is new, not overdue.

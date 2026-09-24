@@ -38,7 +38,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
           <tbody className="divide-y divide-slate-100">{rows.map((row, index) => (
             <tr key={row.resourceId}>
               <td className="whitespace-nowrap px-5 py-4 text-lg">{index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : index + 1}</td>
-              <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-900">{row.name}</td>
+              <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-900"><Link href={`/leaderboard/${row.resourceId}?month=${period.start.slice(0, 7)}`} className="text-sky-800 hover:underline">{row.name}</Link></td>
               <td className="whitespace-nowrap px-5 py-4 text-slate-600">{row.dogsGroomed}</td>
               <td className="whitespace-nowrap px-5 py-4 text-slate-600">{row.retentionRate}% <span className="text-xs text-slate-400">({row.retainedCustomers}/{row.customerCount})</span></td>
               <td className="whitespace-nowrap px-5 py-4 text-slate-600">{row.averageDurationMinutes === null ? "Belum ada data" : `${row.averageDurationMinutes} menit`}</td>
