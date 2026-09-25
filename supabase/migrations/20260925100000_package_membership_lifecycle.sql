@@ -56,6 +56,12 @@ alter table public.customer_package_ledger
 
 create unique index uq_cpl_request_key on public.customer_package_ledger (organization_id, request_key) where request_key is not null;
 
+-- Repair requests are audited in timeline_events rather than the financial
+-- ledger. A unique key also makes retries safe under concurrent requests.
+create unique index uq_package_balance_repair_request on public.timeline_events
+  (organization_id, (data->>'request_key'))
+  where subject_type = 'package' and event_type = 'membership.balance_repaired';
+
 -- ---------------------------------------------------------------------
 -- SECTION 2 — packages (catalog): truthful recurrence + per-pet flag.
 -- ---------------------------------------------------------------------
@@ -97,10 +103,13 @@ create index idx_customer_packages_pet on public.customer_packages (organization
 -- Backfill from the pre-existing metadata convention so historical rows are
 -- queryable/indexable the same way new ones will be, without changing what
 -- they mean.
-update public.customer_packages
-   set source_invoice_id = (metadata->>'source_invoice_id')::uuid,
-       activated_at = coalesce(activated_at, purchased_at)
- where metadata ? 'source_invoice_id' and source_invoice_id is null;
+update public.customer_packages cp
+   set source_invoice_id = i.id,
+       activated_at = coalesce(cp.activated_at, cp.purchased_at)
+  from public.invoices i
+ where i.organization_id = cp.organization_id
+   and i.id::text = cp.metadata->>'source_invoice_id'
+   and cp.source_invoice_id is null;
 update public.customer_packages
    set activated_at = purchased_at
  where activated_at is null;
@@ -240,7 +249,16 @@ begin
      or not app.has_permission('invoice.issue') or not app.has_permission('membership.manage') or not app.has_branch(p_branch) then raise exception 'not_authorized' using errcode='42501'; end if;
   if p_request_key is null or p_issued_at is null or (p_due_at is not null and p_due_at<p_issued_at) then raise exception 'invalid_invoice_details' using errcode='22023'; end if;
   select * into v_invoice from public.invoices where organization_id=v_org and request_key=p_request_key;
-  if found then return v_invoice; end if;
+  if found then
+    if v_invoice.branch_id <> p_branch or v_invoice.customer_id <> p_customer
+       or v_invoice.metadata->>'package_id' is distinct from p_package::text
+       or not exists (select 1 from public.customer_packages existing_package
+           where existing_package.organization_id=v_org and existing_package.source_invoice_id=v_invoice.id
+             and existing_package.pet_id is not distinct from p_pet) then
+      raise exception 'request_key_reused_for_different_invoice' using errcode='22023';
+    end if;
+    return v_invoice;
+  end if;
   if not exists(select 1 from public.customers where organization_id=v_org and id=p_customer and deleted_at is null) then raise exception 'customer_not_found' using errcode='P0002'; end if;
   select * into v_pkg from public.packages where organization_id=v_org and id=p_package and is_active and deleted_at is null;
   if not found then raise exception 'package_not_found' using errcode='P0002'; end if;
@@ -315,13 +333,15 @@ declare v_org uuid; cp public.customer_packages; pkg public.packages; v_new_expi
 begin
   v_org := app.fn_active_organization();
   if p_request_key is null then raise exception 'request_key_required' using errcode = 'check_violation'; end if;
-  if exists (select 1 from public.customer_package_ledger where organization_id = v_org and request_key = p_request_key) then
-    select * into cp from public.customer_packages where organization_id = v_org and id = p_customer_package;
-    if found then return cp; end if;
-  end if;
   select * into cp from public.customer_packages where organization_id = v_org and id = p_customer_package for update;
   if not found then raise exception 'package_not_found' using errcode = 'no_data_found'; end if;
   perform app.assert_tenant_authorized(v_org, 'membership', 'membership.manage');
+  if exists (select 1 from public.customer_package_ledger where organization_id = v_org and request_key = p_request_key and customer_package_id = cp.id and reason = 'renewal') then
+    return cp;
+  end if;
+  if exists (select 1 from public.customer_package_ledger where organization_id = v_org and request_key = p_request_key) then
+    raise exception 'request_key_reused_for_different_package' using errcode = '22023';
+  end if;
   if cp.status = 'canceled' then raise exception 'package_canceled_cannot_renew' using errcode = 'check_violation'; end if;
   select * into pkg from public.packages where organization_id = v_org and id = cp.package_id;
   if not found or not pkg.is_active then raise exception 'package_catalog_inactive' using errcode = 'check_violation'; end if;
@@ -448,16 +468,19 @@ declare v_org uuid; cp public.customer_packages; v_ledger_balance numeric;
 begin
   v_org := app.fn_active_organization();
   if p_request_key is null then raise exception 'request_key_required' using errcode = 'check_violation'; end if;
-  if exists (select 1 from public.timeline_events where organization_id = v_org and subject_type = 'package'
-             and subject_id = p_customer_package and event_type = 'membership.balance_repaired' and data->>'request_key' = p_request_key::text) then
-    select * into cp from public.customer_packages where organization_id = v_org and id = p_customer_package;
-    if found then return cp; end if;
-  end if;
   select * into cp from public.customer_packages where organization_id = v_org and id = p_customer_package for update;
   if not found then raise exception 'package_not_found' using errcode = 'no_data_found'; end if;
   -- Distinct, explicit authorization for the WRITE path (reconcile_customer_package
   -- only requires membership.read; repairing requires membership.manage).
   perform app.assert_tenant_authorized(v_org, 'membership', 'membership.manage');
+  if exists (select 1 from public.timeline_events where organization_id = v_org and subject_type = 'package'
+             and subject_id = p_customer_package and event_type = 'membership.balance_repaired' and data->>'request_key' = p_request_key::text) then
+    return cp;
+  end if;
+  if exists (select 1 from public.timeline_events where organization_id = v_org and subject_type = 'package'
+             and event_type = 'membership.balance_repaired' and data->>'request_key' = p_request_key::text) then
+    raise exception 'request_key_reused_for_different_package' using errcode = '22023';
+  end if;
   if cp.revision <> p_revision then
     raise exception 'stale_repair_request' using errcode = '40001';
   end if;

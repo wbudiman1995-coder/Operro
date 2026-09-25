@@ -1,5 +1,15 @@
 # Handoff: HomePaw parity sections 23-26 (package/membership lifecycle)
 
+## Codex review addendum (2026-09-26)
+
+This addendum supersedes the original session-status claims below. Claude later pushed `claude/sections-23-26-memberships` at `9279f56`; it is still isolated from `local/design-adoption`, with no PR, production deployment, or shared Supabase migration. The combined branch contains **42** migration files, not 41 (the base already had 41).
+
+Independent review found and fixed: renewal/repair idempotency checks occurring before authorization and row locking; reused package-sale keys returning an invoice for different inputs; expired/canceled credits displayed as available in Customer 360; missing per-pet selection in the package invoice studio; and submit-time request-key rotation that weakened retry idempotency. The booking wizard does **not** call the new coverage RPC: it computes coverage from two tenant-scoped bulk queries. `/programs/memberships` displays a cached balance and reservation count; its normal list is not a full ledger-derived history. See the follow-up commit on this branch for the exact diff.
+
+Review validation: typecheck exit 0; lint exit 0; batch1b 257/257; production Next build exit 0 with 31 routes; all 42 migrations applied on a disposable PostgreSQL 17 database; `integration/package_lifecycle_smoke.sql` passed all 22 assertions after the fixes. Claude's PostgreSQL 16 raw logs remain below as evidence of the original branch, not of this follow-up SQL diff. Full GATE 7/8 replay and PostgreSQL 16 replay of the follow-up diff remain outstanding.
+
+**Do not mark sections 24–26 complete or deploy this branch yet.** Paid package renewal currently grants new sessions without a renewal invoice or payment flow. The package catalog has no UI to configure recurrence/per-pet terms. Administration has no purchased-term editor or full ledger history; reconciliation does not compare source/renewal invoices and all ledger lifecycle invariants. `docs/HOMEPAW_PARITY_PLAN.md` now states these limits explicitly.
+
 ## Branch / commits
 
 - Base branch: `local/design-adoption`

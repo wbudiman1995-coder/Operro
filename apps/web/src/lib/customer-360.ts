@@ -573,7 +573,7 @@ export async function loadCustomerPackages(
       .limit(CUSTOMER_INVOICE_LIMIT),
     // Reserved-vs-available balance (section 23): app.list_customer_package_coverage only
     // covers active, unexpired packages, so a missing row here just means "not currently
-    // reservable" -- reservedSessions/availableSessions fall back to the raw cache below.
+    // reservable" -- a missing row must not be displayed as available credit.
     supabase.schema("app").rpc("list_customer_package_coverage", { p_customer: customerId }),
   ]);
   assertResult("customer_packages", packagesResult.error);
@@ -591,7 +591,7 @@ export async function loadCustomerPackages(
       })(),
       sessionsRemaining: remaining,
       reservedSessions: coverage ? Number(coverage.reserved_sessions) : 0,
-      availableSessions: coverage ? Number(coverage.available_sessions) : remaining,
+      availableSessions: coverage ? Number(coverage.available_sessions) : 0,
       status: row.status,
       purchasedAt: row.purchased_at,
       expiresAt: row.expires_at,

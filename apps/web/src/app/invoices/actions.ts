@@ -43,6 +43,7 @@ export async function createPackageInvoiceAction(_previous: PilotActionState, fo
   if (!context) return failure("Sesi atau organisasi aktif tidak tersedia.");
   if (!context.capabilities["invoice.issue"] || !context.capabilities["membership.manage"]) return failure("Peran Anda tidak memiliki izin invoice dan paket.");
   const branchId = id(formData, "branchId"); const customerId = id(formData, "customerId"); const packageId = id(formData, "packageId");
+  const petId = id(formData, "petId");
   const requestKey = id(formData, "requestKey");
   const issuedDate = value(formData, "invoiceDate", 10); const dueDate = value(formData, "dueDate", 10);
   if (!branchId || !customerId || !packageId || !requestKey || !issuedDate) return failure("Cabang, pelanggan, paket, dan tanggal invoice wajib diisi.");
@@ -51,7 +52,7 @@ export async function createPackageInvoiceAction(_previous: PilotActionState, fo
   if (dueAt && new Date(dueAt) < new Date(issuedAt)) return failure("Tanggal jatuh tempo tidak boleh sebelum tanggal invoice.");
   const result = await context.supabase.schema("app").rpc("create_package_invoice", {
     p_branch: branchId, p_customer: customerId, p_package: packageId, p_issued_at: issuedAt, p_due_at: dueAt,
-    p_admin_notes: value(formData, "adminNotes", 2000) || null, p_request_key: requestKey,
+    p_admin_notes: value(formData, "adminNotes", 2000) || null, p_request_key: requestKey, p_pet: petId,
   });
   if (result.error) { console.error("create_package_invoice_failed", result.error); return failure("Invoice paket gagal dibuat. Periksa data dan coba lagi."); }
   const row = result.data as { invoice_number?: string } | null;

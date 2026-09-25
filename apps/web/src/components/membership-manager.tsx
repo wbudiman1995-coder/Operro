@@ -23,14 +23,22 @@ function Message({ state }: { state: PilotActionState }) {
 /** Section 25 (membership administration) + section 26 (reconciliation) for one customer_packages row. */
 export function MembershipManager({ row, canManage }: { row: MembershipPackageRow; canManage: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const [renewState, renewAction, renewPending] = useActionState(renewCustomerPackageAction, initialState);
-  const [statusState, statusAction, statusPending] = useActionState(setCustomerPackageStatusAction, initialState);
-  const [repairState, repairAction, repairPending] = useActionState(repairCustomerPackageBalanceAction, initialState);
   const [report, setReport] = useState<PackageReconciliationReport | null>(null);
-  const [reconcileError, setReconcileError] = useState<string | null>(null);
-  const [reconciling, startReconcile] = useTransition();
   const [renewKey, setRenewKey] = useState(() => crypto.randomUUID());
   const [repairKey, setRepairKey] = useState(() => crypto.randomUUID());
+  const [renewState, renewAction, renewPending] = useActionState(async (previous: PilotActionState, formData: FormData) => {
+    const result = await renewCustomerPackageAction(previous, formData);
+    if (result.success) setRenewKey(crypto.randomUUID());
+    return result;
+  }, initialState);
+  const [statusState, statusAction, statusPending] = useActionState(setCustomerPackageStatusAction, initialState);
+  const [repairState, repairAction, repairPending] = useActionState(async (previous: PilotActionState, formData: FormData) => {
+    const result = await repairCustomerPackageBalanceAction(previous, formData);
+    if (result.success) { setRepairKey(crypto.randomUUID()); setReport(null); }
+    return result;
+  }, initialState);
+  const [reconcileError, setReconcileError] = useState<string | null>(null);
+  const [reconciling, startReconcile] = useTransition();
 
   function runReconcile() {
     setReconcileError(null);
@@ -60,7 +68,7 @@ export function MembershipManager({ row, canManage }: { row: MembershipPackageRo
 
     {expanded ? <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4 text-xs">
       {canManage ? <div className="flex flex-wrap gap-2">
-        <form action={renewAction} onSubmit={() => setRenewKey(crypto.randomUUID())}>
+        <form action={renewAction}>
           <input type="hidden" name="customerPackageId" value={row.id} />
           <input type="hidden" name="requestKey" value={renewKey} />
           <button disabled={renewPending} className="rounded-lg bg-emerald-700 px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50">{renewPending ? "Memproses…" : "Perpanjang"}</button>
@@ -81,7 +89,7 @@ export function MembershipManager({ row, canManage }: { row: MembershipPackageRo
         <p className="font-bold text-slate-700">Hasil rekonsiliasi (revisi {report.revision})</p>
         <p className="mt-1">Saldo cache: <strong>{report.cachedBalance}</strong> · Saldo ledger: <strong>{report.ledgerBalance}</strong> · {report.balanceMatches ? <span className="text-emerald-700">Cocok</span> : <span className="text-rose-700">Tidak cocok</span>}</p>
         <p className="mt-1 text-slate-500">Reservasi aktif: {report.reservedCount} · Konsumsi (reservasi/ledger): {report.consumedReservations}/{report.consumptionLedgerEntries} {report.reservationConsumptionMatches ? "(cocok)" : "(tidak cocok)"}</p>
-        {!report.balanceMatches && canManage ? <form action={repairAction} onSubmit={() => setRepairKey(crypto.randomUUID())} className="mt-3 flex items-center gap-2">
+        {!report.balanceMatches && canManage ? <form action={repairAction} className="mt-3 flex items-center gap-2">
           <input type="hidden" name="customerPackageId" value={row.id} />
           <input type="hidden" name="revision" value={report.revision} />
           <input type="hidden" name="requestKey" value={repairKey} />

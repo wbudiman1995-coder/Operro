@@ -23,6 +23,8 @@ export function InvoiceStudio({ data, requestKey, defaultBookingId }: { data: In
   const [search, setSearch] = useState("");
   const [bookingId, setBookingId] = useState(data.recentBookings.some((item) => item.id === defaultBookingId) ? defaultBookingId! : data.recentBookings[0]?.id ?? "");
   const [customerId, setCustomerId] = useState(data.customers[0]?.id ?? "");
+  const [packageId, setPackageId] = useState(data.packages[0]?.id ?? "");
+  const [packagePetId, setPackagePetId] = useState("");
   const [packageKey, setPackageKey] = useState(requestKey);
   const [invoiceDate, setInvoiceDate] = useState(today);
   const [dueDate, setDueDate] = useState(nextDate(today));
@@ -33,6 +35,7 @@ export function InvoiceStudio({ data, requestKey, defaultBookingId }: { data: In
   const customers = useMemo(() => data.customers.filter((item) => !query || item.searchText.includes(query)), [data.customers, query]);
   const selectedBooking = data.recentBookings.find((item) => item.id === bookingId);
   const selectedCustomer = data.customers.find((item) => item.id === customerId);
+  const selectedPackage = data.packages.find((item) => item.id === packageId);
   const availableGroomers = data.groomers.filter((item) => !selectedBooking || item.branchId === selectedBooking.branchId);
   const changeInvoiceDate = (value: string) => { setInvoiceDate(value); setDueDate(nextDate(value)); };
 
@@ -55,12 +58,13 @@ export function InvoiceStudio({ data, requestKey, defaultBookingId }: { data: In
     </form> : <form action={packageAction} onChange={() => setPackageKey(crypto.randomUUID())} className="space-y-5 rounded-3xl border border-amber-200 bg-amber-50/40 p-5 shadow-sm sm:p-7">
       <input type="hidden" name="requestKey" value={packageKey} />
       <div><h2 className="text-lg font-bold">Invoice paket / prepaid</h2><p className="mt-1 text-sm text-slate-500">Nomor PKG terpisah, baris invoice khusus, dan saldo sesi dibuat dalam satu transaksi.</p></div>
-      <div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-semibold">Pelanggan<select className={`${field} mt-1`} name="customerId" value={customerId} onChange={(event) => setCustomerId(event.target.value)} required>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name} · {customer.code}</option>)}</select></label><label className="text-sm font-semibold">Cabang<select className={`${field} mt-1`} name="branchId" required>{data.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label></div>
+      <div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-semibold">Pelanggan<select className={`${field} mt-1`} name="customerId" value={customerId} onChange={(event) => { setCustomerId(event.target.value); setPackagePetId(""); }} required>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name} · {customer.code}</option>)}</select></label><label className="text-sm font-semibold">Cabang<select className={`${field} mt-1`} name="branchId" required>{data.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label></div>
       {selectedCustomer ? <p className="rounded-xl bg-white p-3 text-xs text-slate-600"><strong>{selectedCustomer.petNames.join(", ") || "Belum ada hewan"}</strong>{selectedCustomer.address ? ` · ${selectedCustomer.address}` : " · alamat belum lengkap"}</p> : null}
-      <label className="block text-sm font-semibold">Paket<select className={`${field} mt-1`} name="packageId" required>{data.packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name} · {pkg.sessions} sesi · Rp{pkg.price.toLocaleString("id-ID")}</option>)}</select></label>
+      <label className="block text-sm font-semibold">Paket<select className={`${field} mt-1`} name="packageId" value={packageId} onChange={(event) => { setPackageId(event.target.value); setPackagePetId(""); }} required>{data.packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name} · {pkg.sessions} sesi · Rp{pkg.price.toLocaleString("id-ID")}{pkg.perPet ? " · per hewan" : ""}{pkg.recurrenceInterval !== "none" ? ` · ${pkg.recurrenceInterval}` : ""}</option>)}</select></label>
+      {selectedPackage?.perPet ? <label className="block text-sm font-semibold">Hewan untuk paket ini<select className={`${field} mt-1`} name="petId" value={packagePetId} onChange={(event) => setPackagePetId(event.target.value)} required><option value="">Pilih hewan</option>{selectedCustomer?.pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}</select></label> : null}
       <div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-semibold">Tanggal invoice<input className={`${field} mt-1`} type="date" name="invoiceDate" value={invoiceDate} onChange={(event) => changeInvoiceDate(event.target.value)} required /></label><label className="text-sm font-semibold">Jatuh tempo<input className={`${field} mt-1`} type="date" name="dueDate" value={dueDate} min={invoiceDate} onChange={(event) => setDueDate(event.target.value)} /></label></div>
       <label className="block text-sm font-semibold">Catatan internal<textarea className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm" name="adminNotes" /></label>
-      <Result state={packageState} /><button disabled={packagePending || !customerId || data.packages.length === 0 || data.branches.length === 0} className="h-11 rounded-xl bg-amber-800 px-5 text-sm font-bold text-white disabled:opacity-50">{packagePending ? "Menerbitkan…" : "Terbitkan invoice paket"}</button>
+      <Result state={packageState} /><button disabled={packagePending || !customerId || data.packages.length === 0 || data.branches.length === 0 || (selectedPackage?.perPet && !packagePetId)} className="h-11 rounded-xl bg-amber-800 px-5 text-sm font-bold text-white disabled:opacity-50">{packagePending ? "Menerbitkan…" : "Terbitkan invoice paket"}</button>
     </form>}
   </div>;
 }

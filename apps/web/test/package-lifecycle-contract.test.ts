@@ -42,19 +42,21 @@ test("section 24: packages gain a truthful recurrence interval and a per-pet fla
 test("section 24: customer_packages gets a real source_invoice_id FK (superseding the metadata convention) and per-pet scope, backfilled from existing rows", () => {
   assert.match(migration, /add column source_invoice_id uuid/);
   assert.match(migration, /fk_customer_packages_source_invoice foreign key \(organization_id, source_invoice_id\)/);
-  assert.match(migration, /update public\.customer_packages\s*\n\s*set source_invoice_id = \(metadata->>'source_invoice_id'\)::uuid/);
+  assert.match(migration, /update public\.customer_packages cp\s*\n\s*set source_invoice_id = i\.id/);
+  assert.match(migration, /i\.id::text = cp\.metadata->>'source_invoice_id'/);
   assert.match(migration, /add column pet_id uuid/);
 });
 
-test("section 24: create_package_invoice keeps its exact idempotency guard (request_key lookup before any insert) and gains an optional, backward-compatible p_pet", () => {
+test("section 24: create_package_invoice guards idempotency keys against different sale inputs and accepts a pet", () => {
   const invoiceFn = migration.slice(migration.indexOf("create function app.create_package_invoice"));
-  assert.match(invoiceFn, /select \* into v_invoice from public\.invoices where organization_id=v_org and request_key=p_request_key;\s*\n\s*if found then return v_invoice; end if;/);
+  assert.match(invoiceFn, /select \* into v_invoice from public\.invoices where organization_id=v_org and request_key=p_request_key;/);
+  assert.match(invoiceFn, /request_key_reused_for_different_invoice/);
   assert.match(migration, /create function app\.create_package_invoice\(\s*\n\s*p_branch uuid, p_customer uuid, p_package uuid, p_issued_at timestamptz, p_due_at timestamptz,\s*\n\s*p_admin_notes text, p_request_key uuid, p_pet uuid default null\)/);
 });
 
 test("section 24: renewal is manual and ledger-backed (a real customer_package_ledger 'renewal' row), reactivates an exhausted/expired package, and is idempotent via request_key", () => {
   assert.match(migration, /add constraint chk_cpl_reason check \(reason in \('purchase','consumption','adjustment','expiry','refund','renewal'\)\)/);
-  assert.match(renewFn, /if exists \(select 1 from public\.customer_package_ledger where organization_id = v_org and request_key = p_request_key\) then/);
+  assert.match(renewFn, /if exists \(select 1 from public\.customer_package_ledger where organization_id = v_org and request_key = p_request_key and customer_package_id = cp\.id and reason = 'renewal'\) then/);
   assert.match(renewFn, /set status = 'active', expires_at = v_new_expiry, renewed_at = now\(\), renewal_count = renewal_count \+ 1/);
   assert.match(renewFn, /reason, notes, request_key\)\s*\n\s*values \(v_org, cp\.id, pkg\.total_sessions, 'renewal'/);
 });
