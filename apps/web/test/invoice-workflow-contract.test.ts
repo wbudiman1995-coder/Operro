@@ -46,6 +46,6 @@ test("unpaid detail edits are optimistic and paid invoices are locked", () => {
   assert.match(migration, /exists\(select 1 from public\.payments/);
   assert.match(migration, /invoice_locked/);
   assert.match(actions, /update_unpaid_invoice_details/);
-  assert.match(pilotActions, /billing_mode: "after_visit"/);
-  assert.match(pilotActions, /groomer_name_snapshot/);
+  assert.match(migration, /'after_visit'/);
+  assert.match(migration, /groomer_name_snapshot/);
 });

@@ -514,11 +514,24 @@ function invoiceDiscountInputs(formData: FormData) {
  */
 export async function issueInvoiceForBookingAction(formData: FormData) {
   const context = await workspace(); if (!context) return;
+  if (!(await loadCapabilities(context.supabase))["invoice.issue"]) return;
   const bookingId = idValue(formData, "bookingId"); if (!bookingId) return;
+  const invoiceDate = textValue(formData, "invoiceDate", 10);
+  const dueDate = textValue(formData, "dueDate", 10);
+  if ((invoiceDate && !/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) || (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate))) return;
+  const issuedAt = invoiceDate ? new Date(`${invoiceDate}T09:00:00+07:00`) : null;
+  const dueAt = dueDate ? new Date(`${dueDate}T23:59:59+07:00`) : null;
+  if ((issuedAt && Number.isNaN(issuedAt.getTime())) || (dueAt && Number.isNaN(dueAt.getTime()))) return;
+  const documentType = textValue(formData, "documentType", 30);
+  if (documentType && !["auto", "invoice", "service_report"].includes(documentType)) return;
   const discounts = invoiceDiscountInputs(formData);
   const result = await context.supabase.schema("app").rpc("issue_invoice_for_booking", {
     p_booking: bookingId, p_invoice_discount: discounts.invoice, p_pet_discounts: discounts.pets,
     p_service_discounts: discounts.services, p_category_discounts: discounts.categories,
+    p_issued_at: issuedAt?.toISOString() ?? null, p_due_at: dueAt?.toISOString() ?? null,
+    p_document_type: documentType === "auto" ? null : documentType || null,
+    p_groomer: idValue(formData, "groomerId"), p_manual_groomer: textValue(formData, "manualGroomer", 160) || null,
+    p_admin_notes: textValue(formData, "adminNotes", 2000) || null,
   });
   if (result.error) { console.error("issue_invoice_failed", result.error); return; }
   revalidatePath("/operations"); revalidatePath("/finance"); revalidatePath("/reports");

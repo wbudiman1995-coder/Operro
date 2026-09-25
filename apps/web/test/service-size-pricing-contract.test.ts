@@ -85,7 +85,7 @@ test("financial_sales invoice/invoice_lines immutability triggers are untouched 
 
 test("run_all_gates.sh records this migration's lineage", () => {
   assert.match(gates, /supabase\/migrations\/20260924130000_service_size_pricing\.sql/);
-  assert.match(gates, /supabase\/migrations\/20260924110000_complaint_rpc_only_writes\.sql\s*\n\s*supabase\/migrations\/20260924130000_service_size_pricing\.sql/);
+  assert.match(gates, /supabase\/migrations\/20260924110000_complaint_rpc_only_writes\.sql\s*\n\s*supabase\/migrations\/20260924120000_invoice_workflow\.sql\s*\n\s*supabase\/migrations\/20260924130000_service_size_pricing\.sql/);
 });
 
 test("client server actions gate service-catalog writes and the price override behind service.manage, never trusting a client-supplied booking price", () => {

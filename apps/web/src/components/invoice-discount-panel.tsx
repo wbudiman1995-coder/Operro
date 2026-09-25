@@ -16,7 +16,7 @@ interface Pet { id: string; name: string }
 interface ServiceLine { id: string; serviceId: string; name: string }
 
 /** Section 22: lets staff configure invoice/pet/service/category discounts, preview the result, then issue. */
-export function InvoiceDiscountPanel({ bookingId, pets, serviceLines }: { bookingId: string; pets: Pet[]; serviceLines: ServiceLine[] }) {
+export function InvoiceDiscountPanel({ bookingId, pets, serviceLines, inInvoiceForm = false }: { bookingId: string; pets: Pet[]; serviceLines: ServiceLine[]; inInvoiceForm?: boolean }) {
   const [open, setOpen] = useState(false);
   const [invoiceRule, setInvoiceRule] = useState<Rule>(EMPTY_RULE);
   const [invoiceBasicOnly, setInvoiceBasicOnly] = useState(false);
@@ -60,7 +60,7 @@ export function InvoiceDiscountPanel({ bookingId, pets, serviceLines }: { bookin
     });
   }
 
-  if (!open) return <button type="button" onClick={() => setOpen(true)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">Diskon &amp; biaya</button>;
+  if (!open) return <>{inInvoiceForm ? [...buildFormData().entries()].filter(([name]) => name !== "bookingId").map(([name, value], index) => <input key={`${name}-${index}`} type="hidden" name={name} value={String(value)} />) : null}<button type="button" onClick={() => setOpen(true)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">Diskon &amp; biaya</button></>;
 
   return <div className="mt-3 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs">
     <div className="flex items-center justify-between"><p className="font-bold uppercase tracking-wide text-slate-500">Diskon invoice</p><button type="button" onClick={() => setOpen(false)} className="text-slate-500">Tutup</button></div>
@@ -109,10 +109,10 @@ export function InvoiceDiscountPanel({ bookingId, pets, serviceLines }: { bookin
 
     <div className="flex flex-wrap gap-2">
       <button type="button" onClick={runPreview} disabled={pending} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">{pending ? "Menghitung…" : "Pratinjau"}</button>
-      <form action={issueInvoiceForBookingAction}>
+      {inInvoiceForm ? [...buildFormData().entries()].filter(([name]) => name !== "bookingId").map(([name, value], index) => <input key={`${name}-${index}`} type="hidden" name={name} value={String(value)} />) : <form action={issueInvoiceForBookingAction}>
         {[...buildFormData().entries()].map(([name, value], index) => <input key={`${name}-${index}`} type="hidden" name={name} value={String(value)} />)}
         <button className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white">Buat invoice</button>
-      </form>
+      </form>}
     </div>
 
     {error ? <p className="font-semibold text-rose-700">{error}</p> : null}

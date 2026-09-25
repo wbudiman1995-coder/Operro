@@ -29,10 +29,10 @@ alter table public.order_items add constraint chk_order_items_type check(item_ty
 alter table public.invoice_lines add constraint chk_invoice_lines_type check(item_type in ('service','product','package'));
 alter table public.order_items add constraint chk_order_items_source check(
   (item_type='package' and package_id is not null and service_id is null and product_id is null)
-  or (item_type<>'package' and package_id is null)
+  or (item_type in ('service','product','fee') and package_id is null)
 );
 alter table public.invoice_lines add constraint chk_invoice_lines_source check(
-  (item_type='package' and package_id is not null) or (item_type in ('service','product') and package_id is null)
+  (item_type='package' and package_id is not null) or (item_type in ('service','product','fee') and package_id is null)
 );
 
 create or replace function public.tg_invoices_freeze()

@@ -87,7 +87,7 @@ test("organization isolation: both RPCs re-derive the booking's own organization
 });
 
 test("unauthorized callers cannot preview or issue: no direct grant to anon, and revoke precedes the authenticated grant", () => {
-  for (const fn of ["app._compute_invoice_pricing(uuid, jsonb, jsonb, jsonb, jsonb)", "app.preview_invoice_pricing(uuid, jsonb, jsonb, jsonb, jsonb)", "app.issue_invoice_for_booking(uuid, jsonb, jsonb, jsonb, jsonb)"]) {
+  for (const fn of ["app._compute_invoice_pricing(uuid, jsonb, jsonb, jsonb, jsonb)", "app.preview_invoice_pricing(uuid, jsonb, jsonb, jsonb, jsonb)", "app.issue_invoice_for_booking(uuid, jsonb, jsonb, jsonb, jsonb, timestamptz, timestamptz, text, uuid, text, text)"]) {
     assert.match(migration, new RegExp(`revoke all on function ${fn.replace(/[.()]/g, "\\$&")} from public, authenticated;`));
   }
   assert.doesNotMatch(migration, /grant execute on function app\._compute_invoice_pricing/);
@@ -111,9 +111,9 @@ test("issued and paid invoices stay immutable: this migration does not touch the
   assert.doesNotMatch(migration, /drop trigger|alter table public\.invoices\b/);
 });
 
-test("widening order_items/invoice_lines to a 'fee' item type only adds a value, it does not touch invoices/invoice_lines columns or the immutability triggers", () => {
-  assert.match(migration, /alter table public\.order_items add constraint chk_order_items_type check \(item_type in \('service','product','fee'\)\);/);
-  assert.match(migration, /alter table public\.invoice_lines add constraint chk_invoice_lines_type check \(item_type in \('service','product','fee'\)\);/);
+test("widening order_items/invoice_lines to fee preserves the package invoice type", () => {
+  assert.match(migration, /alter table public\.order_items add constraint chk_order_items_type check \(item_type in \('service','product','package','fee'\)\);/);
+  assert.match(migration, /alter table public\.invoice_lines add constraint chk_invoice_lines_type check \(item_type in \('service','product','package','fee'\)\);/);
 });
 
 test("client server actions only ever pass discount RULES to the RPC, and the client-side discount panel never submits a computed total", () => {

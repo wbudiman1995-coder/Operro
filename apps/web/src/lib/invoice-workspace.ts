@@ -6,6 +6,8 @@ export interface InvoiceStudioData {
   recentBookings: Array<{
     id: string; branchId: string; customerId: string; customerName: string; startsAt: string;
     petNames: string[]; groomerNames: string[]; serviceNames: string[]; estimatedTotal: number; searchText: string;
+    pets: Array<{ id: string; name: string }>;
+    serviceLines: Array<{ id: string; serviceId: string; name: string }>;
   }>;
   customers: Array<{ id: string; name: string; code: string; petNames: string[]; address: string; searchText: string }>;
   branches: Array<{ id: string; name: string }>;
@@ -35,7 +37,7 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
   const orderIds = (orders.data ?? []).map((row) => row.id);
   const jobPetIds = (jobPets.data ?? []).map((row) => row.id);
   const [serviceLines, invoices] = await Promise.all([
-    jobPetIds.length ? supabase.from("grooming_job_pet_services").select("grooming_job_pet_id,service_name_snapshot,quantity,unit_price_snapshot").eq("organization_id", organizationId).in("grooming_job_pet_id", jobPetIds).is("deleted_at", null) : Promise.resolve({ data: [], error: null }),
+    jobPetIds.length ? supabase.from("grooming_job_pet_services").select("id,grooming_job_pet_id,service_id,service_name_snapshot,quantity,unit_price_snapshot").eq("organization_id", organizationId).in("grooming_job_pet_id", jobPetIds).is("deleted_at", null) : Promise.resolve({ data: [], error: null }),
     orderIds.length ? supabase.from("invoices").select("order_id").eq("organization_id", organizationId).in("order_id", orderIds) : Promise.resolve({ data: [], error: null }),
   ]);
   fail("invoice_service_lines", serviceLines.error); fail("invoice_existing", invoices.error);
@@ -60,7 +62,7 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
       const groomerNames = [...new Set(petRows.map((row) => row.assigned_resource_id ? groomerMap.get(row.assigned_resource_id) : null).filter((name): name is string => Boolean(name)))];
       const serviceNames = [...new Set(lines.map((line) => line.service_name_snapshot))];
       const customerName = customerMap.get(booking.customer_id) ?? "Pelanggan";
-      return { id: booking.id, branchId: booking.branch_id, customerId: booking.customer_id, customerName, startsAt: booking.starts_at, petNames, groomerNames, serviceNames, estimatedTotal: lines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unit_price_snapshot), 0), searchText: [customerName, booking.id, ...petNames, ...groomerNames, ...serviceNames].join(" ").toLowerCase() };
+      return { id: booking.id, branchId: booking.branch_id, customerId: booking.customer_id, customerName, startsAt: booking.starts_at, petNames, groomerNames, serviceNames, pets: petRows.map((row) => ({ id: row.id, name: petMap.get(row.pet_id) ?? "Hewan" })), serviceLines: lines.filter((line) => line.service_id).map((line) => ({ id: line.id, serviceId: line.service_id!, name: line.service_name_snapshot })), estimatedTotal: lines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unit_price_snapshot), 0), searchText: [customerName, booking.id, ...petNames, ...groomerNames, ...serviceNames].join(" ").toLowerCase() };
     }),
     customers: customerRows,
     branches: branches.data ?? [], groomers: (groomers.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, name: row.name })),

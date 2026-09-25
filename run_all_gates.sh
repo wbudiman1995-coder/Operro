@@ -116,6 +116,7 @@ run_as_postgres dropdb --if-exists operro_gate
 run_as_postgres createdb operro_gate
 psql_db operro_gate -q -v ON_ERROR_STOP=1 -c \
   "create schema if not exists auth; create table if not exists auth.users(id uuid primary key, email text, raw_user_meta_data jsonb); create schema if not exists storage; create table if not exists storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]); create table if not exists storage.objects(id uuid, bucket_id text, name text); create or replace function storage.foldername(name text) returns text[] language sql immutable as \$\$ select string_to_array(name, '/') \$\$; do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role service_role nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role supabase_auth_admin nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
+psql_db operro_gate -q -v ON_ERROR_STOP=1 -f integration/gate_bootstrap_extensions.sql
 for migration in "${EXPECTED_MIGRATIONS[@]}"; do
   psql_db operro_gate -q -v ON_ERROR_STOP=1 -f "$migration"
 done
@@ -147,6 +148,7 @@ run_as_postgres dropdb --if-exists operro_cc
 run_as_postgres createdb operro_cc
 psql_db operro_cc -q -v ON_ERROR_STOP=1 -c \
   "create schema if not exists auth; create table if not exists auth.users(id uuid primary key, email text, raw_user_meta_data jsonb); create schema if not exists storage; create table if not exists storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]); create table if not exists storage.objects(id uuid, bucket_id text, name text); create or replace function storage.foldername(name text) returns text[] language sql immutable as \$\$ select string_to_array(name, '/') \$\$; do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role service_role nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role supabase_auth_admin nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
+psql_db operro_cc -q -v ON_ERROR_STOP=1 -f integration/gate_bootstrap_extensions.sql
 for migration in "${EXPECTED_MIGRATIONS[@]}"; do
   psql_db operro_cc -q -v ON_ERROR_STOP=1 -f "$migration"
 done
