@@ -460,6 +460,7 @@ export async function updateGroomingChecklistAction(formData: FormData) {
 
 export async function issueInvoiceForBookingAction(formData: FormData) {
   const context = await workspace(); if (!context) return;
+  if (!(await loadCapabilities(context.supabase))["invoice.issue"]) return;
   const bookingId = idValue(formData, "bookingId"); if (!bookingId) return;
   const { data: booking } = await context.supabase.from("bookings").select("id,branch_id,customer_id,status,metadata").eq("organization_id", context.organizationId).eq("id", bookingId).eq("status", "completed").maybeSingle();
   if (!booking) return;
@@ -468,7 +469,7 @@ export async function issueInvoiceForBookingAction(formData: FormData) {
     const { data: existingInvoice } = await context.supabase.from("invoices").select("id").eq("organization_id", context.organizationId).in("order_id", existingOrders!.map((row) => row.id)).limit(1).maybeSingle();
     if (existingInvoice) return;
   }
-  const { data: jobPets } = await context.supabase.from("grooming_job_pets").select("id").eq("organization_id", context.organizationId).eq("grooming_job_id", bookingId).is("deleted_at", null);
+  const { data: jobPets } = await context.supabase.from("grooming_job_pets").select("id,assigned_resource_id").eq("organization_id", context.organizationId).eq("grooming_job_id", bookingId).is("deleted_at", null);
   const jobPetIds = (jobPets ?? []).map((row) => row.id); if (!jobPetIds.length) return;
   const { data: lines } = await context.supabase.from("grooming_job_pet_services").select("id,service_id,service_name_snapshot,quantity,unit_price_snapshot,currency").eq("organization_id", context.organizationId).in("grooming_job_pet_id", jobPetIds).is("deleted_at", null).order("id");
   if (!lines?.length) return;
@@ -504,8 +505,27 @@ export async function issueInvoiceForBookingAction(formData: FormData) {
   if (itemError) { await context.supabase.from("orders").update({ status: "canceled" }).eq("id", order.id); return; }
   const { data: pricedOrder } = await context.supabase.from("orders").select("subtotal,discount_total,tax_total,total,currency").eq("organization_id", context.organizationId).eq("id", order.id).single();
   if (!pricedOrder) return;
-  const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${Date.now().toString().slice(-6)}`;
-  const { data: invoice, error: invoiceError } = await context.supabase.from("invoices").insert({ organization_id: context.organizationId, branch_id: booking.branch_id, customer_id: booking.customer_id, order_id: order.id, invoice_number: invoiceNumber, status: "issued", currency: pricedOrder.currency, subtotal: pricedOrder.subtotal, discount_total: pricedOrder.discount_total, tax_total: pricedOrder.tax_total, total: pricedOrder.total, due_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), metadata: { created_from: "homepaw_pilot", booking_id: booking.id } }).select("id").single();
+  const invoiceDate = textValue(formData, "invoiceDate", 10);
+  const issuedAt = invoiceDate ? new Date(`${invoiceDate}T09:00:00+07:00`) : new Date();
+  if (Number.isNaN(issuedAt.getTime())) return;
+  const dueDate = textValue(formData, "dueDate", 10);
+  const dueAt = dueDate ? new Date(`${dueDate}T23:59:59+07:00`) : new Date(issuedAt.getTime() + 24 * 60 * 60 * 1000);
+  if (Number.isNaN(dueAt.getTime()) || dueAt < issuedAt) return;
+  let groomerId = idValue(formData, "groomerId");
+  let groomerName = textValue(formData, "manualGroomer", 160) || null;
+  if (!groomerId && !groomerName) {
+    const assigned = [...new Set((jobPets ?? []).map((row) => row.assigned_resource_id).filter((item): item is string => typeof item === "string"))];
+    if (assigned.length === 1) groomerId = assigned[0];
+  }
+  if (groomerId) {
+    const groomer = await context.supabase.from("resources").select("name").eq("organization_id", context.organizationId).eq("branch_id", booking.branch_id).eq("id", groomerId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).maybeSingle();
+    if (!groomer.data) return;
+    groomerName = groomer.data.name;
+  }
+  const requestedDocumentType = textValue(formData, "documentType", 30);
+  const documentType = ["invoice", "service_report"].includes(requestedDocumentType) ? requestedDocumentType : Number(pricedOrder.total) === 0 ? "service_report" : "invoice";
+  const invoiceNumber = `INV-${issuedAt.toISOString().slice(0, 10).replaceAll("-", "")}-${Date.now().toString().slice(-6)}`;
+  const { data: invoice, error: invoiceError } = await context.supabase.from("invoices").insert({ organization_id: context.organizationId, branch_id: booking.branch_id, customer_id: booking.customer_id, order_id: order.id, invoice_number: invoiceNumber, status: "issued", currency: pricedOrder.currency, subtotal: pricedOrder.subtotal, discount_total: pricedOrder.discount_total, tax_total: pricedOrder.tax_total, total: pricedOrder.total, issued_at: issuedAt.toISOString(), due_at: dueAt.toISOString(), billing_mode: "after_visit", document_type: documentType, groomer_resource_id: groomerId, groomer_name_snapshot: groomerName, admin_notes: textValue(formData, "adminNotes", 2000) || null, metadata: { created_from: "homepaw_pilot", booking_id: booking.id } }).select("id").single();
   if (invoiceError || !invoice) return;
   await context.supabase.from("invoice_lines").insert(pricedLines.map((line) => ({ organization_id: context.organizationId, invoice_id: invoice.id, item_type: "service", name_snapshot: line.service_name_snapshot, quantity: line.quantity, unit_price: line.unit_price_snapshot, discount_amount: line.discount, line_total: line.gross - line.discount, pricing_breakdown: { source: "grooming_job_line", ...(Number(line.discountDetail.amount) > 0 ? { complimentary_next_discount: line.discountDetail } : {}), ...(line.categoryDiscount > 0 ? { category_discount: { category: line.category, amount: line.categoryDiscount } } : {}), ...(line.packageId ? { package_coverage: { customer_package_id: line.packageId } } : {}) } })));
   revalidatePath("/operations"); revalidatePath("/finance"); revalidatePath("/reports");

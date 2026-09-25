@@ -210,21 +210,22 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
 }
 
 export interface FinanceWorkspace {
-  invoices: Array<{ id: string; number: string; customerName: string; total: number; status: string; issuedAt: string }>;
+  invoices: Array<{ id: string; branchId: string; number: string; customerName: string; total: number; status: string; issuedAt: string; dueAt: string | null; billingMode: string; documentType: string; groomerId: string | null; groomerName: string | null; adminNotes: string | null; revision: number; canEdit: boolean }>;
   payments: Array<{ id: string; method: string; amount: number; status: string; paidAt: string }>;
   expenses: Array<{ id: string; description: string; category: string | null; amount: number; status: string; incurredAt: string }>;
 }
 
 export async function loadFinanceWorkspace(supabase: SupabaseClient, organizationId: string): Promise<FinanceWorkspace> {
   const [invoices, payments, expenses, customers] = await Promise.all([
-    supabase.from("invoices").select("id,invoice_number,customer_id,total,status,issued_at").eq("organization_id", organizationId).order("issued_at", { ascending: false }).limit(50),
-    supabase.from("payments").select("id,method,amount,status,paid_at").eq("organization_id", organizationId).order("paid_at", { ascending: false }).limit(50),
+    supabase.from("invoices").select("id,branch_id,invoice_number,customer_id,total,status,issued_at,due_at,billing_mode,document_type,groomer_resource_id,groomer_name_snapshot,admin_notes,revision").eq("organization_id", organizationId).order("issued_at", { ascending: false }).limit(50),
+    supabase.from("payments").select("id,invoice_id,method,amount,status,paid_at").eq("organization_id", organizationId).order("paid_at", { ascending: false }).limit(50),
     supabase.from("expenses").select("id,description,category,amount,status,incurred_at").eq("organization_id", organizationId).is("deleted_at", null).order("incurred_at", { ascending: false }).limit(50),
     supabase.from("customers").select("id,display_name").eq("organization_id", organizationId).is("deleted_at", null),
   ]);
   for (const [scope, result] of [["finance_invoices", invoices], ["finance_payments", payments], ["finance_expenses", expenses], ["finance_customers", customers]] as const) assertResult(scope, result.error);
   const customerMap = new Map((customers.data ?? []).map((row) => [row.id, row.display_name]));
-  return { invoices: (invoices.data ?? []).map((row) => ({ id: row.id, number: row.invoice_number, customerName: customerMap.get(row.customer_id) ?? "Pelanggan", total: Number(row.total), status: row.status, issuedAt: row.issued_at })), payments: (payments.data ?? []).map((row) => ({ id: row.id, method: row.method, amount: Number(row.amount), status: row.status, paidAt: row.paid_at })), expenses: (expenses.data ?? []).map((row) => ({ id: row.id, description: row.description, category: row.category, amount: Number(row.amount), status: row.status, incurredAt: row.incurred_at })) };
+  const invoicesWithPayments = new Set((payments.data ?? []).filter((row) => row.status === "succeeded" && row.invoice_id).map((row) => row.invoice_id));
+  return { invoices: (invoices.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, number: row.invoice_number, customerName: customerMap.get(row.customer_id) ?? "Pelanggan", total: Number(row.total), status: row.status, issuedAt: row.issued_at, dueAt: row.due_at, billingMode: row.billing_mode, documentType: row.document_type, groomerId: row.groomer_resource_id, groomerName: row.groomer_name_snapshot, adminNotes: row.admin_notes, revision: row.revision, canEdit: row.status === "issued" && !invoicesWithPayments.has(row.id) })), payments: (payments.data ?? []).map((row) => ({ id: row.id, method: row.method, amount: Number(row.amount), status: row.status, paidAt: row.paid_at })), expenses: (expenses.data ?? []).map((row) => ({ id: row.id, description: row.description, category: row.category, amount: Number(row.amount), status: row.status, incurredAt: row.incurred_at })) };
 }
 
 export async function loadReportWorkspace(supabase: SupabaseClient, organizationId: string) {

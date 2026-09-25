@@ -37,6 +37,7 @@ export const CAPABILITY_KEYS = [
   "finance.read",
   "inventory.read",
   "membership.read",
+  "membership.manage",
   "payroll.read",
   "payroll.manage",
   "reports.view",
@@ -47,6 +48,7 @@ export const CAPABILITY_KEYS = [
   "booking.create",
   "booking.cancel",
   "resource.manage",
+  "invoice.issue",
 ] as const;
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number];
 export type CapabilityMap = Record<CapabilityKey, boolean>;
