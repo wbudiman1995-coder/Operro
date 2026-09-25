@@ -34,8 +34,9 @@ export interface MembershipPackageRow {
 
 const URGENT_WITHIN_DAYS = 7;
 
-function urgencyOf(status: string, expiresAt: string | null): MembershipUrgency {
+function urgencyOf(status: string, expiresAt: string | null, availableSessions: number): MembershipUrgency {
   if (status === "canceled") return "canceled";
+  if (availableSessions <= 0) return "urgent";
   if (!expiresAt) return "normal";
   const daysLeft = (new Date(expiresAt).getTime() - Date.now()) / 86_400_000;
   if (daysLeft <= 0) return "expired";
@@ -70,7 +71,7 @@ export async function loadMembershipAdministrationWorkspace(supabase: SupabaseCl
       packageName: relationName(row.packages, "Paket"),
       recurrenceInterval: (relationRows(row.packages)[0]?.recurrence_interval as string | undefined) ?? "none",
       status: row.status,
-      urgency: urgencyOf(row.status, row.expires_at),
+      urgency: urgencyOf(row.status, row.expires_at, Math.max(0, remaining - reserved)),
       sessionsRemaining: remaining,
       reservedSessions: reserved,
       availableSessions: Math.max(0, remaining - reserved),
