@@ -522,9 +522,12 @@ export interface CustomerPackageRow {
   id: string;
   packageName: string;
   sessionsRemaining: number;
+  reservedSessions: number;
+  availableSessions: number;
   status: string;
   purchasedAt: string;
   expiresAt: string | null;
+  petName: string | null;
 }
 
 export interface CustomerNextDiscountRow {
@@ -559,26 +562,42 @@ export async function loadCustomerPackages(
   organizationId: string,
   customerId: string,
 ): Promise<CustomerPackageRow[]> {
-  const result = await supabase
-    .from("customer_packages")
-    .select("id,package_id,sessions_remaining,status,purchased_at,expires_at,packages(name)")
-    .eq("organization_id", organizationId)
-    .eq("customer_id", customerId)
-    .is("deleted_at", null)
-    .order("purchased_at", { ascending: false })
-    .limit(CUSTOMER_INVOICE_LIMIT);
-  assertResult("customer_packages", result.error);
-  return (result.data ?? []).map((row) => ({
-    id: row.id,
-    packageName: (() => {
-      const name = relationRows(row.packages)[0]?.name;
-      return typeof name === "string" ? name : "Paket";
-    })(),
-    sessionsRemaining: Number(row.sessions_remaining) || 0,
-    status: row.status,
-    purchasedAt: row.purchased_at,
-    expiresAt: row.expires_at,
-  }));
+  const [packagesResult, coverageResult] = await Promise.all([
+    supabase
+      .from("customer_packages")
+      .select("id,package_id,sessions_remaining,status,purchased_at,expires_at,packages(name),pets(name)")
+      .eq("organization_id", organizationId)
+      .eq("customer_id", customerId)
+      .is("deleted_at", null)
+      .order("purchased_at", { ascending: false })
+      .limit(CUSTOMER_INVOICE_LIMIT),
+    // Reserved-vs-available balance (section 23): app.list_customer_package_coverage only
+    // covers active, unexpired packages, so a missing row here just means "not currently
+    // reservable" -- reservedSessions/availableSessions fall back to the raw cache below.
+    supabase.schema("app").rpc("list_customer_package_coverage", { p_customer: customerId }),
+  ]);
+  assertResult("customer_packages", packagesResult.error);
+  if (coverageResult.error) console.error("list_customer_package_coverage_failed", coverageResult.error);
+  const coverageRows = (coverageResult.data ?? []) as Array<{ customer_package_id: string; reserved_sessions: number; available_sessions: number }>;
+  const coverageById = new Map(coverageRows.map((row) => [row.customer_package_id, row] as const));
+  return (packagesResult.data ?? []).map((row) => {
+    const remaining = Number(row.sessions_remaining) || 0;
+    const coverage = coverageById.get(row.id);
+    return {
+      id: row.id,
+      packageName: (() => {
+        const name = relationRows(row.packages)[0]?.name;
+        return typeof name === "string" ? name : "Paket";
+      })(),
+      sessionsRemaining: remaining,
+      reservedSessions: coverage ? Number(coverage.reserved_sessions) : 0,
+      availableSessions: coverage ? Number(coverage.available_sessions) : remaining,
+      status: row.status,
+      purchasedAt: row.purchased_at,
+      expiresAt: row.expires_at,
+      petName: (() => { const name = relationRows(row.pets)[0]?.name; return typeof name === "string" ? name : null; })(),
+    };
+  });
 }
 
 export interface CustomerHistoryRow {

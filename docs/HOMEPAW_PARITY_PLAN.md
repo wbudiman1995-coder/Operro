@@ -32,10 +32,10 @@ Operro remains multi-tenant and multi-branch. Every appointment supports `in_sto
 | 20 | Service and invoice creation | Implemented | Separate visit/package billing studio, 14-day appointment shortcuts, customer/pet/address search, multi-pet snapshots, groomer attribution/manual name, date and due-date controls, automatic/overridden document type, distinct package numbering, idempotency and duplicate guards, optimistic unpaid-detail editing, and final-invoice locks |
 | 21 | Catalog and pricing | Done | Size-based price matrix (small/medium/large/extra_large), additional duration, resolved-price/duration snapshotting, and manual staff override before invoicing shipped in 20260924130000_service_size_pricing.sql |
 | 22 | Discounts and charges | Done | Invoice/pet/service/category discounts, transport fee line, and a pre-issuance preview shipped atomically in 20260924140000_invoice_discounts_charges.sql (app.issue_invoice_for_booking / app.preview_invoice_pricing) |
-| 23 | Coverage detection | Partial | Ledger-backed package reservation exists; improve allocation visibility and over-allocation warnings |
-| 24 | Packages and memberships | Partial | Package sale and ledger exist; add recurring tiers, per-pet terms, source invoice and renewal lifecycle |
-| 25 | Membership administration | Partial | Balances exist; add lifecycle filters, urgency, edit/renew/details/archive |
-| 26 | Subscription reconciliation | Missing | Review-only recomputation and guarded per-membership repair |
+| 23 | Coverage detection | Done | Booking wizard and Customer 360 show available-vs-reserved balance (app.list_customer_package_coverage) with an over-allocation warning; per-pet eligibility enforced server-side in app.reserve_package_session |
+| 24 | Packages and memberships | Done | packages.recurrence_interval/per_pet, customer_packages.source_invoice_id/pet_id/activated_at/renewed_at/renewal_count, and app.renew_customer_package (manual, ledger-backed, no scheduler) shipped in 20260925100000_package_membership_lifecycle.sql |
+| 25 | Membership administration | Done | /programs/memberships: status/urgency filters, per-row renew/archive (guarded against archiving a package with an active reservation), ledger-derived detail, customer/pet links back to Customer 360 |
+| 26 | Subscription reconciliation | Done | app.reconcile_customer_package (read-only preview) + app.repair_customer_package_balance (separately authorized, revision-guarded, idempotent, audited via timeline_events) |
 | 27 | Invoice documents and communication | Partial | Invoice lines exist; add branded preview/PDF, terms/photo pages and WhatsApp templates |
 | 28 | Grooming photo documentation | Partial+ | Private categorized field capture/gallery exists; add compression, deletion, admin history and document inclusion |
 | 29 | Payment control | Partial | Payments exist; add screenshot-confirmed/bank-validated stages and locked validated records |

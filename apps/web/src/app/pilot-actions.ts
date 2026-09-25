@@ -761,29 +761,71 @@ export async function recordExpenseAction(_previous: PilotActionState, formData:
 }
 
 /**
- * Sells a catalog package to a customer: creates the customer_packages entry and records
- * the payment directly (payments.invoice_id is nullable — an invoice is not required).
- * Packages have no service/product catalog row, so they cannot become an order_item
- * (item_type only allows service|product) and cannot flow through invoices the way a
- * booking does — this is a genuine schema gap, not an oversight.
+ * Section 24/25 package/membership lifecycle actions. All three call a
+ * SECURITY DEFINER RPC that re-authorizes itself (membership.manage) and is
+ * idempotent via a client-generated request_key, matching the
+ * create_package_invoice convention already used for package sales.
  */
-export async function sellPackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+export async function renewCustomerPackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
-  const customerId = idValue(formData, "customerId"); const packageId = idValue(formData, "packageId"); const branchId = idValue(formData, "branchId");
-  const method = textValue(formData, "method", 30);
-  if (!customerId || !packageId || !branchId || !["cash", "card", "wallet", "bank_transfer", "other"].includes(method)) return databaseError("Paket", "data tidak valid");
-  const { data: pkg } = await context.supabase.from("packages").select("id,name,total_sessions,price,currency,validity_days").eq("organization_id", context.organizationId).eq("id", packageId).eq("is_active", true).maybeSingle();
-  if (!pkg) return databaseError("Paket", "paket tidak ditemukan");
-  const purchasedAt = new Date();
-  const expiresAt = pkg.validity_days != null ? new Date(purchasedAt.getTime() + pkg.validity_days * 86_400_000).toISOString() : null;
-  const { error: purchaseError } = await context.supabase.from("customer_packages").insert({ organization_id: context.organizationId, customer_id: customerId, package_id: pkg.id, sessions_remaining: pkg.total_sessions, purchased_at: purchasedAt.toISOString(), expires_at: expiresAt, status: "active", metadata: { created_from: "homepaw_pilot" } });
-  if (purchaseError) return databaseError("Paket gagal dijual", purchaseError.message);
-  if (Number(pkg.price) > 0) {
-    const { error: paymentError } = await context.supabase.from("payments").insert({ organization_id: context.organizationId, branch_id: branchId, customer_id: customerId, method, amount: pkg.price, currency: pkg.currency, status: "succeeded", external_ref: `PACKAGE-${Date.now()}`, metadata: { created_from: "homepaw_pilot", kind: "package_purchase", package_id: pkg.id } });
-    if (paymentError) return databaseError("Paket tersimpan, tapi pembayaran gagal dicatat", paymentError.message);
-  }
-  revalidatePath("/programs"); revalidatePath(`/customers/${customerId}`); revalidatePath("/finance");
-  return { error: null, success: `${pkg.name} berhasil dijual.` };
+  const customerPackageId = idValue(formData, "customerPackageId"); const requestKey = idValue(formData, "requestKey");
+  if (!customerPackageId || !requestKey) return databaseError("Paket", "data tidak valid");
+  const result = await context.supabase.schema("app").rpc("renew_customer_package", { p_customer_package: customerPackageId, p_request_key: requestKey });
+  if (result.error) return databaseError("Perpanjangan gagal", /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage diperlukan" : result.error.message);
+  revalidatePath("/programs"); revalidatePath("/programs/memberships");
+  return { error: null, success: "Paket berhasil diperpanjang." };
+}
+
+export async function setCustomerPackageStatusAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  const customerPackageId = idValue(formData, "customerPackageId"); const status = textValue(formData, "status", 20);
+  if (!customerPackageId || !["active", "canceled"].includes(status)) return databaseError("Paket", "data tidak valid");
+  const result = await context.supabase.schema("app").rpc("set_customer_package_status", { p_customer_package: customerPackageId, p_status: status, p_reason: textValue(formData, "reason", 300) || null });
+  if (result.error) return databaseError("Perubahan status gagal", /package_has_active_reservations/i.test(result.error.message) ? "paket masih memiliki sesi yang dipesan; lepaskan dulu sebelum diarsipkan" : /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage diperlukan" : result.error.message);
+  revalidatePath("/programs"); revalidatePath("/programs/memberships");
+  return { error: null, success: status === "canceled" ? "Paket berhasil diarsipkan." : "Paket berhasil diaktifkan kembali." };
+}
+
+export interface PackageReconciliationReport {
+  customerPackageId: string; revision: number; status: string; cachedBalance: number; ledgerBalance: number;
+  balanceMatches: boolean; reservedCount: number; consumedReservations: number; consumptionLedgerEntries: number;
+  reservationConsumptionMatches: boolean; checkedAt: string;
+}
+export interface PackageReconciliationResult { error: string | null; report: PackageReconciliationReport | null }
+
+/** Section 26, read-only: shows the exact mismatch (if any) before anyone touches the repair action. */
+export async function previewPackageReconciliationAction(customerPackageId: string): Promise<PackageReconciliationResult> {
+  const context = await workspace(); if (!context) return { error: "workspace aktif tidak tersedia", report: null };
+  if (!UUID.test(customerPackageId)) return { error: "paket tidak valid", report: null };
+  const result = await context.supabase.schema("app").rpc("reconcile_customer_package", { p_customer_package: customerPackageId });
+  if (result.error) return { error: result.error.message, report: null };
+  const data = result.data as Record<string, unknown>;
+  return {
+    error: null,
+    report: {
+      customerPackageId: String(data.customer_package_id), revision: Number(data.revision), status: String(data.status),
+      cachedBalance: Number(data.cached_balance), ledgerBalance: Number(data.ledger_balance), balanceMatches: Boolean(data.balance_matches),
+      reservedCount: Number(data.reserved_count), consumedReservations: Number(data.consumed_reservations), consumptionLedgerEntries: Number(data.consumption_ledger_entries),
+      reservationConsumptionMatches: Boolean(data.reservation_consumption_matches), checkedAt: String(data.checked_at),
+    },
+  };
+}
+
+/**
+ * Section 26, guarded write: distinct from the preview above, this requires
+ * membership.manage (not just membership.read) and the revision the staff
+ * member last saw a preview for -- a concurrent change makes this stale and
+ * it is rejected rather than silently overwriting newer data.
+ */
+export async function repairCustomerPackageBalanceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  const customerPackageId = idValue(formData, "customerPackageId"); const requestKey = idValue(formData, "requestKey");
+  const revision = numberValue(formData, "revision");
+  if (!customerPackageId || !requestKey || revision === null) return databaseError("Rekonsiliasi", "data tidak valid");
+  const result = await context.supabase.schema("app").rpc("repair_customer_package_balance", { p_customer_package: customerPackageId, p_revision: revision, p_request_key: requestKey });
+  if (result.error) return databaseError("Perbaikan gagal", /stale_repair_request|40001/i.test(result.error.message) ? "data berubah sejak pratinjau terakhir; muat ulang dan coba lagi" : /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage diperlukan" : result.error.message);
+  revalidatePath("/programs"); revalidatePath("/programs/memberships");
+  return { error: null, success: "Saldo paket berhasil diperbaiki." };
 }
 
 /**

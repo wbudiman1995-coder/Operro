@@ -186,15 +186,22 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
               <h3 className="font-bold">{pet?.name}</h3>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">{services.map((service) => {
                 const checked = selection.serviceIds.includes(service.id);
-                const eligiblePackages = customerPackages.filter((item) => item.customerId === customerId && (item.serviceId === null || item.serviceId === service.id));
+                const eligiblePackages = customerPackages.filter((item) => item.customerId === customerId && (item.serviceId === null || item.serviceId === service.id) && (item.petId === null || item.petId === selection.petId));
                 return <div key={service.id} className={`rounded-xl border p-3 ${checked ? "border-emerald-200 bg-emerald-50/60" : "border-transparent bg-slate-50"}`}>
                   <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={checked} onChange={() => toggleService(selection.petId, service.id)} className="mt-1 accent-emerald-700" /><span><span className="block text-sm font-semibold">{service.name}</span><span className="text-xs text-slate-500">{service.category} · {service.durationMinutes} menit · {new Intl.NumberFormat("id-ID", { style: "currency", currency: service.currency, maximumFractionDigits: 0 }).format(service.basePrice)}</span></span></label>
-                  {checked && eligiblePackages.length > 0 ? <label className="mt-3 block text-[11px] font-bold text-indigo-800">Bayar dengan paket
-                    <select value={selection.packageByService[service.id] ?? ""} onChange={(event) => choosePackage(selection.petId, service.id, event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-indigo-200 bg-white px-2 text-xs text-slate-700">
-                      <option value="">Tidak memakai paket</option>
-                      {eligiblePackages.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.sessionsRemaining} sesi tersisa{item.expiresAt ? ` · s.d. ${new Date(item.expiresAt).toLocaleDateString("id-ID")}` : ""}</option>)}
-                    </select>
-                  </label> : null}
+                  {checked && eligiblePackages.length > 0 ? (() => {
+                    const selectedPackageId = selection.packageByService[service.id] ?? "";
+                    const otherAllocationsForPackage = selectedPets.reduce((count, other) => count + Object.values(other.packageByService).filter((id) => id === selectedPackageId && !(other.petId === selection.petId)).length, 0);
+                    const selectedPackage = eligiblePackages.find((item) => item.id === selectedPackageId);
+                    const overAllocated = selectedPackage ? otherAllocationsForPackage >= selectedPackage.availableSessions : false;
+                    return <label className="mt-3 block text-[11px] font-bold text-indigo-800">Bayar dengan paket
+                      <select value={selectedPackageId} onChange={(event) => choosePackage(selection.petId, service.id, event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-indigo-200 bg-white px-2 text-xs text-slate-700">
+                        <option value="">Tidak memakai paket</option>
+                        {eligiblePackages.map((item) => <option key={item.id} value={item.id} disabled={item.availableSessions <= 0}>{item.name} · {item.availableSessions}/{item.sessionsRemaining} sesi tersedia{item.reservedSessions > 0 ? ` (${item.reservedSessions} terpakai)` : ""}{item.expiresAt ? ` · s.d. ${new Date(item.expiresAt).toLocaleDateString("id-ID")}` : ""}</option>)}
+                      </select>
+                      {overAllocated ? <span className="mt-1 block font-semibold text-rose-700">Peringatan: sesi paket ini sudah dialokasikan ke hewan lain dalam booking ini melebihi sisa yang tersedia. Server akan menolak jika keduanya disimpan.</span> : null}
+                    </label>;
+                  })() : null}
                 </div>;
               })}</div>
               <Field label="Groomer"><select value={selection.resourceId} onChange={(event) => updatePet(selection.petId, { resourceId: event.target.value })} className="field"><option value="">Pilih groomer</option>{branchResources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}</select></Field>
