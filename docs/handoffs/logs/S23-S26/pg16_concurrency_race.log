@@ -1,0 +1,55 @@
+operro_pg16_gate
+## fixture: one package with exactly 1 session, two candidate lines
+DELETE 0
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+## racing two concurrent reserve_package_session calls for the ONE session
+## SESSION A OUTPUT:
+BEGIN
+                                              set_config                                               
+-------------------------------------------------------------------------------------------------------
+ {"sub":"04000000-0000-4000-8000-00000000cc01","active_org_id":"04000000-0000-4000-8000-000000000001"}
+(1 row)
+
+       reserve_package_session        
+--------------------------------------
+ 01a0d80a-e59a-706b-9d5e-0973aa0cdce5
+(1 row)
+
+ pg_sleep 
+----------
+ 
+(1 row)
+
+COMMIT
+## SESSION B OUTPUT:
+BEGIN
+                                              set_config                                               
+-------------------------------------------------------------------------------------------------------
+ {"sub":"04000000-0000-4000-8000-00000000cc01","active_org_id":"04000000-0000-4000-8000-000000000001"}
+(1 row)
+
+ERROR:  no_sessions_available
+CONTEXT:  PL/pgSQL function reserve_package_session(uuid,uuid,timestamp with time zone) line 73 at RAISE
+ROLLBACK
+## FINAL_RESERVED_COUNT=1 (must be exactly 1, never 2)
+## CONCURRENCY_CHECK_PASSED
