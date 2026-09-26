@@ -1,0 +1,54 @@
+### migration upgrade replay (review finding #1)
+
+########## fresh database: operro_upgrade_replay ##########
+
+########## applying 42 prior migrations (the state a real installation would be in before this upgrade) ##########
+psql:supabase/migrations/20260721000100_extensions_and_helpers.sql:47: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721000150_fix_uuidv7_supabase.sql:22: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql:488: NOTICE:  BACKFILL OK: all legacy grooming pet/service values mapped; no non-grooming booking carries pet_id/service_id.
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "membership_plans_org_isolation" for relation "public.membership_plans" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_memberships_org_isolation" for relation "public.customer_memberships" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "packages_org_isolation" for relation "public.packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_packages_org_isolation" for relation "public.customer_packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_package_ledger_org_isolation" for relation "public.customer_package_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_accounts_org_isolation" for relation "public.loyalty_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_ledger_org_isolation" for relation "public.loyalty_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_accounts_org_isolation" for relation "public.wallet_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_ledger_org_isolation" for relation "public.wallet_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "referrals_org_isolation" for relation "public.referrals" does not exist, skipping
+
+########## seeding a REAL purchase (a real customer_package_ledger 'purchase' row, via the real app.create_package_invoice RPC) BEFORE upgrading ##########
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 2
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+                                                 set_config                                                 
+------------------------------------------------------------------------------------------------------------
+ {"sub" : "09000000-0000-4000-8000-0000000000c1", "active_org_id" : "09000000-0000-4000-8000-000000000001"}
+(1 row)
+
+                                                                                                                                                                                                                                                                      create_package_invoice                                                                                                                                                                                                                                                                       
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ (01a0dc0d-28db-70b6-b8ea-d247cd266a34,09000000-0000-4000-8000-000000000001,09000000-0000-4000-8000-0000000000a1,09000000-0000-4000-8000-00000000c101,01a0dc0d-28d4-71f4-a70b-328adbbc54e4,PKG-20260926-09000000,issued,IDR,300000.00,0.00,0.00,300000.00,"2026-09-26 04:50:45.038678+00",,,"{""package_id"": ""09000000-0000-4000-8000-00000000ca01""}","2026-09-26 04:50:45.038678+00","2026-09-26 04:50:45.038678+00",09000000-0000-4000-8000-0000000000c1,09000000-0000-4000-8000-0000000000c1,package_sale,invoice,,,,09000000-0000-4000-8000-0000000000f9,1)
+(1 row)
+
+COMMIT
+real purchase ledger rows before upgrade: 1
+
+########## applying the migration under test on top of REAL DATA -- the actual regression check ##########
+
+########## verifying the real purchase row survived untouched and the new column exists ##########
+DO
+NOTICE:  UPGRADE_REPLAY_OK: 1 pre-existing purchase row(s) survived, invoice_id column present
+
+MIGRATION UPGRADE REPLAY PASSED (populated-database upgrade succeeded)

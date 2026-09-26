@@ -769,6 +769,42 @@ export async function recordExpenseAction(_previous: PilotActionState, formData:
  * idempotent via a client-generated request_key, matching the
  * create_package_invoice convention already used for package sales.
  */
+export interface PackageRenewalPreview {
+  customerPackageId: string; packageId: string; packageName: string; price: number; currency: string;
+  sessionsToAdd: number; rolloverPolicy: string; recurrenceInterval: string; petId: string | null; serviceId: string | null;
+  currentAvailable: number; sessionsDiscardedIfRenewed: number; resultingAvailable: number;
+  currentExpiresAt: string | null; resultingExpiresAt: string; catalogActive: boolean; membershipStatus: string;
+  incompatible: boolean; blockingReason: string | null;
+}
+export interface PackageRenewalPreviewResult { error: string | null; preview: PackageRenewalPreview | null }
+
+/**
+ * Section 24, read-only: shows exactly what a renewal would do (price,
+ * sessions, currency, pet/service scope, resulting expiry) and whether the
+ * catalog's terms have drifted incompatibly since this membership was sold
+ * -- BEFORE the staff member commits to issuing the renewal invoice.
+ */
+export async function previewPackageRenewalAction(customerPackageId: string): Promise<PackageRenewalPreviewResult> {
+  const context = await workspace(); if (!context) return { error: "workspace aktif tidak tersedia", preview: null };
+  if (!UUID.test(customerPackageId)) return { error: "paket tidak valid", preview: null };
+  const result = await context.supabase.schema("app").rpc("preview_package_renewal", { p_customer_package: customerPackageId });
+  if (result.error) return { error: result.error.message, preview: null };
+  const data = result.data as Record<string, unknown>;
+  return {
+    error: null,
+    preview: {
+      customerPackageId: String(data.customer_package_id), packageId: String(data.package_id), packageName: String(data.package_name),
+      price: Number(data.price), currency: String(data.currency), sessionsToAdd: Number(data.sessions_to_add),
+      rolloverPolicy: String(data.rollover_policy), recurrenceInterval: String(data.recurrence_interval),
+      petId: data.pet_id ? String(data.pet_id) : null, serviceId: data.service_id ? String(data.service_id) : null,
+      currentAvailable: Number(data.current_available), sessionsDiscardedIfRenewed: Number(data.sessions_discarded_if_renewed),
+      resultingAvailable: Number(data.resulting_available), currentExpiresAt: data.current_expires_at ? String(data.current_expires_at) : null,
+      resultingExpiresAt: String(data.resulting_expires_at), catalogActive: Boolean(data.catalog_active), membershipStatus: String(data.membership_status),
+      incompatible: Boolean(data.incompatible), blockingReason: data.blocking_reason ? String(data.blocking_reason) : null,
+    },
+  };
+}
+
 /**
  * A manual renewal is a real commercial transaction: it creates a renewal
  * invoice (order + invoice + invoice_lines) exactly like the original sale,
@@ -790,7 +826,7 @@ export async function renewCustomerPackageAction(_previous: PilotActionState, fo
     p_customer_package: customerPackageId, p_branch: branchId, p_issued_at: issuedAt, p_due_at: dueAt,
     p_admin_notes: textValue(formData, "adminNotes", 2000) || null, p_request_key: requestKey,
   });
-  if (result.error) return databaseError("Perpanjangan gagal", /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage/invoice.issue diperlukan" : /request_key_reused/i.test(result.error.message) ? "kunci permintaan sudah dipakai untuk perpanjangan lain" : /package_canceled_cannot_renew/i.test(result.error.message) ? "paket sudah diarsipkan dan tidak dapat diperpanjang" : /package_catalog_inactive/i.test(result.error.message) ? "produk paket ini sudah tidak aktif di katalog" : result.error.message);
+  if (result.error) return databaseError("Perpanjangan gagal", /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage/invoice.issue diperlukan" : /request_key_reused/i.test(result.error.message) ? "kunci permintaan sudah dipakai untuk perpanjangan lain" : /package_canceled_cannot_renew/i.test(result.error.message) ? "paket sudah diarsipkan dan tidak dapat diperpanjang" : /package_catalog_inactive/i.test(result.error.message) ? "produk paket ini sudah tidak aktif di katalog" : /catalog_terms_changed_incompatible/i.test(result.error.message) ? "syarat katalog sudah berubah dan tidak lagi cocok dengan paket ini; perbarui katalog atau tangani secara manual" : result.error.message);
   const row = result.data as { invoice_number?: string } | null;
   revalidatePath("/programs"); revalidatePath("/programs/memberships"); revalidatePath("/finance");
   return { error: null, success: `Paket diperpanjang. ${row?.invoice_number ?? "Invoice"} diterbitkan.` };

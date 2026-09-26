@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
 
 import {
-  loadMembershipHistoryAction, previewPackageReconciliationAction, renewCustomerPackageAction, repairCustomerPackageBalanceAction, setCustomerPackageStatusAction,
-  type MembershipHistoryEntry, type MembershipReservationEntry, type PackageReconciliationReport, type PilotActionState,
+  loadMembershipHistoryAction, previewPackageRenewalAction, previewPackageReconciliationAction, renewCustomerPackageAction, repairCustomerPackageBalanceAction, setCustomerPackageStatusAction,
+  type MembershipHistoryEntry, type MembershipReservationEntry, type PackageRenewalPreview, type PackageReconciliationReport, type PilotActionState,
 } from "@/app/pilot-actions";
 import type { MembershipPackageRow, MembershipUrgency } from "@/lib/membership-admin";
 
@@ -18,8 +18,11 @@ const URGENCY_CLASS: Record<MembershipUrgency, string> = {
 const MANUAL_REVIEW_LABEL: Record<string, string> = {
   invalid_consumption_links: "Ada sesi terpakai yang tidak tertaut ke baris ledger konsumsinya",
   invalid_reversal_links: "Ada pembatalan sesi yang tidak tertaut ke baris ledger pembaliknya",
+  missing_reversal_link: "Ada reservasi yang dilepas setelah terpakai tanpa baris ledger pembalik",
+  duplicate_consumption_links: "Ada lebih dari satu reservasi tertaut ke baris ledger konsumsi yang sama",
   orphan_consumption_ledger_entries: "Ada baris ledger konsumsi tanpa reservasi terkait",
-  unlinked_purchase_or_renewal_invoice: "Ada baris pembelian/perpanjangan tanpa invoice tertaut",
+  unlinked_renewal_invoice: "Ada baris perpanjangan tanpa invoice tertaut",
+  invalid_invoice_links: "Invoice yang tertaut tidak cocok (pelanggan/paket/status berbeda)",
   missing_source_invoice: "Paket ini tidak memiliki invoice sumber (data lama)",
   over_reserved: "Jumlah sesi dipesan melebihi saldo tercatat",
   expired_but_status_active: "Sudah lewat tanggal kedaluwarsa tapi status masih aktif",
@@ -43,9 +46,12 @@ export function MembershipManager({ row, canManage, branches }: { row: Membershi
   const today = localDate();
   const [invoiceDate, setInvoiceDate] = useState(today);
   const [dueDate, setDueDate] = useState(nextDate(today, 14));
+  const [renewalPreview, setRenewalPreview] = useState<PackageRenewalPreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [loadingPreview, startPreview] = useTransition();
   const [renewState, renewAction, renewPending] = useActionState(async (previous: PilotActionState, formData: FormData) => {
     const result = await renewCustomerPackageAction(previous, formData);
-    if (result.success) setRenewKey(crypto.randomUUID());
+    if (result.success) { setRenewKey(crypto.randomUUID()); setRenewalPreview(null); setPreviewError(null); }
     return result;
   }, initialState);
   const [statusState, statusAction, statusPending] = useActionState(setCustomerPackageStatusAction, initialState);
@@ -59,6 +65,17 @@ export function MembershipManager({ row, canManage, branches }: { row: Membershi
   const [history, setHistory] = useState<{ ledger: MembershipHistoryEntry[]; reservations: MembershipReservationEntry[] } | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [loadingHistory, startHistory] = useTransition();
+
+  function toggleExpanded() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && !renewalPreview && !previewError) {
+      startPreview(async () => {
+        const result = await previewPackageRenewalAction(row.id);
+        if (result.error) setPreviewError(result.error); else setRenewalPreview(result.preview);
+      });
+    }
+  }
 
   function runReconcile() {
     setReconcileError(null);
@@ -95,7 +112,7 @@ export function MembershipManager({ row, canManage, branches }: { row: Membershi
       </div>
       <div className="flex shrink-0 gap-2">
         <button type="button" onClick={loadHistory} disabled={loadingHistory} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 disabled:opacity-50">{loadingHistory ? "Memuat…" : history ? "Tutup riwayat" : "Riwayat"}</button>
-        <button type="button" onClick={() => setExpanded((value) => !value)} className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">{expanded ? "Tutup" : "Kelola"}</button>
+        <button type="button" onClick={toggleExpanded} className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">{expanded ? "Tutup" : "Kelola"}</button>
       </div>
     </div>
 
@@ -120,13 +137,22 @@ export function MembershipManager({ row, canManage, branches }: { row: Membershi
 
     {expanded ? <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4 text-xs">
       {canManage ? <div className="space-y-3">
+        {loadingPreview ? <p className="text-slate-500">Memuat pratinjau perpanjangan…</p> : null}
+        {previewError ? <p className="font-semibold text-rose-700">{previewError}</p> : null}
+        {renewalPreview ? <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <p className="font-bold text-slate-700">Pratinjau perpanjangan</p>
+          <p className="mt-1 text-slate-600">{renewalPreview.packageName} · +{renewalPreview.sessionsToAdd} sesi · {new Intl.NumberFormat("id-ID", { style: "currency", currency: renewalPreview.currency, maximumFractionDigits: 0 }).format(renewalPreview.price)}</p>
+          <p className="mt-1 text-slate-500">Saldo tersedia sekarang: {renewalPreview.currentAvailable}{renewalPreview.sessionsDiscardedIfRenewed > 0 ? ` (${renewalPreview.sessionsDiscardedIfRenewed} sesi tidak terpakai akan hangus, kebijakan rollover=none)` : ""} → setelah perpanjangan: {renewalPreview.resultingAvailable}</p>
+          <p className="mt-1 text-slate-500">Kedaluwarsa: {renewalPreview.currentExpiresAt ? new Date(renewalPreview.currentExpiresAt).toLocaleDateString("id-ID") : "tanpa batas"} → {new Date(renewalPreview.resultingExpiresAt).toLocaleDateString("id-ID")}</p>
+          {renewalPreview.blockingReason ? <p className="mt-2 font-semibold text-rose-700">Tidak dapat diperpanjang: {renewalPreview.blockingReason === "catalog_terms_changed_incompatible_with_existing_entitlement" ? "syarat katalog sudah berubah (per-hewan) dan tidak lagi cocok dengan paket ini" : renewalPreview.blockingReason === "package_catalog_inactive" ? "produk paket ini sudah tidak aktif di katalog" : "paket sudah diarsipkan"}</p> : null}
+        </div> : null}
         <form action={renewAction} className="flex flex-wrap items-end gap-2 rounded-xl border border-emerald-200 bg-white p-3">
           <input type="hidden" name="customerPackageId" value={row.id} />
           <input type="hidden" name="requestKey" value={renewKey} />
           <label className="text-[11px] font-bold text-slate-600">Cabang<select name="branchId" defaultValue={row.sourceInvoiceBranchId ?? ""} required className="mt-1 block h-9 rounded-lg border border-slate-200 px-2 text-xs"><option value="" disabled>{row.isLegacy ? "Pilih cabang (data lama, wajib dipilih)" : "Pilih cabang"}</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
           <label className="text-[11px] font-bold text-slate-600">Tanggal invoice<input type="date" name="invoiceDate" value={invoiceDate} onChange={(event) => { setInvoiceDate(event.target.value); setDueDate(nextDate(event.target.value, 14)); }} className="mt-1 block h-9 rounded-lg border border-slate-200 px-2 text-xs" /></label>
           <label className="text-[11px] font-bold text-slate-600">Jatuh tempo<input type="date" name="dueDate" value={dueDate} min={invoiceDate} onChange={(event) => setDueDate(event.target.value)} className="mt-1 block h-9 rounded-lg border border-slate-200 px-2 text-xs" /></label>
-          <button disabled={renewPending} className="h-9 rounded-lg bg-emerald-700 px-3 text-[11px] font-bold text-white disabled:opacity-50">{renewPending ? "Menerbitkan…" : "Perpanjang & terbitkan invoice"}</button>
+          <button disabled={renewPending || Boolean(renewalPreview?.blockingReason)} className="h-9 rounded-lg bg-emerald-700 px-3 text-[11px] font-bold text-white disabled:opacity-50">{renewPending ? "Menerbitkan…" : "Perpanjang & terbitkan invoice"}</button>
         </form>
         <div className="flex flex-wrap gap-2">
           {row.status !== "canceled" ? <form action={statusAction}>

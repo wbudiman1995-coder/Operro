@@ -25,6 +25,7 @@ const capabilities = fs.readFileSync(path.join(root, "apps/web/src/lib/authoriza
 const reserveFn = migration.slice(migration.indexOf("function app.reserve_package_session"), migration.indexOf("function app.create_package_invoice"));
 const statusFn = migration.slice(migration.indexOf("function app.set_customer_package_status"), migration.indexOf("function app.reconcile_customer_package"));
 const renewFn = followup.slice(followup.indexOf("create function app.renew_customer_package"), followup.indexOf("revoke all on function app.renew_customer_package"));
+const previewRenewFn = followup.slice(followup.indexOf("create or replace function app.preview_package_renewal"), followup.indexOf("revoke all on function app.preview_package_renewal"));
 const reconcileFn = followup.slice(followup.indexOf("create or replace function app.reconcile_customer_package"));
 
 /**
@@ -88,11 +89,14 @@ test("section 24: create_package_invoice guards idempotency keys against differe
   assert.match(migration, /create function app\.create_package_invoice\(\s*\n\s*p_branch uuid, p_customer uuid, p_package uuid, p_issued_at timestamptz, p_due_at timestamptz,\s*\n\s*p_admin_notes text, p_request_key uuid, p_pet uuid default null\)/);
 });
 
-test("section 24 follow-up: every purchase/renewal ledger row can carry an invoice_id, and create_package_invoice stamps it on the purchase row", () => {
+test("section 24 follow-up: every purchase/renewal ledger row can carry an invoice_id, stamped by create_package_invoice/renew_customer_package at INSERT time, and NEVER backfilled onto pre-existing rows (an UPDATE against the append-only customer_package_ledger would raise restrict_violation the moment a real purchase already existed -- fixed by review finding #1)", () => {
   assert.match(followup, /alter table public\.customer_package_ledger\s*\n\s*add column invoice_id uuid;/);
   assert.match(followup, /add constraint fk_cpl_invoice foreign key \(organization_id, invoice_id\)/);
   const invoiceFn = followup.slice(followup.indexOf("create or replace function app.create_package_invoice"));
   assert.match(invoiceFn, /insert into public\.customer_package_ledger\(organization_id,customer_package_id,delta,reason,notes,invoice_id\)/);
+  // The regression itself: no UPDATE statement against customer_package_ledger
+  // anywhere in this migration (only INSERTs, which are never blocked).
+  assert.doesNotMatch(followup, /update public\.customer_package_ledger/);
 });
 
 test("section 24 follow-up: a paid renewal is a real commercial transaction -- it creates an order/invoice/invoice_lines, not just a session top-up, and requires an explicit branch (never a silently guessed one)", () => {
@@ -111,14 +115,39 @@ test("section 24 follow-up: renewal reuses the SAME status is 'canceled' / catal
   assert.match(renewFn, /set status = 'active', expires_at = v_new_expiry, renewed_at = now\(\), renewal_count = renewal_count \+ 1/);
 });
 
-test("section 24 follow-up: renewal idempotency is order lock -> authorize -> idempotent-return -> validate (matches the reviewed pattern already on this branch), and rejects a request_key reused for a different membership/branch/price", () => {
+test("section 24 follow-up: renewal idempotency is order lock -> authorize -> idempotent-return -> validate (matches the reviewed pattern already on this branch), and rejects a request_key reused for a different membership/branch", () => {
   const lockIndex = renewFn.indexOf("for update;");
   const authIndex = renewFn.indexOf("not app.has_branch(p_branch)");
   const idempotentReturnIndex = renewFn.indexOf("select * into v_invoice from public.invoices where organization_id = v_org and request_key = p_request_key;");
   const validateIndex = renewFn.indexOf("if cp.status = 'canceled'");
   assert.ok(lockIndex >= 0 && authIndex > lockIndex && idempotentReturnIndex > authIndex && validateIndex > idempotentReturnIndex, "expected lock -> authorize -> idempotent-return -> validate ordering");
-  assert.match(renewFn, /v_invoice\.branch_id <> p_branch\s*\n\s*or v_invoice\.metadata->>'renewal_of' is distinct from cp\.id::text\s*\n\s*or v_invoice\.total <> pkg\.price/);
+  assert.match(renewFn, /v_invoice\.branch_id <> p_branch\s*\n\s*or v_invoice\.metadata->>'renewal_of' is distinct from cp\.id::text/);
   assert.match(renewFn, /request_key_reused_for_different_renewal/);
+});
+
+test("section 24 follow-up: the renewal idempotency check does NOT compare catalog price -- price is server-derived state, not a caller input, so a legitimate retry after a catalog price change must still return the original invoice (review finding #3)", () => {
+  assert.doesNotMatch(renewFn, /v_invoice\.total <> pkg\.price/);
+});
+
+test("section 24 follow-up: rollover_policy actually governs renewal (it was previously read but never consumed -- review finding #2). 'none' discards only the UNRESERVED excess via a compensating adjustment row, never a raw UPDATE, and never touches reserved/held sessions", () => {
+  assert.match(renewFn, /if pkg\.rollover_policy = 'none' then/);
+  assert.match(renewFn, /select count\(\*\) into v_reserved_count from public\.package_reservations/);
+  assert.match(renewFn, /v_unreserved_excess := greatest\(0, cp\.sessions_remaining - v_reserved_count\);/);
+  assert.match(renewFn, /insert into public\.customer_package_ledger \(organization_id, customer_package_id, delta, reason, notes\)\s*\n\s*values \(v_org, cp\.id, -v_unreserved_excess, 'adjustment'/);
+  assert.doesNotMatch(renewFn, /update public\.customer_packages\s*\n\s*set sessions_remaining/); // never a raw cache overwrite
+});
+
+test("section 24 follow-up: a catalog per_pet change that disagrees with an existing membership's actual pet scope blocks renewal (never silently tops up an incompatible entitlement -- review finding #3), and app.preview_package_renewal surfaces the same check read-only before the write is attempted", () => {
+  assert.match(renewFn, /if pkg\.per_pet <> \(cp\.pet_id is not null\) then\s*\n\s*raise exception 'catalog_terms_changed_incompatible_with_existing_entitlement'/);
+  assert.match(previewRenewFn, /v_incompatible := cp\.status <> 'canceled' and pkg\.per_pet <> \(cp\.pet_id is not null\);/);
+  assert.match(previewRenewFn, /language plpgsql stable/); // read-only, no writes
+  assert.doesNotMatch(previewRenewFn, /insert into|update public\.|delete from/);
+});
+
+test("section 24 follow-up: a renewal preview action exists in the UI and the renew form's submit is disabled when the preview reports a blocking reason", () => {
+  assert.match(actions, /export async function previewPackageRenewalAction/);
+  assert.match(actions, /rpc\("preview_package_renewal"/);
+  assert.match(membershipManager, /disabled=\{renewPending \|\| Boolean\(renewalPreview\?\.blockingReason\)\}/);
 });
 
 test("section 25: archiving (set_customer_package_status) is guarded and refuses to cancel a package with an outstanding reserved session", () => {
@@ -179,13 +208,26 @@ test("section 26: reconciliation never writes (it is language ... stable, no ins
   assert.match(reconcileFn, /'manual_review_issues', v_manual_review/);
 });
 
-test("section 26: reconciliation verifies actual reservation<->ledger LINKS (consumption_ledger_id / reversal_ledger_id), not just matching counts, and flags orphan consumption ledger rows and unlinked purchase/renewal invoices", () => {
+test("section 26: reconciliation verifies actual reservation<->ledger LINKS (consumption_ledger_id / reversal_ledger_id), not just matching counts, and flags orphan consumption ledger rows and unlinked renewal invoices (review finding #4)", () => {
   assert.match(reconcileFn, /pr\.consumption_ledger_id[\s\S]*cpl\.reason = 'consumption' and cpl\.delta = -1/);
   assert.match(reconcileFn, /pr\.reversal_ledger_id[\s\S]*cpl\.reason = 'adjustment' and cpl\.delta = 1/);
   assert.match(reconcileFn, /v_orphan_consumption_ledger/);
-  assert.match(reconcileFn, /cpl\.reason in \('purchase', 'renewal'\) and cpl\.invoice_id is null/);
+  assert.match(reconcileFn, /cpl\.reason = 'renewal' and cpl\.invoice_id is null/);
   assert.match(reconcileFn, /v_over_reserved := v_reserved > cp\.sessions_remaining/);
   assert.match(reconcileFn, /v_expired_status_mismatch := cp\.status = 'active' and cp\.expires_at is not null and cp\.expires_at < now\(\)/);
+});
+
+test("section 26: a non-null invoice_id is not treated as proof of correct provenance by itself -- the linked invoice must actually belong to the same customer/package, be non-void, and have a matching invoice line (review finding #4, replacing the prior 'is invoice_id non-null' check)", () => {
+  assert.match(reconcileFn, /and i\.customer_id = cp\.customer_id and i\.status in \('issued', 'paid'\)/);
+  assert.match(reconcileFn, /il\.item_type = 'package' and il\.package_id = cp\.package_id/);
+  assert.match(reconcileFn, /v_invalid_invoice_links/);
+});
+
+test("section 26: a reservation released after being consumed (without a reversal_ledger_id) and duplicate consumption links (two reservations sharing one consumption_ledger_id) are both detected, not assumed impossible (review finding #4)", () => {
+  assert.match(reconcileFn, /pr\.consumption_ledger_id is not null and pr\.status <> 'consumed' and pr\.reversal_ledger_id is null/);
+  assert.match(reconcileFn, /v_missing_reversal_link/);
+  assert.match(reconcileFn, /pr2\.consumption_ledger_id = pr1\.consumption_ledger_id/);
+  assert.match(reconcileFn, /v_duplicate_consumption_links/);
 });
 
 test("section 26: repair re-checks the caller-supplied revision against the CURRENT row and rejects a stale one with 40001, before touching any data (repair itself is untouched by the follow-up migration -- it only ever resyncs the cache, never invents financial history)", () => {
@@ -196,11 +238,17 @@ test("section 26: repair re-checks the caller-supplied revision against the CURR
 });
 
 test("organization isolation: every new/changed RPC re-derives its own organization_id (app.fn_active_organization()) and never accepts a caller-supplied org", () => {
-  for (const fn of [reserveFn, reconcileFn, renewFn, statusFn]) {
+  for (const fn of [reserveFn, reconcileFn, renewFn, previewRenewFn, statusFn]) {
     assert.match(fn, /app\.fn_active_organization\(\)/);
   }
   assert.doesNotMatch(migration, /p_organization_id|p_org_id\b/);
   assert.doesNotMatch(followup, /p_organization_id|p_org_id\b/);
+});
+
+test("guarded purchased-term editing (a raw field-by-field editor for an already-sold membership) remains intentionally NOT implemented -- this is documented as an incomplete item in the handoff, not disguised as done", () => {
+  const handoff = fs.readFileSync(path.join(root, "docs/handoffs/S23-S26-HANDOFF.md"), "utf8");
+  assert.match(handoff, /purchased-term editing/i);
+  assert.match(handoff, /incomplete/i);
 });
 
 test("run_all_gates.sh records both migrations' lineage", () => {

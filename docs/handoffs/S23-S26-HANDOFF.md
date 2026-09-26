@@ -1,6 +1,77 @@
 # Handoff: HomePaw parity sections 23-26 (package/membership lifecycle)
 
-## Follow-up completion (2026-09-26) — READ THIS FIRST, supersedes everything below
+## Review round 2 (2026-09-26) — READ THIS FIRST, supersedes everything below
+
+Codex reviewed commit `86ad714` (the "Follow-up completion" work described in the next section) and found 4 code-level findings despite the passing gate 7/8 logs already committed at that point. This section documents each finding and its fix; the "Follow-up completion" section below is otherwise still accurate (nothing in it was wrong, these findings are additional gaps that survived it) except where explicitly corrected here.
+
+**All 4 findings are fixed on this branch. One item from the original section 25 brief remains genuinely incomplete (not disguised as done) — see "Remaining incomplete requirement" below.**
+
+### Finding 1 — upgrade migration fails when purchase ledger rows already exist (FIXED)
+
+`20260926090000_membership_renewal_billing_and_reconciliation.sql` originally backfilled `customer_package_ledger.invoice_id` onto existing `'purchase'` rows with an `UPDATE`. `customer_package_ledger` is append-only (`trg_cpl_block_update`, from the very first customer-programs migration, unconditionally rejects any `UPDATE`). On a fresh, empty schema that `UPDATE` matches zero rows and the trigger body never runs, so gate replay against a fresh schema passed — but the same `UPDATE` raises `restrict_violation` the instant it runs against a database that already has one real purchase (i.e., any actual installation that has ever sold a package).
+
+**Fix:** removed the backfill entirely. `invoice_id` is now set only at `INSERT` time (by `create_package_invoice`/`renew_customer_package` going forward); historical purchase provenance already lives on `customer_packages.source_invoice_id` (set by the *original* section 24 migration), so `reconcile_customer_package` reads that column directly for legacy rows instead of requiring a retrofitted ledger column. The migration was amended in place (not layered under a third migration) because it had never been applied outside disposable, destroyed-after-use test containers.
+
+**New permanent regression test:** `integration/migration_upgrade_replay.sh` — applies every migration up through (but not including) `20260926090000_...`, creates a **real** purchase via the real `app.create_package_invoice` RPC (a real `customer_package_ledger` `'purchase'` row now exists), *then* applies `20260926090000_...` on top, and asserts it succeeds and the real row survived untouched. I additionally confirmed the ORIGINAL (buggy) `UPDATE` genuinely fails in exactly this scenario, by running it standalone against the same populated database: `ERROR: Updates blocked on customer_package_ledger (append-only/immutable). Insert a correcting row instead.` — proving the bug was real, not theoretical, before claiming the fix.
+
+### Finding 2 — rollover configuration was ignored (FIXED)
+
+`packages.rollover_policy` (`'none'|'rollover'`) is exposed as editable in the new catalog UI, but `renew_customer_package` always just added `pkg.total_sessions` on top of the existing balance regardless of the setting — a control that did nothing. (This column pre-dates this branch entirely, from the original `customer_programs` migration; it was never consumed anywhere in the codebase before this branch exposed it as editable without wiring it up.)
+
+**Fix:** `renew_customer_package` now branches on `rollover_policy`. `'rollover'` (unchanged): adds `pkg.total_sessions`, nothing discarded. `'none'`: computes the currently-**held** (reserved) session count, discards only the **unreserved excess** above that via one explicit compensating `'adjustment'` ledger row (never a raw `UPDATE` to `sessions_remaining`), then adds `pkg.total_sessions`. Reserved sessions — which back a real, already-scheduled booking line — are never reduced or touched by either policy. Tested with a genuine positive remaining balance *and* an active held reservation on a `rollover_policy='none'` package (see S39-S41 below): the held session survives untouched, only the unreserved excess is discarded.
+
+### Finding 3 — renewal retries depended on mutable catalog state; no preview (FIXED)
+
+Two related bugs, both in the idempotent-retry check: it compared `v_invoice.total <> pkg.price`, where `pkg.price` is re-read fresh on every call. A legitimate retry (same `request_key`, same membership, same branch) after the catalog price changed in between was wrongly rejected as `request_key_reused_for_different_renewal` — the opposite of idempotent. Conversely, nothing validated that a catalog per-pet-scope change since the original sale hadn't made the renewal's terms incompatible with the entitlement it's topping up.
+
+**Fix:**
+- Removed the price comparison from the idempotency check entirely — price is server-derived state, not a caller input, so it should never gate idempotency. The check now compares only genuinely caller-supplied material inputs: the membership being renewed and the branch. A retry with the SAME key at a DIFFERENT branch is still correctly rejected (new test, S45).
+- Added a hard guard: if `pkg.per_pet <> (cp.pet_id is not null)` (the catalog's current per-pet flag disagrees with whether this specific membership actually has a pet scope), renewal is refused with `catalog_terms_changed_incompatible_with_existing_entitlement` rather than silently charging for a now-different product against an old entitlement.
+- Added `app.preview_package_renewal` (read-only, `membership.read`) returning price, currency, sessions to add, rollover policy, pet/service scope, current vs. resulting available sessions, current vs. resulting expiry, and the same incompatibility check/blocking reason — surfaced in the UI as soon as the "Kelola" panel opens, before the renewal form can be submitted (submit is disabled when the preview reports a blocking reason).
+
+### Finding 4 — invoice reconciliation only checked for NULL linkage (FIXED)
+
+The prior `reconcile_customer_package` treated any non-null `invoice_id` as sufficient proof of correct provenance — the FK only guarantees the invoice exists in the same organization, not that it's the *right* invoice.
+
+**Fix, all in `reconcile_customer_package`:**
+- A non-null `invoice_id` on a purchase/renewal ledger row is now validated against the actual invoice: same `customer_id`, a relevant status (`issued`/`paid`, not `void`), and at least one matching `invoice_lines` row for the same `package_id`. New `invalid_invoice_links` flag. Tested with a real, same-organization, wrong-**package** invoice deliberately attached to a renewal row (S52) — flagged, not silently accepted.
+- `unlinked_purchase_or_renewal_invoice` narrowed to `unlinked_renewal_invoice`: only `'renewal'` rows are required to self-link via `invoice_id` now (every renewal since this migration sets it); `'purchase'` provenance is `customer_packages.source_invoice_id`, already covered by the separate `missing_source_invoice` flag (see finding #1's fix — there is no retrofitted ledger-level purchase link to check).
+- New `missing_reversal_link`: a reservation that was consumed (has a `consumption_ledger_id`) but is no longer `status='consumed'` must have gone through `reverse_package_reservation`, which always sets `reversal_ledger_id` — a released-after-consumption row with no reversal link is a broken invariant. Tested (S53) by consuming a reservation and then releasing it directly (bypassing `reverse_package_reservation`).
+- New `duplicate_consumption_links`: no DB uniqueness constraint prevents two `package_reservations` rows from pointing at the same `consumption_ledger_id`; now checked explicitly rather than assumed impossible. Tested (S54) by pointing a second reservation's link at the first's ledger row.
+
+### Remaining incomplete requirement — guarded purchased-term editing
+
+The original section 25 brief asked for "guarded editing of applicable purchased terms, with reason, audit, and revision checks." This branch (both the original follow-up and this review round) deliberately implements only the **stateful lifecycle actions** — renew, archive/reactivate, reconcile, repair — plus (this round) a read-only renewal preview and a full ledger/reservation history view. It does **not** implement a raw field-by-field editor for an already-sold membership's own columns (e.g., manually correcting `pet_id`, `expires_at`, or `service_id` on a specific `customer_packages` row after the fact). **This is retained as an explicitly incomplete item, not disguised as done or folded into a "minor risk" note.** A safe version would need: an explicit allow-list of editable fields, a revision check matching `repair_customer_package_balance`'s pattern, a `membership.manage`-gated RPC, and an audit trail in `timeline_events` — none of that exists yet. If needed, it is a bounded, well-understood follow-up (mirroring `repair_customer_package_balance`'s existing guard pattern), not attempted here to avoid scope creep beyond "fix every finding."
+
+### Verification — review round 2, exact results
+
+All commands re-run against the fully amended migration. Logs under `docs/handoffs/logs/S23-S26/` (absolute path: `E:\Claude\operro-review-s23-s26\docs\handoffs\logs\S23-S26\`).
+
+| Command | Result | Log file |
+|---|---|---|
+| `npm run typecheck -w apps/web` | exit 0, clean | `npm_typecheck_review2.log` |
+| `npm run lint -w apps/web` | exit 0, clean (caught and fixed one real issue: a `useState` setter referenced before its declaration in a hook body — a hard error, not a style nit, under this repo's `react-hooks/immutability` rule) | `npm_lint_review2.log` |
+| `npm run test:batch1a -w apps/web` | **107/107 pass** | `npm_test_batch1a_review2.log` |
+| `npm run test:batch1b -w apps/web` | **272/272 pass** (up from 265; contract suite extended to cover all 4 findings plus the incomplete-item disclosure) | `npm_test_batch1b_review2.log` |
+| `npm run build -w apps/web` | exit 0 — 31 routes | `npm_build_review2.log` |
+| PostgreSQL 16 — GATE 4-6 + both SQL smoke tests | **all pass**, 91 `PASS` notices total, zero errors | `pg16_migration_gate4_6_smoke_review2.log` |
+| PostgreSQL 16 — GATE 7 (real authenticated-role integration, literal script) | **PASSED** | `pg16_gate7_gate8_review2.log` |
+| PostgreSQL 16 — GATE 8 (concurrency harness, literal script) | **PASSED** | `pg16_gate7_gate8_review2.log` |
+| PostgreSQL 16 — `integration/migration_upgrade_replay.sh` (NEW, finding #1's permanent regression test) | **PASSED** — real purchase row survives an upgrade that would previously have failed | `pg16_migration_upgrade_replay.log` |
+
+`integration/package_lifecycle_smoke.sql` grew from 38 to **54** assertions (S1-S54); the 16 new ones (S39-S54) cover: rollover_policy='none' protecting a held session while discarding unreserved excess, a legitimate retry after a catalog price change, a request_key reused at a different branch, `preview_package_renewal`'s no-write guarantee and field set, the per_pet-drift incompatibility guard (both in preview and at the actual write), a real wrong-package invoice attached to a renewal row (`invalid_invoice_links`), a consumed-then-released-without-reversal reservation (`missing_reversal_link`), and two reservations sharing one consumption ledger row (`duplicate_consumption_links`).
+
+**Browser verification: not performed this round** (recorded separately from compilation/SQL evidence, per instruction) — this round's changes are entirely server-side RPC logic plus one new client-state ordering fix caught by lint; the new UI surface (renewal preview panel, disabled-submit-on-incompatibility) was exercised only via the contract test's static assertions and the SQL-level behavior tests, not a live browser session. If a visual/interaction check of the preview panel is wanted, that is still open.
+
+### What Codex should verify next (review round 2)
+
+1. **Independently confirm the `invalid_invoice_links` join logic has no false positives for a healthy, real invoice** — the check requires `invoice_lines.item_type='package' and package_id=cp.package_id`; if any future code path creates a package invoice line without `item_type='package'` set correctly, this would misfire. Worth a second look against `create_package_invoice`'s and `renew_customer_package`'s own inserts (both already set it correctly, but it's the single coupling point).
+2. **Reconsider whether `rollover_policy='none'`'s discard-on-renewal is the product behavior actually wanted** — this session implemented the mathematically-safe interpretation (protect held sessions, discard only unreserved excess), but the original HomePaw reference material for this exact policy was not available to check against (see the original follow-up section's risk #4 about missing HTML references).
+3. **Decide whether to build the guarded purchased-term editor** (see "Remaining incomplete requirement" above) or formally close it as out of scope for sections 23-26.
+
+---
+
+## Follow-up completion (2026-09-26) — see "Review round 2" above for what changed after this
 
 This follow-up closes every gap the Codex review found in the `9279f56` state (branch/commit history below). **All four sections (23-26) are now functionally complete, tested, and pushed.** Nothing was merged, deployed, or applied to a shared/real Supabase project — this remains an isolated branch.
 
