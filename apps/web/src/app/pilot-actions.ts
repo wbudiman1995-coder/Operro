@@ -737,18 +737,72 @@ export async function adjustInventoryAction(_previous: PilotActionState, formDat
   revalidatePath("/inventory"); revalidatePath("/catalog"); return { error: null, success: "Stok berhasil disesuaikan." };
 }
 
+const paymentProofMimeExtensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+/**
+ * Records a payment through app.record_payment (section 29). Direct inserts into
+ * `payments` are revoked at the privilege layer (20260928100000_payment_control_workflow.sql)
+ * so this RPC is now the only way to record one. bank_transfer requires a proof
+ * screenshot: it is uploaded to the private `attachments` bucket and linked to
+ * THIS invoice (subject_type='invoice') before the RPC call, because the RPC
+ * verifies that specific linkage rather than trusting a bare attachment ID.
+ * `requestKey` is generated once per form mount (PaymentForm) and resubmitted
+ * unchanged on retry, which is what makes app.record_payment's idempotency work
+ * — a fresh key would defeat it on every retry.
+ */
 export async function recordPaymentAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   const invoiceId = idValue(formData, "invoiceId"); const amount = numberValue(formData, "amount"); const method = textValue(formData, "method", 30);
-  if (!invoiceId || !amount || amount <= 0 || !["cash", "card", "wallet", "bank_transfer", "other"].includes(method)) return databaseError("Pembayaran", "data tidak valid");
-  const { data: invoice } = await context.supabase.from("invoices").select("id,branch_id,customer_id,total,status").eq("organization_id", context.organizationId).eq("id", invoiceId).eq("status", "issued").maybeSingle();
-  if (!invoice) return databaseError("Pembayaran", "invoice tidak ditemukan atau sudah ditutup");
-  const { error } = await context.supabase.from("payments").insert({ organization_id: context.organizationId, branch_id: invoice.branch_id, invoice_id: invoice.id, customer_id: invoice.customer_id, method, amount, currency: "IDR", status: "succeeded", external_ref: `MANUAL-${Date.now()}`, metadata: { created_from: "homepaw_pilot" } });
-  if (error) return databaseError("Pembayaran gagal", error.message);
-  const { data: rows } = await context.supabase.from("payments").select("amount").eq("organization_id", context.organizationId).eq("invoice_id", invoice.id).eq("status", "succeeded");
-  const paid = (rows ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
-  if (paid >= Number(invoice.total)) await context.supabase.from("invoices").update({ status: "paid", paid_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("id", invoice.id);
-  revalidatePath("/finance"); revalidatePath("/dashboard"); revalidatePath("/reports"); return { error: null, success: "Pembayaran berhasil dicatat." };
+  const requestKey = idValue(formData, "requestKey");
+  if (!invoiceId || !amount || amount <= 0 || !["cash", "card", "wallet", "bank_transfer", "other"].includes(method) || !requestKey) {
+    return databaseError("Pembayaran", "data tidak valid");
+  }
+
+  let proofAttachmentId: string | null = null;
+  let storagePath: string | null = null;
+  const proofFile = formData.get("proof");
+  if (proofFile instanceof File && proofFile.size > 0) {
+    const extension = paymentProofMimeExtensions[proofFile.type];
+    if (!extension) return databaseError("Bukti transfer", "format harus JPG, PNG, atau WebP");
+    if (proofFile.size > 4 * 1024 * 1024) return databaseError("Bukti transfer", "ukuran maksimum 4 MB");
+    storagePath = `${context.organizationId}/payments/${invoiceId}/${crypto.randomUUID()}.${extension}`;
+    const upload = await context.supabase.storage.from("attachments").upload(storagePath, proofFile, { contentType: proofFile.type, upsert: false });
+    if (upload.error) return databaseError("Bukti transfer gagal diunggah", upload.error.message);
+    const attachment = await context.supabase.from("attachments").insert({
+      organization_id: context.organizationId, storage_bucket: "attachments", storage_path: storagePath,
+      filename: proofFile.name.slice(0, 200) || `bukti.${extension}`, mime_type: proofFile.type, size_bytes: proofFile.size,
+      uploaded_by: context.userId, metadata: { category: "payment_proof" },
+    }).select("id").single();
+    if (attachment.error || !attachment.data) {
+      await context.supabase.storage.from("attachments").remove([storagePath]);
+      return databaseError("Bukti transfer", "metadata gagal disimpan");
+    }
+    const link = await context.supabase.from("attachment_links").insert({ organization_id: context.organizationId, attachment_id: attachment.data.id, subject_type: "invoice", subject_id: invoiceId });
+    if (link.error) {
+      await context.supabase.from("attachments").delete().eq("organization_id", context.organizationId).eq("id", attachment.data.id);
+      await context.supabase.storage.from("attachments").remove([storagePath]);
+      return databaseError("Bukti transfer", "gagal ditautkan ke invoice");
+    }
+    proofAttachmentId = attachment.data.id;
+  }
+
+  const result = await context.supabase.schema("app").rpc("record_payment", {
+    p_invoice: invoiceId, p_method: method, p_amount: amount, p_external_ref: `MANUAL-${Date.now()}`,
+    p_proof_attachment: proofAttachmentId, p_request_key: requestKey,
+  });
+  if (result.error) {
+    if (storagePath) await context.supabase.storage.from("attachments").remove([storagePath]);
+    const message = result.error.message;
+    if (/proof_required_for_bank_transfer/.test(message)) return databaseError("Pembayaran", "transfer bank wajib menyertakan bukti screenshot");
+    if (/invoice_already_paid/.test(message)) return databaseError("Pembayaran", "invoice ini sudah lunas");
+    if (/invoice_void/.test(message)) return databaseError("Pembayaran", "invoice ini sudah dibatalkan");
+    if (/invoice_zero_due/.test(message)) return databaseError("Pembayaran", "invoice ini tidak memiliki tagihan");
+    if (/not_authorized/.test(message)) return databaseError("Pembayaran", "Anda tidak memiliki akses ke cabang invoice ini");
+    console.error("record_payment RPC failed", { code: result.error.code, message });
+    return databaseError("Pembayaran gagal", "server tidak dapat mencatat pembayaran. Coba lagi.");
+  }
+  revalidatePath("/finance"); revalidatePath("/dashboard"); revalidatePath("/reports");
+  return { error: null, success: "Pembayaran berhasil dicatat." };
 }
 
 export async function recordExpenseAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
@@ -762,16 +816,17 @@ export async function recordExpenseAction(_previous: PilotActionState, formData:
 
 /**
  * Sells a catalog package to a customer: creates the customer_packages entry and records
- * the payment directly (payments.invoice_id is nullable — an invoice is not required).
- * Packages have no service/product catalog row, so they cannot become an order_item
- * (item_type only allows service|product) and cannot flow through invoices the way a
- * booking does — this is a genuine schema gap, not an oversight.
+ * the payment through app.record_package_purchase_payment (payments.invoice_id is
+ * nullable — an invoice is not required). Packages have no service/product catalog row,
+ * so they cannot become an order_item (item_type only allows service|product) and cannot
+ * flow through invoices the way a booking does — this is a genuine schema gap, not an
+ * oversight.
  */
 export async function sellPackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   const customerId = idValue(formData, "customerId"); const packageId = idValue(formData, "packageId"); const branchId = idValue(formData, "branchId");
-  const method = textValue(formData, "method", 30);
-  if (!customerId || !packageId || !branchId || !["cash", "card", "wallet", "bank_transfer", "other"].includes(method)) return databaseError("Paket", "data tidak valid");
+  const method = textValue(formData, "method", 30); const requestKey = idValue(formData, "requestKey");
+  if (!customerId || !packageId || !branchId || !["cash", "card", "wallet", "bank_transfer", "other"].includes(method) || !requestKey) return databaseError("Paket", "data tidak valid");
   const { data: pkg } = await context.supabase.from("packages").select("id,name,total_sessions,price,currency,validity_days").eq("organization_id", context.organizationId).eq("id", packageId).eq("is_active", true).maybeSingle();
   if (!pkg) return databaseError("Paket", "paket tidak ditemukan");
   const purchasedAt = new Date();
@@ -779,8 +834,13 @@ export async function sellPackageAction(_previous: PilotActionState, formData: F
   const { error: purchaseError } = await context.supabase.from("customer_packages").insert({ organization_id: context.organizationId, customer_id: customerId, package_id: pkg.id, sessions_remaining: pkg.total_sessions, purchased_at: purchasedAt.toISOString(), expires_at: expiresAt, status: "active", metadata: { created_from: "homepaw_pilot" } });
   if (purchaseError) return databaseError("Paket gagal dijual", purchaseError.message);
   if (Number(pkg.price) > 0) {
-    const { error: paymentError } = await context.supabase.from("payments").insert({ organization_id: context.organizationId, branch_id: branchId, customer_id: customerId, method, amount: pkg.price, currency: pkg.currency, status: "succeeded", external_ref: `PACKAGE-${Date.now()}`, metadata: { created_from: "homepaw_pilot", kind: "package_purchase", package_id: pkg.id } });
-    if (paymentError) return databaseError("Paket tersimpan, tapi pembayaran gagal dicatat", paymentError.message);
+    // app.record_package_purchase_payment: payments no longer accepts a direct
+    // insert (revoked in 20260928100000_payment_control_workflow.sql).
+    const result = await context.supabase.schema("app").rpc("record_package_purchase_payment", {
+      p_branch: branchId, p_customer: customerId, p_package: pkg.id, p_method: method,
+      p_amount: pkg.price, p_currency: pkg.currency, p_request_key: requestKey,
+    });
+    if (result.error) return databaseError("Paket tersimpan, tapi pembayaran gagal dicatat", result.error.message);
   }
   revalidatePath("/programs"); revalidatePath(`/customers/${customerId}`); revalidatePath("/finance");
   return { error: null, success: `${pkg.name} berhasil dijual.` };

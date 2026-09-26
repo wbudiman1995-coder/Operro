@@ -6,7 +6,7 @@
  * - PackageSaleForm: sells a catalog package to a customer.
  * - ActionMessage: consistent success and error feedback.
  */
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   adjustInventoryAction,
@@ -112,12 +112,30 @@ export function InventoryForm({ branches, products }: { branches: Array<{ id: st
 
 export function PaymentForm({ invoices }: { invoices: Array<{ id: string; number: string; total: number }> }) {
   const [state, action, pending] = useActionState(recordPaymentAction, initialPilotActionState);
-  return <form action={action} className="space-y-3"><select className={inputClass} name="invoiceId" required>{invoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number} · Rp{invoice.total.toLocaleString("id-ID")}</option>)}</select><div className="grid grid-cols-2 gap-3"><select className={inputClass} name="method" defaultValue="bank_transfer"><option value="cash">Tunai</option><option value="bank_transfer">Transfer</option><option value="card">Kartu</option><option value="wallet">Wallet</option><option value="other">Lainnya</option></select><input className={inputClass} type="number" min="1" step="1000" name="amount" placeholder="Jumlah Rp" required /></div><ActionMessage state={state} /><button className={buttonClass} disabled={pending || invoices.length === 0}>{pending ? "Menyimpan..." : "Catat pembayaran"}</button></form>;
+  // Generated once per form mount and resubmitted unchanged on retry — this is
+  // what makes app.record_payment's request_key idempotency actually work. A
+  // fresh key on every submit would defeat it (see recordPaymentAction).
+  const [requestKey] = useState(() => crypto.randomUUID());
+  const [method, setMethod] = useState("bank_transfer");
+  return <form action={action} className="space-y-3">
+    <input type="hidden" name="requestKey" value={requestKey} />
+    <select className={inputClass} name="invoiceId" required>{invoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number} · Rp{invoice.total.toLocaleString("id-ID")}</option>)}</select>
+    <div className="grid grid-cols-2 gap-3">
+      <select className={inputClass} name="method" value={method} onChange={(event) => setMethod(event.target.value)}><option value="cash">Tunai</option><option value="bank_transfer">Transfer</option><option value="card">Kartu</option><option value="wallet">Wallet</option><option value="other">Lainnya</option></select>
+      <input className={inputClass} type="number" min="1" step="1000" name="amount" placeholder="Jumlah Rp" required />
+    </div>
+    {method === "bank_transfer" ? <div className="space-y-1"><label className="text-xs font-semibold text-slate-600">Bukti transfer (wajib)</label><input className={inputClass} type="file" name="proof" accept="image/jpeg,image/png,image/webp" required /></div> : null}
+    <ActionMessage state={state} /><button className={buttonClass} disabled={pending || invoices.length === 0}>{pending ? "Menyimpan..." : "Catat pembayaran"}</button>
+  </form>;
 }
 
 export function PackageSaleForm({ customers, packages, branches }: { customers: Array<{ id: string; name: string }>; packages: Array<{ id: string; name: string; sessions: number; price: number }>; branches: Array<{ id: string; name: string }> }) {
   const [state, action, pending] = useActionState(sellPackageAction, initialPilotActionState);
-  return <form action={action} className="space-y-3"><select className={inputClass} name="customerId" required><option value="">Pilih pelanggan</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select><select className={inputClass} name="packageId" required><option value="">Pilih paket</option>{packages.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.sessions} sesi · Rp{item.price.toLocaleString("id-ID")}</option>)}</select><div className="grid grid-cols-2 gap-3"><select className={inputClass} name="branchId" required>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><select className={inputClass} name="method" defaultValue="cash"><option value="cash">Tunai</option><option value="bank_transfer">Transfer</option><option value="card">Kartu</option><option value="wallet">Wallet</option><option value="other">Lainnya</option></select></div><ActionMessage state={state} /><button className={buttonClass} disabled={pending || customers.length === 0 || packages.length === 0}>{pending ? "Menyimpan..." : "Jual paket"}</button></form>;
+  const [requestKey] = useState(() => crypto.randomUUID());
+  return <form action={action} className="space-y-3">
+    <input type="hidden" name="requestKey" value={requestKey} />
+    <select className={inputClass} name="customerId" required><option value="">Pilih pelanggan</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select><select className={inputClass} name="packageId" required><option value="">Pilih paket</option>{packages.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.sessions} sesi · Rp{item.price.toLocaleString("id-ID")}</option>)}</select><div className="grid grid-cols-2 gap-3"><select className={inputClass} name="branchId" required>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><select className={inputClass} name="method" defaultValue="cash"><option value="cash">Tunai</option><option value="bank_transfer">Transfer</option><option value="card">Kartu</option><option value="wallet">Wallet</option><option value="other">Lainnya</option></select></div><ActionMessage state={state} /><button className={buttonClass} disabled={pending || customers.length === 0 || packages.length === 0}>{pending ? "Menyimpan..." : "Jual paket"}</button>
+  </form>;
 }
 
 export function ExpenseForm({ branches }: { branches: Array<{ id: string; name: string }> }) {
