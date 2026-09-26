@@ -10,17 +10,24 @@
 #   2. the custom_access_token_hook wiring (production also relies on it for active_org_id
 #      and is_platform_admin JWT claims — see supabase/migrations/20260721001400_*.sql)
 
-project_id = "operro-m13-local"
+project_id = "operro-s2730-local"
+
+# NOTE (sections 27-30 isolated worktree, E:\Claude\operro-sections-27-30): project_id
+# and every port below were changed from the shared "operro-m13-local" values so this
+# worktree's `supabase start` never touches the other project's/worktree's running
+# containers or database (operro-m13-local already occupies 54321-54324 on this
+# machine at the time this branch was created). Restore the original values only when
+# integrating back onto a branch that owns those ports exclusively.
 
 [api]
 enabled = true
-port = 54321
+port = 54341
 schemas = ["public", "app", "graphql_public"]
 extra_search_path = ["public", "app"]
 max_rows = 1000
 
 [db]
-port = 54322
+port = 54342
 # Supabase CLI 2.117.0 supports PostgreSQL 17 for its managed local stack.
 # run_all_gates.sh uses a separate PostgreSQL 16 container for lineage gates.
 major_version = 17
@@ -32,7 +39,7 @@ sql_paths = ["./seed.sql", "./seeds/homepaw_demo.sql", "./seeds/homepaw_home_ser
 
 [studio]
 enabled = true
-port = 54323
+port = 54343
 
 [auth]
 enabled = true
@@ -51,5 +58,9 @@ uri = "pg-functions://postgres/public/custom_access_token_hook"
 [realtime]
 enabled = false
 
+[inbucket]
+port = 54344
+
 [storage]
-enabled = false
+enabled = true
+file_size_limit = "5MiB"
