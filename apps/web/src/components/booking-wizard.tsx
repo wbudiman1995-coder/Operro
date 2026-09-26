@@ -191,7 +191,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
                   <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={checked} onChange={() => toggleService(selection.petId, service.id)} className="mt-1 accent-emerald-700" /><span><span className="block text-sm font-semibold">{service.name}</span><span className="text-xs text-slate-500">{service.category} · {service.durationMinutes} menit · {new Intl.NumberFormat("id-ID", { style: "currency", currency: service.currency, maximumFractionDigits: 0 }).format(service.basePrice)}</span></span></label>
                   {checked && eligiblePackages.length > 0 ? (() => {
                     const selectedPackageId = selection.packageByService[service.id] ?? "";
-                    const otherAllocationsForPackage = selectedPets.reduce((count, other) => count + Object.values(other.packageByService).filter((id) => id === selectedPackageId && !(other.petId === selection.petId)).length, 0);
+                    const otherAllocationsForPackage = selectedPets.reduce((count, other) => count + Object.entries(other.packageByService).filter(([otherServiceId, id]) => id === selectedPackageId && !(other.petId === selection.petId && otherServiceId === service.id)).length, 0);
                     const selectedPackage = eligiblePackages.find((item) => item.id === selectedPackageId);
                     const overAllocated = selectedPackage ? otherAllocationsForPackage >= selectedPackage.availableSessions : false;
                     return <label className="mt-3 block text-[11px] font-bold text-indigo-800">Bayar dengan paket

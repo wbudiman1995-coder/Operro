@@ -1,6 +1,117 @@
 # Handoff: HomePaw parity sections 23-26 (package/membership lifecycle)
 
+## Follow-up completion (2026-09-26) — READ THIS FIRST, supersedes everything below
+
+This follow-up closes every gap the Codex review found in the `9279f56` state (branch/commit history below). **All four sections (23-26) are now functionally complete, tested, and pushed.** Nothing was merged, deployed, or applied to a shared/real Supabase project — this remains an isolated branch.
+
+### What changed in this follow-up, section by section
+
+**Section 23 (coverage detection).** Fixed a real bug: the booking wizard's over-allocation warning excluded the *entire current pet* from its "other allocations" count, so selecting the same package for two different services on the SAME pet was never flagged, even though the server would still correctly reject the second reservation under lock. Fixed to count every other `(pet, service)` cell, including a different service on the same pet ([booking-wizard.tsx](../../apps/web/src/components/booking-wizard.tsx)). Re-verified the final-session race with a genuine two-connection test (see PostgreSQL 16 section).
+
+**Section 24 (packages and memberships) — the two biggest gaps, both closed:**
+1. **Paid renewal is now a real commercial transaction.** `app.renew_customer_package` (dropped and recreated; new signature, new return type) now creates an order, invoice, and invoice line — exactly like the original sale in `create_package_invoice` — instead of silently granting sessions. Branch is a **required** argument; the UI defaults it to the source invoice's branch when known but the staff member confirms/can change it (never silently guessed, and a legacy membership with no source invoice forces an explicit choice). See "Renewal billing policy" below for the exact rules.
+2. **Package catalog terms are now configurable in the app.** `/programs` gained a catalog editor (recurrence interval, per-pet flag, session count, price, validity days, rollover policy, applicable service, active flag) via `createPackageAction`/`updatePackageAction` — plain RLS-guarded table writes on `public.packages` (the same pattern already used by `createServiceAction`/`updateServiceAction`), gated on the pre-existing `membership.manage` capability. Editing the catalog can only ever change future sales; it structurally cannot rewrite an already-sold `customer_packages` row (verified by a contract test that greps `updatePackageAction`'s body for the absence of any `customer_packages` reference).
+
+**Section 25 (membership administration).** The renewal form now has an explicit branch selector + invoice date/due-date fields and reports the issued invoice number. Added a per-membership, lazy-loaded history panel (ledger rows with their linked invoice number, and the reservation lifecycle) via `loadMembershipHistoryAction` — scoped to one `customer_package_id`, never an unbounded organization-wide query. Urgency now also reacts to an exhausted balance (0 available sessions), not only to the expiry date, fixing a real gap where a package with no sessions left but a far-off expiry showed as "normal." Legacy memberships (no `source_invoice_id`) are flagged in the UI.
+
+**Section 26 (subscription reconciliation).** `app.reconcile_customer_package` is rewritten to verify actual **links**, not counts: every `consumed` reservation's `consumption_ledger_id` must point to a real matching ledger row; every reversed reservation's `reversal_ledger_id` likewise; an orphan consumption ledger row (one no reservation links back to) is now detected even though the raw counts alone would look fine. It also flags unlinked purchase/renewal invoices, over-reservation, expiry/status inconsistency, and missing source-invoice provenance — all under a `manual_review_issues` array, explicitly separate from `auto_repairable` (cache-vs-ledger drift, the *only* thing the guarded repair RPC ever touches). `repair_customer_package_balance` itself is **unchanged** — it never invents financial history, exactly as instructed.
+
+**Security/error-prone areas, explicitly re-tested this session** (see the extended SQL smoke test for the actual assertions): two organizations; a same-organization **read-only** member (`membership.read` only) calling every write RPC directly (bypassing the UI) and being denied, including a retry of an **already-used renewal request_key** — authorization is re-checked on every call, so a caller without `membership.manage` never receives the cached idempotent result of someone else's earlier successful call; a request_key reused for a *different* membership is rejected; cross-organization denial for reconcile/repair/renew; RLS-as-`authenticated`-role visibility across two real organizations; a genuine two-connection race for the final available session (exactly one winner, the other correctly rejected, never two reserved rows).
+
+### Renewal billing/activation/rollover/expiry policy (explicit, uniform across every status)
+
+- **Sessions always roll over.** A renewal is `+package.total_sessions` appended to `customer_package_ledger` (reason `'renewal'`) on top of whatever balance already exists — there is no "reset to catalog total" path and no per-status branching (active, exhausted, and expired packages all behave identically).
+- **Expiry always extends from `greatest(now(), current expires_at)`.** An active package loses no remaining paid-for time; an already-expired package's new term starts counting from today. Same formula for every status.
+- **The invoice is always created, even for a zero-price package.** An invoice with `status = 'issued'` is a billing record, not proof of payment — this RPC never marks anything paid; payment is the pre-existing, separate `payments` table/flow.
+- **Branch is mandatory and explicit**, never inferred silently. The UI pre-fills the source invoice's branch when one exists; a legacy membership with no source invoice has no pre-fill and forces the staff member to pick one.
+- **Canceled memberships cannot be renewed**; an inactive catalog package cannot be used to renew either (its terms are no longer sold).
+- **No automatic card charging, no scheduler, no recurring-billing infrastructure** was added — this remains a manual, staff-initiated action, per the original constraint.
+- Idempotency: locks the `customer_packages` row first (serializing concurrent retries), then re-authorizes (`membership.manage` + `invoice.issue` + `finance`/`membership` modules + branch access), then checks `public.invoices` for the `request_key` — if found, validates it is the SAME membership/branch/price before returning it (else `request_key_reused_for_different_renewal`), otherwise proceeds. A double-click, timeout-retry, or concurrent identical request produces exactly one invoice and one renewal ledger row.
+
+### Branch / commits (this follow-up)
+
+- Base for this follow-up: `claude/sections-23-26-memberships` at `5b486266ad317d0a698110f41b97ca5278e063ff` (the Codex-reviewed state; see that section below for its own history back to `f820b6b`).
+- New migration: `supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql` (forward-only; does not edit `20260925100000_package_membership_lifecycle.sql` or any earlier migration).
+- Nothing pushed to any shared/real Supabase project; only this isolated branch was pushed to `origin` at the end of this session (final SHA reported in the chat reply, not repeated here to avoid drift if this file is read out of order).
+
+### Files changed in this follow-up
+
+**Migration**
+- `supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql` (new) — `customer_package_ledger.invoice_id` column + FK + backfill; `create_package_invoice` now stamps `invoice_id` on the purchase ledger row (`create or replace`, same signature); `renew_customer_package` **dropped and recreated** with a new signature/return type (real invoice creation); `reconcile_customer_package` **rewritten** (deep link verification, `auto_repairable`/`manual_review_issues`).
+
+**App code**
+- `apps/web/src/components/booking-wizard.tsx` — fixed the same-pet multi-service over-allocation undercount.
+- `apps/web/src/app/pilot-actions.ts` — `renewCustomerPackageAction` rewritten (branch/dates, issues an invoice); new `createPackageAction`/`updatePackageAction` (catalog CRUD); new `loadMembershipHistoryAction`; `PackageReconciliationReport` extended with `autoRepairable`/`manualReviewIssues`.
+- `apps/web/src/components/pilot-forms.tsx` — new `PackageForm` (catalog create).
+- `apps/web/src/components/package-manager.tsx` (new) — catalog edit form (mirrors `service-manager.tsx`).
+- `apps/web/src/lib/pilot-data.ts` — `CatalogWorkspace.packages` extended with the full catalog term set.
+- `apps/web/src/app/programs/page.tsx` — wires the new catalog form/editor in place of the old static read-only list.
+- `apps/web/src/lib/membership-admin.ts` — `loadMembershipAdministrationWorkspace` now also returns `branches` and each row's `sourceInvoiceBranchId`/`isLegacy`; urgency computation unchanged from the prior session's fix (exhausted balance also counts as urgent).
+- `apps/web/src/components/membership-manager.tsx` — renewal form gains branch/date fields; new lazy-loaded history panel; reconciliation panel shows `manualReviewIssues` separately from the (now `autoRepairable`-gated) repair button.
+- `apps/web/src/components/membership-filter-list.tsx`, `apps/web/src/app/programs/memberships/page.tsx` — thread `branches` through.
+
+**Tests**
+- `apps/web/test/package-lifecycle-contract.test.ts` — rewritten: the two RPC-name-distance regexes that broke twice now (see "the flaky test, corrected" below) use two independent, distance-free assertions instead of one `{0,N}`-bounded window; extended with contract tests for the new renewal/reconcile/catalog behavior.
+- `integration/package_lifecycle_smoke.sql` — extended from 22 to **38** assertions (S1-S38): the new invoice-creating renewal (S12-S21), a request_key reused for a different membership (S22), the deep-reconcile link checks including an induced orphan consumption ledger row and a legacy no-source-invoice package (S23-S27), a cross-org renewal denial even with the caller's own valid branch (S32), and — new — a same-organization read-only member denied renew/repair/archive but allowed to preview reconcile, including a denied retry of an already-used request_key (S35-S38).
+
+**Docs**
+- `docs/HOMEPAW_PARITY_PLAN.md` — sections 23-26 all moved to "Done" with accurate, specific notes.
+
+### The flaky test, corrected
+
+The *original* handoff (before Codex's review) attributed one `test:batch1b` failure to "resource contention" without being able to reproduce it. This follow-up found the real, deterministic cause: `package-lifecycle-contract.test.ts` had a regex of the form `/renewCustomerPackageAction[\s\S]{0,N}rpc\("renew_customer_package"/` — a fixed character budget between two anchors. Codex's review already had to widen this once (300→600) after adding an authorization check; this session's changes (branch/date parsing) pushed it over budget *again*. This was never flakiness — it was a brittle regex that breaks every time unrelated, legitimate code grows between its two anchors. Fixed properly this time: replaced with a helper (`assertFunctionCallsRpc`) that finds the named function's body by locating the *next* function declaration (no fixed distance at all) and asserts the RPC call within that boundary. Per the instruction to favor real behavior tests over regex text-matching, the bulk of new verification for this follow-up went into the SQL integration smoke test, not new regex assertions.
+
+### Test commands, exit codes, and raw logs (this follow-up, final combined branch)
+
+All log files are under `docs/handoffs/logs/S23-S26/` (absolute path on this machine: `E:\Claude\operro-review-s23-s26\docs\handoffs\logs\S23-S26\`).
+
+| Command | Result | Log file |
+|---|---|---|
+| `npm run typecheck -w apps/web` | exit 0, clean | `npm_typecheck_followup.log` |
+| `npm run lint -w apps/web` | exit 0, clean | `npm_lint_followup.log` |
+| `npm run test:batch1a -w apps/web` | **107/107 pass** | `npm_test_batch1a_followup.log` |
+| `npm run test:batch1b -w apps/web` | **265/265 pass** (0 failures — the flaky #211 from before is fixed, not just re-passed) | `npm_test_batch1b_followup.log` |
+| `npm run build -w apps/web` | exit 0 — 31 routes | `npm_build_followup.log` |
+
+### PostgreSQL 16 — GATE 7 and GATE 8 now genuinely ran as literally scripted
+
+**The environment blocker from the prior session is resolved.** The prior session's substitute was necessary because WSL2's mirrored networking makes `127.0.0.1:<published-port>` unreachable *from the host* to a Dockerized Postgres. The fix this session: run the SQL client **inside the container** via `docker exec` (where `127.0.0.1` is the container's own loopback and genuinely reachable), instead of connecting from the host. Concretely: `docker cp` the `supabase/tests/concurrency/` harness into the container (stripping the Windows checkout's CRLF line endings, which otherwise corrupt the bash script's `set -o pipefail`/`trap` lines), then `docker exec` runs `bash run_concurrency_assembly.sh` with `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/operro_cc` — no bind mount needed for the SQL-only steps (those are piped over `docker exec -i psql < file` from the host, which works fine since only stdin/stdout cross the boundary, not a TCP connection).
+
+1. **Full 43-migration lineage** (42 prior + this follow-up's new one) replayed clean on a disposable `operro_gate16_v2` database.
+2. **GATE 4**: `assembly%` function count = 8 (unchanged).
+3. **GATE 5 / GATE 6** (unmodified existing suites): all PASS.
+4. **`integration/invoice_parity_smoke.sql`** (the orphaned section 20-22 carry-forward test, run this time with its required `0100_integration_seed.sql` prerequisite): both assertions PASS — package invoice idempotency/line/balance, and the discounted-visit preview-vs-issued-total agreement.
+5. **`integration/package_lifecycle_smoke.sql`**, extended to 38 assertions: **all PASS** (see the file itself for S1-S38; summarized above).
+6. **GATE 7** (`integration/0100_integration_seed.sql` + `0100_integration_client.sql`, run as the literal `operro_gate_client` authenticated-role login, exactly as `run_all_gates.sh` scripts it): **PASSED**.
+7. **GATE 8** (`supabase/tests/concurrency/run_concurrency_assembly.sh`, exactly as scripted — `complete_booking` vs `set_line_quantity`/`void_line`/`reserve_package_session`): **PASSED** — all three cases: no deadlock, session A committed, session B genuinely blocked then received the correct frozen-booking rejection.
+8. **New: a standalone two-connection race for the FINAL available session** of a 1-session package (not GATE 8's booking-freeze scenario — a direct reservation-vs-reservation race): session A reserves the only session and holds the row lock for 3s before committing; session B, started 1s later, genuinely blocks and then correctly fails with `no_sessions_available` after A commits. Final reserved-row count: exactly 1, never 2.
+
+Raw logs: `pg16_migration_gate4_6_smoke_followup.log` (items 1-5), `pg16_gate7_gate8_followup.log` (items 6-7), `pg16_final_session_race_followup.log` (item 8). The prior session's logs (`npm_typecheck.log`, `npm_lint.log`, `npm_test_batch1a.log`, `npm_test_batch1b.log`, `npm_build.log`, `pg16_concurrency_race.log`, `pg16_migration_gate5_gate6_smoke.log`) remain in the same folder as historical record of the pre-review state; the `_followup` files are the current, authoritative ones.
+
+**What was NOT run as one literal top-to-bottom `bash run_all_gates.sh` invocation:** the script assumes a native `psql`/`createdb`/`dropdb` reachable via host-to-container TCP, which this sandbox's WSL2 mirrored-networking mode still does not support (unchanged limitation). GATE 1-3 (node/npm-based: typecheck, workspace build, in-memory tests) were run directly via WSL/npm, not inside the container (no Node.js in the `postgres:16` image, and installing it there would add risk for no verification benefit). GATE 4-8 ran their **exact, unmodified** SQL/bash scenarios inside the container, which is what item 2 in the original follow-up brief accepted as sufficient ("running the client/harness inside a suitable container is acceptable, but document the exact commands and environment" — done above).
+
+### Unresolved risks / scope decisions (this follow-up)
+
+1. **Membership administration's history view is read-only and does not paginate.** For a membership with an unusually large ledger/reservation history this could be a large single query; scoped to one `customer_package_id` (never organization-wide), so the practical size is bounded by how many times that one membership has been renewed/consumed, which is small in practice. Flagged, not fixed, since nothing in this task described an expected volume.
+2. **`repair_customer_package_balance` is unchanged and was not re-audited this session** beyond confirming (via the contract test) that the follow-up migration does not redefine it. Its own correctness was independently reviewed in the prior Codex pass.
+3. **The catalog write path (`createPackageAction`/`updatePackageAction`) has no dedicated negative RLS test in the SQL smoke test** — it relies on the pre-existing, unmodified `packages_write_ins`/`_upd`/`_del` restrictive policies (from `20260721001100_security_rls_capabilities.sql`, unchanged by this branch) plus the JS contract test's assertion that the server action checks `membership.manage` before writing. This is a narrower proof than a live RLS denial test would be; reasonable given the RLS mechanism itself is pre-existing and shared by a dozen other tables already exercised elsewhere in this repo's test suite, not something this branch changes.
+4. **`integration/invoice_parity_smoke.sql` is still not wired into `run_all_gates.sh`** as its own gate step (same as noted in the prior session) — it was run manually this session (see above) and passes, but remains orphaned from the automated script. Recommended follow-up, not done here to stay focused on sections 23-26.
+5. **`integration/package_lifecycle_smoke.sql` is likewise still not wired into `run_all_gates.sh`.** Same recommendation as before.
+6. **The GATE 7/8-inside-container methodology is not itself committed as a script** — the exact commands are documented above and are reproducible by any operator with docker + WSL2 (or any Linux host, where the whole problem disappears). Not added as a permanent script in this branch since it is sandbox-specific plumbing, not portable CI infrastructure; `run_all_gates.sh` itself is unchanged apart from the `EXPECTED_MIGRATIONS` lineage entry for the new migration.
+
+### What Codex should verify next
+
+1. **Independently re-derive the renewal idempotency-comparison logic** in `app.renew_customer_package` (`v_invoice.branch_id <> p_branch or v_invoice.metadata->>'renewal_of' is distinct from cp.id::text or v_invoice.total <> pkg.price`) — confirm these three fields are sufficient to catch every "material input changed" case the brief asked for (membership, branch, price), and that comparing against `pkg.price` *at retry time* (not the price captured on the original invoice) is the intended semantics if the catalog price changes between the original call and a retry within the same short idempotency window.
+2. **Confirm the deep-reconciliation link checks have no false positives on a real, larger dataset** — this session's proof uses a small, hand-built fixture per issue; a real Supabase project's actual historical data (especially pre-this-branch legacy rows) may surface edge cases the fixture didn't anticipate (e.g., a `consumption` ledger row from before `reference_line_id`/`consumption_ledger_id` existed at all — check the migration history for when those columns were added relative to any real production data, if this is ever pointed at a non-empty database).
+3. **Re-run GATE 7/GATE 8 on a host where native TCP to Postgres actually works** (this sandbox's container-exec substitution is a faithful re-creation of the same scenarios, but a completely clean-room run outside any workaround is still worth one confirmation).
+4. **Review whether the package catalog UI needs a confirmation step before deactivating (`isActive=false`) a package that customers currently hold active memberships of** — deactivating only blocks *future* sales and renewals (an inactive package cannot be renewed, per policy above); existing memberships keep consuming/reserving normally. This is intentional but worth a product-level second look.
+5. **Confirm the invoice line name suffix `" (Perpanjangan #N)"` on a renewal invoice line doesn't collide with any downstream invoice-PDF/branded-document generation** (section 27, not yet built) that might parse `name_snapshot` expecting only the bare package name.
+
+---
+
 ## Codex review addendum (2026-09-26)
+
+**This section, and everything below it in this file, documents the state BEFORE the follow-up above.** It is kept for historical continuity (it explains what Codex found and fixed, and the original session's own PostgreSQL 16 proof) but its "Do not mark sections 24-26 complete" conclusion is superseded by the follow-up section at the top of this file.
 
 This addendum supersedes the original session-status claims below. Claude later pushed `claude/sections-23-26-memberships` at `9279f56`; it is still isolated from `local/design-adoption`, with no PR, production deployment, or shared Supabase migration. The combined branch contains **42** migration files, not 41 (the base already had 41).
 
@@ -8,17 +119,19 @@ Independent review found and fixed: renewal/repair idempotency checks occurring 
 
 Review validation: typecheck exit 0; lint exit 0; batch1b 257/257; production Next build exit 0 with 31 routes; all 42 migrations applied on a disposable PostgreSQL 17 database; `integration/package_lifecycle_smoke.sql` passed all 22 assertions after the fixes. Claude's PostgreSQL 16 raw logs remain below as evidence of the original branch, not of this follow-up SQL diff. Full GATE 7/8 replay and PostgreSQL 16 replay of the follow-up diff remain outstanding.
 
-**Do not mark sections 24–26 complete or deploy this branch yet.** Paid package renewal currently grants new sessions without a renewal invoice or payment flow. The package catalog has no UI to configure recurrence/per-pet terms. Administration has no purchased-term editor or full ledger history; reconciliation does not compare source/renewal invoices and all ledger lifecycle invariants. `docs/HOMEPAW_PARITY_PLAN.md` now states these limits explicitly.
+**Do not mark sections 24-26 complete or deploy this branch yet.** Paid package renewal currently grants new sessions without a renewal invoice or payment flow. The package catalog has no UI to configure recurrence/per-pet terms. Administration has no purchased-term editor or full ledger history; reconciliation does not compare source/renewal invoices and all ledger lifecycle invariants. `docs/HOMEPAW_PARITY_PLAN.md` now states these limits explicitly.
 
 ## Branch / commits
 
 - Base branch: `local/design-adoption`
 - Base commit (verified before editing): `f820b6b904cffd9d7a24af7e395b8effc327fc06` ("Integrate invoice workflow, size pricing and discounts" — combines sections 20-22)
 - Work branch: `claude/sections-23-26-memberships`
-- Commits on this branch:
+- Commits on this branch (original + review, before this follow-up):
   1. `1bd9837` — "Add HomePaw parity sections 23-26: package/membership lifecycle" (all code/migration/test changes)
-  2. This handoff file (committed separately, see final SHA reported at the end of this session)
-- **Nothing has been pushed, deployed, or applied to any shared/real Supabase project.** All database verification ran against a disposable, local-only `postgres:16` Docker container (`operro_pg16_gate`, created for this session only). No `supabase db push`, no remote git push.
+  2. `4de7a91` — handoff doc + raw verification logs
+  3. `9279f56` — urgency fix (exhausted sessions flagged regardless of expiry)
+  4. `5b48626` — Codex review: security/idempotency fixes described above
+- **Nothing has been pushed, deployed, or applied to any shared/real Supabase project** through any of these commits. All database verification ran against disposable, local-only Docker containers.
 
 ## Gap map (what existed before this branch)
 
@@ -29,129 +142,87 @@ Review validation: typecheck exit 0; lint exit 0; batch1b 257/257; production Ne
 | Membership administration | `/programs` was read-only (catalog + customer balances list). No filters, no renew/archive, no detail view. | `/programs/memberships`: status/urgency filters, ledger-derived detail, guarded renew/archive, links back to Customer 360. |
 | Subscription reconciliation | Did not exist. | `app.reconcile_customer_package` (read-only preview) + `app.repair_customer_package_balance` (separately authorized, revision-guarded, idempotent, audited write) + matching UI. |
 
-Full column/RPC inventory was captured via a research pass before writing any code (packages/customer_packages/customer_package_ledger/package_reservations schema, every RPC touching them, `create_package_invoice`'s idempotency mechanism, the booking wizard's and Customer 360's actual queries) — not reproduced verbatim here for brevity, but every claim above was verified against migration source, not assumed.
-
-## Files changed (commit `1bd9837`)
-
-17 files, +1211/-76:
-
-**Migration**
-- `supabase/migrations/20260925100000_package_membership_lifecycle.sql` (new)
-
-**App code**
-- `apps/web/src/lib/bookings.ts` — booking-wizard package loader now also fetches `pet_id` and a bulk `package_reservations` query, computing `reservedSessions`/`availableSessions` per package client-side.
-- `apps/web/src/components/booking-wizard.tsx` — package `<select>` shows `available/remaining` and disables exhausted options; an inline warning fires when the customer's in-progress selections for the SAME booking would exceed what's left (server still re-validates under lock regardless).
-- `apps/web/src/lib/customer-360.ts` — `loadCustomerPackages` now also calls `app.list_customer_package_coverage` and exposes `reservedSessions`/`availableSessions`/`petName`.
-- `apps/web/src/app/customers/[customerId]/page.tsx` — packages tab shows the available/reserved split and pet name.
-- `apps/web/src/app/pilot-actions.ts` — new actions `renewCustomerPackageAction`, `setCustomerPackageStatusAction`, `previewPackageReconciliationAction`, `repairCustomerPackageBalanceAction`; removed the dead `sellPackageAction`.
-- `apps/web/src/components/pilot-forms.tsx` — removed the dead `PackageSaleForm` (only caller of `sellPackageAction`; not rendered by any page).
-- `apps/web/src/app/programs/page.tsx` — added a link to the new membership administration page.
-- `apps/web/src/app/programs/memberships/page.tsx` (new) — the section 25 page.
-- `apps/web/src/components/membership-filter-list.tsx` (new) — client-side status/urgency/search filter.
-- `apps/web/src/components/membership-manager.tsx` (new) — per-row renew/archive/reconcile/repair UI.
-- `apps/web/src/lib/membership-admin.ts` (new) — the admin list loader + urgency derivation.
-- `apps/web/package.json` — added the new test file to `test:batch1b`.
-
-**Tests**
-- `apps/web/test/package-lifecycle-contract.test.ts` (new) — 16 static contract tests against the migration/action source.
-- `integration/package_lifecycle_smoke.sql` (new) — 22-assertion SQL integration test (see below).
-
-**Docs / gates**
-- `docs/HOMEPAW_PARITY_PLAN.md` — sections 23-26 rows updated to "Done".
-- `run_all_gates.sh` — new migration added to `EXPECTED_MIGRATIONS`; **two environment-bootstrap bugs fixed** (see "Fixes made to run_all_gates.sh" below) — these were blocking replay on *any* vanilla (non-Supabase-flavored) Postgres 16/17 image, not something introduced by this branch, but discovered and fixed while getting real database proof.
-
-**Untouched, as instructed:** `operro_batch1a_v3_recovered.patch`, `operro_batch1b_v4.patch`, `.dev-error.log`, `.dev-output.log` (all untracked, still present, byte-identical — confirmed via `git status`/`git diff --check` before every commit).
-
-## Migration: `20260925100000_package_membership_lifecycle.sql`
+## Migration: `20260925100000_package_membership_lifecycle.sql` (original)
 
 Forward-only, additive, no prior migration edited. Every new column is nullable or has a safe default; every existing row and every existing RPC caller keeps working unchanged with the new arguments/columns left at their defaults.
 
 **Schema changes**
 - `customer_package_ledger`: `+request_key uuid` (unique per org, partial index `where request_key is not null`); `reason` check widened to add `'renewal'` (was `purchase|consumption|adjustment|expiry|refund`).
 - `packages`: `+recurrence_interval text not null default 'none'` (`none|week|month|year`); `+per_pet boolean not null default false`.
-- `customer_packages`: `+source_invoice_id uuid` (real FK to `invoices`, backfilled from the old `metadata->>'source_invoice_id'` convention, which is still also written for compatibility); `+pet_id uuid` (FK to `pets`, null = any pet, same convention as the existing `service_id`); `+activated_at timestamptz` (backfilled from `purchased_at`); `+renewed_at timestamptz`; `+renewal_count integer not null default 0`; `+revision integer not null default 1`.
+- `customer_packages`: `+source_invoice_id uuid` (real FK to `invoices`); `+pet_id uuid` (FK to `pets`, null = any pet); `+activated_at timestamptz`; `+renewed_at timestamptz`; `+renewal_count integer not null default 0`; `+revision integer not null default 1`.
 - Indexes: `idx_customer_packages_source_invoice`, `idx_customer_packages_pet` (both partial, `where ... is not null`).
 
-**RPC signatures**
+**RPC signatures (as of this migration; renew_customer_package and reconcile_customer_package are SUPERSEDED by the follow-up migration above)**
 
 ```sql
--- unchanged signature, body extended with a per-pet check
 app.reserve_package_session(p_line uuid, p_customer_package uuid, p_expires_at timestamptz default null) returns uuid
 
--- dropped + recreated (parameter list changed; existing callers unaffected, p_pet defaults null)
 app.create_package_invoice(p_branch uuid, p_customer uuid, p_package uuid, p_issued_at timestamptz,
   p_due_at timestamptz, p_admin_notes text, p_request_key uuid, p_pet uuid default null) returns invoices
 
--- new
 app.list_customer_package_coverage(p_customer uuid)
   returns table(customer_package_id uuid, package_id uuid, package_name text, service_id uuid, pet_id uuid,
                 sessions_remaining integer, reserved_sessions integer, available_sessions integer,
                 expires_at timestamptz, status text)
 
-app.renew_customer_package(p_customer_package uuid, p_request_key uuid) returns customer_packages
-
 app.set_customer_package_status(p_customer_package uuid, p_status text, p_reason text default null) returns customer_packages
-
-app.reconcile_customer_package(p_customer_package uuid) returns jsonb   -- STABLE, no writes
 
 app.repair_customer_package_balance(p_customer_package uuid, p_revision integer, p_request_key uuid) returns customer_packages
 ```
 
-**Why `repair_customer_package_balance` resyncs the cache directly instead of appending a compensating ledger delta** (the one non-obvious design decision in this branch, worth an independent check — see "What Codex should check next" #1): `sessions_remaining` is defined as `sum(customer_package_ledger.delta)` for that package (that's the entire point of the pre-existing `tg_package_apply_ledger` trigger). If the cache disagrees with that sum, appending ONE MORE delta equal to `(ledger_sum - cached)` does not converge them — the new row shifts `ledger_sum` by exactly the same amount it shifts the cache via the trigger, so the gap the function was called to close is preserved, just relabeled. I found this by writing a test for it (see S9-S11 below) that failed against my first draft, then fixed the function to set `sessions_remaining = ledger_sum` directly and record the repair as a `timeline_events` row (`subject_type='package'`, matching the existing `subject_types` registry — not a new ledger delta) instead.
+## Migration: `20260926090000_membership_renewal_billing_and_reconciliation.sql` (this follow-up)
 
-**Fixes made to `run_all_gates.sh`** (both are environment-bootstrap gaps, not migration-lineage changes): the GATE 4/8 bootstrap SQL now also does `create schema if not exists extensions; create extension if not exists pgcrypto with schema extensions;` (a later, pre-existing migration calls `extensions.digest(...)`, which errors on a vanilla Postgres image with no `pgcrypto`) and stubs `auth.uid()` reading `request.jwt.claims` (matching the exact convention `app.fn_current_user_id()`/`app.fn_active_organization()` already use) since one existing RLS policy (`attendance_read`) calls `auth.uid()` directly and it doesn't exist at all on a non-Supabase Postgres image. Without these two fixes, `run_all_gates.sh` cannot get past GATE 4 on any Postgres image except a real Supabase-flavored one.
+```sql
+-- customer_package_ledger gains invoice_id (nullable, FK to invoices), backfilled
+-- for existing 'purchase' rows from customer_packages.source_invoice_id.
 
-## UI routes and click paths
+-- create_package_invoice: create-or-replace, SAME signature, now also stamps
+-- invoice_id on the purchase ledger row it inserts.
 
-- **`/programs`** (existing) — added a card linking to the new admin page.
-- **`/programs/memberships`** (new) — owner/admin click path: `/programs` → "Buka administrasi paket" → filter by urgency chip or search → click a customer's name (goes to Customer 360) or "Kelola" to expand a row → "Perpanjang" / "Arsipkan" / "Aktifkan lagi" / "Rekonsiliasi" (shows cached vs. ledger balance; if mismatched, a distinct "Perbaiki saldo sekarang" button appears, gated on `membership.manage`).
-- **`/bookings`** (existing wizard, extended) — groomer/staff click path: new booking → step 1 pick customer/pets → step 2 pick a service → if the customer has an eligible package, "Bayar dengan paket" dropdown now shows `available/remaining` per option and disables exhausted ones; picking the same package for two pets in one booking beyond what's available shows an inline warning before submit (server still re-validates under lock at submit time regardless of what the client shows).
-- **`/customers/[customerId]`** (existing, packages tab extended) — shows `available/remaining (N dipesan)` and the linked pet name per package.
+-- renew_customer_package: DROPPED + RECREATED (signature and return type both
+-- change -- this is the bug fix, not a compatible extension).
+drop function if exists app.renew_customer_package(uuid, uuid);
+create function app.renew_customer_package(
+  p_customer_package uuid, p_branch uuid, p_issued_at timestamptz, p_due_at timestamptz,
+  p_admin_notes text, p_request_key uuid)
+returns public.invoices
 
-## Test commands, exit codes, and raw logs
+-- reconcile_customer_package: create-or-replace, SAME signature (p_customer_package
+-- uuid) returns jsonb, extended output fields: auto_repairable boolean,
+-- manual_review_issues jsonb (array of issue-code strings), plus the new
+-- invalid_consumption_links / invalid_reversal_links / orphan_consumption_ledger_entries
+-- / unlinked_purchase_or_renewal_invoice_entries / missing_source_invoice /
+-- over_reserved / expired_but_status_active fields backing that array.
+```
 
-All raw logs are committed in this repo at `docs/handoffs/logs/S23-S26/` (absolute path on this machine: `E:\Claude\operro-local-dev\docs\handoffs\logs\S23-S26\`), so they survive independently of this session's temp scratchpad.
+## UI routes and click paths (current, after this follow-up)
+
+- **`/programs`** — "Katalog paket" now has a create form (if `membership.manage`) and each package row is editable (recurrence/per-pet/sessions/price/validity/service/active). Existing "Jual paket dengan invoice" and "Administrasi paket pelanggan" cards unchanged.
+- **`/programs/memberships`** — filter by urgency chip or search → click "Kelola" to expand a row → renewal form now asks for **branch** (defaulted to the source invoice's branch when known) + invoice date/due date, then "Perpanjang & terbitkan invoice" → shows the issued invoice number on success. "Riwayat" button lazy-loads the ledger + reservation history. "Rekonsiliasi" shows cached vs. ledger balance, reservation/consumption link health, and — when present — a "Perlu peninjauan manual" list of issues distinct from the repair button (which now only appears when `autoRepairable`).
+- **`/invoices/new`** (Invoice Studio) — unchanged from the Codex review: per-pet package selection when the chosen package is `per_pet`.
+- **`/bookings`** (booking wizard) — unchanged UI, corrected same-pet-multi-service over-allocation count.
+- **`/customers/[customerId]`** — unchanged from the Codex review (available/reserved split, pet name, no stale expired-credit display).
+
+## Test commands, exit codes, and raw logs (original session, before Codex review and before this follow-up)
 
 | Command | Result | Log file |
 |---|---|---|
 | `npm run typecheck -w apps/web` | exit 0, clean | `npm_typecheck.log` |
-| `npm run lint -w apps/web` | exit 0 — 0 errors, 1 warning (pre-existing, in `test/invoice-workflow-contract.test.ts`, **not touched by this branch**) | `npm_lint.log` |
-| `npm run test:batch1a -w apps/web` | **107/107 pass** | `npm_test_batch1a.log` |
-| `npm run test:batch1b -w apps/web` | **257/257 pass** (see flakiness note below) | `npm_test_batch1b.log` |
-| `npm run build -w apps/web` | exit 0 — 31 routes, including new `/programs/memberships` | `npm_build.log` |
+| `npm run lint -w apps/web` | exit 0 — 0 errors, 1 warning (pre-existing, unrelated) | `npm_lint.log` |
+| `npm run test:batch1a -w apps/web` | 107/107 pass | `npm_test_batch1a.log` |
+| `npm run test:batch1b -w apps/web` | 257/257 pass (see the corrected explanation above — this session found and fixed the actual cause) | `npm_test_batch1b.log` |
+| `npm run build -w apps/web` | exit 0 — 31 routes | `npm_build.log` |
 
-**Flakiness note:** one run of `test:batch1b`, executed as the last of five heavy commands chained in a single shell invocation, reported `# pass 256 / # fail 1` against test #211 (one of my own new contract tests). Re-running `test:batch1b` alone immediately after: clean, 0 failures. Running just the new file (`test/package-lifecycle-contract.test.ts`) in isolation 5 times in a row: 16/16 pass every time, zero flakes. I could not reproduce the failure in isolation and attribute the one-off to resource contention in this session's WSL2/Docker sandbox (which needed real troubleshooting all session — see below), not a real defect; flagged for Codex to keep an eye on rather than declared safe outright.
+### PostgreSQL 16 — the original session's database proof (superseded by the follow-up section at the top for GATE 7/8; GATE 4-6 methodology unchanged)
 
-### PostgreSQL 16 — the actual database proof
+Original environment note and GATE 1-6 proof preserved for continuity: this sandbox has no native `psql` installable via `sudo apt`, and WSL2's mirrored networking mode makes `localhost:<published-port>` unreachable from the host for a Dockerized Postgres. Every command in the original session ran via `docker exec` directly against a disposable `postgres:16` container (`operro_pg16_gate`). GATE 7/8 were **not** run end-to-end in the original session (see the follow-up section at the top of this file for their resolution).
 
-**Environment note (read before judging any "PG16 not available" claim from an earlier session):** this sandbox has no native `psql` installable via `sudo apt` (no passwordless sudo), and WSL2's mirrored networking mode makes `localhost:<published-port>` unreachable from the host for a Dockerized Postgres (`Connection timed out` on every attempt). I extracted a `postgresql-client-18` binary from a `.deb` without root (`apt-get download` + `dpkg -x`) and, once host→container TCP proved unreliable, switched to running every SQL command via `docker exec` directly against a disposable `postgres:16` container (`operro_pg16_gate`) — this has no host-networking dependency at all. Every result below is genuine PostgreSQL 16.15 execution, not a simulation.
+## Unresolved risks / scope decisions (original session + Codex review; see the follow-up section at the top for what remains after this session)
 
-1. **Full 41-migration lineage** (every file in `EXPECTED_MIGRATIONS`, including this branch's new one) replayed with `psql -v ON_ERROR_STOP=1` against a disposable `operro_gate16` database: **zero errors**, `SCHEMA_APPLIED_OK`.
-2. **GATE 4's own assertion** (`assembly%` function count in schema `app`): **8** (unchanged — this branch adds no `assembly_*`-prefixed function).
-3. **GATE 5** (`supabase/tests/20260721001350_test_assembly.sql`, unmodified): **all PASS notices, exit 0.**
-4. **GATE 6** (`supabase/tests/20260721001350_test_reservation.sql`, unmodified): **all PASS notices, exit 0** — this is the existing reservation-lifecycle suite; it passing unmodified is the main proof this branch didn't regress existing package-reservation behavior.
-5. **New: `integration/package_lifecycle_smoke.sql`** — 22 assertions, **all PASS**: per-pet eligibility (reject wrong pet / accept right pet), coverage listing, reconcile on a healthy package, an *intentionally induced* cache/ledger mismatch (direct `UPDATE` bypassing the ledger) correctly detected, a stale repair request (wrong revision) correctly rejected with `40001`, a correctly-revisioned repair converging cache to ledger and being idempotent on retry, reconcile confirming health again afterward, renewal reactivating an exhausted/expired package and being idempotent, guarded archive (refused while a reservation is outstanding, succeeds once released), cross-organization denial of both `reconcile` and `repair` at the RPC layer, and — as the `authenticated` Postgres role (not superuser) across two real organizations — RLS itself hiding org A's package from org B and showing it to org A.
-6. **New: concurrent final-session allocation race** (not a `.sql` file — a small bash script driving two real, separately-connected `psql` sessions against a 1-session package): session A reserves the only session and holds it for 2s before committing; session B, started 1s later, genuinely **blocks** on the `customer_packages` row lock and — after A commits — correctly computes availability `0` and is rejected with `no_sessions_available`. Final reserved-row count: **exactly 1, never 2.** (This is the literal "two organizations... concurrent final-session allocation" proof requested; it's a session-side script, not a committed file, since it's a one-shot verification rather than a permanent gate — see risk #5 below for the recommendation to promote it.)
-
-Raw logs for all of the above: `docs/handoffs/logs/S23-S26/pg16_migration_gate5_gate6_smoke.log` (items 1-5) and `pg16_concurrency_race.log` (item 6).
-
-**What was NOT run as literally scripted:** `run_all_gates.sh` was not executed as one top-to-bottom invocation (it assumes a native `psql`/`createdb`/`dropdb` on `PATH` and host-reachable TCP, neither of which hold in this sandbox — see the environment note above). GATE 1-6's *logic* was reproduced and verified as described above (with two real bugs fixed along the way); **GATE 7** (real `authenticated`-role integration client against `integration/0100_integration_seed.sql`/`0100_integration_client.sql`) and **GATE 8** (the existing `supabase/tests/concurrency/` bash harness, `complete_booking` vs. `assembly_*`/`reserve_package_session`) were **not** re-run end-to-end in this sandbox. I substituted narrower, purpose-built equivalents that cover this branch's own new surface (the `SET ROLE authenticated` RLS check inside the smoke test; my own concurrency race script above) but did not re-verify GATE 7/8's *existing* scenarios still pass post-migration. This is the top item in "What Codex should check next."
-
-## Unresolved risks / scope decisions
-
-1. **GATE 7 and GATE 8 (as scripted) were not re-run** — see above. Everything they'd exercise that overlaps this branch was covered by substitute tests; what's unverified is whether the *unrelated* existing scenarios in those two gates (e.g. `complete_booking` vs. `assembly_void_line` concurrency) still pass with this migration applied. Nothing in this branch touches those code paths, but "nothing touches it" is not the same as "verified."
-2. **Membership administration "edit" is narrow by design**: renew / archive / reactivate / reconcile / repair only — no free-form editing of a purchased package's fields (expiry, pet, service) by hand. Flagged as a deliberate scope decision (the parity plan says "edit/renew/details/archive", and renew+archive+reconcile+repair cover the *stateful* lifecycle actions; a raw field-editor was not requested to also exist, so it wasn't built to avoid a second, competing way to mutate the same data outside the ledger).
-3. **Renewal does not create a new invoice.** It is a pure ledger/expiry extension (`reason='renewal'`), matching "usable manual renewal path... do not invent automatic card charging or a scheduler." If the business also wants a billable document per renewal (not just per initial sale), that's a follow-up on top of `create_package_invoice`'s existing pattern, not built here.
-4. **`docs/HOMEPAW_PARITY_PLAN.md`'s cited HomePaw HTML references** (`index (2).html`, `booking (1).html`, `groomer (3).html`, `join (2).html`, `expand-gmaps.js`) were confirmed absent from this machine in an earlier session covering sections 20-22; sections 23-26 were likewise implemented from the parity plan's one-line descriptions only, not the original HomePaw markup.
-5. **The concurrency proof is a one-off script, not a permanent gate.** Recommend adding a `reserve_package_session` race scenario to `supabase/tests/concurrency/` alongside the existing `complete_booking`-vs-assembly scenarios, and wiring `integration/package_lifecycle_smoke.sql` into `run_all_gates.sh` as its own gate step, in a follow-up change.
-6. **`integration/invoice_parity_smoke.sql`** (written in the prior, already-merged combined session, covering sections 20-22) is still not wired into `run_all_gates.sh` — noticed while investigating gate wiring for this branch, left untouched as out of scope for sections 23-26.
-7. **One flaky `test:batch1b` run** (see above) — not reproducible in isolation; likely sandbox resource contention, not a code defect, but not conclusively ruled out either.
-
-## What Codex should check next
-
-1. **Independently verify the `repair_customer_package_balance` design** (direct cache resync to the ledger sum + a `timeline_events` audit row, instead of a compensating ledger delta). The reasoning is in the migration's own comment block and above; it's the single most load-bearing, least-obvious decision in this branch and deserves a second pair of eyes on the math, not just the tests passing.
-2. **Re-run GATE 7 and GATE 8 exactly as scripted** in `run_all_gates.sh`, on a host where the native `psql` client and TCP loopback to a local Postgres actually work (this sandbox's WSL2 mirrored-networking mode made that impossible here) — confirm the *existing* authenticated-role integration and concurrency scenarios still pass with this migration in the lineage.
-3. **Confirm `create_package_invoice`'s DROP + CREATE (not CREATE OR REPLACE)** doesn't cause a PostgREST schema-cache staleness issue on a real Supabase project — check whether a `notify pgrst,'reload schema';` is actually needed here (some migrations in this repo include it, some, including this branch's and the immediately-preceding section-22 migration, do not — the convention is already inconsistent, worth resolving in one direction).
-4. **Sanity-check the `pg_temp.act_as`/`SET ROLE authenticated` fixture pattern** used in `integration/package_lifecycle_smoke.sql` against a *real* Supabase Postgres (where `auth.uid()` is the genuine function, not this sandbox's stub) to make sure the RLS-as-authenticated-role assertions (S21/S22) aren't accidentally relying on stub-specific behavior.
-5. **Review the booking-wizard over-allocation warning** (`booking-wizard.tsx`) — it's a client-side heads-up only (the server's row lock in `reserve_package_session` is the real guarantee, proven by the concurrency test); confirm the UX threshold (comparing in-progress selections across pets in the same draft booking) matches what staff actually expect to see.
-6. **Confirm the dead-code removal (`sellPackageAction`/`PackageSaleForm`) is truly safe** — grepped for every reference before deleting (only each other referenced it, no page rendered the form), but worth a second confirmation given it directly touches money/session-balance code.
+1. ~~GATE 7 and GATE 8 (as scripted) were not re-run~~ — **resolved this follow-up**, see above.
+2. Membership administration "edit" remains narrow by design: renew/archive/reactivate/reconcile/repair, plus (new this follow-up) a full history view — no free-form editing of a purchased package's raw fields by hand. Deliberate, to avoid a second way to mutate the same data outside the ledger.
+3. ~~Renewal does not create a new invoice~~ — **fixed this follow-up**, see above.
+4. The cited HomePaw HTML references (`index (2).html`, `booking (1).html`, etc.) were confirmed absent from this machine in an earlier session; sections 23-26 (and this follow-up) were implemented from the parity plan's descriptions and the user's own detailed task briefs, not the original HomePaw markup. A later session did paste an updated `index (3).html` reference for a *different*, already-merged piece of work (section 25's urgency logic); it was not needed for this follow-up.
+5. The concurrency proof is a one-off script, not a permanent gate (unchanged recommendation — see "Unresolved risks" in the follow-up section at the top, item 6).
+6. `integration/invoice_parity_smoke.sql` is still not wired into `run_all_gates.sh` (unchanged; run manually and passing, see above).
+7. The originally-reported "flaky" `test:batch1b` run is now understood and fixed, not just unreproduced — see "The flaky test, corrected" in the follow-up section at the top.

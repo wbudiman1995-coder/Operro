@@ -1,0 +1,1604 @@
+
+> web@0.1.0 test:batch1b
+> tsx --test test/booking-reschedule.test.ts test/booking-series-contract.test.ts test/availability-blocks.test.ts test/branch-availability-contract.test.ts test/safe-archive-contract.test.ts test/groomer-management-contract.test.ts test/attendance-contract.test.ts test/groomer-performance-contract.test.ts test/complaint-lifecycle-contract.test.ts test/invoice-workflow-contract.test.ts test/mutation-safety.test.ts test/reschedule-steps.test.ts test/use-server-exports.test.ts test/onboarding-contract.test.ts test/styling-references-contract.test.ts test/complimentary-discount-contract.test.ts test/calendar-bulk-contract.test.ts test/service-size-pricing-contract.test.ts test/invoice-discounts-contract.test.ts test/package-lifecycle-contract.test.ts
+
+TAP version 13
+# Subtest: attendance is tenant isolated and RPC writes stay authenticated
+ok 1 - attendance is tenant isolated and RPC writes stay authenticated
+  ---
+  duration_ms: 3.249891
+  type: 'test'
+  ...
+# Subtest: check-in requires the assigned groomer, linked photo and valid GPS
+ok 2 - check-in requires the assigned groomer, linked photo and valid GPS
+  ---
+  duration_ms: 0.484854
+  type: 'test'
+  ...
+# Subtest: server classifies lateness and payroll can audit exceptions
+ok 3 - server classifies lateness and payroll can audit exceptions
+  ---
+  duration_ms: 0.351908
+  type: 'test'
+  ...
+# Subtest: a valid one-off blackout parses into branch-local instants
+ok 4 - a valid one-off blackout parses into branch-local instants
+  ---
+  duration_ms: 27.523839
+  type: 'test'
+  ...
+# Subtest: a late-evening blackout crosses the UTC date boundary correctly
+ok 5 - a late-evening blackout crosses the UTC date boundary correctly
+  ---
+  duration_ms: 0.853431
+  type: 'test'
+  ...
+# Subtest: zero-length and inverted windows are rejected
+ok 6 - zero-length and inverted windows are rejected
+  ---
+  duration_ms: 0.276101
+  type: 'test'
+  ...
+# Subtest: a resource outside the selected branch is rejected
+ok 7 - a resource outside the selected branch is rejected
+  ---
+  duration_ms: 0.200094
+  type: 'test'
+  ...
+# Subtest: a missing or non-string resource id is rejected
+ok 8 - a missing or non-string resource id is rejected
+  ---
+  duration_ms: 0.217183
+  type: 'test'
+  ...
+# Subtest: an empty accessible-resource set blocks all blackout creation
+ok 9 - an empty accessible-resource set blocks all blackout creation
+  ---
+  duration_ms: 0.187374
+  type: 'test'
+  ...
+# Subtest: malformed dates and times are rejected
+ok 10 - malformed dates and times are rejected
+  ---
+  duration_ms: 0.319419
+  type: 'test'
+  ...
+# Subtest: a blank reason normalizes to null and an over-long one is rejected
+ok 11 - a blank reason normalizes to null and an over-long one is rejected
+  ---
+  duration_ms: 0.767444
+  type: 'test'
+  ...
+# Subtest: the maximum span guard is enforced
+ok 12 - the maximum span guard is enforced
+  ---
+  duration_ms: 1.151491
+  type: 'test'
+  ...
+# Subtest: ranges are half-open, matching tstzrange [start, end)
+ok 13 - ranges are half-open, matching tstzrange [start, end)
+  ---
+  duration_ms: 0.646358
+  type: 'test'
+  ...
+# Subtest: a blackout over an active assigned booking is rejected
+ok 14 - a blackout over an active assigned booking is rejected
+  ---
+  duration_ms: 0.344298
+  type: 'test'
+  ...
+# Subtest: an INACTIVE assignment does not block a blackout
+ok 15 - an INACTIVE assignment does not block a blackout
+  ---
+  duration_ms: 0.176084
+  type: 'test'
+  ...
+# Subtest: another groomer's booking does not block
+ok 16 - another groomer's booking does not block
+  ---
+  duration_ms: 0.149385
+  type: 'test'
+  ...
+# Subtest: an adjacent booking does not block
+ok 17 - an adjacent booking does not block
+  ---
+  duration_ms: 0.156864
+  type: 'test'
+  ...
+# Subtest: no assignments means no conflict
+ok 18 - no assignments means no conflict
+  ---
+  duration_ms: 0.253931
+  type: 'test'
+  ...
+# Subtest: parseTstzRange reads a Postgres tstzrange literal's bounds
+ok 19 - parseTstzRange reads a Postgres tstzrange literal's bounds
+  ---
+  duration_ms: 0.408976
+  type: 'test'
+  ...
+# Subtest: parseTstzRange rejects malformed or unparseable literals rather than guessing
+ok 20 - parseTstzRange rejects malformed or unparseable literals rather than guessing
+  ---
+  duration_ms: 0.266361
+  type: 'test'
+  ...
+# Subtest: deriveActiveAssignmentWindows sources bounds from `during`, and excludes a soft-deleted booking's row
+ok 21 - deriveActiveAssignmentWindows sources bounds from `during`, and excludes a soft-deleted booking's row
+  ---
+  duration_ms: 0.32038
+  type: 'test'
+  ...
+# Subtest: deriveActiveAssignmentWindows drops a row with a malformed `during` or a non-string identifier rather than guessing
+ok 22 - deriveActiveAssignmentWindows drops a row with a malformed `during` or a non-string identifier rather than guessing
+  ---
+  duration_ms: 0.180293
+  type: 'test'
+  ...
+# Subtest: v3 correction 4 regression: conflict detection follows booking_resources.during, not the parent booking's own starts_at/ends_at, when the two differ
+ok 23 - v3 correction 4 regression: conflict detection follows booking_resources.during, not the parent booking's own starts_at/ends_at, when the two differ
+  ---
+  duration_ms: 0.211673
+  type: 'test'
+  ...
+# Subtest: rescheduling into a blackout is detected for the targeted groomer
+ok 24 - rescheduling into a blackout is detected for the targeted groomer
+  ---
+  duration_ms: 0.29512
+  type: 'test'
+  ...
+# Subtest: only the targeted groomers' blackouts are considered
+ok 25 - only the targeted groomers' blackouts are considered
+  ---
+  duration_ms: 0.165144
+  type: 'test'
+  ...
+# Subtest: a multi-pet reschedule checks every targeted groomer
+ok 26 - a multi-pet reschedule checks every targeted groomer
+  ---
+  duration_ms: 0.373128
+  type: 'test'
+  ...
+# Subtest: a soft-removed blackout is excluded by the schedule read contract
+ok 27 - a soft-removed blackout is excluded by the schedule read contract
+  ---
+  duration_ms: 0.993087
+  type: 'test'
+  ...
+# Subtest: a WhatsApp URL is built from a local number with the country prefix
+ok 28 - a WhatsApp URL is built from a local number with the country prefix
+  ---
+  duration_ms: 0.256681
+  type: 'test'
+  ...
+# Subtest: separators and spacing in stored numbers are normalized
+ok 29 - separators and spacing in stored numbers are normalized
+  ---
+  duration_ms: 0.227182
+  type: 'test'
+  ...
+# Subtest: prefilled text is percent-encoded so it cannot corrupt the query string
+ok 30 - prefilled text is percent-encoded so it cannot corrupt the query string
+  ---
+  duration_ms: 0.206523
+  type: 'test'
+  ...
+# Subtest: an unusable phone number yields no link rather than a broken one
+ok 31 - an unusable phone number yields no link rather than a broken one
+  ---
+  duration_ms: 0.146255
+  type: 'test'
+  ...
+# Subtest: an already-international number is left intact
+ok 32 - an already-international number is left intact
+  ---
+  duration_ms: 0.159074
+  type: 'test'
+  ...
+# Subtest: no message means no query string at all
+ok 33 - no message means no query string at all
+  ---
+  duration_ms: 0.148565
+  type: 'test'
+  ...
+# Subtest: reschedulable statuses exclude in_progress and every terminal status
+ok 34 - reschedulable statuses exclude in_progress and every terminal status
+  ---
+  duration_ms: 10.083133
+  type: 'test'
+  ...
+# Subtest: cancellable statuses include in_progress but no terminal status
+ok 35 - cancellable statuses include in_progress but no terminal status
+  ---
+  duration_ms: 0.639058
+  type: 'test'
+  ...
+# Subtest: rescheduling a terminal or in-progress booking is rejected by the parser
+ok 36 - rescheduling a terminal or in-progress booking is rejected by the parser
+  ---
+  duration_ms: 1.063254
+  type: 'test'
+  ...
+# Subtest: an unknown status is rejected rather than allowed through
+ok 37 - an unknown status is rejected rather than allowed through
+  ---
+  duration_ms: 0.329979
+  type: 'test'
+  ...
+# Subtest: wall-clock input is interpreted in the branch timezone
+ok 38 - wall-clock input is interpreted in the branch timezone
+  ---
+  duration_ms: 39.213814
+  type: 'test'
+  ...
+# Subtest: a late branch-local time lands on the previous UTC calendar day
+ok 39 - a late branch-local time lands on the previous UTC calendar day
+  ---
+  duration_ms: 1.623174
+  type: 'test'
+  ...
+# Subtest: the same wall clock in a negative-offset branch resolves to a different instant
+ok 40 - the same wall clock in a negative-offset branch resolves to a different instant
+  ---
+  duration_ms: 3.942747
+  type: 'test'
+  ...
+# Subtest: requires ends_at strictly after starts_at
+ok 41 - requires ends_at strictly after starts_at
+  ---
+  duration_ms: 0.458115
+  type: 'test'
+  ...
+# Subtest: rejects malformed dates and times
+ok 42 - rejects malformed dates and times
+  ---
+  duration_ms: 0.986847
+  type: 'test'
+  ...
+# Subtest: parseClockMinutes accepts only zero-padded 24-hour values
+ok 43 - parseClockMinutes accepts only zero-padded 24-hour values
+  ---
+  duration_ms: 1.130162
+  type: 'test'
+  ...
+# Subtest: fulfillment mode is restricted to the schema's enum
+ok 44 - fulfillment mode is restricted to the schema's enum
+  ---
+  duration_ms: 1.029765
+  type: 'test'
+  ...
+# Subtest: over-long notes are rejected
+ok 45 - over-long notes are rejected
+  ---
+  duration_ms: 0.323389
+  type: 'test'
+  ...
+# Subtest: blank notes normalize to null rather than an empty string
+ok 46 - blank notes normalize to null rather than an empty string
+  ---
+  duration_ms: 1.029185
+  type: 'test'
+  ...
+# Subtest: a pet id not on this booking is rejected
+ok 47 - a pet id not on this booking is rejected
+  ---
+  duration_ms: 0.264281
+  type: 'test'
+  ...
+# Subtest: a resource outside the booking's branch is rejected
+ok 48 - a resource outside the booking's branch is rejected
+  ---
+  duration_ms: 0.311179
+  type: 'test'
+  ...
+# Subtest: an empty accessible-resource set rejects every assignment
+ok 49 - an empty accessible-resource set rejects every assignment
+  ---
+  duration_ms: 0.29445
+  type: 'test'
+  ...
+# Subtest: multi-pet bookings keep independent groomers
+ok 50 - multi-pet bookings keep independent groomers
+  ---
+  duration_ms: 1.047264
+  type: 'test'
+  ...
+# Subtest: two pets may share one groomer
+ok 51 - two pets may share one groomer
+  ---
+  duration_ms: 1.096603
+  type: 'test'
+  ...
+# Subtest: a pet entirely absent from the submitted map is rejected, not silently kept as-is
+ok 52 - a pet entirely absent from the submitted map is rejected, not silently kept as-is
+  ---
+  duration_ms: 0.319489
+  type: 'test'
+  ...
+# Subtest: a pet present with an empty string selection is rejected, not treated as no-op
+ok 53 - a pet present with an empty string selection is rejected, not treated as no-op
+  ---
+  duration_ms: 0.373557
+  type: 'test'
+  ...
+# Subtest: a pet present with a non-string selection is rejected
+ok 54 - a pet present with a non-string selection is rejected
+  ---
+  duration_ms: 0.258801
+  type: 'test'
+  ...
+# Subtest: a booking with a single pet still requires that pet's assignment
+ok 55 - a booking with a single pet still requires that pet's assignment
+  ---
+  duration_ms: 1.140621
+  type: 'test'
+  ...
+# Subtest: a booking with no pets requires no assignment and succeeds with an empty map
+ok 56 - a booking with no pets requires no assignment and succeeds with an empty map
+  ---
+  duration_ms: 1.136571
+  type: 'test'
+  ...
+# Subtest: an unchanged assignment set only refreshes the occupied window
+ok 57 - an unchanged assignment set only refreshes the occupied window
+  ---
+  duration_ms: 0.464495
+  type: 'test'
+  ...
+# Subtest: reassigning deactivates the old resource and activates the new one
+ok 58 - reassigning deactivates the old resource and activates the new one
+  ---
+  duration_ms: 0.397117
+  type: 'test'
+  ...
+# Subtest: a previously released row is reactivated rather than inserted again
+ok 59 - a previously released row is reactivated rather than inserted again
+  ---
+  duration_ms: 0.255291
+  type: 'test'
+  ...
+# Subtest: an inactive row not in the desired set is never activated accidentally
+ok 60 - an inactive row not in the desired set is never activated accidentally
+  ---
+  duration_ms: 0.226742
+  type: 'test'
+  ...
+# Subtest: dropping every assignment deactivates all active rows and activates none
+ok 61 - dropping every assignment deactivates all active rows and activates none
+  ---
+  duration_ms: 0.216363
+  type: 'test'
+  ...
+# Subtest: the exclusion violation is recognised as a slot conflict
+ok 62 - the exclusion violation is recognised as a slot conflict
+  ---
+  duration_ms: 0.420136
+  type: 'test'
+  ...
+# Subtest: authorization, transition, and not-found failures are distinguished
+ok 63 - authorization, transition, and not-found failures are distinguished
+  ---
+  duration_ms: 0.807602
+  type: 'test'
+  ...
+# Subtest: anything unrecognised is unexpected, never optimistically allowed
+ok 64 - anything unrecognised is unexpected, never optimistically allowed
+  ---
+  duration_ms: 0.281391
+  type: 'test'
+  ...
+# Subtest: the happy path runs every step in order with no compensation
+ok 65 - the happy path runs every step in order with no compensation
+  ---
+  duration_ms: 1.461961
+  type: 'test'
+  ...
+# Subtest: a blocking blackout stops before any step runs
+ok 66 - a blocking blackout stops before any step runs
+  ---
+  duration_ms: 1.51965
+  type: 'test'
+  ...
+# Subtest: a blackout probe failure is unexpected and writes nothing
+ok 67 - a blackout probe failure is unexpected and writes nothing
+  ---
+  duration_ms: 0.930758
+  type: 'test'
+  ...
+# Subtest: a failure on a later step compensates every already-applied step in reverse order
+ok 68 - a failure on a later step compensates every already-applied step in reverse order
+  ---
+  duration_ms: 2.981349
+  type: 'test'
+  ...
+# Subtest: a step failing with stale:true is reported as not_found, and still triggers compensation
+ok 69 - a step failing with stale:true is reported as not_found, and still triggers compensation
+  ---
+  duration_ms: 0.870071
+  type: 'test'
+  ...
+# Subtest: a step whose zero-row write matched is never treated as success (Correction 2)
+ok 70 - a step whose zero-row write matched is never treated as success (Correction 2)
+  ---
+  duration_ms: 0.638729
+  type: 'test'
+  ...
+# Subtest: when compensation itself fails, the outcome is partially_applied, never a false success
+ok 71 - when compensation itself fails, the outcome is partially_applied, never a false success
+  ---
+  duration_ms: 1.524079
+  type: 'test'
+  ...
+# Subtest: an uncompensatable step (null original assignment) forces partially_applied even though every other step reverses cleanly
+ok 72 - an uncompensatable step (null original assignment) forces partially_applied even though every other step reverses cleanly
+  ---
+  duration_ms: 1.388113
+  type: 'test'
+  ...
+# Subtest: compensation continues through every applied step even after one compensation fails
+ok 73 - compensation continues through every applied step even after one compensation fails
+  ---
+  duration_ms: 0.963568
+  type: 'test'
+  ...
+# Subtest: a failed first-step write (the booking row itself) needs no compensation, since nothing else applied
+ok 74 - a failed first-step write (the booking row itself) needs no compensation, since nothing else applied
+  ---
+  duration_ms: 0.449075
+  type: 'test'
+  ...
+# Subtest: a single-step reschedule (no resource or pet changes) never calls recheckStatus's result against a later step
+ok 75 - a single-step reschedule (no resource or pet changes) never calls recheckStatus's result against a later step
+  ---
+  duration_ms: 0.363888
+  type: 'test'
+  ...
+# Subtest: a status recheck that reveals a concurrent invalid transition compensates and reports invalid_transition
+ok 76 - a status recheck that reveals a concurrent invalid transition compensates and reports invalid_transition
+  ---
+  duration_ms: 0.531862
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: a status recheck error stops the sequence, compensates the booking row, and reports unexpected once compensation is verified
+ok 77 - v4 correction 2: a status recheck error stops the sequence, compensates the booking row, and reports unexpected once compensation is verified
+  ---
+  duration_ms: 0.488363
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: a missing row on recheck (status and error both null) is treated the same as a recheck error
+ok 78 - v4 correction 2: a missing row on recheck (status and error both null) is treated the same as a recheck error
+  ---
+  duration_ms: 0.671277
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: when the booking-row compensation after a failed recheck cannot itself be verified, the outcome is partially_applied, never unexpected
+ok 79 - v4 correction 2: when the booking-row compensation after a failed recheck cannot itself be verified, the outcome is partially_applied, never unexpected
+  ---
+  duration_ms: 0.633019
+  type: 'test'
+  ...
+# Subtest: a recheck reporting a still-reschedulable status lets the sequence continue
+ok 80 - a recheck reporting a still-reschedulable status lets the sequence continue
+  ---
+  duration_ms: 0.444415
+  type: 'test'
+  ...
+# Subtest: a compensation failure during the recheck's rollback is also reported as partially_applied
+ok 81 - a compensation failure during the recheck's rollback is also reported as partially_applied
+  ---
+  duration_ms: 0.553621
+  type: 'test'
+  ...
+# Subtest: pet reassignment steps are simply absent from the sequence when nothing changed, rather than run as no-ops
+ok 82 - pet reassignment steps are simply absent from the sequence when nothing changed, rather than run as no-ops
+  ---
+  duration_ms: 1.178755
+  type: 'test'
+  ...
+# Subtest: a second pet's RPC throwing after the first pet changed compensates the first pet, the resource, and the booking row
+ok 83 - a second pet's RPC throwing after the first pet changed compensates the first pet, the resource, and the booking row
+  ---
+  duration_ms: 11.836165
+  type: 'test'
+  ...
+# Subtest: a resource mutation that throws with an uncertain commit state is reported as partially_applied even when it did not apply
+ok 84 - a resource mutation that throws with an uncertain commit state is reported as partially_applied even when it did not apply
+  ---
+  duration_ms: 2.471806
+  type: 'test'
+  ...
+# Subtest: a compensation that throws still lets the remaining compensations execute
+ok 85 - a compensation that throws still lets the remaining compensations execute
+  ---
+  duration_ms: 1.233567
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: a status recheck that throws after the booking-row mutation stops the sequence and compensates it, rather than letting the sequence continue
+ok 86 - v4 correction 2: a status recheck that throws after the booking-row mutation stops the sequence and compensates it, rather than letting the sequence continue
+  ---
+  duration_ms: 0.765734
+  type: 'test'
+  ...
+# Subtest: an ambiguous currently-failing step whose own recovery also throws is reported as partially_applied, not guessed
+ok 87 - an ambiguous currently-failing step whose own recovery also throws is reported as partially_applied, not guessed
+  ---
+  duration_ms: 7.3937
+  type: 'test'
+  ...
+# Subtest: full, verified restoration of every earlier step still reports the original classified error, not ok or unexpected
+ok 88 - full, verified restoration of every earlier step still reports the original classified error, not ok or unexpected
+  ---
+  duration_ms: 0.8819
+  type: 'test'
+  ...
+# Subtest: series creation is tenant and permission scoped
+ok 89 - series creation is tenant and permission scoped
+  ---
+  duration_ms: 4.268121
+  type: 'test'
+  ...
+# Subtest: series children preserve immutable service and location snapshots
+ok 90 - series children preserve immutable service and location snapshots
+  ---
+  duration_ms: 0.951659
+  type: 'test'
+  ...
+# Subtest: resource collisions are explicit and support skip or atomic stop
+ok 91 - resource collisions are explicit and support skip or atomic stop
+  ---
+  duration_ms: 0.941707
+  type: 'test'
+  ...
+# Subtest: series materializes independent pet, service, and resource rows
+ok 92 - series materializes independent pet, service, and resource rows
+  ---
+  duration_ms: 1.157759
+  type: 'test'
+  ...
+# Subtest: collisions can use a bounded nearby alternative time
+ok 93 - collisions can use a bounded nearby alternative time
+  ---
+  duration_ms: 0.716565
+  type: 'test'
+  ...
+# Subtest: series cancellation has explicit current, future, and all scopes
+ok 94 - series cancellation has explicit current, future, and all scopes
+  ---
+  duration_ms: 0.447705
+  type: 'test'
+  ...
+# Subtest: the occurrence materializer cannot be called by browser roles
+ok 95 - the occurrence materializer cannot be called by browser roles
+  ---
+  duration_ms: 0.282451
+  type: 'test'
+  ...
+# Subtest: branch closure races are rejected from both mutation directions
+ok 96 - branch closure races are rejected from both mutation directions
+  ---
+  duration_ms: 2.877282
+  type: 'test'
+  ...
+# Subtest: availability tables are tenant, branch and capability scoped
+ok 97 - availability tables are tenant, branch and capability scoped
+  ---
+  duration_ms: 0.414286
+  type: 'test'
+  ...
+# Subtest: slot recommendations consume closures and dated served-city plans
+ok 98 - slot recommendations consume closures and dated served-city plans
+  ---
+  duration_ms: 0.506213
+  type: 'test'
+  ...
+# Subtest: management UI exposes both branch closures and served-city dates
+ok 99 - management UI exposes both branch closures and served-city dates
+  ---
+  duration_ms: 0.294661
+  type: 'test'
+  ...
+# Subtest: calendar move is one locked transaction with collision and blackout enforcement
+ok 100 - calendar move is one locked transaction with collision and blackout enforcement
+  ---
+  duration_ms: 2.98485
+  type: 'test'
+  ...
+# Subtest: mass cancellation delegates every row to the canonical state machine
+ok 101 - mass cancellation delegates every row to the canonical state machine
+  ---
+  duration_ms: 1.111642
+  type: 'test'
+  ...
+# Subtest: server actions call only app-schema bulk RPCs and keep a confirmation token
+ok 102 - server actions call only app-schema bulk RPCs and keep a confirmation token
+  ---
+  duration_ms: 0.392537
+  type: 'test'
+  ...
+# Subtest: calendar exposes drag, shift-selection, grouped controls and source badges
+ok 103 - calendar exposes drag, shift-selection, grouped controls and source badges
+  ---
+  duration_ms: 0.428405
+  type: 'test'
+  ...
+# Subtest: source badges prefer membership, then complimentary, then package coverage
+ok 104 - source badges prefer membership, then complimentary, then package coverage
+  ---
+  duration_ms: 1.069484
+  type: 'test'
+  ...
+# Subtest: complaints are tenant and branch isolated with no browser table writes
+ok 105 - complaints are tenant and branch isolated with no browser table writes
+  ---
+  duration_ms: 7.861571
+  type: 'test'
+  ...
+# Subtest: creation validates every linked tenant entity
+ok 106 - creation validates every linked tenant entity
+  ---
+  duration_ms: 3.161323
+  type: 'test'
+  ...
+# Subtest: lifecycle requires resolution notes and writes immutable history
+ok 107 - lifecycle requires resolution notes and writes immutable history
+  ---
+  duration_ms: 0.88365
+  type: 'test'
+  ...
+# Subtest: application exposes recovery, audit, filters and authorized CSV export
+ok 108 - application exposes recovery, audit, filters and authorized CSV export
+  ---
+  duration_ms: 0.926969
+  type: 'test'
+  ...
+# Subtest: only one active next-booking offer can exist per customer
+ok 109 - only one active next-booking offer can exist per customer
+  ---
+  duration_ms: 4.72497
+  type: 'test'
+  ...
+# Subtest: offer assignment validates the three HomePaw service scopes
+ok 110 - offer assignment validates the three HomePaw service scopes
+  ---
+  duration_ms: 0.664848
+  type: 'test'
+  ...
+# Subtest: consumption locks the booking and offer and writes an immutable line snapshot
+ok 111 - consumption locks the booking and offer and writes an immutable line snapshot
+  ---
+  duration_ms: 0.902579
+  type: 'test'
+  ...
+# Subtest: booking consumes only after confirmation and recurring copies lose the offer snapshot
+ok 112 - booking consumes only after confirmation and recurring copies lose the offer snapshot
+  ---
+  duration_ms: 1.196049
+  type: 'test'
+  ...
+# Subtest: invoice order and frozen invoice lines receive the snapshotted amount
+ok 113 - invoice order and frozen invoice lines receive the snapshotted amount
+  ---
+  duration_ms: 0.505133
+  type: 'test'
+  ...
+# Subtest: groomer profiles carry phone, calendar color and route base coordinates
+ok 114 - groomer profiles carry phone, calendar color and route base coordinates
+  ---
+  duration_ms: 5.935313
+  type: 'test'
+  ...
+# Subtest: groomers can link to memberships, compensation and their filtered schedule
+ok 115 - groomers can link to memberships, compensation and their filtered schedule
+  ---
+  duration_ms: 2.410788
+  type: 'test'
+  ...
+# Subtest: archiving is a soft delete and refuses future assigned bookings
+ok 116 - archiving is a soft delete and refuses future assigned bookings
+  ---
+  duration_ms: 2.458277
+  type: 'test'
+  ...
+# Subtest: performance keeps invoice revenue unsplit and uses attributable activity
+ok 117 - performance keeps invoice revenue unsplit and uses attributable activity
+  ---
+  duration_ms: 2.823744
+  type: 'test'
+  ...
+# Subtest: retention and duration come from bounded booking history and timeline actuals
+ok 118 - retention and duration come from bounded booking history and timeline actuals
+  ---
+  duration_ms: 1.844668
+  type: 'test'
+  ...
+# Subtest: documentation and complaint metrics use real evidence and complaint records
+ok 119 - documentation and complaint metrics use real evidence and complaint records
+  ---
+  duration_ms: 1.550437
+  type: 'test'
+  ...
+# Subtest: performance cycles can move backward and forward by month
+ok 120 - performance cycles can move backward and forward by month
+  ---
+  duration_ms: 0.365178
+  type: 'test'
+  ...
+# Subtest: leaderboard links each groomer to a visit-level evidence drill-down
+ok 121 - leaderboard links each groomer to a visit-level evidence drill-down
+  ---
+  duration_ms: 0.367797
+  type: 'test'
+  ...
+# Subtest: invoice-level percentage discount is validated (0-100) and applied to whatever remains after prior layers
+ok 122 - invoice-level percentage discount is validated (0-100) and applied to whatever remains after prior layers
+  ---
+  duration_ms: 3.781542
+  type: 'test'
+  ...
+# Subtest: invoice-level fixed discount is a single pool consumed deterministically across eligible lines
+ok 123 - invoice-level fixed discount is a single pool consumed deterministically across eligible lines
+  ---
+  duration_ms: 0.519692
+  type: 'test'
+  ...
+# Subtest: an invoice discount can be restricted to Basic Grooming lines only
+ok 124 - an invoice discount can be restricted to Basic Grooming lines only
+  ---
+  duration_ms: 3.394366
+  type: 'test'
+  ...
+# Subtest: per-pet discounts are validated and applied before per-service/category/invoice layers, keyed by grooming_job_pet_id
+ok 125 - per-pet discounts are validated and applied before per-service/category/invoice layers, keyed by grooming_job_pet_id
+  ---
+  duration_ms: 1.120102
+  type: 'test'
+  ...
+# Subtest: per-service discounts are keyed by service_id, not by the grooming line id, so they apply across every pet with that service
+ok 126 - per-service discounts are keyed by service_id, not by the grooming line id, so they apply across every pet with that service
+  ---
+  duration_ms: 0.964458
+  type: 'test'
+  ...
+# Subtest: per-category discounts are restricted to the four HomePaw categories and default unclassified services to Other Fees
+ok 127 - per-category discounts are restricted to the four HomePaw categories and default unclassified services to Other Fees
+  ---
+  duration_ms: 0.516782
+  type: 'test'
+  ...
+# Subtest: a home-service transport fee is carried onto the invoice as its own line, untouched by any discount layer
+ok 128 - a home-service transport fee is carried onto the invoice as its own line, untouched by any discount layer
+  ---
+  duration_ms: 0.439205
+  type: 'test'
+  ...
+# Subtest: a discount preview shares the exact same calculator as issuance and performs no writes
+ok 129 - a discount preview shares the exact same calculator as issuance and performs no writes
+  ---
+  duration_ms: 6.578939
+  type: 'test'
+  ...
+# Subtest: every discount input is a rule (type/value/target), never a browser-supplied total, subtotal or discount amount
+ok 130 - every discount input is a rule (type/value/target), never a browser-supplied total, subtotal or discount amount
+  ---
+  duration_ms: 0.938188
+  type: 'test'
+  ...
+# Subtest: package-covered lines are fully zeroed and skip every new discount layer without touching any fixed pool
+ok 131 - package-covered lines are fully zeroed and skip every new discount layer without touching any fixed pool
+  ---
+  duration_ms: 1.403183
+  type: 'test'
+  ...
+# Subtest: no line total or invoice total can go negative: every discount layer is clamped with least()/greatest()
+ok 132 - no line total or invoice total can go negative: every discount layer is clamped with least()/greatest()
+  ---
+  duration_ms: 0.348148
+  type: 'test'
+  ...
+# Subtest: multiple pets and services are tracked independently via per-key maps, not a single shared running total
+ok 133 - multiple pets and services are tracked independently via per-key maps, not a single shared running total
+  ---
+  duration_ms: 0.218683
+  type: 'test'
+  ...
+# Subtest: organization isolation: both RPCs re-derive the booking's own organization_id and re-check it, never trusting a caller-supplied org
+ok 134 - organization isolation: both RPCs re-derive the booking's own organization_id and re-check it, never trusting a caller-supplied org
+  ---
+  duration_ms: 0.335509
+  type: 'test'
+  ...
+# Subtest: unauthorized callers cannot preview or issue: no direct grant to anon, and revoke precedes the authenticated grant
+ok 135 - unauthorized callers cannot preview or issue: no direct grant to anon, and revoke precedes the authenticated grant
+  ---
+  duration_ms: 0.383237
+  type: 'test'
+  ...
+# Subtest: re-issuing for the same booking is refused once an order already exists (duplicate-submit safe)
+ok 136 - re-issuing for the same booking is refused once an order already exists (duplicate-submit safe)
+  ---
+  duration_ms: 0.355828
+  type: 'test'
+  ...
+# Subtest: issuance is one atomic PL\\/pgSQL function, not sequential app-code inserts: order, order_items, invoice and invoice_lines are all written before returning
+ok 137 - issuance is one atomic PL\\/pgSQL function, not sequential app-code inserts: order, order_items, invoice and invoice_lines are all written before returning
+  ---
+  duration_ms: 0.276711
+  type: 'test'
+  ...
+# Subtest: issued and paid invoices stay immutable: this migration does not touch the pre-existing freeze/append-only triggers
+ok 138 - issued and paid invoices stay immutable: this migration does not touch the pre-existing freeze/append-only triggers
+  ---
+  duration_ms: 0.349988
+  type: 'test'
+  ...
+# Subtest: widening order_items/invoice_lines to fee preserves the package invoice type
+ok 139 - widening order_items/invoice_lines to fee preserves the package invoice type
+  ---
+  duration_ms: 0.317
+  type: 'test'
+  ...
+# Subtest: client server actions only ever pass discount RULES to the RPC, and the client-side discount panel never submits a computed total
+ok 140 - client server actions only ever pass discount RULES to the RPC, and the client-side discount panel never submits a computed total
+  ---
+  duration_ms: 0.438166
+  type: 'test'
+  ...
+# Subtest: pilot-actions.ts stays a valid "use server" module: only async functions and types are exported, never a const object/array (Next.js build error)
+ok 141 - pilot-actions.ts stays a valid "use server" module: only async functions and types are exported, never a const object/array (Next.js build error)
+  ---
+  duration_ms: 0.459475
+  type: 'test'
+  ...
+# Subtest: the catalog category select feeds the section-22 per-category discount vocabulary exactly
+ok 142 - the catalog category select feeds the section-22 per-category discount vocabulary exactly
+  ---
+  duration_ms: 6.510819
+  type: 'test'
+  ...
+# Subtest: run_all_gates.sh records this migration's lineage
+ok 143 - run_all_gates.sh records this migration's lineage
+  ---
+  duration_ms: 0.485414
+  type: 'test'
+  ...
+# Subtest: invoice workflow separates visit and package billing with immutable identity
+ok 144 - invoice workflow separates visit and package billing with immutable identity
+  ---
+  duration_ms: 3.156572
+  type: 'test'
+  ...
+# Subtest: package issuance is atomic, idempotency-keyed, and ledger backed
+ok 145 - package issuance is atomic, idempotency-keyed, and ledger backed
+  ---
+  duration_ms: 0.960787
+  type: 'test'
+  ...
+# Subtest: duplicate visit invoices and double-click saves are protected
+ok 146 - duplicate visit invoices and double-click saves are protected
+  ---
+  duration_ms: 1.59965
+  type: 'test'
+  ...
+# Subtest: studio provides HomePaw invoice selection and due-date workflow
+ok 147 - studio provides HomePaw invoice selection and due-date workflow
+  ---
+  duration_ms: 1.339247
+  type: 'test'
+  ...
+# Subtest: unpaid detail edits are optimistic and paid invoices are locked
+ok 148 - unpaid detail edits are optimistic and paid invoices are locked
+  ---
+  duration_ms: 1.026746
+  type: 'test'
+  ...
+# Subtest: cancellation goes through the controlled status RPC
+ok 149 - cancellation goes through the controlled status RPC
+  ---
+  duration_ms: 3.635149
+  type: 'test'
+  ...
+# Subtest: no mutation hard-deletes a row
+ok 150 - no mutation hard-deletes a row
+  ---
+  duration_ms: 0.680467
+  type: 'test'
+  ...
+# Subtest: a rejected pet reassignment is never silently deleted, only deactivated or restored
+ok 151 - a rejected pet reassignment is never silently deleted, only deactivated or restored
+  ---
+  duration_ms: 0.626728
+  type: 'test'
+  ...
+# Subtest: blackout removal is a soft delete
+ok 152 - blackout removal is a soft delete
+  ---
+  duration_ms: 0.29116
+  type: 'test'
+  ...
+# Subtest: package and resource release is not reimplemented in application code
+ok 153 - package and resource release is not reimplemented in application code
+  ---
+  duration_ms: 0.554022
+  type: 'test'
+  ...
+# Subtest: reschedule requires both the semantic and the RLS-required capability
+ok 154 - reschedule requires both the semantic and the RLS-required capability
+  ---
+  duration_ms: 0.30059
+  type: 'test'
+  ...
+# Subtest: cancel requires booking.cancel and the RPC's booking.update
+ok 155 - cancel requires booking.cancel and the RPC's booking.update
+  ---
+  duration_ms: 0.378878
+  type: 'test'
+  ...
+# Subtest: blackout mutations require resource.manage
+ok 156 - blackout mutations require resource.manage
+  ---
+  duration_ms: 0.28811
+  type: 'test'
+  ...
+# Subtest: every mutation reads capabilities rather than trusting the client
+ok 157 - every mutation reads capabilities rather than trusting the client
+  ---
+  duration_ms: 0.575671
+  type: 'test'
+  ...
+# Subtest: no mutation trusts an organization id from the browser
+ok 158 - no mutation trusts an organization id from the browser
+  ---
+  duration_ms: 0.967117
+  type: 'test'
+  ...
+# Subtest: branch access is re-resolved server-side for every mutation
+ok 159 - branch access is re-resolved server-side for every mutation
+  ---
+  duration_ms: 0.354438
+  type: 'test'
+  ...
+# Subtest: every write is scoped by organization_id
+ok 160 - every write is scoped by organization_id
+  ---
+  duration_ms: 0.720255
+  type: 'test'
+  ...
+# Subtest: booking writes are additionally scoped by branch
+ok 161 - booking writes are additionally scoped by branch
+  ---
+  duration_ms: 0.447074
+  type: 'test'
+  ...
+# Subtest: no service-role credential is referenced anywhere in the mutations
+ok 162 - no service-role credential is referenced anywhere in the mutations
+  ---
+  duration_ms: 0.468434
+  type: 'test'
+  ...
+# Subtest: identifiers arriving from the form are shape-validated
+ok 163 - identifiers arriving from the form are shape-validated
+  ---
+  duration_ms: 0.149055
+  type: 'test'
+  ...
+# Subtest: all cancellation and availability-removal actions require an explicit confirmation token
+ok 164 - all cancellation and availability-removal actions require an explicit confirmation token
+  ---
+  duration_ms: 0.28321
+  type: 'test'
+  ...
+# Subtest: unexpected database detail is logged server-side, not returned to the browser
+ok 165 - unexpected database detail is logged server-side, not returned to the browser
+  ---
+  duration_ms: 0.30173
+  type: 'test'
+  ...
+# Subtest: every exported mutation action wraps its entire body in try/catch
+ok 166 - every exported mutation action wraps its entire body in try/catch
+  ---
+  duration_ms: 1.18123
+  type: 'test'
+  ...
+# Subtest: booking mutations revalidate every affected surface
+ok 167 - booking mutations revalidate every affected surface
+  ---
+  duration_ms: 0.450405
+  type: 'test'
+  ...
+# Subtest: the reschedule engine snapshots and compensates an arbitrary number of steps, not a fixed two
+ok 168 - the reschedule engine snapshots and compensates an arbitrary number of steps, not a fixed two
+  ---
+  duration_ms: 0.58936
+  type: 'test'
+  ...
+# Subtest: a step failure that cannot be fully compensated is reported as partially_applied, never success
+ok 169 - a step failure that cannot be fully compensated is reported as partially_applied, never success
+  ---
+  duration_ms: 0.395176
+  type: 'test'
+  ...
+# Subtest: the booking row write is guarded by both status and the optimistic concurrency token
+ok 170 - the booking row write is guarded by both status and the optimistic concurrency token
+  ---
+  duration_ms: 0.415206
+  type: 'test'
+  ...
+# Subtest: every step verifies its own affected-row count rather than trusting an absent error
+ok 171 - every step verifies its own affected-row count rather than trusting an absent error
+  ---
+  duration_ms: 0.378197
+  type: 'test'
+  ...
+# Subtest: a pet whose original groomer was null cannot be falsely reported as fully restored
+ok 172 - a pet whose original groomer was null cannot be falsely reported as fully restored
+  ---
+  duration_ms: 0.211433
+  type: 'test'
+  ...
+# Subtest: a newly-activated booking_resources row is deactivated on compensation, never deleted
+ok 173 - a newly-activated booking_resources row is deactivated on compensation, never deleted
+  ---
+  duration_ms: 0.309779
+  type: 'test'
+  ...
+# Subtest: a mid-sequence status recheck exists and re-validates reschedulability
+ok 174 - a mid-sequence status recheck exists and re-validates reschedulability
+  ---
+  duration_ms: 0.379137
+  type: 'test'
+  ...
+# Subtest: the parser requires a complete, non-empty assignment for every pet on the booking
+ok 175 - the parser requires a complete, non-empty assignment for every pet on the booking
+  ---
+  duration_ms: 0.322279
+  type: 'test'
+  ...
+# Subtest: the server action reads every pet's form field, including an absent or empty one, rather than skipping it
+ok 176 - the server action reads every pet's form field, including an absent or empty one, rather than skipping it
+  ---
+  duration_ms: 0.259671
+  type: 'test'
+  ...
+# Subtest: blackout update and removal verify the affected row count before reporting success
+ok 177 - blackout update and removal verify the affected row count before reporting success
+  ---
+  duration_ms: 0.424255
+  type: 'test'
+  ...
+# Subtest: the preselected customer is re-read server-side within the active organization
+ok 178 - the preselected customer is re-read server-side within the active organization
+  ---
+  duration_ms: 0.26994
+  type: 'test'
+  ...
+# Subtest: an inaccessible preselection opens the wizard normally, exposing no authorization difference
+ok 179 - an inaccessible preselection opens the wizard normally, exposing no authorization difference
+  ---
+  duration_ms: 0.29893
+  type: 'test'
+  ...
+# Subtest: a thrown step.run() is never treated as an ordinary generic error — it always routes through handleUncertainStep
+ok 180 - a thrown step.run() is never treated as an ordinary generic error — it always routes through handleUncertainStep
+  ---
+  duration_ms: 0.448875
+  type: 'test'
+  ...
+# Subtest: handleUncertainStep never guesses: no recovery method, a thrown recovery, or an unverified restore all resolve to partially_applied
+ok 181 - handleUncertainStep never guesses: no recovery method, a thrown recovery, or an unverified restore all resolve to partially_applied
+  ---
+  duration_ms: 0.338669
+  type: 'test'
+  ...
+# Subtest: compensateApplied catches a throwing compensate() and keeps compensating the remaining applied steps
+ok 182 - compensateApplied catches a throwing compensate() and keeps compensating the remaining applied steps
+  ---
+  duration_ms: 0.436385
+  type: 'test'
+  ...
+# Subtest: a thrown status recheck after the booking-row mutation falls back to a neutral result rather than returning early from inside the catch
+ok 183 - a thrown status recheck after the booking-row mutation falls back to a neutral result rather than returning early from inside the catch
+  ---
+  duration_ms: 0.498363
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: a thrown recheck, a resolved recheck error, and a missing row all stop the sequence and compensate before returning, never falling through to run a later step
+ok 184 - v4 correction 2: a thrown recheck, a resolved recheck error, and a missing row all stop the sequence and compensate before returning, never falling through to run a later step
+  ---
+  duration_ms: 0.457432
+  type: 'test'
+  ...
+# Subtest: every concrete resource and pet step builder implements recoverFromUncertainRun for the thrown-run case
+ok 185 - every concrete resource and pet step builder implements recoverFromUncertainRun for the thrown-run case
+  ---
+  duration_ms: 0.597992
+  type: 'test'
+  ...
+# Subtest: the concrete step builders are extracted into a dedicated, dependency-injectable module rather than inlined in the server action
+ok 186 - the concrete step builders are extracted into a dedicated, dependency-injectable module rather than inlined in the server action
+  ---
+  duration_ms: 0.335478
+  type: 'test'
+  ...
+# Subtest: BookingResourceSnapshot captures updated_at alongside resource_id, during, and is_active
+ok 187 - BookingResourceSnapshot captures updated_at alongside resource_id, during, and is_active
+  ---
+  duration_ms: 0.291251
+  type: 'test'
+  ...
+# Subtest: every resource step guards its own write on the snapshot's updated_at, and remembers what it wrote so compensation guards on that value, not the stale snapshot
+ok 188 - every resource step guards its own write on the snapshot's updated_at, and remembers what it wrote so compensation guards on that value, not the stale snapshot
+  ---
+  duration_ms: 0.706827
+  type: 'test'
+  ...
+# Subtest: v4 correction 1: recoverFromUncertainRun never writes — booking-row, resource, and pet recovery are all pure reads, so an unprovable ownership case can never mutate the row
+ok 189 - v4 correction 1: recoverFromUncertainRun never writes — booking-row, resource, and pet recovery are all pure reads, so an unprovable ownership case can never mutate the row
+  ---
+  duration_ms: 1.283247
+  type: 'test'
+  ...
+# Subtest: buildActivateStep distinguishes a guarded reactivation from a new-row insert, and never upserts over an existing row
+ok 190 - buildActivateStep distinguishes a guarded reactivation from a new-row insert, and never upserts over an existing row
+  ---
+  duration_ms: 0.474104
+  type: 'test'
+  ...
+# Subtest: zero or unexpected affected rows are reported as stale, never as a silent success, throughout the resource step builders
+ok 191 - zero or unexpected affected rows are reported as stale, never as a silent success, throughout the resource step builders
+  ---
+  duration_ms: 0.335199
+  type: 'test'
+  ...
+# Subtest: findConflictingBooking derives the active-assignment window from booking_resources.during, never from bookings.starts_at/ends_at
+ok 192 - findConflictingBooking derives the active-assignment window from booking_resources.during, never from bookings.starts_at/ends_at
+  ---
+  duration_ms: 0.499733
+  type: 'test'
+  ...
+# Subtest: both blackout-mutation call sites route their conflict check through findConflictingBooking
+ok 193 - both blackout-mutation call sites route their conflict check through findConflictingBooking
+  ---
+  duration_ms: 0.3148
+  type: 'test'
+  ...
+# Subtest: onboarding stores only a token hash and grants no anonymous table access
+ok 194 - onboarding stores only a token hash and grants no anonymous table access
+  ---
+  duration_ms: 3.059947
+  type: 'test'
+  ...
+# Subtest: public RPCs are narrow while review stays authenticated
+ok 195 - public RPCs are narrow while review stays authenticated
+  ---
+  duration_ms: 0.418736
+  type: 'test'
+  ...
+# Subtest: one link can create only one pending submission and is consumed
+ok 196 - one link can create only one pending submission and is consumed
+  ---
+  duration_ms: 0.642028
+  type: 'test'
+  ...
+# Subtest: approval is tenant and permission scoped and rejection never creates CRM rows
+ok 197 - approval is tenant and permission scoped and rejection never creates CRM rows
+  ---
+  duration_ms: 0.425016
+  type: 'test'
+  ...
+# Subtest: onboarding styling uploads are token scoped and never expose raw tokens in paths
+ok 198 - onboarding styling uploads are token scoped and never expose raw tokens in paths
+  ---
+  duration_ms: 0.571651
+  type: 'test'
+  ...
+# Subtest: approval validates uploaded object ownership before linking it to the created pet
+ok 199 - approval validates uploaded object ownership before linking it to the created pet
+  ---
+  duration_ms: 0.324249
+  type: 'test'
+  ...
+# Subtest: onboarding settings are tenant and customer-manage scoped
+ok 200 - onboarding settings are tenant and customer-manage scoped
+  ---
+  duration_ms: 0.552481
+  type: 'test'
+  ...
+# Subtest: onboarding approval applies organization retention before attachment insert
+ok 201 - onboarding approval applies organization retention before attachment insert
+  ---
+  duration_ms: 0.445772
+  type: 'test'
+  ...
+# Subtest: storage cleanup is bounded and removes objects before soft deleting metadata
+ok 202 - storage cleanup is bounded and removes objects before soft deleting metadata
+  ---
+  duration_ms: 1.816968
+  type: 'test'
+  ...
+# Subtest: section 23: per-pet eligibility is enforced server-side in reserve_package_session, same signature (no new overload)
+ok 203 - section 23: per-pet eligibility is enforced server-side in reserve_package_session, same signature (no new overload)
+  ---
+  duration_ms: 4.350552
+  type: 'test'
+  ...
+# Subtest: section 23: a batched coverage RPC exposes reserved vs available, and the booking wizard/Customer 360 actually consume it instead of the raw cache
+ok 204 - section 23: a batched coverage RPC exposes reserved vs available, and the booking wizard/Customer 360 actually consume it instead of the raw cache
+  ---
+  duration_ms: 0.718125
+  type: 'test'
+  ...
+# Subtest: section 23: the booking-wizard over-allocation warning counts every OTHER (pet, service) cell against the same package, including a different service on the SAME pet
+ok 205 - section 23: the booking-wizard over-allocation warning counts every OTHER (pet, service) cell against the same package, including a different service on the SAME pet
+  ---
+  duration_ms: 0.833451
+  type: 'test'
+  ...
+# Subtest: section 24: packages gain a truthful recurrence interval and a per-pet flag, no invented auto-billing/scheduler
+ok 206 - section 24: packages gain a truthful recurrence interval and a per-pet flag, no invented auto-billing/scheduler
+  ---
+  duration_ms: 1.15947
+  type: 'test'
+  ...
+# Subtest: section 24: customer_packages gets a real source_invoice_id FK (superseding the metadata convention) and per-pet scope, backfilled from existing rows
+ok 207 - section 24: customer_packages gets a real source_invoice_id FK (superseding the metadata convention) and per-pet scope, backfilled from existing rows
+  ---
+  duration_ms: 0.779824
+  type: 'test'
+  ...
+# Subtest: section 24: create_package_invoice guards idempotency keys against different sale inputs and accepts a pet
+ok 208 - section 24: create_package_invoice guards idempotency keys against different sale inputs and accepts a pet
+  ---
+  duration_ms: 0.634979
+  type: 'test'
+  ...
+# Subtest: section 24 follow-up: every purchase/renewal ledger row can carry an invoice_id, and create_package_invoice stamps it on the purchase row
+ok 209 - section 24 follow-up: every purchase/renewal ledger row can carry an invoice_id, and create_package_invoice stamps it on the purchase row
+  ---
+  duration_ms: 0.404267
+  type: 'test'
+  ...
+# Subtest: section 24 follow-up: a paid renewal is a real commercial transaction -- it creates an order/invoice/invoice_lines, not just a session top-up, and requires an explicit branch (never a silently guessed one)
+ok 210 - section 24 follow-up: a paid renewal is a real commercial transaction -- it creates an order/invoice/invoice_lines, not just a session top-up, and requires an explicit branch (never a silently guessed one)
+  ---
+  duration_ms: 0.810672
+  type: 'test'
+  ...
+# Subtest: section 24 follow-up: renewal reuses the SAME status is 'canceled' / catalog inactive guards, extends expiry from greatest(now, current expiry), and reactivates an exhausted/expired package uniformly (no per-status special case)
+ok 211 - section 24 follow-up: renewal reuses the SAME status is 'canceled' / catalog inactive guards, extends expiry from greatest(now, current expiry), and reactivates an exhausted/expired package uniformly (no per-status special case)
+  ---
+  duration_ms: 0.768044
+  type: 'test'
+  ...
+# Subtest: section 24 follow-up: renewal idempotency is order lock -> authorize -> idempotent-return -> validate (matches the reviewed pattern already on this branch), and rejects a request_key reused for a different membership/branch/price
+ok 212 - section 24 follow-up: renewal idempotency is order lock -> authorize -> idempotent-return -> validate (matches the reviewed pattern already on this branch), and rejects a request_key reused for a different membership/branch/price
+  ---
+  duration_ms: 1.442482
+  type: 'test'
+  ...
+# Subtest: section 25: archiving (set_customer_package_status) is guarded and refuses to cancel a package with an outstanding reserved session
+ok 213 - section 25: archiving (set_customer_package_status) is guarded and refuses to cancel a package with an outstanding reserved session
+  ---
+  duration_ms: 0.490603
+  type: 'test'
+  ...
+# Subtest: section 25: the membership administration page filters by status/urgency, flags legacy (no source invoice) rows, and links back to Customer 360
+ok 214 - section 25: the membership administration page filters by status/urgency, flags legacy (no source invoice) rows, and links back to Customer 360
+  ---
+  duration_ms: 0.29596
+  type: 'test'
+  ...
+# Subtest: section 25: the renewal form in the UI requires an explicit branch (defaulted to the source invoice's branch when known, never silently substituted) and issues an invoice
+ok 215 - section 25: the renewal form in the UI requires an explicit branch (defaulted to the source invoice's branch when known, never silently substituted) and issues an invoice
+  ---
+  duration_ms: 0.443996
+  type: 'test'
+  ...
+# Subtest: section 25: membership history (purchases/renewals/consumption/reservations) loads scoped to one membership, never an unbounded organization-wide scan
+ok 216 - section 25: membership history (purchases/renewals/consumption/reservations) loads scoped to one membership, never an unbounded organization-wide scan
+  ---
+  duration_ms: 0.480864
+  type: 'test'
+  ...
+# Subtest: section 24: package catalog terms (recurrence/per-pet/sessions/price/validity/active) are configurable in the UI, reusing the RLS-guarded table-write pattern already used by createServiceAction (no bespoke RPC, no second package system)
+ok 217 - section 24: package catalog terms (recurrence/per-pet/sessions/price/validity/active) are configurable in the UI, reusing the RLS-guarded table-write pattern already used by createServiceAction (no bespoke RPC, no second package system)
+  ---
+  duration_ms: 0.724966
+  type: 'test'
+  ...
+# Subtest: section 24: editing the catalog can never rewrite an already-sold membership -- updatePackageAction only ever writes public.packages, never public.customer_packages
+ok 218 - section 24: editing the catalog can never rewrite an already-sold membership -- updatePackageAction only ever writes public.packages, never public.customer_packages
+  ---
+  duration_ms: 0.329669
+  type: 'test'
+  ...
+# Subtest: section 25/26: renew, archive, catalog writes, and repair are all gated behind membership.manage; reconcile preview only needs membership.read
+ok 219 - section 25/26: renew, archive, catalog writes, and repair are all gated behind membership.manage; reconcile preview only needs membership.read
+  ---
+  duration_ms: 0.521963
+  type: 'test'
+  ...
+# Subtest: section 26: reconciliation never writes (it is language ... stable, no insert/update/delete in its body), and separates auto-repairable cache drift from manual-review-only issues
+ok 220 - section 26: reconciliation never writes (it is language ... stable, no insert/update/delete in its body), and separates auto-repairable cache drift from manual-review-only issues
+  ---
+  duration_ms: 0.30436
+  type: 'test'
+  ...
+# Subtest: section 26: reconciliation verifies actual reservation<->ledger LINKS (consumption_ledger_id / reversal_ledger_id), not just matching counts, and flags orphan consumption ledger rows and unlinked purchase/renewal invoices
+ok 221 - section 26: reconciliation verifies actual reservation<->ledger LINKS (consumption_ledger_id / reversal_ledger_id), not just matching counts, and flags orphan consumption ledger rows and unlinked purchase/renewal invoices
+  ---
+  duration_ms: 0.28615
+  type: 'test'
+  ...
+# Subtest: section 26: repair re-checks the caller-supplied revision against the CURRENT row and rejects a stale one with 40001, before touching any data (repair itself is untouched by the follow-up migration -- it only ever resyncs the cache, never invents financial history)
+ok 222 - section 26: repair re-checks the caller-supplied revision against the CURRENT row and rejects a stale one with 40001, before touching any data (repair itself is untouched by the follow-up migration -- it only ever resyncs the cache, never invents financial history)
+  ---
+  duration_ms: 0.309609
+  type: 'test'
+  ...
+# Subtest: organization isolation: every new/changed RPC re-derives its own organization_id (app.fn_active_organization()) and never accepts a caller-supplied org
+ok 223 - organization isolation: every new/changed RPC re-derives its own organization_id (app.fn_active_organization()) and never accepts a caller-supplied org
+  ---
+  duration_ms: 0.434226
+  type: 'test'
+  ...
+# Subtest: run_all_gates.sh records both migrations' lineage
+ok 224 - run_all_gates.sh records both migrations' lineage
+  ---
+  duration_ms: 0.176104
+  type: 'test'
+  ...
+# Subtest: the superseded, ledger-bypassing sellPackageAction/PackageSaleForm dead code path is removed, not left as a second package balance system
+ok 225 - the superseded, ledger-bypassing sellPackageAction/PackageSaleForm dead code path is removed, not left as a second package balance system
+  ---
+  duration_ms: 0.612499
+  type: 'test'
+  ...
+# Subtest: membership.manage and membership.read remain the only capability keys governing this module (catalog writes reuse membership.manage, not a new key)
+ok 226 - membership.manage and membership.read remain the only capability keys governing this module (catalog writes reuse membership.manage, not a new key)
+  ---
+  duration_ms: 0.248601
+  type: 'test'
+  ...
+# Subtest: buildDeactivateStep.run() deactivates the row and compensate() restores it, wired to a fake db through the same RescheduleDbClient interface production code uses
+ok 227 - buildDeactivateStep.run() deactivates the row and compensate() restores it, wired to a fake db through the same RescheduleDbClient interface production code uses
+  ---
+  duration_ms: 8.154234
+  type: 'test'
+  ...
+# Subtest: concurrent cancellation deactivates a resource before uncertain deactivate recovery; recovery must not reactivate it
+ok 228 - concurrent cancellation deactivates a resource before uncertain deactivate recovery; recovery must not reactivate it
+  ---
+  duration_ms: 1.384776
+  type: 'test'
+  ...
+# Subtest: a concurrent modification of a resource's window before uncertain keep recovery is not overwritten
+ok 229 - a concurrent modification of a resource's window before uncertain keep recovery is not overwritten
+  ---
+  duration_ms: 0.793103
+  type: 'test'
+  ...
+# Subtest: a concurrent reactivation of a resource before uncertain activate recovery is not overwritten
+ok 230 - a concurrent reactivation of a resource before uncertain activate recovery is not overwritten
+  ---
+  duration_ms: 0.683357
+  type: 'test'
+  ...
+# Subtest: an uncertain insert followed by an existing row does not deactivate that row
+ok 231 - an uncertain insert followed by an existing row does not deactivate that row
+  ---
+  duration_ms: 0.385797
+  type: 'test'
+  ...
+# Subtest: an uncertain insert with no row at all is correctly reported as not applied
+ok 232 - an uncertain insert with no row at all is correctly reported as not applied
+  ---
+  duration_ms: 0.304169
+  type: 'test'
+  ...
+# Subtest: a terminal booking status reached before uncertain booking-row recovery is not updated
+ok 233 - a terminal booking status reached before uncertain booking-row recovery is not updated
+  ---
+  duration_ms: 0.807383
+  type: 'test'
+  ...
+# Subtest: booking-row recovery reports not applied only when the complete current state still matches the original snapshot exactly
+ok 234 - booking-row recovery reports not applied only when the complete current state still matches the original snapshot exactly
+  ---
+  duration_ms: 0.476114
+  type: 'test'
+  ...
+# Subtest: a pet reassigned by a concurrent request before uncertain pet recovery is not reverted, and the RPC is never re-invoked by recovery
+ok 235 - a pet reassigned by a concurrent request before uncertain pet recovery is not reverted, and the RPC is never re-invoked by recovery
+  ---
+  duration_ms: 1.949378
+  type: 'test'
+  ...
+# Subtest: archive supports explicit current, future and whole-series scopes
+ok 236 - archive supports explicit current, future and whole-series scopes
+  ---
+  duration_ms: 2.315062
+  type: 'test'
+  ...
+# Subtest: archive refuses financial records and cleans linked visit rows
+ok 237 - archive refuses financial records and cleans linked visit rows
+  ---
+  duration_ms: 0.959052
+  type: 'test'
+  ...
+# Subtest: archive reconciles both reserved and consumed package effects
+ok 238 - archive reconciles both reserved and consumed package effects
+  ---
+  duration_ms: 0.409356
+  type: 'test'
+  ...
+# Subtest: service_catalog gains a nullable size price matrix that preserves base_price
+ok 239 - service_catalog gains a nullable size price matrix that preserves base_price
+  ---
+  duration_ms: 4.902374
+  type: 'test'
+  ...
+# Subtest: size and price columns are constrained non-negative / to a fixed enum
+ok 240 - size and price columns are constrained non-negative / to a fixed enum
+  ---
+  duration_ms: 0.813683
+  type: 'test'
+  ...
+# Subtest: every supported size resolves to its own catalog column in assembly_add_line
+ok 241 - every supported size resolves to its own catalog column in assembly_add_line
+  ---
+  duration_ms: 0.520572
+  type: 'test'
+  ...
+# Subtest: a missing size or a missing size price falls back to base_price, never null/negative
+ok 242 - a missing size or a missing size price falls back to base_price, never null/negative
+  ---
+  duration_ms: 0.839082
+  type: 'test'
+  ...
+# Subtest: additional duration only ever adds time for units beyond the first, defaulting to zero impact
+ok 243 - additional duration only ever adds time for units beyond the first, defaulting to zero impact
+  ---
+  duration_ms: 0.477354
+  type: 'test'
+  ...
+# Subtest: the resolved size, price source and duration are snapshotted onto the line, never recomputed later
+ok 244 - the resolved size, price source and duration are snapshotted onto the line, never recomputed later
+  ---
+  duration_ms: 0.415157
+  type: 'test'
+  ...
+# Subtest: assembly_add_line keeps its exact signature so run_all_gates.sh GATE 4's assembly-function count is unaffected
+ok 245 - assembly_add_line keeps its exact signature so run_all_gates.sh GATE 4's assembly-function count is unaffected
+  ---
+  duration_ms: 3.738253
+  type: 'test'
+  ...
+# Subtest: manual override is a dedicated RPC outside the assembly-count gate, and requires org auth, a reason, and a non-negative price
+ok 246 - manual override is a dedicated RPC outside the assembly-count gate, and requires org auth, a reason, and a non-negative price
+  ---
+  duration_ms: 0.87966
+  type: 'test'
+  ...
+# Subtest: override is refused once an invoice already exists for the booking (issued invoice immutability boundary)
+ok 247 - override is refused once an invoice already exists for the booking (issued invoice immutability boundary)
+  ---
+  duration_ms: 0.944458
+  type: 'test'
+  ...
+# Subtest: override writes an auditable trail and revokes public/anon execute
+ok 248 - override writes an auditable trail and revokes public/anon execute
+  ---
+  duration_ms: 1.235299
+  type: 'test'
+  ...
+# Subtest: financial_sales invoice/invoice_lines immutability triggers are untouched by this migration
+ok 249 - financial_sales invoice/invoice_lines immutability triggers are untouched by this migration
+  ---
+  duration_ms: 0.550951
+  type: 'test'
+  ...
+# Subtest: run_all_gates.sh records this migration's lineage
+ok 250 - run_all_gates.sh records this migration's lineage
+  ---
+  duration_ms: 0.379378
+  type: 'test'
+  ...
+# Subtest: client server actions gate service-catalog writes and the price override behind service.manage, never trusting a client-supplied booking price
+ok 251 - client server actions gate service-catalog writes and the price override behind service.manage, never trusting a client-supplied booking price
+  ---
+  duration_ms: 1.265717
+  type: 'test'
+  ...
+# Subtest: service create/update stay organization-scoped and validate every size price is a non-negative number or blank
+ok 252 - service create/update stay organization-scoped and validate every size price is a non-negative number or blank
+  ---
+  duration_ms: 0.896269
+  type: 'test'
+  ...
+# Subtest: pet size selection is optional and constrained to the four supported bands
+ok 253 - pet size selection is optional and constrained to the four supported bands
+  ---
+  duration_ms: 0.431345
+  type: 'test'
+  ...
+# Subtest: catalog admin UI exposes size prices, additional duration and fulfillment-mode checkboxes for editing
+ok 254 - catalog admin UI exposes size prices, additional duration and fulfillment-mode checkboxes for editing
+  ---
+  duration_ms: 0.455575
+  type: 'test'
+  ...
+# Subtest: operations pricing data snapshots price_source per line so overridden lines are distinguishable
+ok 255 - operations pricing data snapshots price_source per line so overridden lines are distinguishable
+  ---
+  duration_ms: 0.416746
+  type: 'test'
+  ...
+# Subtest: multiple services per pet remain supported: assembly_add_line is called once per selected service, unbounded by size logic
+ok 256 - multiple services per pet remain supported: assembly_add_line is called once per selected service, unbounded by size logic
+  ---
+  duration_ms: 5.958327
+  type: 'test'
+  ...
+# Subtest: styling reference bucket is private and tenant partitioned
+ok 257 - styling reference bucket is private and tenant partitioned
+  ---
+  duration_ms: 3.877045
+  type: 'test'
+  ...
+# Subtest: upload validates tenant pet ownership and stores bounded expiry metadata
+ok 258 - upload validates tenant pet ownership and stores bounded expiry metadata
+  ---
+  duration_ms: 0.608198
+  type: 'test'
+  ...
+# Subtest: loaders hide expired references and issue short lived signed urls
+ok 259 - loaders hide expired references and issue short lived signed urls
+  ---
+  duration_ms: 0.327559
+  type: 'test'
+  ...
+# Subtest: actions.ts starts with the "use server" directive
+ok 260 - actions.ts starts with the "use server" directive
+  ---
+  duration_ms: 130.50391
+  type: 'test'
+  ...
+# Subtest: every export from actions.ts is an async function declaration
+ok 261 - every export from actions.ts is an async function declaration
+  ---
+  duration_ms: 52.488704
+  type: 'test'
+  ...
+# Subtest: actions.ts does not declare or export MutationState/IDLE_STATE itself
+ok 262 - actions.ts does not declare or export MutationState/IDLE_STATE itself
+  ---
+  duration_ms: 33.378724
+  type: 'test'
+  ...
+# Subtest: actions.ts imports MutationState as a type-only import from lib/schedule/idle_state
+ok 263 - actions.ts imports MutationState as a type-only import from lib/schedule/idle_state
+  ---
+  duration_ms: 22.542738
+  type: 'test'
+  ...
+# Subtest: lib/schedule/idle_state.ts owns MutationState and IDLE_STATE, and carries no directive
+ok 264 - lib/schedule/idle_state.ts owns MutationState and IDLE_STATE, and carries no directive
+  ---
+  duration_ms: 12.279596
+  type: 'test'
+  ...
+# Subtest: blackout-manager and booking-edit-form import IDLE_STATE from idle_state.ts, not from actions.ts
+ok 265 - blackout-manager and booking-edit-form import IDLE_STATE from idle_state.ts, not from actions.ts
+  ---
+  duration_ms: 55.187626
+  type: 'test'
+  ...
+1..265
+# tests 265
+# suites 0
+# pass 265
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6021.262539

@@ -11,7 +11,7 @@ const URGENCY_OPTIONS: Array<{ value: MembershipUrgency | "all"; label: string }
 ];
 
 /** Section 25: status/urgency filters over the membership administration list. */
-export function MembershipFilterList({ rows, canManage }: { rows: MembershipPackageRow[]; canManage: boolean }) {
+export function MembershipFilterList({ rows, canManage, branches }: { rows: MembershipPackageRow[]; canManage: boolean; branches: Array<{ id: string; name: string }> }) {
   const [urgency, setUrgency] = useState<MembershipUrgency | "all">("all");
   const [search, setSearch] = useState("");
 
@@ -28,6 +28,6 @@ export function MembershipFilterList({ rows, canManage }: { rows: MembershipPack
         {URGENCY_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => setUrgency(option.value)} className={`rounded-full px-3 py-1.5 text-xs font-bold ${urgency === option.value ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`}>{option.label}</button>)}
       </div>
     </div>
-    {filtered.length === 0 ? <p className="p-5 text-sm text-slate-500">Tidak ada paket yang cocok dengan filter ini.</p> : <div className="divide-y">{filtered.map((row) => <MembershipManager key={row.id} row={row} canManage={canManage} />)}</div>}
+    {filtered.length === 0 ? <p className="p-5 text-sm text-slate-500">Tidak ada paket yang cocok dengan filter ini.</p> : <div className="divide-y">{filtered.map((row) => <MembershipManager key={row.id} row={row} canManage={canManage} branches={branches} />)}</div>}
   </div>;
 }

@@ -30,6 +30,13 @@ export interface MembershipPackageRow {
   renewalCount: number;
   revision: number;
   sourceInvoiceNumber: string | null;
+  sourceInvoiceBranchId: string | null;
+  isLegacy: boolean;
+}
+
+export interface MembershipAdministrationWorkspace {
+  rows: MembershipPackageRow[];
+  branches: Array<{ id: string; name: string }>;
 }
 
 const URGENT_WITHIN_DAYS = 7;
@@ -44,25 +51,28 @@ function urgencyOf(status: string, expiresAt: string | null, availableSessions: 
   return "normal";
 }
 
-export async function loadMembershipAdministrationWorkspace(supabase: SupabaseClient, organizationId: string): Promise<MembershipPackageRow[]> {
-  const [rowsResult, reservedResult] = await Promise.all([
+export async function loadMembershipAdministrationWorkspace(supabase: SupabaseClient, organizationId: string): Promise<MembershipAdministrationWorkspace> {
+  const [rowsResult, reservedResult, branchesResult] = await Promise.all([
     supabase
       .from("customer_packages")
-      .select("id,customer_id,package_id,sessions_remaining,status,purchased_at,activated_at,expires_at,renewed_at,renewal_count,revision,source_invoice_id,customers(display_name),packages(name,recurrence_interval),pets(name),invoices(invoice_number)")
+      .select("id,customer_id,package_id,sessions_remaining,status,purchased_at,activated_at,expires_at,renewed_at,renewal_count,revision,source_invoice_id,customers(display_name),packages(name,recurrence_interval),pets(name),invoices(invoice_number,branch_id)")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .order("purchased_at", { ascending: false }),
     supabase.from("package_reservations").select("customer_package_id").eq("organization_id", organizationId).eq("status", "reserved"),
+    supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
   ]);
   if (rowsResult.error) throw new Error(`membership_admin_packages_failed:${rowsResult.error.message}`);
   if (reservedResult.error) throw new Error(`membership_admin_reservations_failed:${reservedResult.error.message}`);
+  if (branchesResult.error) throw new Error(`membership_admin_branches_failed:${branchesResult.error.message}`);
 
   const reservedByPackage = new Map<string, number>();
   for (const row of reservedResult.data ?? []) reservedByPackage.set(row.customer_package_id, (reservedByPackage.get(row.customer_package_id) ?? 0) + 1);
 
-  return (rowsResult.data ?? []).map((row) => {
+  const rows = (rowsResult.data ?? []).map((row) => {
     const remaining = Number(row.sessions_remaining) || 0;
     const reserved = reservedByPackage.get(row.id) ?? 0;
+    const sourceInvoice = relationRows(row.invoices)[0];
     return {
       id: row.id,
       customerId: row.customer_id,
@@ -81,7 +91,10 @@ export async function loadMembershipAdministrationWorkspace(supabase: SupabaseCl
       renewedAt: row.renewed_at,
       renewalCount: row.renewal_count,
       revision: row.revision,
-      sourceInvoiceNumber: relationRows(row.invoices)[0]?.invoice_number as string | undefined ?? null,
+      sourceInvoiceNumber: sourceInvoice?.invoice_number as string | undefined ?? null,
+      sourceInvoiceBranchId: sourceInvoice?.branch_id as string | undefined ?? null,
+      isLegacy: !row.source_invoice_id,
     };
   });
+  return { rows, branches: branchesResult.data ?? [] };
 }

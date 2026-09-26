@@ -175,7 +175,7 @@ export interface CatalogWorkspace {
     phone: string | null; color: string; baseLabel: string | null; latitude: number | null; longitude: number | null;
     appointmentCount: number; lateCount: number; missingPhotoCount: number; joinDate: string; baseSalary: number | null; payType: string | null;
   }>;
-  packages: Array<{ id: string; name: string; sessions: number; price: number; active: boolean }>;
+  packages: Array<{ id: string; name: string; description: string | null; serviceId: string | null; sessions: number; price: number; currency: string; validityDays: number | null; rolloverPolicy: string; recurrenceInterval: string; perPet: boolean; active: boolean }>;
   products: Array<{ id: string; name: string; sku: string | null; stock: number }>;
 }
 
@@ -185,7 +185,7 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
     supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("service_catalog").select("id,name,category,duration_minutes,additional_duration_minutes,base_price,price_small,price_medium,price_large,price_extra_large,fulfillment_modes,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,membership_id,name,status,skills,settings,created_at").eq("organization_id", organizationId).eq("kind", "staff").is("deleted_at", null).order("name"),
-    supabase.from("packages").select("id,name,total_sessions,price,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
+    supabase.from("packages").select("id,name,description,service_id,total_sessions,price,currency,validity_days,rollover_policy,recurrence_interval,per_pet,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("product_catalog").select("id,name,sku").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("inventory_levels").select("product_id,quantity").eq("organization_id", organizationId),
     supabase.from("memberships").select("id,users(full_name,email)").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
@@ -206,7 +206,7 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
     const pay = (compensation.data ?? []).find((item) => item.membership_id === row.membership_id);
     const ownAttendance = (attendance.data ?? []).filter((item) => item.resource_id === row.id);
     return { id: row.id, branchId: row.branch_id, membershipId: row.membership_id, name: row.name, branchName: branchMap.get(row.branch_id) ?? "Cabang", status: row.status, skills: row.skills, phone: typeof settings.phone === "string" ? settings.phone : null, color: typeof settings.calendar_color === "string" ? settings.calendar_color : "#0f766e", baseLabel: typeof base.label === "string" ? base.label : null, latitude: base.latitude !== null && base.latitude !== undefined && Number.isFinite(Number(base.latitude)) ? Number(base.latitude) : null, longitude: base.longitude !== null && base.longitude !== undefined && Number.isFinite(Number(base.longitude)) ? Number(base.longitude) : null, appointmentCount: new Set((assignments.data ?? []).filter((item) => item.resource_id === row.id).map((item) => item.booking_id)).size, lateCount: ownAttendance.filter((item) => item.classification === "late" && !item.waived_at).length, missingPhotoCount: ownAttendance.filter((item) => item.classification === "missing_photo").length, joinDate: row.created_at, baseSalary: pay ? Number(pay.base_amount) : null, payType: pay?.pay_type ?? null };
-  }), packages: (packages.data ?? []).map((row) => ({ id: row.id, name: row.name, sessions: row.total_sessions, price: Number(row.price), active: row.is_active })), products: (products.data ?? []).map((row) => ({ id: row.id, name: row.name, sku: row.sku, stock: stock.get(row.id) ?? 0 })) };
+  }), packages: (packages.data ?? []).map((row) => ({ id: row.id, name: row.name, description: row.description, serviceId: row.service_id, sessions: row.total_sessions, price: Number(row.price), currency: row.currency, validityDays: row.validity_days, rolloverPolicy: row.rollover_policy, recurrenceInterval: row.recurrence_interval, perPet: row.per_pet, active: row.is_active })), products: (products.data ?? []).map((row) => ({ id: row.id, name: row.name, sku: row.sku, stock: stock.get(row.id) ?? 0 })) };
 }
 
 export interface FinanceWorkspace {

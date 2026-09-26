@@ -11,7 +11,7 @@ export const metadata = { title: "Administrasi paket" };
 
 export default async function MembershipsPage() {
   const workspace = await requireActiveWorkspace();
-  const rows = await loadMembershipAdministrationWorkspace(workspace.supabase, workspace.activeOrganization.id);
+  const { rows, branches } = await loadMembershipAdministrationWorkspace(workspace.supabase, workspace.activeOrganization.id);
   return <WorkspaceShell {...workspace} activePath="/programs">
     <PageHeader
       eyebrow="Retensi pelanggan"
@@ -22,7 +22,7 @@ export default async function MembershipsPage() {
     <section className="mt-7 rounded-3xl border border-slate-200 bg-white shadow-sm">
       {rows.length === 0
         ? <div className="p-5"><EmptyState title="Belum ada paket pelanggan" description="Paket yang terjual melalui invoice akan muncul di sini." /></div>
-        : <MembershipFilterList rows={rows} canManage={workspace.capabilities["membership.manage"]} />}
+        : <MembershipFilterList rows={rows} canManage={workspace.capabilities["membership.manage"]} branches={branches} />}
     </section>
   </WorkspaceShell>;
 }

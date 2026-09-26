@@ -10,6 +10,9 @@
  * - uploadGroomingEvidenceAction: stores private, booking-linked grooming evidence for an assigned groomer.
  * - updateGroomingChecklistAction / issueInvoiceForBookingAction / previewInvoiceDiscountsAction: closes the service-to-cash loop, including section-22 invoice/pet/service/category discounts, transport fee, and a pre-issuance preview.
  * - createServiceAction / updateServiceAction / overrideGroomingLinePriceAction / createResourceAction / updateResourceAction / archiveResourceAction: configures the operating catalog.
+ * - createPackageAction / updatePackageAction: configures the package/membership catalog (recurrence, per-pet, sessions, price, validity) -- future sales only, never rewrites already-sold customer_packages.
+ * - renewCustomerPackageAction: manual paid renewal -- creates a renewal invoice/order/ledger row, not just a session top-up.
+ * - loadMembershipHistoryAction: read-only ledger + reservation history for one membership (section 25 detail view).
  * - adjustInventoryAction: appends an inventory adjustment movement.
  * - recordPaymentAction / recordExpenseAction: records manual financial activity.
  * - sellPackageAction: sells a catalog package to a customer and records the payment.
@@ -766,14 +769,98 @@ export async function recordExpenseAction(_previous: PilotActionState, formData:
  * idempotent via a client-generated request_key, matching the
  * create_package_invoice convention already used for package sales.
  */
+/**
+ * A manual renewal is a real commercial transaction: it creates a renewal
+ * invoice (order + invoice + invoice_lines) exactly like the original sale,
+ * not just a session top-up. Branch is required and explicit -- the UI
+ * defaults it to the membership's source-invoice branch when known, but the
+ * staff member confirms it; nothing here guesses a branch for a legacy
+ * membership with no source invoice.
+ */
 export async function renewCustomerPackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
-  const customerPackageId = idValue(formData, "customerPackageId"); const requestKey = idValue(formData, "requestKey");
-  if (!customerPackageId || !requestKey) return databaseError("Paket", "data tidak valid");
-  const result = await context.supabase.schema("app").rpc("renew_customer_package", { p_customer_package: customerPackageId, p_request_key: requestKey });
-  if (result.error) return databaseError("Perpanjangan gagal", /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage diperlukan" : result.error.message);
-  revalidatePath("/programs"); revalidatePath("/programs/memberships");
-  return { error: null, success: "Paket berhasil diperpanjang." };
+  if (!(await loadCapabilities(context.supabase))["invoice.issue"]) return databaseError("Paket", "izin invoice.issue diperlukan");
+  const customerPackageId = idValue(formData, "customerPackageId"); const branchId = idValue(formData, "branchId"); const requestKey = idValue(formData, "requestKey");
+  const issuedDate = textValue(formData, "invoiceDate", 10); const dueDate = textValue(formData, "dueDate", 10);
+  if (!customerPackageId || !branchId || !requestKey || !issuedDate) return databaseError("Paket", "cabang, tanggal invoice, dan paket wajib diisi");
+  const issuedAt = new Date(`${issuedDate}T09:00:00+07:00`).toISOString();
+  const dueAt = dueDate ? new Date(`${dueDate}T23:59:59+07:00`).toISOString() : null;
+  if (dueAt && new Date(dueAt) < new Date(issuedAt)) return databaseError("Paket", "tanggal jatuh tempo tidak boleh sebelum tanggal invoice");
+  const result = await context.supabase.schema("app").rpc("renew_customer_package", {
+    p_customer_package: customerPackageId, p_branch: branchId, p_issued_at: issuedAt, p_due_at: dueAt,
+    p_admin_notes: textValue(formData, "adminNotes", 2000) || null, p_request_key: requestKey,
+  });
+  if (result.error) return databaseError("Perpanjangan gagal", /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage/invoice.issue diperlukan" : /request_key_reused/i.test(result.error.message) ? "kunci permintaan sudah dipakai untuk perpanjangan lain" : /package_canceled_cannot_renew/i.test(result.error.message) ? "paket sudah diarsipkan dan tidak dapat diperpanjang" : /package_catalog_inactive/i.test(result.error.message) ? "produk paket ini sudah tidak aktif di katalog" : result.error.message);
+  const row = result.data as { invoice_number?: string } | null;
+  revalidatePath("/programs"); revalidatePath("/programs/memberships"); revalidatePath("/finance");
+  return { error: null, success: `Paket diperpanjang. ${row?.invoice_number ?? "Invoice"} diterbitkan.` };
+}
+
+const RECURRENCE_INTERVALS = new Set(["none", "week", "month", "year"]);
+const ROLLOVER_POLICIES = new Set(["none", "rollover"]);
+
+interface PackagePayload {
+  name: string; description: string | null; service_id: string | null; total_sessions: number; price: number;
+  validity_days: number | null; rollover_policy: string; recurrence_interval: string; per_pet: boolean;
+}
+
+function packagePayload(formData: FormData): PackagePayload | { invalid: string } {
+  const name = textValue(formData, "name", 100);
+  const sessions = numberValue(formData, "sessions");
+  const price = numberValue(formData, "price");
+  const validityDaysText = textValue(formData, "validityDays", 10);
+  const validityDays = validityDaysText ? numberValue(formData, "validityDays") : null;
+  const recurrenceInterval = textValue(formData, "recurrenceInterval", 10) || "none";
+  const rolloverPolicy = textValue(formData, "rolloverPolicy", 10) || "none";
+  const serviceId = idValue(formData, "serviceId");
+  const perPet = formData.get("perPet") === "on";
+  const description = textValue(formData, "description", 300) || null;
+  if (name.length < 2 || !sessions || sessions < 1 || price === null || price < 0) return { invalid: "nama, jumlah sesi, atau harga tidak valid" };
+  if (validityDaysText && (validityDays === null || !Number.isInteger(validityDays) || validityDays < 1)) return { invalid: "masa berlaku tidak valid" };
+  if (!RECURRENCE_INTERVALS.has(recurrenceInterval)) return { invalid: "interval perpanjangan tidak valid" };
+  if (!ROLLOVER_POLICIES.has(rolloverPolicy)) return { invalid: "kebijakan rollover tidak valid" };
+  return { name, description, service_id: serviceId, total_sessions: sessions, price, validity_days: validityDays, rollover_policy: rolloverPolicy, recurrence_interval: recurrenceInterval, per_pet: perPet };
+}
+
+/**
+ * Section 24 catalog configuration: plain RLS-guarded table writes, the same
+ * pattern as createServiceAction/updateServiceAction (packages already has a
+ * membership.manage write policy -- see 20260721001100_security_rls_capabilities.sql
+ * -- so no bespoke RPC is needed for a non-monetary-ledger catalog edit).
+ * Editing the catalog only ever changes public.packages; it can never rewrite
+ * an already-sold customer_packages row (those snapshot their own pet/service
+ * at purchase time), so existing entitlements are untouched by design.
+ */
+export async function createPackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  if (!(await loadCapabilities(context.supabase))["membership.manage"]) return databaseError("Paket", "izin membership.manage diperlukan");
+  const payload = packagePayload(formData);
+  if ("invalid" in payload) return databaseError("Paket", payload.invalid);
+  if (payload.service_id) {
+    const { data: service } = await context.supabase.from("service_catalog").select("id").eq("organization_id", context.organizationId).eq("id", payload.service_id).is("deleted_at", null).maybeSingle();
+    if (!service) return databaseError("Paket", "layanan tidak ditemukan");
+  }
+  const { error } = await context.supabase.from("packages").insert({ organization_id: context.organizationId, ...payload, currency: "IDR", is_active: true, metadata: { created_from: "homepaw_pilot" } });
+  if (error) return databaseError("Paket gagal dibuat", error.message);
+  revalidatePath("/programs"); revalidatePath("/invoices/new");
+  return { error: null, success: "Paket berhasil ditambahkan ke katalog." };
+}
+
+export async function updatePackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  if (!(await loadCapabilities(context.supabase))["membership.manage"]) return databaseError("Paket", "izin membership.manage diperlukan");
+  const packageId = idValue(formData, "packageId"); if (!packageId) return databaseError("Paket", "paket tidak valid");
+  const payload = packagePayload(formData);
+  if ("invalid" in payload) return databaseError("Paket", payload.invalid);
+  if (payload.service_id) {
+    const { data: service } = await context.supabase.from("service_catalog").select("id").eq("organization_id", context.organizationId).eq("id", payload.service_id).is("deleted_at", null).maybeSingle();
+    if (!service) return databaseError("Paket", "layanan tidak ditemukan");
+  }
+  const isActive = formData.get("isActive") === "on";
+  const { error } = await context.supabase.from("packages").update({ ...payload, is_active: isActive }).eq("organization_id", context.organizationId).eq("id", packageId);
+  if (error) return databaseError("Paket gagal diperbarui", error.message);
+  revalidatePath("/programs"); revalidatePath("/invoices/new");
+  return { error: null, success: "Paket katalog berhasil diperbarui. Paket yang sudah terjual tidak berubah." };
 }
 
 export async function setCustomerPackageStatusAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
@@ -788,8 +875,8 @@ export async function setCustomerPackageStatusAction(_previous: PilotActionState
 
 export interface PackageReconciliationReport {
   customerPackageId: string; revision: number; status: string; cachedBalance: number; ledgerBalance: number;
-  balanceMatches: boolean; reservedCount: number; consumedReservations: number; consumptionLedgerEntries: number;
-  reservationConsumptionMatches: boolean; checkedAt: string;
+  balanceMatches: boolean; autoRepairable: boolean; reservedCount: number; consumedReservations: number; consumptionLedgerEntries: number;
+  reservationConsumptionMatches: boolean; manualReviewIssues: string[]; checkedAt: string;
 }
 export interface PackageReconciliationResult { error: string | null; report: PackageReconciliationReport | null }
 
@@ -805,9 +892,47 @@ export async function previewPackageReconciliationAction(customerPackageId: stri
     report: {
       customerPackageId: String(data.customer_package_id), revision: Number(data.revision), status: String(data.status),
       cachedBalance: Number(data.cached_balance), ledgerBalance: Number(data.ledger_balance), balanceMatches: Boolean(data.balance_matches),
+      autoRepairable: Boolean(data.auto_repairable),
       reservedCount: Number(data.reserved_count), consumedReservations: Number(data.consumed_reservations), consumptionLedgerEntries: Number(data.consumption_ledger_entries),
-      reservationConsumptionMatches: Boolean(data.reservation_consumption_matches), checkedAt: String(data.checked_at),
+      reservationConsumptionMatches: Boolean(data.reservation_consumption_matches),
+      manualReviewIssues: Array.isArray(data.manual_review_issues) ? (data.manual_review_issues as unknown[]).map(String) : [],
+      checkedAt: String(data.checked_at),
     },
+  };
+}
+
+export interface MembershipHistoryEntry {
+  id: string; delta: number; reason: string; notes: string | null; occurredAt: string;
+  invoiceNumber: string | null; invoiceId: string | null;
+}
+export interface MembershipReservationEntry {
+  id: string; status: string; reservedAt: string; consumedAt: string | null; releasedAt: string | null; expiresAt: string | null;
+}
+export interface MembershipHistoryResult { error: string | null; ledger: MembershipHistoryEntry[]; reservations: MembershipReservationEntry[] }
+
+/**
+ * Section 25 detail view: purchases/renewals/consumption/adjustments (with
+ * their invoice, when linked) plus the reservation lifecycle for one
+ * membership. Read-only, capability-gated (membership.read), and scoped to a
+ * single customer_package_id -- never an unbounded organization-wide scan.
+ */
+export async function loadMembershipHistoryAction(customerPackageId: string): Promise<MembershipHistoryResult> {
+  const context = await workspace(); if (!context) return { error: "workspace aktif tidak tersedia", ledger: [], reservations: [] };
+  if (!UUID.test(customerPackageId)) return { error: "paket tidak valid", ledger: [], reservations: [] };
+  if (!(await loadCapabilities(context.supabase))["membership.read"]) return { error: "izin membership.read diperlukan", ledger: [], reservations: [] };
+  const [ledgerResult, reservationResult] = await Promise.all([
+    context.supabase.from("customer_package_ledger").select("id,delta,reason,notes,occurred_at,invoice_id,invoices(invoice_number)").eq("organization_id", context.organizationId).eq("customer_package_id", customerPackageId).order("occurred_at", { ascending: false }),
+    context.supabase.from("package_reservations").select("id,status,reserved_at,consumed_at,released_at,expires_at").eq("organization_id", context.organizationId).eq("customer_package_id", customerPackageId).order("reserved_at", { ascending: false }),
+  ]);
+  if (ledgerResult.error) return { error: ledgerResult.error.message, ledger: [], reservations: [] };
+  if (reservationResult.error) return { error: reservationResult.error.message, ledger: [], reservations: [] };
+  return {
+    error: null,
+    ledger: (ledgerResult.data ?? []).map((row) => {
+      const invoice = Array.isArray(row.invoices) ? row.invoices[0] : row.invoices;
+      return { id: row.id, delta: row.delta, reason: row.reason, notes: row.notes, occurredAt: row.occurred_at, invoiceId: row.invoice_id, invoiceNumber: (invoice as { invoice_number?: string } | null)?.invoice_number ?? null };
+    }),
+    reservations: (reservationResult.data ?? []).map((row) => ({ id: row.id, status: row.status, reservedAt: row.reserved_at, consumedAt: row.consumed_at, releasedAt: row.released_at, expiresAt: row.expires_at })),
   };
 }
 

@@ -2,7 +2,7 @@
 
 /**
  * Function index:
- * - CustomerForm, TaskForm, ServiceForm, ResourceForm, InventoryForm, PaymentForm, ExpenseForm: interactive pilot forms.
+ * - CustomerForm, TaskForm, ServiceForm, PackageForm, ResourceForm, InventoryForm, PaymentForm, ExpenseForm: interactive pilot forms.
  * - ActionMessage: consistent success and error feedback.
  */
 import { useActionState } from "react";
@@ -10,6 +10,7 @@ import { useActionState } from "react";
 import {
   adjustInventoryAction,
   createCustomerAction,
+  createPackageAction,
   createResourceAction,
   createServiceAction,
   createTaskAction,
@@ -95,6 +96,35 @@ export function ServiceForm() {
     </div>
     <ActionMessage state={state} />
     <button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Tambah layanan"}</button>
+  </form>;
+}
+
+/** Section 24: package/membership catalog terms. Governs future sales only -- see createPackageAction. */
+export function PackageForm({ services }: { services: Array<{ id: string; name: string }> }) {
+  const [state, action, pending] = useActionState(createPackageAction, initialPilotActionState);
+  return <form action={action} className="space-y-3">
+    <input className={inputClass} name="name" placeholder="Nama paket" required />
+    <input className={inputClass} name="description" placeholder="Deskripsi (opsional)" />
+    <div className="grid gap-3 sm:grid-cols-2">
+      <input className={inputClass} type="number" min="1" step="1" name="sessions" placeholder="Jumlah sesi" required />
+      <input className={inputClass} type="number" min="0" step="1000" name="price" placeholder="Harga Rp" required />
+    </div>
+    <select className={inputClass} name="serviceId" defaultValue="" aria-label="Berlaku untuk layanan">
+      <option value="">Berlaku untuk semua layanan</option>
+      {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+    </select>
+    <div className="grid gap-3 sm:grid-cols-3">
+      <input className={inputClass} type="number" min="1" step="1" name="validityDays" placeholder="Masa berlaku (hari, opsional)" />
+      <select className={inputClass} name="recurrenceInterval" defaultValue="none" aria-label="Interval perpanjangan">
+        <option value="none">Sekali beli (tidak berulang)</option><option value="week">Mingguan</option><option value="month">Bulanan</option><option value="year">Tahunan</option>
+      </select>
+      <select className={inputClass} name="rolloverPolicy" defaultValue="none" aria-label="Kebijakan rollover">
+        <option value="none">Sesi tidak digabung</option><option value="rollover">Sesi bisa digabung (rollover)</option>
+      </select>
+    </div>
+    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700"><input type="checkbox" name="perPet" />Khusus satu hewan per pembelian (bukan berbagi antar hewan pelanggan)</label>
+    <ActionMessage state={state} />
+    <button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Tambah paket"}</button>
   </form>;
 }
 
