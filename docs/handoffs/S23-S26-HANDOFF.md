@@ -1,10 +1,370 @@
 # Handoff: HomePaw parity sections 23-26 (package/membership lifecycle)
 
-## Review round 2 (2026-09-26) — READ THIS FIRST, supersedes everything below
+## Review round 3 (2026-09-26) — READ THIS FIRST, supersedes everything below
+
+Codex reviewed commit `6b4dc27` (the "Review round 2" work below) against
+`docs/handoffs/S23-S26-REVIEW-86ad714.md`'s intent and found 5 remaining
+gaps -- some were incomplete fixes from round 2 (idempotency only compared
+branch/membership, not the other caller-supplied fields; the pet-scope
+compatibility rule was too strict and blocked a legitimate case; the
+reconcile provenance checks stopped short of the specific event), one was
+a genuinely new architectural gap (the renewal preview was advisory only,
+with no binding between what was previewed and what was actually charged),
+and one was the previously-disclosed incomplete item (guarded purchased-
+term editing) that needed to actually be built, not just disclosed.
+
+**All 5 findings are now fixed and independently verified on PostgreSQL 16,
+including a genuine populated-database upgrade replay strengthened to
+content-hash comparison (not row-count) per this round's explicit ask.**
+Live browser verification (see "Browser verification" below) additionally
+found and fixed a 6th, UI-only defect: a stale-prop bug in
+`MembershipManager` let the purchased-term correction form silently revert
+a just-completed renewal's expiry date. This was not caught by any SQL/JS
+contract test because those exercise the RPC directly with correct inputs;
+it only surfaced by driving the actual React component through a real
+renewal-then-correction sequence in a browser.
+
+### Current authoritative status (sections 23-26)
+
+| Section | Status | Evidence |
+|---|---|---|
+| 23 — Coverage detection | **Done** | Booking wizard/Customer 360 show available-vs-reserved; per-pet eligibility enforced server-side; two-connection race proven (round-1 log, untouched this round) |
+| 24 — Packages and memberships | **Done** | Catalog UI (recurrence/per-pet/service/rollover/price/validity); per-pet sale; paid renewal creates a real invoice with a server-validated preview binding; rollover_policy actually governs renewal; pet/service catalog-drift compatibility corrected |
+| 25 — Membership administration | **Done** | Filters/urgency/history/renew/archive/reconcile, AND (this round) guarded purchased-term editing (`app.update_customer_package_terms` + UI form) -- the item previously disclosed as incomplete is now implemented and tested |
+| 26 — Subscription reconciliation | **Done** | Deep reservation/ledger link checks, invoice-linkage checks tied to the SPECIFIC purchase/renewal event (not just customer+product), historical `source_invoice_id` validated the same way, guarded revision-checked repair unchanged |
+
+### Finding 1 — renewal idempotency still ignored caller-supplied material inputs (FIXED)
+
+Round 2 only compared `branch_id` and `renewal_of` (membership) before
+returning a cached invoice on retry; `p_issued_at`/`p_due_at`/
+`p_admin_notes` (all genuinely caller-supplied) could silently differ on a
+"retry" and the caller would get back an invoice with terms it never
+actually confirmed. **Fixed** in both `renew_customer_package` and
+`create_package_invoice` (which had the identical gap, not previously
+caught): the idempotent-return check now compares `issued_at` (exact),
+`due_at` (null-safe), and a normalized `admin_notes` (same `left(nullif(
+trim(...)),2000)` normalization used at insert time) alongside
+branch/membership. An identical retry (including after a later catalog
+price change) still returns the original invoice unchanged; a retry with
+any one of these fields genuinely different is rejected with
+`request_key_reused_for_different_renewal`/`..._invoice`. New SQL tests:
+S43/S44 (identical retry survives a price change), S44b (different
+`issued_at` rejected), S44c (different `admin_notes` rejected).
+
+### Finding 2 — the renewal preview was advisory only (FIXED)
+
+The preview showed terms but nothing bound them to the actual write: the
+submit button was enabled while the preview was loading, missing, or
+failed; a preview error blocked ever retrying; and the RPC re-read live
+catalog state with no cross-check against what the staff member actually
+saw, so a catalog edit between preview and submit could silently change
+the charged terms.
+
+**Fixed:**
+- `app.preview_package_renewal` now returns a `terms_fingerprint` -- a pure,
+  query-free `md5` digest (`app.fn_renewal_terms_fingerprint`, `language
+  sql immutable`, computed from the SAME already-fetched `pkg`/`cp` rows
+  the caller already holds, never a second query, so there is no
+  read-then-use race window) over every field the charge depends on:
+  catalog price/currency/sessions/rollover/recurrence/per_pet/service/
+  active, and the membership's own status/pet/service/expiry/balance/held-
+  count.
+- `app.renew_customer_package` now requires `p_terms_fingerprint` for a
+  NEW request (no existing invoice for that `request_key`): missing ->
+  `renewal_preview_required`; present but stale (recomputed under the SAME
+  row lock and mismatching) -> `renewal_terms_changed_since_preview`
+  (`40001`, matching the repair/stale-revision convention). An idempotent
+  RETRY (an invoice already exists for that key) never re-checks the
+  fingerprint at all -- a genuine retry must still survive a later catalog
+  change, which a fingerprint re-check would defeat.
+- UI (`membership-manager.tsx`): submit requires `canSubmitRenewal` --
+  `Boolean(renewalPreview) && !renewalPreview.blockingReason &&
+  !loadingPreview && !renewPending` -- not merely "no blocking reason yet".
+  A failed preview shows an explicit "Coba lagi" (retry) button. The
+  preview is invalidated (cleared, forcing a reload) after every mutation
+  that could change it: a successful renewal, repair, status change/
+  archive, or terms correction. The renewal form submits
+  `renewalPreview.termsFingerprint` as a hidden field. Pet/service scope in
+  the preview panel is shown via the row's own resolved names
+  (`row.petName`/`row.serviceName`), not raw UUIDs.
+- New SQL tests: S48b (no fingerprint -> refused), S48c (stale fingerprint
+  after a live price change -> refused, `40001`), S48d (reloading the
+  preview then resubmitting the SAME request succeeds and charges the NEW
+  price -- a deliberate re-confirmation, not a permanent block), plus S20/
+  S43 proving a garbage/stale fingerprint is silently ignored on a genuine
+  retry (by design).
+
+### Finding 3 — catalog service changes could still renew incompatible entitlements (FIXED, and the round-2 pet check was corrected)
+
+Two issues: (a) only `per_pet` was checked, never `service_id`; (b) the
+round-2 `per_pet` rule (`pkg.per_pet <> (cp.pet_id is not null)`) was
+**too strict** -- a sale may legitimately bind an optional pet even when
+`per_pet=false` (pet presence alone is not proof the catalog changed), so
+that rule wrongly blocked a real, legitimate case forever.
+
+**Fixed, in both `renew_customer_package` and `preview_package_renewal`
+identically:**
+- `v_pet_incompatible := pkg.per_pet and cp.pet_id is null` -- the ONLY
+  unsafe drift is the catalog NOW requiring a pet for a membership sold
+  with none at all. `per_pet` going `true -> false` while a pet stays
+  optionally bound is explicitly compatible (this is the round-2 bug fix).
+- `v_service_incompatible := cp.service_id is not null and pkg.service_id
+  is not null and cp.service_id <> pkg.service_id` -- `cp.service_id` is
+  the immutable purchase-time snapshot (set once by `create_package_invoice`,
+  never touched by renewal); `NULL` on either side ("any service") is never
+  itself a mismatch by definition -- only two different SPECIFIC services
+  are incompatible.
+- Preview exposes both as separate flags (`pet_scope_incompatible`,
+  `service_scope_incompatible`) so the UI/tests can tell which one fired.
+- New SQL tests (S49-S56): the bug-fix case (per_pet true->false with an
+  optionally-bound pet stays COMPATIBLE), the genuine incompatibility case
+  (per_pet false->true with no pet ever bound), service A->B (incompatible,
+  with a REAL renewal attempt refused, not just a preview check, and a
+  genuinely HELD reservation present throughout via `per_pet_cp`), service
+  A->NULL and NULL->A (both compatible), and a real successful renewal
+  under a legitimate broadened-then-narrowed service scope.
+
+### Finding 4 — reconciliation still missed historical and wrong-renewal associations (FIXED)
+
+Two gaps: (a) `customer_packages.source_invoice_id` (the historical
+purchase link, predating the ledger's own `invoice_id` column) was only
+ever checked for NULL, never actually validated when present; (b) the
+ledger-level `invalid_invoice_links` check accepted any invoice matching
+"same customer, same package", which two separate purchases OR two
+separate renewals of the same membership could both satisfy without
+actually being the CORRECT specific invoice for that specific event.
+
+**Fixed:**
+- New `v_invalid_source_invoice` check on `customer_packages.source_invoice_id`
+  when non-null: real invoice, right customer, right package line,
+  non-void status, AND a matching session-count snapshot against the
+  purchase ledger row -- as a read-only cross-check, never by mutating the
+  immutable ledger row itself. New `invalid_source_invoice` manual-review
+  flag.
+- The ledger-level check is now tied to the SPECIFIC event: a `'purchase'`
+  row must match `cp.source_invoice_id` exactly; a `'renewal'` row's
+  invoice must match BOTH `metadata->>'renewal_of' = cp.id` AND
+  `invoices.request_key = customer_package_ledger.request_key` (both are
+  stamped identically by `renew_customer_package`) -- so two renewals of
+  the same membership can no longer cross-link each other's invoice either.
+- New SQL tests (S60-S67): a healthy baseline, wrong-CUSTOMER source
+  (a second customer added to the fixtures specifically for this), wrong-
+  PACKAGE source, VOID-status source, a MISMATCHED session-count snapshot
+  (999 vs the real ledger delta, constructed as a standalone raw
+  invoice+line since `invoice_lines` is also append-only and can't be
+  corrupted via UPDATE), same-membership-but-wrong-renewal (request_key
+  mismatch), and a legacy NULL-invoice_id renewal row (pre-migration data).
+
+### Finding 5 — guarded purchased-term editing (NOW IMPLEMENTED, was disclosed incomplete)
+
+New `app.update_customer_package_terms(p_customer_package, p_revision,
+p_reason, p_expires_at, p_pet, p_service) returns customer_packages`.
+Allowed-field matrix: `expires_at` is always correctable (while not
+`canceled`) since it never touches the ledger or any past reservation
+(`reserve_package_session` re-checks it live, never snapshots it). `pet_id`/
+`service_id` are correctable ONLY while the entitlement has never been
+touched at all -- no `package_reservations` row of ANY status has ever
+existed for it, and it has never been renewed (`renewal_count = 0`) --
+refused with a precise `entitlement_scope_locked_after_first_reservation`/
+`_after_renewal` otherwise, explaining exactly why and that `expires_at`
+alone remains open. Guarded like every other write RPC on this branch:
+`membership.manage`, row locked first, revision-checked (`40001` on stale,
+matching `repair_customer_package_balance`), a mandatory non-empty reason,
+and a full before/after audit row in `timeline_events`
+(`membership.terms_corrected`). Never touches `sessions_remaining`,
+`package_id`, `customer_id`, or `source_invoice_id` -- no balance edit, no
+retroactive invoice/ledger rewrite. New UI form ("Koreksi data paket") in
+`membership-manager.tsx`, gated on `canManage`, with the pet/service
+selects disabled client-side once `row.hasAnyReservationHistory` (a real
+signal from a bulk, per-organization reservation-existence query, not an
+unbounded scan). New SQL tests (S68-S76): allowed correction (pet+service+
+expiry, with audit verification and unchanged balance/invoice total),
+stale revision, unauthorized (read-only) role, cross-customer pet
+rejection (a second customer/pet fixture added specifically for this),
+scope-locked rejection on a membership with reservation history, and
+`expires_at`-only correction remaining open on that same locked membership.
+
+### Verification — review round 3, exact results
+
+All commands re-run against the fully amended migration and app code.
+Logs under `docs/handoffs/logs/S23-S26/` (absolute path:
+`E:\Claude\operro-review-s23-s26\docs\handoffs\logs\S23-S26\`).
+
+| Command | Result | Log file |
+|---|---|---|
+| `npm run typecheck -w apps/web` | exit 0, clean | `npm_typecheck_review3.log` |
+| `npm run lint -w apps/web` | exit 0, clean | `npm_lint_review3.log` |
+| `npm run test:batch1a -w apps/web` | **107/107 pass** | `npm_test_batch1a_review3.log` |
+| `npm run test:batch1b -w apps/web` | **283/283 pass** (up from 272; contract suite extended for all 5 findings) | `npm_test_batch1b_review3.log` |
+| `npm run build -w apps/web` | exit 0 — 31 routes | `npm_build_review3.log` |
+| PostgreSQL 16 — GATE 4-6 + both SQL smoke tests | **all pass**, 123 `PASS` notices total, zero errors | `pg16_migration_gate4_6_smoke_review3.log` |
+| PostgreSQL 16 — GATE 7 (real authenticated-role integration, literal script) | **PASSED** | `pg16_gate7_gate8_review3.log` |
+| PostgreSQL 16 — GATE 8 (concurrency harness, literal script) | **PASSED** | `pg16_gate7_gate8_review3.log` |
+| PostgreSQL 16 — `integration/migration_upgrade_replay.sh` (strengthened: content-hash comparison, not row count) | **PASSED** | `pg16_migration_upgrade_replay.log` |
+
+`integration/package_lifecycle_smoke.sql` grew from 54 to **86 PASS
+notices** (S1-S76, several with lettered sub-assertions); the new ones
+(S39 onward were already present from round 2 for rollover; S42 onward are
+new this round) cover all 5 findings above with real fixtures and real RPC
+calls, not source-string assertions -- per the explicit instruction to
+favor behavior tests.
+
+**`integration/migration_upgrade_replay.sh` was strengthened per this
+round's explicit ask** (a row count staying the same does not prove a row
+is untouched): it now hashes the pre-existing purchase ledger row's full
+content (id, customer_package_id, delta, reason, notes, occurred_at,
+created_at) and the corresponding `customer_packages` balance/source
+association BEFORE the upgrade, recomputes the identical hash AFTER, and
+fails unless they are byte-identical; it also confirms the row's new
+`invoice_id` column is left NULL (never backfilled -- structurally would
+require the very UPDATE that was removed) and that append-only enforcement
+on `customer_package_ledger` is still active after the upgrade (a live
+UPDATE attempt against it must still fail with the same trigger error).
+
+### Browser verification
+
+Performed live against a disposable local stack for this worktree only
+(Supabase on ports 54351-54354, `project_id=operro-review-s23s26-local`;
+Next.js dev server via `npm run dev -w apps/web`), using the in-app browser
+tool. `supabase/config.toml` was restored to its committed state
+(`git checkout -- supabase/config.toml`) before the final commit below, and
+both the dev server and `npx supabase stop` were shut down afterward.
+
+**Authorized (owner) role** -- signed in as the seeded
+`wbudiman1995@gmail.com` (owner, full permissions) and exercised
+`/programs/memberships` end to end:
+
+1. **Renewal preview loads automatically and shows readable terms, not raw
+   IDs**: expanding a row auto-fetched the preview, showing package name,
+   `row.serviceName ?? "semua layanan"`, pet name, session delta, price,
+   current -> resulting balance, and current -> resulting expiry, plus a
+   "Dimuat HH:MM:SS" timestamp.
+2. **Submit is gated on a loaded, non-blocking preview and a bound
+   fingerprint**: confirmed via `javascript_tool` that the hidden
+   `termsFingerprint` input carried a real, non-empty md5 value
+   (`333c63b3fc29ce1b2e661833b081523c`) before submit.
+3. **Genuine renewal success**: selected a branch, submitted, got
+   `Paket diperpanjang. PKR-20260926-F534D1AC diterbitkan.`; sessions went
+   2/2 -> 3/3, expiry 14/1/2027 -> 14/5/2027, header now reads
+   "diperpanjang 1x".
+4. **Failure/disabled path after a successful renewal (real, not
+   simulated)**: immediately after success the preview is cleared and the
+   submit button's own label changes to "Muat pratinjau terlebih dahulu"
+   or "Coba lagi" and is `disabled` -- a genuine retry cannot fire without
+   a fresh preview, live in the browser, not just asserted against the
+   source string.
+5. **"Muat ulang pratinjau" refresh works**: clicking it re-fetched a fresh
+   preview (new expiry math 14/5/2027 -> 11/9/2027) and re-enabled
+   submission.
+6. **Terms-correction form ("Koreksi data paket")**: opened it on the
+   just-renewed row; empty-reason submit was blocked by the browser's own
+   `required` validation ("Please fill out this field"); the scope-lock
+   message ("Hewan dan layanan tidak dapat diubah karena paket ini pernah
+   dipesan, dipakai, atau diperpanjang...") was shown and the pet/service
+   selects were disabled because this package already had `renewal_count >
+   0`; filled a reason and submitted an expiry-only correction, which
+   succeeded (`Data paket berhasil dikoreksi.`).
+7. **Reconciliation panel**: ran it on a legacy (no source-invoice) row;
+   showed `Saldo cache: 3 | Saldo ledger: 3 | Cocok`, 0 active reservations,
+   and correctly flagged `missing_source_invoice` under "Perlu peninjauan
+   manual" for that legacy row -- not silently auto-repaired.
+
+**A real bug was found and fixed during this verification, not just
+simulated**: step 6 above initially reproduced a genuine defect --
+`MembershipManager`'s "Koreksi data paket" form pre-fills its `Kedaluwarsa`
+date input from the `row.expiresAt` prop via `useState`'s lazy initializer,
+which only runs once per mount. Because a successful renewal does not
+remount the row's component (only its raw text fields re-render from the
+fresh prop), the correction form kept showing the **pre-renewal** expiry
+date. Submitting that stale value as a "correction" silently reverted the
+just-completed renewal's expiry extension back to its old value -- verified
+directly against the database (`customer_packages.expires_at` went from
+`2027-05-14` back to `2027-01-14` after such a submit, with no error, since
+`update_customer_package_terms`'s own revision guard has nothing to catch
+here: it is doing exactly what it was told). **Fix**:
+[membership-filter-list.tsx](../../apps/web/src/components/membership-filter-list.tsx)
+now keys each `<MembershipManager>` by
+`` `${row.id}-${row.revision}-${row.renewalCount}-${row.expiresAt}-${row.petId}-${row.serviceId}` ``
+instead of just `row.id`, so the row's entire local state (including the
+correction form's pre-filled inputs) is freshly re-initialized from the
+latest server data whenever any of those fields change server-side (a
+renewal, a correction, a reservation). Re-tested live after the fix: a
+second renewal on the same row, followed by immediately reopening "Koreksi
+data paket" (no page reload), showed the **correct** post-renewal expiry
+(`05/14/2027`), and submitting an unrelated expiry-only correction no longer
+reverted anything. Re-ran `npm run typecheck`, `npm run lint -w apps/web`,
+and `npm run test:batch1b -w apps/web` (283/283 pass) after this fix --
+logs: `npm_typecheck_review3_browserfix.log`,
+`npm_lint_review3_browserfix.log`, `npm_test_batch1b_review3_browserfix.log`.
+
+(Note on process, for whoever debugs this class of issue again: the first
+attempt at this fix appeared not to work when tested live, because the dev
+server -- running inside WSL2, watching the repo over its `/mnt/e` 9p
+mount -- did not pick up a file edit made from the Windows side via
+filesystem watch/HMR. Restarting `npm run dev` picked up the change
+immediately. This is an environment quirk of this sandbox, not a defect in
+the fix or the app.)
+
+**Read-only / unauthorized role**: no read-only-role user existed in the
+seed data. Rather than fabricate one, the seeded `groomer@homepaw.local`
+account was used, since its role (`Groomer`) holds only
+`booking.read`/`booking.update`/`booking.complete` -- no `membership.read`
+or `membership.manage`. Signed in as that account and navigated to
+`/programs/memberships`: the page rendered its genuine empty state
+("Belum ada paket pelanggan"), because `customer_packages` (and the other
+membership tables) are RLS-gated on the `membership.read` permission
+(registered in `20260721001100_security_rls_capabilities.sql`), which this
+role does not hold. This confirms the authorization boundary is enforced at
+the database (RLS) layer, not merely hidden in the UI -- an unauthorized
+session cannot see membership administration data at all, not just fail to
+mutate it.
+
+**Genuine remaining gap, reported plainly rather than glossed over**: this
+repo has no seeded role with `membership.read` but *without*
+`membership.manage` (i.e. a true "can view, cannot edit" role), so the
+specific UI behavior of `canManage=false` (read-only visible rows, hidden
+mutation forms, but a visible reconciliation panel) was verified by earlier
+static/contract tests and by code inspection, not by driving that exact
+role through a live browser session -- only the two extremes (full owner
+access, and zero access via RLS) were exercised live. Creating such a role
+would require either a new seed fixture or an in-app staff/role-management
+UI, neither of which exists yet in this worktree; flagging this rather than
+claiming it was covered.
+
+Screenshots were captured and visually reviewed at each step above through
+the in-app browser tool during this session, but the tool does not persist
+them to disk as files -- there is no PNG artifact path to attach here
+beyond this written, step-by-step reproduction record.
+
+### What Codex should verify next (review round 3)
+
+1. **Independently confirm the `terms_fingerprint` design has no gap**: it
+   is computed once under the row lock inside `renew_customer_package` (and
+   separately, identically, inside the read-only `preview_package_renewal`,
+   which does NOT hold the row lock). Between a preview and a submit, could
+   a concurrent write change `cp`/`pkg` in a way NOT captured by the
+   fingerprint's field list, yet still affect the charge? The fingerprint
+   covers every field this session identified as charge-relevant; a second
+   pair of eyes on that list specifically is worth having.
+2. **Confirm the `entitlement_scope_locked_after_first_reservation` boundary
+   (ANY reservation of ANY status, forever) is the right permanence
+   choice** -- an alternative would be to only lock while a reservation is
+   currently `'reserved'`/`'consumed'` and allow correction again once
+   fully `'released'`/`'expired'`. This session chose the stricter,
+   permanent-once-touched rule as the safer default; revisit if it proves
+   too restrictive in practice.
+3. **Re-run the full gate suite once more on a completely clean host** (this
+   sandbox's docker-exec-in-container methodology is unchanged from round
+   2, just re-run against the further-amended migration) as an independent
+   confirmation outside this session's own tooling.
+
+---
+
+## Review round 2 (2026-09-26) — superseded by round 3 above
 
 Codex reviewed commit `86ad714` (the "Follow-up completion" work described in the next section) and found 4 code-level findings despite the passing gate 7/8 logs already committed at that point. This section documents each finding and its fix; the "Follow-up completion" section below is otherwise still accurate (nothing in it was wrong, these findings are additional gaps that survived it) except where explicitly corrected here.
 
-**All 4 findings are fixed on this branch. One item from the original section 25 brief remains genuinely incomplete (not disguised as done) — see "Remaining incomplete requirement" below.**
+**All 4 findings from this round are fixed on this branch. One item from the original section 25 brief was left genuinely incomplete at the time (not disguised as done) — see "Remaining incomplete requirement" below — and was subsequently built in review round 3 (see the top of this file).**
 
 ### Finding 1 — upgrade migration fails when purchase ledger rows already exist (FIXED)
 
@@ -39,9 +399,9 @@ The prior `reconcile_customer_package` treated any non-null `invoice_id` as suff
 - New `missing_reversal_link`: a reservation that was consumed (has a `consumption_ledger_id`) but is no longer `status='consumed'` must have gone through `reverse_package_reservation`, which always sets `reversal_ledger_id` — a released-after-consumption row with no reversal link is a broken invariant. Tested (S53) by consuming a reservation and then releasing it directly (bypassing `reverse_package_reservation`).
 - New `duplicate_consumption_links`: no DB uniqueness constraint prevents two `package_reservations` rows from pointing at the same `consumption_ledger_id`; now checked explicitly rather than assumed impossible. Tested (S54) by pointing a second reservation's link at the first's ledger row.
 
-### Remaining incomplete requirement — guarded purchased-term editing
+### Remaining incomplete requirement — guarded purchased-term editing (SUPERSEDED — implemented in review round 3, see the top of this file)
 
-The original section 25 brief asked for "guarded editing of applicable purchased terms, with reason, audit, and revision checks." This branch (both the original follow-up and this review round) deliberately implements only the **stateful lifecycle actions** — renew, archive/reactivate, reconcile, repair — plus (this round) a read-only renewal preview and a full ledger/reservation history view. It does **not** implement a raw field-by-field editor for an already-sold membership's own columns (e.g., manually correcting `pet_id`, `expires_at`, or `service_id` on a specific `customer_packages` row after the fact). **This is retained as an explicitly incomplete item, not disguised as done or folded into a "minor risk" note.** A safe version would need: an explicit allow-list of editable fields, a revision check matching `repair_customer_package_balance`'s pattern, a `membership.manage`-gated RPC, and an audit trail in `timeline_events` — none of that exists yet. If needed, it is a bounded, well-understood follow-up (mirroring `repair_customer_package_balance`'s existing guard pattern), not attempted here to avoid scope creep beyond "fix every finding."
+The original section 25 brief asked for "guarded editing of applicable purchased terms, with reason, audit, and revision checks." At the time this round-2 section was written, this branch deliberately implemented only the **stateful lifecycle actions** — renew, archive/reactivate, reconcile, repair — plus a read-only renewal preview and a full ledger/reservation history view, and NOT a field-by-field editor. **Review round 3 built it**: `app.update_customer_package_terms` (allow-list of `expires_at`/`pet_id`/`service_id`, revision-checked, reasoned, audited in `timeline_events`, locked once the entitlement has any reservation history or a renewal) plus a matching UI form. See "Review round 3" at the top of this file for the full design and its tests (S68-S76). This paragraph is kept for historical continuity, not as a current gap.
 
 ### Verification — review round 2, exact results
 
@@ -67,7 +427,7 @@ All commands re-run against the fully amended migration. Logs under `docs/handof
 
 1. **Independently confirm the `invalid_invoice_links` join logic has no false positives for a healthy, real invoice** — the check requires `invoice_lines.item_type='package' and package_id=cp.package_id`; if any future code path creates a package invoice line without `item_type='package'` set correctly, this would misfire. Worth a second look against `create_package_invoice`'s and `renew_customer_package`'s own inserts (both already set it correctly, but it's the single coupling point).
 2. **Reconsider whether `rollover_policy='none'`'s discard-on-renewal is the product behavior actually wanted** — this session implemented the mathematically-safe interpretation (protect held sessions, discard only unreserved excess), but the original HomePaw reference material for this exact policy was not available to check against (see the original follow-up section's risk #4 about missing HTML references).
-3. **Decide whether to build the guarded purchased-term editor** (see "Remaining incomplete requirement" above) or formally close it as out of scope for sections 23-26.
+3. ~~Decide whether to build the guarded purchased-term editor~~ — **built in review round 3** (see the top of this file).
 
 ---
 

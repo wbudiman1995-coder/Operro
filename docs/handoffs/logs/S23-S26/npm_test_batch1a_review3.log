@@ -1,0 +1,656 @@
+
+> web@0.1.0 test:batch1a
+> tsx --test test/timezone.test.ts test/schedule-layout.test.ts test/schedule-segments.test.ts test/schedule-assignments.test.ts test/search-and-profile.test.ts test/zoned-formatting.test.ts test/authorization.test.ts test/booking-week.test.ts test/maps.test.ts test/slot-recommendations.test.ts test/booking-chat-parser.test.ts
+
+TAP version 13
+# Subtest: a membership with explicit grants sees only those branches
+ok 1 - a membership with explicit grants sees only those branches
+  ---
+  duration_ms: 10.769046
+  type: 'test'
+  ...
+# Subtest: branches.all sees every organization branch
+ok 2 - branches.all sees every organization branch
+  ---
+  duration_ms: 1.093633
+  type: 'test'
+  ...
+# Subtest: an inaccessible branch cannot be selected through a query parameter
+ok 3 - an inaccessible branch cannot be selected through a query parameter
+  ---
+  duration_ms: 0.712506
+  type: 'test'
+  ...
+# Subtest: a membership with no branch grants sees nothing
+ok 4 - a membership with no branch grants sees nothing
+  ---
+  duration_ms: 0.403247
+  type: 'test'
+  ...
+# Subtest: each permission-bearing tab declares its required capability
+ok 5 - each permission-bearing tab declares its required capability
+  ---
+  duration_ms: 0.380138
+  type: 'test'
+  ...
+# Subtest: unauthorized tabs are not offered
+ok 6 - unauthorized tabs are not offered
+  ---
+  duration_ms: 0.710436
+  type: 'test'
+  ...
+# Subtest: granting a capability reveals exactly its tab
+ok 7 - granting a capability reveals exactly its tab
+  ---
+  duration_ms: 1.2008
+  type: 'test'
+  ...
+# Subtest: a tab reached by editing the query string is still denied
+ok 8 - a tab reached by editing the query string is still denied
+  ---
+  duration_ms: 0.525242
+  type: 'test'
+  ...
+# Subtest: all capabilities default to denied
+ok 9 - all capabilities default to denied
+  ---
+  duration_ms: 0.8837
+  type: 'test'
+  ...
+# Subtest: totals are grouped per currency and never added across currencies
+ok 10 - totals are grouped per currency and never added across currencies
+  ---
+  duration_ms: 4.601305
+  type: 'test'
+  ...
+# Subtest: numeric strings from the database are coerced
+ok 11 - numeric strings from the database are coerced
+  ---
+  duration_ms: 1.589907
+  type: 'test'
+  ...
+# Subtest: a missing currency is labelled rather than merged into another
+ok 12 - a missing currency is labelled rather than merged into another
+  ---
+  duration_ms: 0.992216
+  type: 'test'
+  ...
+# Subtest: no payments yields no currency rows, which is distinct from restricted
+ok 13 - no payments yields no currency rows, which is distinct from restricted
+  ---
+  duration_ms: 0.29243
+  type: 'test'
+  ...
+# Subtest: currency rows are ordered by amount descending
+ok 14 - currency rows are ordered by amount descending
+  ---
+  duration_ms: 0.286831
+  type: 'test'
+  ...
+# Subtest: parses a HomePaw booking chat into one customer and multiple pets
+ok 15 - parses a HomePaw booking chat into one customer and multiple pets
+  ---
+  duration_ms: 14.317007
+  type: 'test'
+  ...
+# Subtest: shares a single pet field value across every parsed pet
+ok 16 - shares a single pet field value across every parsed pet
+  ---
+  duration_ms: 1.781663
+  type: 'test'
+  ...
+# Subtest: caps imports at ten pets and tolerates unrelated chat lines
+ok 17 - caps imports at ten pets and tolerates unrelated chat lines
+  ---
+  duration_ms: 2.013192
+  type: 'test'
+  ...
+# Subtest: expands a Monday anchor into its seven calendar dates
+ok 18 - expands a Monday anchor into its seven calendar dates
+  ---
+  duration_ms: 20.343794
+  type: 'test'
+  ...
+# Subtest: crosses a month boundary without drift
+ok 19 - crosses a month boundary without drift
+  ---
+  duration_ms: 0.854721
+  type: 'test'
+  ...
+# Subtest: a booking is bucketed by its OWN branch's zone, not a shared org zone
+ok 20 - a booking is bucketed by its OWN branch's zone, not a shared org zone
+  ---
+  duration_ms: 69.301052
+  type: 'test'
+  ...
+# Subtest: two branches in different zones disagree on the day for a near-midnight instant
+ok 21 - two branches in different zones disagree on the day for a near-midnight instant
+  ---
+  duration_ms: 1.709522
+  type: 'test'
+  ...
+# Subtest: falls back to the supplied default zone when the branch is not in the map
+ok 22 - falls back to the supplied default zone when the branch is not in the map
+  ---
+  duration_ms: 0.765924
+  type: 'test'
+  ...
+# Subtest: groups a week of bookings onto all seven day buckets, including empty ones
+ok 23 - groups a week of bookings onto all seven day buckets, including empty ones
+  ---
+  duration_ms: 1.846778
+  type: 'test'
+  ...
+# Subtest: a booking whose branch zone pushes it outside the requested week is dropped, not misfiled
+ok 24 - a booking whose branch zone pushes it outside the requested week is dropped, not misfiled
+  ---
+  duration_ms: 1.072494
+  type: 'test'
+  ...
+# Subtest: parses common Google Maps coordinate formats
+ok 25 - parses common Google Maps coordinate formats
+  ---
+  duration_ms: 17.009952
+  type: 'test'
+  ...
+# Subtest: only recognizes allow-listed Google short-link hosts
+ok 26 - only recognizes allow-listed Google short-link hosts
+  ---
+  duration_ms: 1.132052
+  type: 'test'
+  ...
+# Subtest: an inactive assignment does not make a booking match a selected groomer
+ok 27 - an inactive assignment does not make a booking match a selected groomer
+  ---
+  duration_ms: 11.120569
+  type: 'test'
+  ...
+# Subtest: an inactive assignment does not match even when another groomer is active on the booking
+ok 28 - an inactive assignment does not match even when another groomer is active on the booking
+  ---
+  duration_ms: 0.829402
+  type: 'test'
+  ...
+# Subtest: an inactive assignment is absent from resourceIds in an unfiltered read
+ok 29 - an inactive assignment is absent from resourceIds in an unfiltered read
+  ---
+  duration_ms: 1.460531
+  type: 'test'
+  ...
+# Subtest: a missing, null, or non-boolean active flag is treated as released
+ok 30 - a missing, null, or non-boolean active flag is treated as released
+  ---
+  duration_ms: 0.819812
+  type: 'test'
+  ...
+# Subtest: malformed assignment rows are ignored rather than throwing
+ok 31 - malformed assignment rows are ignored rather than throwing
+  ---
+  duration_ms: 0.870061
+  type: 'test'
+  ...
+# Subtest: active assignments still place a booking under their groomer
+ok 32 - active assignments still place a booking under their groomer
+  ---
+  duration_ms: 1.383173
+  type: 'test'
+  ...
+# Subtest: an active assignment for two groomers yields both columns
+ok 33 - an active assignment for two groomers yields both columns
+  ---
+  duration_ms: 1.272599
+  type: 'test'
+  ...
+# Subtest: a selection narrows active assignments to the selected groomers only
+ok 34 - a selection narrows active assignments to the selected groomers only
+  ---
+  duration_ms: 0.397606
+  type: 'test'
+  ...
+# Subtest: an unassigned booking yields no columns but is not discarded
+ok 35 - an unassigned booking yields no columns but is not discarded
+  ---
+  duration_ms: 0.703446
+  type: 'test'
+  ...
+# Subtest: the unfiltered select omits !inner so unassigned bookings survive the join
+ok 36 - the unfiltered select omits !inner so unassigned bookings survive the join
+  ---
+  duration_ms: 1.361214
+  type: 'test'
+  ...
+# Subtest: the filtered select uses !inner so the groomer restriction reaches the parent rows
+ok 37 - the filtered select uses !inner so the groomer restriction reaches the parent rows
+  ---
+  duration_ms: 0.430545
+  type: 'test'
+  ...
+# Subtest: both selects request is_active, since the derivation depends on it
+ok 38 - both selects request is_active, since the derivation depends on it
+  ---
+  duration_ms: 0.348908
+  type: 'test'
+  ...
+# Subtest: per-pet assigned resources still contribute columns
+ok 39 - per-pet assigned resources still contribute columns
+  ---
+  duration_ms: 0.363548
+  type: 'test'
+  ...
+# Subtest: a per-pet assignment survives alongside a released booking-level assignment
+ok 40 - a per-pet assignment survives alongside a released booking-level assignment
+  ---
+  duration_ms: 0.285791
+  type: 'test'
+  ...
+# Subtest: null per-pet assignments are skipped without collapsing the rest
+ok 41 - null per-pet assignments are skipped without collapsing the rest
+  ---
+  duration_ms: 0.353888
+  type: 'test'
+  ...
+# Subtest: a resource appearing as both an active assignment and a pet assignment is not duplicated
+ok 42 - a resource appearing as both an active assignment and a pet assignment is not duplicated
+  ---
+  duration_ms: 0.30595
+  type: 'test'
+  ...
+# Subtest: a resource outside the active branch is excluded even when actively assigned
+ok 43 - a resource outside the active branch is excluded even when actively assigned
+  ---
+  duration_ms: 0.331238
+  type: 'test'
+  ...
+# Subtest: guards the view parameter against arbitrary input
+ok 44 - guards the view parameter against arbitrary input
+  ---
+  duration_ms: 5.543372
+  type: 'test'
+  ...
+# Subtest: expands each view into the right number of day columns
+ok 45 - expands each view into the right number of day columns
+  ---
+  duration_ms: 9.132931
+  type: 'test'
+  ...
+# Subtest: week view snaps to a Monday start regardless of the requested day
+ok 46 - week view snaps to a Monday start regardless of the requested day
+  ---
+  duration_ms: 1.131922
+  type: 'test'
+  ...
+# Subtest: uses configured business hours when nothing falls outside them
+ok 47 - uses configured business hours when nothing falls outside them
+  ---
+  duration_ms: 0.993456
+  type: 'test'
+  ...
+# Subtest: widens the window so an early or late booking is never hidden
+ok 48 - widens the window so an early or late booking is never hidden
+  ---
+  duration_ms: 0.31196
+  type: 'test'
+  ...
+# Subtest: ignores zero-length and inverted spans when widening
+ok 49 - ignores zero-length and inverted spans when widening
+  ---
+  duration_ms: 0.242842
+  type: 'test'
+  ...
+# Subtest: never produces an empty window
+ok 50 - never produces an empty window
+  ---
+  duration_ms: 0.668168
+  type: 'test'
+  ...
+# Subtest: positions a span proportionally inside the window
+ok 51 - positions a span proportionally inside the window
+  ---
+  duration_ms: 0.677897
+  type: 'test'
+  ...
+# Subtest: drops spans that fall entirely outside the window
+ok 52 - drops spans that fall entirely outside the window
+  ---
+  duration_ms: 1.877638
+  type: 'test'
+  ...
+# Subtest: clamps a span that straddles the window edge
+ok 53 - clamps a span that straddles the window edge
+  ---
+  duration_ms: 6.333135
+  type: 'test'
+  ...
+# Subtest: keeps a very short booking clickable rather than zero-height
+ok 54 - keeps a very short booking clickable rather than zero-height
+  ---
+  duration_ms: 0.434926
+  type: 'test'
+  ...
+# Subtest: emits inclusive time-axis markers
+ok 55 - emits inclusive time-axis markers
+  ---
+  duration_ms: 2.798886
+  type: 'test'
+  ...
+# Subtest: formats minute offsets as a zero-padded clock
+ok 56 - formats minute offsets as a zero-padded clock
+  ---
+  duration_ms: 0.585281
+  type: 'test'
+  ...
+# Subtest: places a same-day booking on exactly one day
+ok 57 - places a same-day booking on exactly one day
+  ---
+  duration_ms: 77.96588
+  type: 'test'
+  ...
+# Subtest: a booking starting before the window is still placed inside it
+ok 58 - a booking starting before the window is still placed inside it
+  ---
+  duration_ms: 1.636085
+  type: 'test'
+  ...
+# Subtest: a booking crossing local midnight appears on both days
+ok 59 - a booking crossing local midnight appears on both days
+  ---
+  duration_ms: 2.38456
+  type: 'test'
+  ...
+# Subtest: a multi-day occupancy fills every intermediate day
+ok 60 - a multi-day occupancy fills every intermediate day
+  ---
+  duration_ms: 4.756718
+  type: 'test'
+  ...
+# Subtest: returns no segments when the range misses every requested day
+ok 61 - returns no segments when the range misses every requested day
+  ---
+  duration_ms: 4.244858
+  type: 'test'
+  ...
+# Subtest: rejects a zero-length or inverted range
+ok 62 - rejects a zero-length or inverted range
+  ---
+  duration_ms: 1.066295
+  type: 'test'
+  ...
+# Subtest: segment minutes are branch-local, not UTC
+ok 63 - segment minutes are branch-local, not UTC
+  ---
+  duration_ms: 1.804259
+  type: 'test'
+  ...
+# Subtest: bounds derive from segments, so a filtered-out groomer cannot stretch the axis
+ok 64 - bounds derive from segments, so a filtered-out groomer cannot stretch the axis
+  ---
+  duration_ms: 2.888282
+  type: 'test'
+  ...
+# Subtest: requires a minimum term length
+ok 65 - requires a minimum term length
+  ---
+  duration_ms: 4.174539
+  type: 'test'
+  ...
+# Subtest: trims surrounding whitespace and caps length
+ok 66 - trims surrounding whitespace and caps length
+  ---
+  duration_ms: 0.397157
+  type: 'test'
+  ...
+# Subtest: rejects non-string input
+ok 67 - rejects non-string input
+  ---
+  duration_ms: 0.463264
+  type: 'test'
+  ...
+# Subtest: escapes LIKE metacharacters so a query cannot widen its own match
+ok 68 - escapes LIKE metacharacters so a query cannot widen its own match
+  ---
+  duration_ms: 0.625429
+  type: 'test'
+  ...
+# Subtest: hostile terms survive normalization without being rejected outright
+ok 69 - hostile terms survive normalization without being rejected outright
+  ---
+  duration_ms: 0.410846
+  type: 'test'
+  ...
+# Subtest: LIKE metacharacters are escaped and no others are introduced
+ok 70 - LIKE metacharacters are escaped and no others are introduced
+  ---
+  duration_ms: 3.55419
+  type: 'test'
+  ...
+# Subtest: PostgREST structural characters pass through as ordinary text
+ok 71 - PostgREST structural characters pass through as ordinary text
+  ---
+  duration_ms: 0.717666
+  type: 'test'
+  ...
+# Subtest: an injected filter fragment stays a literal search term
+ok 72 - an injected filter fragment stays a literal search term
+  ---
+  duration_ms: 0.375067
+  type: 'test'
+  ...
+# Subtest: a single character is rejected before any query is built
+ok 73 - a single character is rejected before any query is built
+  ---
+  duration_ms: 0.602369
+  type: 'test'
+  ...
+# Subtest: deduplicates customers matched by both name and phone
+ok 74 - deduplicates customers matched by both name and phone
+  ---
+  duration_ms: 4.475049
+  type: 'test'
+  ...
+# Subtest: merge preserves first-seen ordering and tolerates empty inputs
+ok 75 - merge preserves first-seen ordering and tolerates empty inputs
+  ---
+  duration_ms: 0.412516
+  type: 'test'
+  ...
+# Subtest: derives grooming size bands from weight
+ok 76 - derives grooming size bands from weight
+  ---
+  duration_ms: 0.365518
+  type: 'test'
+  ...
+# Subtest: returns no size band for missing or invalid weight
+ok 77 - returns no size band for missing or invalid weight
+  ---
+  duration_ms: 0.214793
+  type: 'test'
+  ...
+# Subtest: renders age from a birthdate
+ok 78 - renders age from a birthdate
+  ---
+  duration_ms: 0.691907
+  type: 'test'
+  ...
+# Subtest: rejects unusable birthdates including future dates
+ok 79 - rejects unusable birthdates including future dates
+  ---
+  duration_ms: 0.261701
+  type: 'test'
+  ...
+# Subtest: surfaces only scalar metadata as custom fields
+ok 80 - surfaces only scalar metadata as custom fields
+  ---
+  duration_ms: 0.834722
+  type: 'test'
+  ...
+# Subtest: tolerates non-object metadata
+ok 81 - tolerates non-object metadata
+  ---
+  duration_ms: 0.244312
+  type: 'test'
+  ...
+# Subtest: reads medical flags from both object and array shapes
+ok 82 - reads medical flags from both object and array shapes
+  ---
+  duration_ms: 0.815372
+  type: 'test'
+  ...
+# Subtest: haversine returns a plausible Jakarta distance
+ok 83 - haversine returns a plausible Jakarta distance
+  ---
+  duration_ms: 7.162498
+  type: 'test'
+  ...
+# Subtest: traffic factor is higher in morning and evening peaks
+ok 84 - traffic factor is higher in morning and evening peaks
+  ---
+  duration_ms: 0.539192
+  type: 'test'
+  ...
+# Subtest: recommends only common free windows for every selected groomer
+ok 85 - recommends only common free windows for every selected groomer
+  ---
+  duration_ms: 61.051349
+  type: 'test'
+  ...
+# Subtest: uses the previous stop before branch base for route scoring
+ok 86 - uses the previous stop before branch base for route scoring
+  ---
+  duration_ms: 16.895611
+  type: 'test'
+  ...
+# Subtest: an explicitly selected customer anchor overrides the previous stop
+ok 87 - an explicitly selected customer anchor overrides the previous stop
+  ---
+  duration_ms: 3.343318
+  type: 'test'
+  ...
+# Subtest: same-city days rank above a groomer day already committed to another city
+ok 88 - same-city days rank above a groomer day already committed to another city
+  ---
+  duration_ms: 5.0574
+  type: 'test'
+  ...
+# Subtest: resolves a fixed positive offset
+ok 89 - resolves a fixed positive offset
+  ---
+  duration_ms: 101.267673
+  type: 'test'
+  ...
+# Subtest: resolves a negative offset
+ok 90 - resolves a negative offset
+  ---
+  duration_ms: 5.628581
+  type: 'test'
+  ...
+# Subtest: maps an instant to its branch-local calendar day
+ok 91 - maps an instant to its branch-local calendar day
+  ---
+  duration_ms: 1.324866
+  type: 'test'
+  ...
+# Subtest: reads local minutes from midnight, not UTC minutes
+ok 92 - reads local minutes from midnight, not UTC minutes
+  ---
+  duration_ms: 0.866071
+  type: 'test'
+  ...
+# Subtest: round-trips a local date and minute offset through UTC
+ok 93 - round-trips a local date and minute offset through UTC
+  ---
+  duration_ms: 1.957734
+  type: 'test'
+  ...
+# Subtest: local midnight is not UTC midnight
+ok 94 - local midnight is not UTC midnight
+  ---
+  duration_ms: 0.844401
+  type: 'test'
+  ...
+# Subtest: survives a DST transition zone without shifting the local wall clock
+ok 95 - survives a DST transition zone without shifting the local wall clock
+  ---
+  duration_ms: 2.830924
+  type: 'test'
+  ...
+# Subtest: counts whole local days across a UTC day boundary
+ok 96 - counts whole local days across a UTC day boundary
+  ---
+  duration_ms: 3.365272
+  type: 'test'
+  ...
+# Subtest: shifts ISO dates across month and year ends
+ok 97 - shifts ISO dates across month and year ends
+  ---
+  duration_ms: 7.418901
+  type: 'test'
+  ...
+# Subtest: guards malformed date input
+ok 98 - guards malformed date input
+  ---
+  duration_ms: 2.128057
+  type: 'test'
+  ...
+# Subtest: the fixture really does straddle the UTC/Jakarta date boundary
+ok 99 - the fixture really does straddle the UTC/Jakarta date boundary
+  ---
+  duration_ms: 71.373312
+  type: 'test'
+  ...
+# Subtest: formatZonedDate reports the branch calendar date, not the UTC one
+ok 100 - formatZonedDate reports the branch calendar date, not the UTC one
+  ---
+  duration_ms: 2.871973
+  type: 'test'
+  ...
+# Subtest: formatZonedDateTime reports the branch wall clock
+ok 101 - formatZonedDateTime reports the branch wall clock
+  ---
+  duration_ms: 1.878016
+  type: 'test'
+  ...
+# Subtest: formatZonedDayLong reports the branch weekday
+ok 102 - formatZonedDayLong reports the branch weekday
+  ---
+  duration_ms: 1.017556
+  type: 'test'
+  ...
+# Subtest: formatters accept both Date and ISO string inputs identically
+ok 103 - formatters accept both Date and ISO string inputs identically
+  ---
+  duration_ms: 2.016873
+  type: 'test'
+  ...
+# Subtest: a branch in a negative offset zone also shifts the reported date
+ok 104 - a branch in a negative offset zone also shifts the reported date
+  ---
+  duration_ms: 5.054464
+  type: 'test'
+  ...
+# Subtest: default branch timezone prefers the explicit default branch
+ok 105 - default branch timezone prefers the explicit default branch
+  ---
+  duration_ms: 0.86706
+  type: 'test'
+  ...
+# Subtest: default branch timezone falls back to the first branch when none is flagged
+ok 106 - default branch timezone falls back to the first branch when none is flagged
+  ---
+  duration_ms: 0.348388
+  type: 'test'
+  ...
+# Subtest: timezone resolution reports an explicit fallback when no branch is readable
+ok 107 - timezone resolution reports an explicit fallback when no branch is readable
+  ---
+  duration_ms: 0.883959
+  type: 'test'
+  ...
+1..107
+# tests 107
+# suites 0
+# pass 107
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4315.088924

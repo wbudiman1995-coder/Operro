@@ -74,15 +74,24 @@ create or replace function app.create_package_invoice(
   p_branch uuid, p_customer uuid, p_package uuid, p_issued_at timestamptz, p_due_at timestamptz,
   p_admin_notes text, p_request_key uuid, p_pet uuid default null)
 returns public.invoices language plpgsql security definer set search_path=app,public as $$
-declare v_org uuid:=app.fn_active_organization(); v_pkg public.packages; v_order public.orders; v_invoice public.invoices; v_cp uuid; v_number text;
+declare v_org uuid:=app.fn_active_organization(); v_pkg public.packages; v_order public.orders; v_invoice public.invoices; v_cp uuid; v_number text; v_normalized_notes text;
 begin
   if v_org is null or not app.has_membership() or not app.has_module('finance') or not app.has_module('membership')
      or not app.has_permission('invoice.issue') or not app.has_permission('membership.manage') or not app.has_branch(p_branch) then raise exception 'not_authorized' using errcode='42501'; end if;
   if p_request_key is null or p_issued_at is null or (p_due_at is not null and p_due_at<p_issued_at) then raise exception 'invalid_invoice_details' using errcode='22023'; end if;
+  v_normalized_notes := left(nullif(trim(p_admin_notes),''),2000);
   select * into v_invoice from public.invoices where organization_id=v_org and request_key=p_request_key;
   if found then
+    -- Every genuinely caller-supplied material input is compared, not just
+    -- branch/customer/package/pet: issued_at/due_at/admin_notes are also
+    -- caller inputs, and a retry that silently changed them would issue an
+    -- invoice with different terms than the one the caller thinks they are
+    -- retrying (review round 3, finding #1 -- the same gap existed here).
     if v_invoice.branch_id <> p_branch or v_invoice.customer_id <> p_customer
        or v_invoice.metadata->>'package_id' is distinct from p_package::text
+       or v_invoice.issued_at <> p_issued_at
+       or v_invoice.due_at is distinct from p_due_at
+       or v_invoice.admin_notes is distinct from v_normalized_notes
        or not exists (select 1 from public.customer_packages existing_package
            where existing_package.organization_id=v_org and existing_package.source_invoice_id=v_invoice.id
              and existing_package.pet_id is not distinct from p_pet) then
@@ -103,7 +112,7 @@ begin
   select * into v_order from public.orders where id=v_order.id;
   v_number:='PKG-'||to_char(p_issued_at at time zone 'Asia/Jakarta','YYYYMMDD')||'-'||upper(substr(replace(p_request_key::text,'-',''),1,8));
   insert into public.invoices(organization_id,branch_id,customer_id,order_id,invoice_number,status,currency,subtotal,discount_total,tax_total,total,issued_at,due_at,billing_mode,document_type,admin_notes,request_key,metadata)
-  values(v_org,p_branch,p_customer,v_order.id,v_number,'issued',v_order.currency,v_order.subtotal,v_order.discount_total,v_order.tax_total,v_order.total,p_issued_at,p_due_at,'package_sale','invoice',left(nullif(trim(p_admin_notes),''),2000),p_request_key,jsonb_build_object('package_id',v_pkg.id)) returning * into v_invoice;
+  values(v_org,p_branch,p_customer,v_order.id,v_number,'issued',v_order.currency,v_order.subtotal,v_order.discount_total,v_order.tax_total,v_order.total,p_issued_at,p_due_at,'package_sale','invoice',v_normalized_notes,p_request_key,jsonb_build_object('package_id',v_pkg.id)) returning * into v_invoice;
   insert into public.invoice_lines(organization_id,invoice_id,item_type,package_id,name_snapshot,quantity,unit_price,line_total,pricing_breakdown)
   values(v_org,v_invoice.id,'package',v_pkg.id,v_pkg.name,1,v_pkg.price,v_pkg.price,jsonb_build_object('sessions',v_pkg.total_sessions,'validity_days',v_pkg.validity_days));
   insert into public.customer_packages(organization_id,customer_id,package_id,service_id,pet_id,sessions_remaining,purchased_at,activated_at,source_invoice_id,expires_at,status,source_ref,metadata)
@@ -149,13 +158,26 @@ end $$;
 --   - An inactive catalog package cannot be renewed (unchanged from
 --     before): its terms are no longer sold, so it cannot be topped up
 --     either.
---   - If the catalog's per_pet flag has changed since this membership was
---     sold such that it now disagrees with whether this membership actually
---     has a pet scope (cp.pet_id), the renewal is REFUSED
---     (catalog_terms_changed_incompatible_with_existing_entitlement) rather
---     than silently topping up an old entitlement under new, incompatible
---     terms. app.preview_package_renewal (below) surfaces this before the
---     staff member ever attempts the write.
+--   - Catalog compatibility (review round 3, finding #3 -- replaces the
+--     round-2 per_pet check, which was too strict): a sale may optionally
+--     bind a pet even when per_pet=false (pet presence alone is not proof
+--     the catalog changed), so the only genuinely unsafe per-pet drift is
+--     the catalog NOW requiring a pet (per_pet=true) for a membership that
+--     was sold with NO pet bound at all (cp.pet_id is null) -- renewal can
+--     never retroactively assign one. Symmetrically for service scope:
+--     cp.service_id is itself the immutable purchase-time snapshot (set
+--     once by create_package_invoice, never touched by renewal), so the
+--     only unsafe drift is the catalog's CURRENT service_id being a
+--     DIFFERENT specific service than the one this membership was actually
+--     sold for (both non-null and different) -- a catalog service_id of
+--     NULL ("any service") on either side is never itself a mismatch,
+--     since NULL always means "broader than any specific value". Either
+--     incompatibility REFUSES the renewal
+--     (catalog_terms_changed_incompatible_with_existing_entitlement)
+--     rather than silently topping up an old entitlement under new,
+--     incompatible terms. app.preview_package_renewal (below) surfaces
+--     both as separate flags before the staff member ever attempts the
+--     write.
 --
 -- Idempotency / concurrency (same shape as create_package_invoice /
 -- repair_customer_package_balance, reviewed on this branch): the
@@ -164,33 +186,73 @@ end $$;
 -- lock; by the time the second call reads public.invoices for the
 -- request_key, the first call's invoice (if any) is already committed and
 -- visible, so it is returned unchanged rather than re-created. The
--- idempotent-return check compares ONLY genuinely caller-supplied material
--- inputs (the membership being renewed, and the branch) -- NOT the
--- catalog's current price, which is server-derived state that can
--- legitimately drift between the original call and a retry without making
--- the retry illegitimate. A request key reused for a DIFFERENT membership
--- or a different branch is rejected; a plain retry after a catalog price
--- change returns the original invoice unchanged, exactly as it should.
--- Order matches the reviewed pattern on this branch: lock -> authorize ->
--- idempotent-return check -> business validation -> mutate.
+-- idempotent-return check (review round 3, finding #1) compares EVERY
+-- genuinely caller-supplied material input: the membership being renewed,
+-- the branch, and the caller-supplied issued_at/due_at/normalized
+-- admin_notes -- NOT the catalog's current price/sessions/rollover/expiry
+-- terms, which are server-derived state that can legitimately drift
+-- between the original call and a retry without making the retry
+-- illegitimate (a genuine retry must still return its original result
+-- after a later catalog change). A request key reused for a DIFFERENT
+-- membership, branch, issued/due date, or admin note is rejected with a
+-- single clear error; a plain retry with IDENTICAL inputs after a catalog
+-- price change returns the original invoice unchanged, exactly as it
+-- should.
+--
+-- Preview binding (review round 3, finding #2): a NEW renewal (one whose
+-- request_key has no existing invoice yet) must supply
+-- p_terms_fingerprint, computed by app.preview_package_renewal from the
+-- SAME pkg/cp/reserved-count snapshot this function itself reads under the
+-- row lock (app.fn_renewal_terms_fingerprint is a pure function of already-
+-- fetched rows, not a second query, so there is no re-read race between
+-- validating the fingerprint and using those exact values to compute the
+-- charge). If the catalog/entitlement state has changed since the preview
+-- was generated, the fingerprint will not match and the write is refused
+-- (renewal_terms_changed_since_preview) -- the staff member must reload
+-- the preview and re-confirm. An idempotent RETRY never re-checks the
+-- fingerprint (it is not re-derivable from an already-issued invoice, and
+-- re-checking it would defeat the "genuine retry survives a later catalog
+-- change" guarantee above).
+-- Order: lock -> authorize -> idempotent-return check -> business
+-- validation (status/catalog-active/compatibility) -> fingerprint check ->
+-- mutate.
 -- ---------------------------------------------------------------------
 drop function if exists app.renew_customer_package(uuid, uuid);
+drop function if exists app.renew_customer_package(uuid, uuid, timestamptz, timestamptz, text, uuid);
+
+-- Pure, query-free composition of the renewal terms fingerprint from
+-- ALREADY-FETCHED pkg/cp rows plus an already-computed reserved-session
+-- count -- never re-queried, so preview and renew always agree on exactly
+-- the same snapshot they each already hold, with no TOCTOU window between
+-- "check" and "use".
+create or replace function app.fn_renewal_terms_fingerprint(pkg public.packages, cp public.customer_packages, p_reserved_count integer)
+returns text
+language sql immutable as $$
+  select md5(concat_ws('|',
+    pkg.id::text, pkg.price::text, pkg.currency, pkg.total_sessions::text, pkg.rollover_policy, pkg.recurrence_interval,
+    pkg.per_pet::text, coalesce(pkg.service_id::text,'-'), pkg.is_active::text, coalesce(pkg.validity_days::text,'-'),
+    cp.status, coalesce(cp.pet_id::text,'-'), coalesce(cp.service_id::text,'-'),
+    coalesce(cp.expires_at::text,'-'), cp.sessions_remaining::text, p_reserved_count::text))
+$$;
+
+revoke all on function app.fn_renewal_terms_fingerprint(public.packages, public.customer_packages, integer) from public, authenticated;
 
 create function app.renew_customer_package(
   p_customer_package uuid, p_branch uuid, p_issued_at timestamptz, p_due_at timestamptz,
-  p_admin_notes text, p_request_key uuid)
+  p_admin_notes text, p_request_key uuid, p_terms_fingerprint text)
 returns public.invoices
 security definer set search_path = app, public
 language plpgsql as $$
 declare
   v_org uuid; cp public.customer_packages; pkg public.packages; v_invoice public.invoices; v_order public.orders;
-  v_new_expiry timestamptz; v_interval interval; v_number text; v_line_name text;
-  v_reserved_count integer; v_unreserved_excess integer;
+  v_new_expiry timestamptz; v_interval interval; v_number text; v_line_name text; v_normalized_notes text;
+  v_reserved_count integer; v_unreserved_excess integer; v_pet_incompatible boolean; v_service_incompatible boolean;
 begin
   v_org := app.fn_active_organization();
   if p_request_key is null or p_issued_at is null or (p_due_at is not null and p_due_at < p_issued_at) then
     raise exception 'invalid_invoice_details' using errcode = '22023';
   end if;
+  v_normalized_notes := left(nullif(trim(p_admin_notes), ''), 2000);
 
   select * into cp from public.customer_packages where organization_id = v_org and id = p_customer_package for update;
   if not found then raise exception 'package_not_found' using errcode = 'no_data_found'; end if;
@@ -203,13 +265,18 @@ begin
   select * into pkg from public.packages where organization_id = v_org and id = cp.package_id;
   if not found then raise exception 'package_not_found' using errcode = 'no_data_found'; end if;
 
-  -- Idempotent return: same request_key must mean the same renewal (same
-  -- membership, same branch) -- catalog price is deliberately NOT compared
-  -- here (see the comment block above this function).
+  select count(*) into v_reserved_count from public.package_reservations
+   where organization_id = v_org and customer_package_id = cp.id and status = 'reserved';
+
+  -- Idempotent return: same request_key must mean the SAME renewal request
+  -- in full (see the comment block above this function).
   select * into v_invoice from public.invoices where organization_id = v_org and request_key = p_request_key;
   if found then
     if v_invoice.branch_id <> p_branch
-       or v_invoice.metadata->>'renewal_of' is distinct from cp.id::text then
+       or v_invoice.metadata->>'renewal_of' is distinct from cp.id::text
+       or v_invoice.issued_at <> p_issued_at
+       or v_invoice.due_at is distinct from p_due_at
+       or v_invoice.admin_notes is distinct from v_normalized_notes then
       raise exception 'request_key_reused_for_different_renewal' using errcode = '22023';
     end if;
     return v_invoice;
@@ -217,8 +284,15 @@ begin
 
   if cp.status = 'canceled' then raise exception 'package_canceled_cannot_renew' using errcode = 'check_violation'; end if;
   if not pkg.is_active then raise exception 'package_catalog_inactive' using errcode = 'check_violation'; end if;
-  if pkg.per_pet <> (cp.pet_id is not null) then
+  v_pet_incompatible := pkg.per_pet and cp.pet_id is null;
+  v_service_incompatible := cp.service_id is not null and pkg.service_id is not null and cp.service_id <> pkg.service_id;
+  if v_pet_incompatible or v_service_incompatible then
     raise exception 'catalog_terms_changed_incompatible_with_existing_entitlement' using errcode = 'check_violation';
+  end if;
+
+  if p_terms_fingerprint is null then raise exception 'renewal_preview_required' using errcode = '22023'; end if;
+  if p_terms_fingerprint <> app.fn_renewal_terms_fingerprint(pkg, cp, v_reserved_count) then
+    raise exception 'renewal_terms_changed_since_preview' using errcode = '40001';
   end if;
 
   v_interval := case pkg.recurrence_interval
@@ -244,7 +318,7 @@ begin
     subtotal, discount_total, tax_total, total, issued_at, due_at, billing_mode, document_type, admin_notes, request_key, metadata)
   values (v_org, p_branch, cp.customer_id, v_order.id, v_number, 'issued', pkg.currency,
     pkg.price, 0, 0, pkg.price, p_issued_at, p_due_at, 'package_sale', 'invoice',
-    left(nullif(trim(p_admin_notes), ''), 2000), p_request_key,
+    v_normalized_notes, p_request_key,
     jsonb_build_object('package_id', pkg.id, 'renewal_of', cp.id))
   returning * into v_invoice;
   insert into public.invoice_lines(organization_id, invoice_id, item_type, package_id, name_snapshot, quantity, unit_price, line_total, pricing_breakdown)
@@ -258,8 +332,6 @@ begin
   -- to sessions_remaining), so the ledger remains the single source of
   -- truth and reconcile_customer_package never sees a cache/ledger gap.
   if pkg.rollover_policy = 'none' then
-    select count(*) into v_reserved_count from public.package_reservations
-     where organization_id = v_org and customer_package_id = cp.id and status = 'reserved';
     v_unreserved_excess := greatest(0, cp.sessions_remaining - v_reserved_count);
     if v_unreserved_excess > 0 then
       insert into public.customer_package_ledger (organization_id, customer_package_id, delta, reason, notes)
@@ -277,15 +349,17 @@ begin
   return v_invoice;
 end; $$;
 
-revoke all on function app.renew_customer_package(uuid, uuid, timestamptz, timestamptz, text, uuid) from public, authenticated;
-grant execute on function app.renew_customer_package(uuid, uuid, timestamptz, timestamptz, text, uuid) to authenticated;
+revoke all on function app.renew_customer_package(uuid, uuid, timestamptz, timestamptz, text, uuid, text) from public, authenticated;
+grant execute on function app.renew_customer_package(uuid, uuid, timestamptz, timestamptz, text, uuid, text) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- SECTION 3B — preview_package_renewal: READ-ONLY. Shows exactly what a
 -- renewal would do (price, sessions to add, currency, pet/service scope,
 -- resulting expiry, and whether the catalog's terms have drifted
 -- incompatibly since this membership was sold) BEFORE the staff member
--- commits to the write. Never writes; membership.read is sufficient.
+-- commits to the write, and returns the terms_fingerprint that
+-- renew_customer_package requires for a new (non-retry) request. Never
+-- writes; membership.read is sufficient.
 -- ---------------------------------------------------------------------
 create or replace function app.preview_package_renewal(p_customer_package uuid)
 returns jsonb
@@ -294,7 +368,7 @@ language plpgsql stable as $$
 declare
   v_org uuid; cp public.customer_packages; pkg public.packages;
   v_interval interval; v_new_expiry timestamptz; v_reserved_count integer; v_unreserved_excess integer;
-  v_incompatible boolean;
+  v_pet_incompatible boolean; v_service_incompatible boolean;
 begin
   v_org := app.fn_active_organization();
   select * into cp from public.customer_packages where organization_id = v_org and id = p_customer_package;
@@ -304,7 +378,18 @@ begin
   select * into pkg from public.packages where organization_id = v_org and id = cp.package_id;
   if not found then raise exception 'package_not_found' using errcode = 'no_data_found'; end if;
 
-  v_incompatible := cp.status <> 'canceled' and pkg.per_pet <> (cp.pet_id is not null);
+  select count(*) into v_reserved_count from public.package_reservations
+   where organization_id = v_org and customer_package_id = cp.id and status = 'reserved';
+
+  -- See the compatibility comment on renew_customer_package: optional pet
+  -- binding on a per_pet=false sale is legitimate, so pet presence alone is
+  -- never proof of drift; only the catalog NOW requiring a pet for a
+  -- membership sold with none is unsafe. Service scope compares the
+  -- catalog's current service_id against the immutable purchase-time
+  -- snapshot cp.service_id; NULL on either side ("any service") is never a
+  -- mismatch by itself.
+  v_pet_incompatible := cp.status <> 'canceled' and pkg.per_pet and cp.pet_id is null;
+  v_service_incompatible := cp.status <> 'canceled' and cp.service_id is not null and pkg.service_id is not null and cp.service_id <> pkg.service_id;
 
   v_interval := case pkg.recurrence_interval
     when 'week' then interval '7 days'
@@ -313,9 +398,6 @@ begin
     else (coalesce(pkg.validity_days, 30) || ' days')::interval
   end;
   v_new_expiry := greatest(now(), coalesce(cp.expires_at, now())) + v_interval;
-
-  select count(*) into v_reserved_count from public.package_reservations
-   where organization_id = v_org and customer_package_id = cp.id and status = 'reserved';
   v_unreserved_excess := case when pkg.rollover_policy = 'none' then greatest(0, cp.sessions_remaining - v_reserved_count) else 0 end;
 
   return jsonb_build_object(
@@ -328,13 +410,16 @@ begin
     'resulting_available', greatest(0, cp.sessions_remaining - v_reserved_count) - v_unreserved_excess + pkg.total_sessions,
     'current_expires_at', cp.expires_at, 'resulting_expires_at', v_new_expiry,
     'catalog_active', pkg.is_active, 'membership_status', cp.status,
-    'incompatible', v_incompatible,
+    'pet_scope_incompatible', v_pet_incompatible, 'service_scope_incompatible', v_service_incompatible,
+    'incompatible', v_pet_incompatible or v_service_incompatible,
     'blocking_reason', case
       when cp.status = 'canceled' then 'package_canceled_cannot_renew'
       when not pkg.is_active then 'package_catalog_inactive'
-      when v_incompatible then 'catalog_terms_changed_incompatible_with_existing_entitlement'
+      when v_pet_incompatible or v_service_incompatible then 'catalog_terms_changed_incompatible_with_existing_entitlement'
       else null
-    end);
+    end,
+    'terms_fingerprint', app.fn_renewal_terms_fingerprint(pkg, cp, v_reserved_count),
+    'generated_at', now());
 end; $$;
 
 revoke all on function app.preview_package_renewal(uuid) from public, authenticated;
@@ -363,10 +448,23 @@ grant execute on function app.preview_package_renewal(uuid) to authenticated;
 --     customer_packages.source_invoice_id instead, checked separately).
 --   - A non-null invoice_id must point to a REAL, matching invoice: same
 --     organization AND customer, a relevant status (issued/paid, not
---     void), and at least one invoice_lines row for the same package_id.
---     A non-null FK alone (satisfied by any invoice in the same org) is
---     NOT sufficient proof of correct provenance.
---   - The package's own source_invoice_id presence (legacy flag).
+--     void), a matching invoice_lines row for the same package_id with a
+--     session snapshot equal to the ledger movement it produced (never
+--     today's catalog sessions/price), AND -- review round 3, finding #4 --
+--     the SPECIFIC membership: a 'purchase' row must point at exactly
+--     cp.source_invoice_id, and a 'renewal' row's invoice must have
+--     metadata->>'renewal_of' equal to THIS cp.id. Two separate purchases
+--     of the same catalog package by the same customer (two different
+--     customer_packages rows) must not be able to cross-link each other's
+--     invoice and pass as "verified" merely by matching customer+product.
+--   - The HISTORICAL source_invoice_id on customer_packages itself
+--     (round 2 only checked it for NULL) is now validated the same way
+--     when non-null: right customer, right package line, non-void status,
+--     matching session snapshot -- as a read-only cross-check, never by
+--     mutating the immutable purchase ledger row (invalid_source_invoice).
+--   - The package's own source_invoice_id presence (legacy flag,
+--     missing_source_invoice -- an explicit, disclosed "unknown
+--     provenance" state, never silently treated as verified).
 --   - Over-reservation: reserved_count must never exceed the cached
 --     balance (would mean more capacity is held than exists).
 --   - Expiry/status inconsistency: status='active' with expires_at in the
@@ -390,6 +488,7 @@ declare
   v_invalid_consumption_links integer; v_invalid_reversal_links integer;
   v_orphan_consumption_ledger integer; v_unlinked_renewal integer;
   v_invalid_invoice_links integer; v_missing_reversal_link integer; v_duplicate_consumption_links integer;
+  v_invalid_source_invoice integer;
   v_over_reserved boolean; v_expired_status_mismatch boolean; v_missing_source_invoice boolean;
   v_manual_review jsonb := '[]'::jsonb;
 begin
@@ -473,24 +572,57 @@ begin
 
   -- A non-null invoice_id is not proof of correct provenance by itself --
   -- the FK only guarantees the invoice exists in the same organization.
-  -- Verify it actually belongs to THIS customer and THIS package, is not
-  -- void, and has a matching invoice line.
+  -- Verify it actually belongs to THIS customer, is the CORRECT invoice for
+  -- THIS SPECIFIC membership (not merely "same customer, same product" --
+  -- two separate purchases of the same catalog package by the same
+  -- customer must not pass by cross-linking each other's invoice), is not
+  -- void, and its invoice line's snapshotted session count matches the
+  -- ledger movement it produced (never today's catalog sessions/price).
   select count(*) into v_invalid_invoice_links
     from public.customer_package_ledger cpl
    where cpl.organization_id = v_org and cpl.customer_package_id = p_customer_package
      and cpl.reason in ('purchase', 'renewal') and cpl.invoice_id is not null
      and not exists (
        select 1 from public.invoices i
+        join public.invoice_lines il
+          on il.organization_id = v_org and il.invoice_id = i.id
+         and il.item_type = 'package' and il.package_id = cp.package_id
         where i.organization_id = v_org and i.id = cpl.invoice_id
           and i.customer_id = cp.customer_id and i.status in ('issued', 'paid')
-          and exists (
-            select 1 from public.invoice_lines il
-             where il.organization_id = v_org and il.invoice_id = i.id
-               and il.item_type = 'package' and il.package_id = cp.package_id
+          and (il.pricing_breakdown->>'sessions')::numeric = cpl.delta
+          and (
+            (cpl.reason = 'purchase' and cpl.invoice_id = cp.source_invoice_id)
+            -- Tied to the SPECIFIC renewal event, not merely "some invoice
+            -- for this membership": two renewals of the same membership
+            -- must not cross-link each other's invoice either. request_key
+            -- is stamped identically onto both the invoice and its own
+            -- renewal ledger row by renew_customer_package.
+            or (cpl.reason = 'renewal' and i.metadata->>'renewal_of' = cp.id::text and i.request_key = cpl.request_key)
           )
      );
 
+  -- The HISTORICAL purchase invoice (customer_packages.source_invoice_id,
+  -- set once at purchase time, before invoice_id existed on the ledger
+  -- itself) was previously checked only for NULL. A non-null value is now
+  -- validated the same way: right customer, right package line, non-void
+  -- status, and a matching session snapshot against the purchase ledger
+  -- row -- WITHOUT mutating the immutable ledger row itself (this is a
+  -- read-only cross-check, never a backfill/UPDATE).
   v_missing_source_invoice := cp.source_invoice_id is null;
+  select count(*) into v_invalid_source_invoice
+    from public.customer_packages self
+   where self.id = cp.id and self.source_invoice_id is not null
+     and not exists (
+       select 1 from public.invoices i
+        join public.invoice_lines il
+          on il.organization_id = v_org and il.invoice_id = i.id
+         and il.item_type = 'package' and il.package_id = cp.package_id
+        join public.customer_package_ledger cpl
+          on cpl.organization_id = v_org and cpl.customer_package_id = cp.id and cpl.reason = 'purchase'
+        where i.organization_id = v_org and i.id = self.source_invoice_id
+          and i.customer_id = cp.customer_id and i.status in ('issued', 'paid')
+          and (il.pricing_breakdown->>'sessions')::numeric = cpl.delta
+     );
   v_over_reserved := v_reserved > cp.sessions_remaining;
   v_expired_status_mismatch := cp.status = 'active' and cp.expires_at is not null and cp.expires_at < now();
 
@@ -502,6 +634,7 @@ begin
   if v_unlinked_renewal > 0 then v_manual_review := v_manual_review || jsonb_build_array('unlinked_renewal_invoice'); end if;
   if v_invalid_invoice_links > 0 then v_manual_review := v_manual_review || jsonb_build_array('invalid_invoice_links'); end if;
   if v_missing_source_invoice then v_manual_review := v_manual_review || jsonb_build_array('missing_source_invoice'); end if;
+  if v_invalid_source_invoice > 0 then v_manual_review := v_manual_review || jsonb_build_array('invalid_source_invoice'); end if;
   if v_over_reserved then v_manual_review := v_manual_review || jsonb_build_array('over_reserved'); end if;
   if v_expired_status_mismatch then v_manual_review := v_manual_review || jsonb_build_array('expired_but_status_active'); end if;
 
@@ -523,6 +656,7 @@ begin
     'unlinked_renewal_invoice_entries', v_unlinked_renewal,
     'invalid_invoice_links', v_invalid_invoice_links,
     'missing_source_invoice', v_missing_source_invoice,
+    'invalid_source_invoice', v_invalid_source_invoice,
     'over_reserved', v_over_reserved,
     'expired_but_status_active', v_expired_status_mismatch,
     'manual_review_issues', v_manual_review,
@@ -531,5 +665,108 @@ end; $$;
 
 revoke all on function app.reconcile_customer_package(uuid) from public, authenticated;
 grant execute on function app.reconcile_customer_package(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- SECTION 5 — update_customer_package_terms: guarded, audited correction
+-- of a PURCHASED membership's own administrative terms (review round 3,
+-- finding #5 -- the section 25 requirement the handoff had disclosed as
+-- incomplete). This is deliberately narrow, matching the allowed-field
+-- matrix below; it is NOT a general-purpose editor and never touches
+-- money or the session ledger.
+--
+-- Allowed-field matrix:
+--   - expires_at: always correctable while the membership is not
+--     'canceled' (an archived membership is reactivated via
+--     set_customer_package_status first, not edited while archived).
+--     Correcting it never touches sessions_remaining/the ledger, and never
+--     retroactively invalidates a past reservation (reserve_package_session
+--     already re-checks expires_at live at reservation time; it does not
+--     snapshot it onto the reservation row).
+--   - pet_id / service_id: correctable ONLY while the entitlement has
+--     never been touched -- no package_reservations row of ANY status has
+--     ever existed for it, and it has never been renewed
+--     (renewal_count = 0). Once a session has been reserved/consumed
+--     against a specific pet/service scope, or the membership has been
+--     billed again under that scope via a renewal invoice, retargeting it
+--     would retroactively misrepresent what was actually sold and
+--     consumed -- refused with a precise reason
+--     (entitlement_scope_locked_after_first_reservation /
+--     entitlement_scope_locked_after_renewal) rather than silently allowed
+--     or silently ignored.
+--   - Never editable here: sessions_remaining, package_id, customer_id,
+--     source_invoice_id, or any invoice/ledger row (no balance edits, no
+--     retroactive rewriting of invoice/ledger terms -- that is exactly
+--     what this RPC refuses to do; a balance correction still only ever
+--     goes through repair_customer_package_balance).
+--
+-- Guarded like every other write RPC on this branch: membership.manage,
+-- row locked FIRST, revision-checked (40001 on a stale request, same as
+-- repair_customer_package_balance), a mandatory non-empty reason, and a
+-- full before/after audit row in timeline_events -- never silent.
+-- ---------------------------------------------------------------------
+create or replace function app.update_customer_package_terms(
+  p_customer_package uuid, p_revision integer, p_reason text,
+  p_expires_at timestamptz, p_pet uuid, p_service uuid)
+returns public.customer_packages
+security definer set search_path = app, public
+language plpgsql as $$
+declare
+  v_org uuid; cp public.customer_packages; v_has_reservations boolean;
+  v_pet_changed boolean; v_service_changed boolean;
+begin
+  v_org := app.fn_active_organization();
+  select * into cp from public.customer_packages where organization_id = v_org and id = p_customer_package for update;
+  if not found then raise exception 'package_not_found' using errcode = 'no_data_found'; end if;
+
+  perform app.assert_tenant_authorized(v_org, 'membership', 'membership.manage');
+
+  if p_reason is null or length(btrim(p_reason)) = 0 then
+    raise exception 'correction_reason_required' using errcode = 'check_violation';
+  end if;
+  if cp.revision <> p_revision then raise exception 'stale_correction_request' using errcode = '40001'; end if;
+  if cp.status = 'canceled' then raise exception 'package_canceled_cannot_edit' using errcode = 'check_violation'; end if;
+
+  v_pet_changed := p_pet is distinct from cp.pet_id;
+  v_service_changed := p_service is distinct from cp.service_id;
+
+  if v_pet_changed or v_service_changed then
+    if cp.renewal_count > 0 then
+      raise exception 'entitlement_scope_locked_after_renewal' using errcode = 'check_violation';
+    end if;
+    select exists(
+      select 1 from public.package_reservations
+       where organization_id = v_org and customer_package_id = cp.id
+    ) into v_has_reservations;
+    if v_has_reservations then
+      raise exception 'entitlement_scope_locked_after_first_reservation' using errcode = 'check_violation';
+    end if;
+  end if;
+
+  if v_pet_changed and p_pet is not null
+     and not exists(select 1 from public.pets where organization_id = v_org and id = p_pet and customer_id = cp.customer_id and deleted_at is null) then
+    raise exception 'pet_not_found_for_customer' using errcode = 'P0002';
+  end if;
+  if v_service_changed and p_service is not null
+     and not exists(select 1 from public.service_catalog where organization_id = v_org and id = p_service and deleted_at is null) then
+    raise exception 'service_not_found' using errcode = 'P0002';
+  end if;
+
+  update public.customer_packages
+     set expires_at = p_expires_at, pet_id = p_pet, service_id = p_service, revision = revision + 1
+   where id = cp.id;
+
+  insert into public.timeline_events (organization_id, subject_type, subject_id, actor_id, event_type, summary, data)
+  values (v_org, 'package', cp.id, app.fn_current_user_id(), 'membership.terms_corrected', 'membership.terms_corrected',
+          jsonb_build_object(
+            'reason', p_reason,
+            'before', jsonb_build_object('expires_at', cp.expires_at, 'pet_id', cp.pet_id, 'service_id', cp.service_id),
+            'after', jsonb_build_object('expires_at', p_expires_at, 'pet_id', p_pet, 'service_id', p_service)));
+
+  select * into cp from public.customer_packages where organization_id = v_org and id = p_customer_package;
+  return cp;
+end; $$;
+
+revoke all on function app.update_customer_package_terms(uuid, integer, text, timestamptz, uuid, uuid) from public, authenticated;
+grant execute on function app.update_customer_package_terms(uuid, integer, text, timestamptz, uuid, uuid) to authenticated;
 
 commit;

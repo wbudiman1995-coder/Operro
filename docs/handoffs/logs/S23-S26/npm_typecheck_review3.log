@@ -1,0 +1,9 @@
+
+> web@0.1.0 typecheck
+> tsc --noEmit
+
+test/package-lifecycle-contract.test.ts(145,64): error TS1501: This regular expression flag is only available when targeting 'es2018' or later.
+npm ERR! Lifecycle script `typecheck` failed with error: 
+npm ERR! Error: command failed 
+npm ERR!   in workspace: web@0.1.0 
+npm ERR!   at location: /mnt/e/Claude/operro-review-s23-s26/apps/web 

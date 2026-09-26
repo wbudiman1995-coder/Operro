@@ -11,7 +11,8 @@
  * - updateGroomingChecklistAction / issueInvoiceForBookingAction / previewInvoiceDiscountsAction: closes the service-to-cash loop, including section-22 invoice/pet/service/category discounts, transport fee, and a pre-issuance preview.
  * - createServiceAction / updateServiceAction / overrideGroomingLinePriceAction / createResourceAction / updateResourceAction / archiveResourceAction: configures the operating catalog.
  * - createPackageAction / updatePackageAction: configures the package/membership catalog (recurrence, per-pet, sessions, price, validity) -- future sales only, never rewrites already-sold customer_packages.
- * - renewCustomerPackageAction: manual paid renewal -- creates a renewal invoice/order/ledger row, not just a session top-up.
+ * - renewCustomerPackageAction: manual paid renewal -- creates a renewal invoice/order/ledger row, not just a session top-up, bound to a fresh preview's terms_fingerprint.
+ * - updateCustomerPackageTermsAction: guarded correction of a purchased membership's expires_at/pet/service, revision-checked and audited (never a balance/invoice edit).
  * - loadMembershipHistoryAction: read-only ledger + reservation history for one membership (section 25 detail view).
  * - adjustInventoryAction: appends an inventory adjustment movement.
  * - recordPaymentAction / recordExpenseAction: records manual financial activity.
@@ -774,7 +775,8 @@ export interface PackageRenewalPreview {
   sessionsToAdd: number; rolloverPolicy: string; recurrenceInterval: string; petId: string | null; serviceId: string | null;
   currentAvailable: number; sessionsDiscardedIfRenewed: number; resultingAvailable: number;
   currentExpiresAt: string | null; resultingExpiresAt: string; catalogActive: boolean; membershipStatus: string;
-  incompatible: boolean; blockingReason: string | null;
+  petScopeIncompatible: boolean; serviceScopeIncompatible: boolean; incompatible: boolean; blockingReason: string | null;
+  termsFingerprint: string; generatedAt: string;
 }
 export interface PackageRenewalPreviewResult { error: string | null; preview: PackageRenewalPreview | null }
 
@@ -782,7 +784,11 @@ export interface PackageRenewalPreviewResult { error: string | null; preview: Pa
  * Section 24, read-only: shows exactly what a renewal would do (price,
  * sessions, currency, pet/service scope, resulting expiry) and whether the
  * catalog's terms have drifted incompatibly since this membership was sold
- * -- BEFORE the staff member commits to issuing the renewal invoice.
+ * -- BEFORE the staff member commits to issuing the renewal invoice. Also
+ * returns termsFingerprint, which the actual renewal write must present
+ * unchanged (see renewCustomerPackageAction) -- a stale fingerprint means
+ * the catalog/entitlement changed since this preview was generated and the
+ * staff member must reload it before submitting.
  */
 export async function previewPackageRenewalAction(customerPackageId: string): Promise<PackageRenewalPreviewResult> {
   const context = await workspace(); if (!context) return { error: "workspace aktif tidak tersedia", preview: null };
@@ -800,7 +806,9 @@ export async function previewPackageRenewalAction(customerPackageId: string): Pr
       currentAvailable: Number(data.current_available), sessionsDiscardedIfRenewed: Number(data.sessions_discarded_if_renewed),
       resultingAvailable: Number(data.resulting_available), currentExpiresAt: data.current_expires_at ? String(data.current_expires_at) : null,
       resultingExpiresAt: String(data.resulting_expires_at), catalogActive: Boolean(data.catalog_active), membershipStatus: String(data.membership_status),
+      petScopeIncompatible: Boolean(data.pet_scope_incompatible), serviceScopeIncompatible: Boolean(data.service_scope_incompatible),
       incompatible: Boolean(data.incompatible), blockingReason: data.blocking_reason ? String(data.blocking_reason) : null,
+      termsFingerprint: String(data.terms_fingerprint), generatedAt: String(data.generated_at),
     },
   };
 }
@@ -811,25 +819,61 @@ export async function previewPackageRenewalAction(customerPackageId: string): Pr
  * not just a session top-up. Branch is required and explicit -- the UI
  * defaults it to the membership's source-invoice branch when known, but the
  * staff member confirms it; nothing here guesses a branch for a legacy
- * membership with no source invoice.
+ * membership with no source invoice. termsFingerprint must come from a
+ * freshly-loaded previewPackageRenewalAction result -- the RPC re-validates
+ * it under the row lock and refuses a stale one (see the migration).
  */
 export async function renewCustomerPackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   if (!(await loadCapabilities(context.supabase))["invoice.issue"]) return databaseError("Paket", "izin invoice.issue diperlukan");
   const customerPackageId = idValue(formData, "customerPackageId"); const branchId = idValue(formData, "branchId"); const requestKey = idValue(formData, "requestKey");
+  const termsFingerprint = textValue(formData, "termsFingerprint", 64) || null;
   const issuedDate = textValue(formData, "invoiceDate", 10); const dueDate = textValue(formData, "dueDate", 10);
   if (!customerPackageId || !branchId || !requestKey || !issuedDate) return databaseError("Paket", "cabang, tanggal invoice, dan paket wajib diisi");
+  if (!termsFingerprint) return databaseError("Paket", "muat pratinjau perpanjangan terlebih dahulu sebelum mengirim");
   const issuedAt = new Date(`${issuedDate}T09:00:00+07:00`).toISOString();
   const dueAt = dueDate ? new Date(`${dueDate}T23:59:59+07:00`).toISOString() : null;
   if (dueAt && new Date(dueAt) < new Date(issuedAt)) return databaseError("Paket", "tanggal jatuh tempo tidak boleh sebelum tanggal invoice");
   const result = await context.supabase.schema("app").rpc("renew_customer_package", {
     p_customer_package: customerPackageId, p_branch: branchId, p_issued_at: issuedAt, p_due_at: dueAt,
-    p_admin_notes: textValue(formData, "adminNotes", 2000) || null, p_request_key: requestKey,
+    p_admin_notes: textValue(formData, "adminNotes", 2000) || null, p_request_key: requestKey, p_terms_fingerprint: termsFingerprint,
   });
-  if (result.error) return databaseError("Perpanjangan gagal", /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage/invoice.issue diperlukan" : /request_key_reused/i.test(result.error.message) ? "kunci permintaan sudah dipakai untuk perpanjangan lain" : /package_canceled_cannot_renew/i.test(result.error.message) ? "paket sudah diarsipkan dan tidak dapat diperpanjang" : /package_catalog_inactive/i.test(result.error.message) ? "produk paket ini sudah tidak aktif di katalog" : /catalog_terms_changed_incompatible/i.test(result.error.message) ? "syarat katalog sudah berubah dan tidak lagi cocok dengan paket ini; perbarui katalog atau tangani secara manual" : result.error.message);
+  if (result.error) return databaseError("Perpanjangan gagal", /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage/invoice.issue diperlukan" : /renewal_terms_changed_since_preview|40001/i.test(result.error.message) ? "syarat paket berubah sejak pratinjau; muat ulang pratinjau dan coba lagi" : /renewal_preview_required/i.test(result.error.message) ? "muat pratinjau perpanjangan terlebih dahulu sebelum mengirim" : /request_key_reused/i.test(result.error.message) ? "kunci permintaan sudah dipakai untuk perpanjangan lain" : /package_canceled_cannot_renew/i.test(result.error.message) ? "paket sudah diarsipkan dan tidak dapat diperpanjang" : /package_catalog_inactive/i.test(result.error.message) ? "produk paket ini sudah tidak aktif di katalog" : /catalog_terms_changed_incompatible/i.test(result.error.message) ? "syarat katalog sudah berubah dan tidak lagi cocok dengan paket ini; perbarui katalog atau tangani secara manual" : result.error.message);
   const row = result.data as { invoice_number?: string } | null;
   revalidatePath("/programs"); revalidatePath("/programs/memberships"); revalidatePath("/finance");
   return { error: null, success: `Paket diperpanjang. ${row?.invoice_number ?? "Invoice"} diterbitkan.` };
+}
+
+export async function updateCustomerPackageTermsAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  if (!(await loadCapabilities(context.supabase))["membership.manage"]) return databaseError("Paket", "izin membership.manage diperlukan");
+  const customerPackageId = idValue(formData, "customerPackageId");
+  const revision = numberValue(formData, "revision");
+  const reason = textValue(formData, "reason", 300);
+  const expiresDate = textValue(formData, "expiresAt", 10);
+  const petId = idValue(formData, "petId");
+  const serviceId = idValue(formData, "serviceId");
+  if (!customerPackageId || revision === null || !Number.isInteger(revision)) return databaseError("Koreksi", "data tidak valid");
+  if (reason.length < 3) return databaseError("Koreksi", "alasan koreksi wajib diisi (minimal 3 karakter)");
+  const expiresAt = expiresDate ? new Date(`${expiresDate}T23:59:59+07:00`).toISOString() : null;
+  const result = await context.supabase.schema("app").rpc("update_customer_package_terms", {
+    p_customer_package: customerPackageId, p_revision: revision, p_reason: reason,
+    p_expires_at: expiresAt, p_pet: petId, p_service: serviceId,
+  });
+  if (result.error) return databaseError(
+    "Koreksi gagal",
+    /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage diperlukan"
+    : /stale_correction_request|40001/i.test(result.error.message) ? "data berubah sejak dimuat; muat ulang dan coba lagi"
+    : /entitlement_scope_locked_after_first_reservation/i.test(result.error.message) ? "hewan/layanan tidak dapat diubah setelah paket ini pernah dipesan atau dipakai"
+    : /entitlement_scope_locked_after_renewal/i.test(result.error.message) ? "hewan/layanan tidak dapat diubah setelah paket ini pernah diperpanjang"
+    : /package_canceled_cannot_edit/i.test(result.error.message) ? "paket yang diarsipkan tidak dapat dikoreksi; aktifkan kembali terlebih dahulu"
+    : /pet_not_found_for_customer/i.test(result.error.message) ? "hewan tidak ditemukan untuk pelanggan ini"
+    : /service_not_found/i.test(result.error.message) ? "layanan tidak ditemukan"
+    : /correction_reason_required/i.test(result.error.message) ? "alasan koreksi wajib diisi"
+    : result.error.message,
+  );
+  revalidatePath("/programs"); revalidatePath("/programs/memberships");
+  return { error: null, success: "Data paket berhasil dikoreksi." };
 }
 
 const RECURRENCE_INTERVALS = new Set(["none", "week", "month", "year"]);

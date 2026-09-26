@@ -19,6 +19,15 @@
 # bug needed: apply everything BEFORE this migration, create a REAL
 # purchase, THEN apply this migration on top.
 #
+# Strengthened (review round 3): a row count staying the same does not
+# prove a row is untouched. This script hashes the pre-existing purchase
+# ledger row's full content (and the corresponding customer_packages
+# balance/source association) BEFORE the upgrade and again AFTER, and fails
+# unless they are byte-identical; it also confirms the row's new invoice_id
+# column is left NULL (never backfilled) and that append-only enforcement
+# on customer_package_ledger is still active after the upgrade (an UPDATE
+# attempt must still fail).
+#
 # Run from the repository root against a disposable database:
 #   PGHOST=... PGPORT=... PGUSER=... PGPASSWORD=... bash integration/migration_upgrade_replay.sh [database_name]
 # In this sandbox (WSL2 host->container TCP is unreachable), run it via
@@ -87,21 +96,56 @@ REAL_PURCHASE_ROWS=$(psql -d "$DB" -tAc "select count(*) from public.customer_pa
 echo "real purchase ledger rows before upgrade: $REAL_PURCHASE_ROWS"
 [ "$REAL_PURCHASE_ROWS" -ge 1 ] || { echo "FAIL: fixture did not create a real purchase ledger row"; exit 1; }
 
+step "capturing pre-upgrade content hashes (row count alone does not prove 'untouched' -- review round 3)"
+# A content hash of every column that legitimately exists BEFORE this
+# migration (invoice_id is deliberately excluded -- it does not exist yet).
+# md5(string_agg(...)) over the deterministic id order is stable across the
+# two runs as long as no row's actual content changed.
+PRE_LEDGER_HASH=$(psql -d "$DB" -tAc "select md5(string_agg(id::text || ':' || customer_package_id::text || ':' || delta::text || ':' || reason || ':' || coalesce(notes,'') || ':' || occurred_at::text || ':' || created_at::text, '|' order by id)) from public.customer_package_ledger where reason = 'purchase';")
+PRE_CP_HASH=$(psql -d "$DB" -tAc "select md5(string_agg(id::text || ':' || sessions_remaining::text || ':' || coalesce(source_invoice_id::text,'-') || ':' || revision::text || ':' || status, '|' order by id)) from public.customer_packages;")
+echo "pre-upgrade ledger content hash: $PRE_LEDGER_HASH"
+echo "pre-upgrade customer_packages content hash: $PRE_CP_HASH"
+
 step "applying the migration under test on top of REAL DATA -- the actual regression check"
 psql -d "$DB" -q -v ON_ERROR_STOP=1 -f "$MIGRATION_UNDER_TEST"
 
-step "verifying the real purchase row survived untouched and the new column exists"
+step "verifying the real purchase row's PRE-EXISTING columns are byte-identical after the upgrade (not merely 'still exists'), invoice_id was NOT backfilled onto it, and append-only enforcement still holds"
+POST_LEDGER_HASH=$(psql -d "$DB" -tAc "select md5(string_agg(id::text || ':' || customer_package_id::text || ':' || delta::text || ':' || reason || ':' || coalesce(notes,'') || ':' || occurred_at::text || ':' || created_at::text, '|' order by id)) from public.customer_package_ledger where reason = 'purchase';")
+POST_CP_HASH=$(psql -d "$DB" -tAc "select md5(string_agg(id::text || ':' || sessions_remaining::text || ':' || coalesce(source_invoice_id::text,'-') || ':' || revision::text || ':' || status, '|' order by id)) from public.customer_packages;")
+echo "post-upgrade ledger content hash: $POST_LEDGER_HASH"
+echo "post-upgrade customer_packages content hash: $POST_CP_HASH"
+[ "$PRE_LEDGER_HASH" = "$POST_LEDGER_HASH" ] || { echo "FAIL: pre-existing ledger row content changed across the upgrade (it must be byte-identical -- the ledger is append-only)"; exit 1; }
+[ "$PRE_CP_HASH" = "$POST_CP_HASH" ] || { echo "FAIL: pre-existing customer_packages content changed across the upgrade (balance/source association must be untouched)"; exit 1; }
+
 psql -d "$DB" -v ON_ERROR_STOP=1 <<'SQL'
 do $$
-declare v_count int; v_has_column boolean;
+declare v_count int; v_has_column boolean; v_invoice_id_after uuid;
 begin
   select count(*) into v_count from public.customer_package_ledger where reason = 'purchase';
   if v_count < 1 then raise exception 'FAIL: purchase ledger row disappeared after upgrade'; end if;
   select exists(select 1 from information_schema.columns where table_schema='public' and table_name='customer_package_ledger' and column_name='invoice_id') into v_has_column;
   if not v_has_column then raise exception 'FAIL: invoice_id column missing after upgrade'; end if;
-  raise notice 'UPGRADE_REPLAY_OK: % pre-existing purchase row(s) survived, invoice_id column present', v_count;
+  -- The whole point of removing the backfill UPDATE: this pre-existing
+  -- purchase row's new invoice_id column must be NULL, not retroactively
+  -- populated (that would have required the very UPDATE that was removed).
+  select invoice_id into v_invoice_id_after from public.customer_package_ledger where reason = 'purchase' limit 1;
+  if v_invoice_id_after is not null then raise exception 'FAIL: invoice_id was backfilled onto a pre-existing row -- this should be structurally impossible without an UPDATE, which was removed'; end if;
+  raise notice 'UPGRADE_REPLAY_OK: % pre-existing purchase row(s) byte-identical, invoice_id column present and correctly left NULL (not backfilled)', v_count;
 end $$;
 SQL
 
+step "verifying append-only enforcement itself still holds after the upgrade (the migration must not have weakened it)"
+set +e
+psql -d "$DB" -v ON_ERROR_STOP=1 -tAc "update public.customer_package_ledger set notes = 'tampered' where reason = 'purchase';" 2>/tmp_upgrade_replay_block_check.log
+BLOCK_RC=$?
+set -e
+if [ "$BLOCK_RC" -eq 0 ]; then
+  echo "FAIL: an UPDATE against customer_package_ledger succeeded after the upgrade -- append-only enforcement was weakened"
+  exit 1
+fi
+grep -qi "append-only\|immutable\|restrict_violation" /tmp_upgrade_replay_block_check.log || { echo "FAIL: the UPDATE failed for an unexpected reason (not the append-only trigger)"; cat /tmp_upgrade_replay_block_check.log; exit 1; }
+echo "append-only enforcement confirmed still active post-upgrade: $(cat /tmp_upgrade_replay_block_check.log | tr '\n' ' ')"
+rm -f /tmp_upgrade_replay_block_check.log
+
 echo ""
-echo "MIGRATION UPGRADE REPLAY PASSED (populated-database upgrade succeeded)"
+echo "MIGRATION UPGRADE REPLAY PASSED (populated-database upgrade succeeded; pre-existing rows proven byte-identical, not merely present; append-only behavior preserved)"

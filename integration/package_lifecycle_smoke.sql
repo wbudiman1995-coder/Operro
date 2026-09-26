@@ -190,8 +190,9 @@ end $$;
 insert into public.customer_package_ledger (organization_id, customer_package_id, delta, reason, notes)
 values ('02000000-0000-4000-8000-000000000001', pg_temp.id_of('shared_cp'), -3, 'adjustment', 'test: simulate full exhaustion via the ledger');
 update public.customer_packages set status = 'exhausted', expires_at = now() - interval '1 day' where id = pg_temp.id_of('shared_cp');
-do $$ declare v_invoice public.invoices; v_cp public.customer_packages; v_ledger record; v_renewal_count int; begin
-  v_invoice := app.renew_customer_package(pg_temp.id_of('shared_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff050000-0000-4000-8000-000000000005');
+do $$ declare v_invoice public.invoices; v_cp public.customer_packages; v_ledger record; v_renewal_count int; v_fp text; begin
+  v_fp := app.preview_package_renewal(pg_temp.id_of('shared_cp'))->>'terms_fingerprint';
+  v_invoice := app.renew_customer_package(pg_temp.id_of('shared_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff050000-0000-4000-8000-000000000005', v_fp);
   insert into smoke_ids (key, val) select 'renewal_invoice', v_invoice.id;
   perform pg_temp.ok(v_invoice.status = 'issued', 'S12 renewal produces a real invoice with status issued (not paid -- an issued invoice is never proof of payment)');
   perform pg_temp.ok(v_invoice.total = 300000, 'S13 renewal invoice total matches the catalog price');
@@ -207,16 +208,19 @@ do $$ declare v_invoice public.invoices; v_cp public.customer_packages; v_ledger
   perform pg_temp.ok(v_ledger.invoice_id = v_invoice.id, 'S19 the renewal ledger row links to the renewal invoice (invoice_id)');
 
   -- idempotent retry: same request_key, same inputs -> the SAME invoice, no
-  -- second order/invoice/ledger row, renewal_count unchanged.
-  v_invoice := app.renew_customer_package(pg_temp.id_of('shared_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff050000-0000-4000-8000-000000000005');
-  perform pg_temp.ok(v_invoice.id = pg_temp.id_of('renewal_invoice'), 'S20 repeating the same renewal request_key returns the SAME invoice (idempotent)');
+  -- second order/invoice/ledger row, renewal_count unchanged. A deliberately
+  -- WRONG/garbage terms_fingerprint is passed here to PROVE a genuine retry
+  -- never re-checks it (review round 3, finding #2: "a genuine retry of a
+  -- completed operation must still return its original result").
+  v_invoice := app.renew_customer_package(pg_temp.id_of('shared_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff050000-0000-4000-8000-000000000005', 'stale-or-garbage-fingerprint-must-be-ignored-on-retry');
+  perform pg_temp.ok(v_invoice.id = pg_temp.id_of('renewal_invoice'), 'S20 repeating the same renewal request_key returns the SAME invoice (idempotent), even with a garbage terms_fingerprint -- a retry never re-checks it');
   select renewal_count into v_renewal_count from public.customer_packages where id = pg_temp.id_of('shared_cp');
   perform pg_temp.ok(v_renewal_count = 1, 'S21 the idempotent retry did not double-apply (renewal_count still 1)');
 end $$;
 
 -- --- a request_key reused for a DIFFERENT membership is rejected, not silently returned ---
 do $$ begin
-  perform app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff050000-0000-4000-8000-000000000005');
+  perform app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff050000-0000-4000-8000-000000000005', 'irrelevant-never-reached');
   perform pg_temp.ok(false, 'S22 reusing a renewal request_key for a different membership should be rejected');
 exception when sqlstate '22023' then
   perform pg_temp.ok(sqlerrm like '%request_key_reused_for_different_renewal%', 'S22 renewal request_key reused for a different membership is rejected');
@@ -289,7 +293,7 @@ exception when no_data_found then
   perform pg_temp.ok(sqlerrm like '%package_not_found%', 'S31 cross-org repair correctly denies access (package_not_found)');
 end $$;
 do $$ begin
-  perform app.renew_customer_package(pg_temp.id_of('shared_cp'), '02000000-0000-4000-8000-0000000000a2', now(), null, null, 'ff070000-0000-4000-8000-000000000007');
+  perform app.renew_customer_package(pg_temp.id_of('shared_cp'), '02000000-0000-4000-8000-0000000000a2', now(), null, null, 'ff070000-0000-4000-8000-000000000007', 'irrelevant-never-reached');
   perform pg_temp.ok(false, 'S32 cross-org renewal should not find another organization''s package');
 exception when no_data_found then
   perform pg_temp.ok(sqlerrm like '%package_not_found%', 'S32 cross-org renewal correctly denies access (package_not_found) even though the caller supplied ITS OWN valid branch');
@@ -319,7 +323,7 @@ do $$ begin
   -- 'ff050000-...-000000000005' already succeeded once under the owner (S12).
   -- A read-only caller retrying that SAME key must be denied, not handed the
   -- existing invoice back.
-  perform app.renew_customer_package(pg_temp.id_of('shared_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff050000-0000-4000-8000-000000000005');
+  perform app.renew_customer_package(pg_temp.id_of('shared_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff050000-0000-4000-8000-000000000005', 'irrelevant-never-reached');
   perform pg_temp.ok(false, 'S35 a read-only member retrying an already-used renewal request_key should be denied, not handed the cached invoice');
 exception when insufficient_privilege then
   perform pg_temp.ok(sqlerrm like '%missing_permission:membership.manage%' or sqlerrm like '%not_authorized%', 'S35 read-only member is denied membership.manage even on an already-used request_key (authorization re-checked every call)');
@@ -362,8 +366,9 @@ insert into public.grooming_job_pet_services (id, organization_id, grooming_job_
 do $$ begin
   perform app.reserve_package_session('02000000-0000-4000-8000-000000001a03', pg_temp.id_of('norollover_cp'));
 end $$;
-do $$ declare v_cp public.customer_packages; begin
-  perform app.renew_customer_package(pg_temp.id_of('norollover_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0a0000-0000-4000-8000-00000000000a');
+do $$ declare v_cp public.customer_packages; v_fp text; begin
+  v_fp := app.preview_package_renewal(pg_temp.id_of('norollover_cp'))->>'terms_fingerprint';
+  perform app.renew_customer_package(pg_temp.id_of('norollover_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0a0000-0000-4000-8000-00000000000a', v_fp);
   select * into v_cp from public.customer_packages where id = pg_temp.id_of('norollover_cp');
   perform pg_temp.ok(v_cp.sessions_remaining = 6, 'S39 rollover_policy=none: remaining ends at reserved(1) + total_sessions(5) = 6 (5 sold, -4 unreserved excess discarded, +5 renewal)');
 end $$;
@@ -376,54 +381,169 @@ do $$ declare v_delta int; begin
   perform pg_temp.ok(v_delta = -4, 'S41 rollover_policy=none: the compensating adjustment discards exactly the unreserved excess (4 = 5 sold - 1 held), never the held session, and is a real ledger row, not a raw cache overwrite');
 end $$;
 
--- --- finding #3: a legitimate retry after a catalog price change must
--- still return the original invoice, not be rejected. ---
-do $$ declare v_invoice public.invoices; begin
-  v_invoice := app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0b0000-0000-4000-8000-00000000000b');
+-- --- finding #1: a legitimate retry after a catalog price change must
+-- still return the original invoice, not be rejected -- but a retry with a
+-- DIFFERENT caller-supplied issued_at/due_at/admin_notes must be. ---
+do $$ declare v_invoice public.invoices; v_fp text; begin
+  v_fp := app.preview_package_renewal(pg_temp.id_of('per_pet_cp'))->>'terms_fingerprint';
+  v_invoice := app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', '2026-09-26 09:00:00+07', null, 'original note', 'ff0b0000-0000-4000-8000-00000000000b', v_fp);
   insert into smoke_ids (key, val) select 'price_retry_invoice', v_invoice.id;
   perform pg_temp.ok(v_invoice.total = 150000, 'S42 renewal invoice captures the catalog price observed at the time of the ORIGINAL call (150000)');
 end $$;
 update public.packages set price = 999999 where id = '02000000-0000-4000-8000-00000000ca02';
 do $$ declare v_invoice public.invoices; begin
-  v_invoice := app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0b0000-0000-4000-8000-00000000000b');
-  perform pg_temp.ok(v_invoice.id = pg_temp.id_of('price_retry_invoice'), 'S43 a legitimate retry of the SAME request_key after a catalog price change still returns the ORIGINAL invoice (review finding #3 -- this used to be rejected as request_key_reused_for_different_renewal, which was the actual bug)');
+  -- IDENTICAL inputs (same issued_at/due_at/notes), garbage fingerprint (a
+  -- retry never re-checks it) -> returns the ORIGINAL invoice unchanged.
+  v_invoice := app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', '2026-09-26 09:00:00+07', null, 'original note', 'ff0b0000-0000-4000-8000-00000000000b', 'stale-or-garbage-fingerprint-must-be-ignored-on-retry');
+  perform pg_temp.ok(v_invoice.id = pg_temp.id_of('price_retry_invoice'), 'S43 a legitimate retry of the SAME request_key with IDENTICAL inputs after a catalog price change still returns the ORIGINAL invoice (review finding #1/#3 -- this used to be rejected as request_key_reused_for_different_renewal, which was the actual bug)');
   perform pg_temp.ok(v_invoice.total = 150000, 'S44 the returned invoice keeps its originally captured total (150000), unaffected by the later catalog price edit to 999999');
+end $$;
+
+-- --- finding #1: a request_key reused with a DIFFERENT caller-supplied
+-- issued_at, or a DIFFERENT admin_notes, is rejected -- not silently
+-- accepted with the changed value (the previous review round only fixed
+-- the branch/membership comparison, not these). ---
+do $$ begin
+  perform app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', '2026-09-27 09:00:00+07', null, 'original note', 'ff0b0000-0000-4000-8000-00000000000b', 'irrelevant-never-reached');
+  perform pg_temp.ok(false, 'S44b reusing a renewal request_key with a DIFFERENT issued_at should be rejected');
+exception when sqlstate '22023' then
+  perform pg_temp.ok(sqlerrm like '%request_key_reused_for_different_renewal%', 'S44b renewal request_key reused with a different issued_at is rejected');
+end $$;
+do $$ begin
+  perform app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', '2026-09-26 09:00:00+07', null, 'a DIFFERENT note', 'ff0b0000-0000-4000-8000-00000000000b', 'irrelevant-never-reached');
+  perform pg_temp.ok(false, 'S44c reusing a renewal request_key with DIFFERENT admin_notes should be rejected');
+exception when sqlstate '22023' then
+  perform pg_temp.ok(sqlerrm like '%request_key_reused_for_different_renewal%', 'S44c renewal request_key reused with different admin_notes is rejected');
 end $$;
 
 -- --- finding #3: a request_key reused at a genuinely DIFFERENT branch (not
 -- just a different membership, already covered by S22) is still rejected. ---
 do $$ begin
-  perform app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a3', now(), null, null, 'ff0b0000-0000-4000-8000-00000000000b');
+  perform app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a3', '2026-09-26 09:00:00+07', null, 'original note', 'ff0b0000-0000-4000-8000-00000000000b', 'irrelevant-never-reached');
   perform pg_temp.ok(false, 'S45 reusing a renewal request_key at a DIFFERENT branch should be rejected');
 exception when sqlstate '22023' then
   perform pg_temp.ok(sqlerrm like '%request_key_reused_for_different_renewal%', 'S45 renewal request_key reused at a different branch is rejected, not silently accepted');
 end $$;
 
--- --- finding #3: preview_package_renewal is read-only and exposes the
--- fields the brief asked for (price, sessions, currency, pet/service scope,
--- expiry), and a catalog per_pet drift that disagrees with an existing
--- membership's actual pet scope blocks renewal instead of silently topping
--- up an incompatible product. ---
+-- --- finding #2: preview_package_renewal is read-only, exposes the fields
+-- the brief asked for, and returns a terms_fingerprint that binds the
+-- write to what was actually previewed. ---
 do $$ declare v_before public.customer_packages; v_after public.customer_packages; v_preview jsonb; begin
   select * into v_before from public.customer_packages where id = pg_temp.id_of('per_pet_cp');
   v_preview := app.preview_package_renewal(pg_temp.id_of('per_pet_cp'));
   select * into v_after from public.customer_packages where id = pg_temp.id_of('per_pet_cp');
   perform pg_temp.ok(v_before.revision = v_after.revision and v_before.sessions_remaining = v_after.sessions_remaining, 'S46 preview_package_renewal writes nothing (revision/sessions_remaining unchanged)');
-  perform pg_temp.ok(v_preview ? 'price' and v_preview ? 'currency' and v_preview ? 'sessions_to_add' and v_preview ? 'resulting_expires_at' and v_preview ? 'pet_id' and v_preview ? 'service_id', 'S47 preview exposes price/currency/sessions/expiry/pet/service scope');
+  perform pg_temp.ok(v_preview ? 'price' and v_preview ? 'currency' and v_preview ? 'sessions_to_add' and v_preview ? 'resulting_expires_at' and v_preview ? 'pet_id' and v_preview ? 'service_id' and v_preview ? 'terms_fingerprint', 'S47 preview exposes price/currency/sessions/expiry/pet/service scope and a terms_fingerprint');
   perform pg_temp.ok(not (v_preview->>'incompatible')::boolean, 'S48 preview reports compatible while the catalog per_pet flag still matches the membership''s actual pet scope');
 end $$;
+
+-- --- finding #2: a renewal WITHOUT a fingerprint, and one with a STALE
+-- fingerprint (the catalog changed after the preview was generated), are
+-- both refused -- the write is bound to what was actually previewed under
+-- the row lock, not to whatever the client claims. A fresh preview after
+-- the change succeeds. Uses a SECOND, separate purchase of the same
+-- catalog package (also doubles as the "two purchases of the same product"
+-- fixture for finding #4 below). ---
+do $$ declare v_invoice public.invoices; begin
+  v_invoice := app.create_package_invoice(
+    '02000000-0000-4000-8000-0000000000a1', '02000000-0000-4000-8000-00000000c101', '02000000-0000-4000-8000-00000000ca01',
+    now(), null, null, 'ff0d0000-0000-4000-8000-00000000000d');
+  insert into smoke_ids (key, val) select 'fingerprint_cp', id from public.customer_packages
+    where organization_id = '02000000-0000-4000-8000-000000000001' and source_invoice_id = v_invoice.id;
+end $$;
+do $$ begin
+  perform app.renew_customer_package(pg_temp.id_of('fingerprint_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0e0000-0000-4000-8000-00000000000e', null);
+  perform pg_temp.ok(false, 'S48b a renewal with no terms_fingerprint at all should be refused');
+exception when sqlstate '22023' then
+  perform pg_temp.ok(sqlerrm like '%renewal_preview_required%', 'S48b a new renewal without a terms_fingerprint is refused (renewal_preview_required)');
+end $$;
+do $$ declare v_stale_fp text; begin
+  v_stale_fp := app.preview_package_renewal(pg_temp.id_of('fingerprint_cp'))->>'terms_fingerprint';
+  update public.packages set price = 777777 where id = '02000000-0000-4000-8000-00000000ca01';
+  begin
+    perform app.renew_customer_package(pg_temp.id_of('fingerprint_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0e0000-0000-4000-8000-00000000000e', v_stale_fp);
+    perform pg_temp.ok(false, 'S48c a NEW renewal with a STALE fingerprint (catalog changed since preview) should be refused');
+  exception when sqlstate '40001' then
+    perform pg_temp.ok(sqlerrm like '%renewal_terms_changed_since_preview%', 'S48c a stale terms_fingerprint (catalog price changed since the preview was generated) is refused, not silently accepted');
+  end;
+end $$;
+do $$ declare v_fresh_fp text; v_invoice public.invoices; begin
+  v_fresh_fp := app.preview_package_renewal(pg_temp.id_of('fingerprint_cp'))->>'terms_fingerprint';
+  v_invoice := app.renew_customer_package(pg_temp.id_of('fingerprint_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0e0000-0000-4000-8000-00000000000e', v_fresh_fp);
+  perform pg_temp.ok(v_invoice.total = 777777, 'S48d after reloading the preview (fresh fingerprint), the SAME request succeeds and charges the NEW catalog price (deliberate re-confirmation, not a silent block forever)');
+  insert into smoke_ids (key, val) select 'fingerprint_cp_invoice', v_invoice.id;
+end $$;
+update public.packages set price = 300000 where id = '02000000-0000-4000-8000-00000000ca01';
+
+-- --- finding #3: per_pet compatibility, corrected. A sale may optionally
+-- bind a pet even when per_pet=false (per_pet_cp keeps its pet bound
+-- throughout) -- pet presence alone must never itself be treated as a
+-- catalog-drift proof. The ONLY unsafe drift is the catalog NOW requiring a
+-- pet for a membership that was sold with none at all. ---
 update public.packages set per_pet = false where id = '02000000-0000-4000-8000-00000000ca02';
 do $$ declare v_preview jsonb; begin
   v_preview := app.preview_package_renewal(pg_temp.id_of('per_pet_cp'));
-  perform pg_temp.ok((v_preview->>'incompatible')::boolean, 'S49 preview flags incompatible once the catalog''s per_pet flag no longer matches the membership''s actual (already-fixed) pet scope');
-  perform pg_temp.ok(v_preview->>'blocking_reason' = 'catalog_terms_changed_incompatible_with_existing_entitlement', 'S50 preview reports the specific blocking reason before any write is attempted');
+  perform pg_temp.ok(not (v_preview->>'pet_scope_incompatible')::boolean, 'S49 catalog per_pet drifting from true to false while the membership keeps its OPTIONALLY-bound pet is COMPATIBLE (the review round 3 bug fix -- pet presence alone is not proof the catalog changed)');
+end $$;
+update public.packages set per_pet = true where id = '02000000-0000-4000-8000-00000000ca02';
+
+-- shared_cp (package ca01, per_pet=false, no pet ever bound) is the genuine
+-- incompatibility case: the catalog NOW requiring a pet for a membership
+-- sold with none. Reactivate it first (archived at S29).
+do $$ begin perform app.set_customer_package_status(pg_temp.id_of('shared_cp'), 'active', 'reactivated for review round 3 finding #3 fixture'); end $$;
+update public.packages set per_pet = true where id = '02000000-0000-4000-8000-00000000ca01';
+do $$ declare v_preview jsonb; begin
+  v_preview := app.preview_package_renewal(pg_temp.id_of('shared_cp'));
+  perform pg_temp.ok((v_preview->>'pet_scope_incompatible')::boolean, 'S50 catalog per_pet drifting from false to true for a membership that was sold with NO pet bound at all is genuinely incompatible');
+  perform pg_temp.ok(v_preview->>'blocking_reason' = 'catalog_terms_changed_incompatible_with_existing_entitlement', 'S50b preview reports the specific blocking reason before any write is attempted');
 end $$;
 do $$ begin
-  perform app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0c0000-0000-4000-8000-00000000000c');
-  perform pg_temp.ok(false, 'S51 renewal should be refused when catalog terms drifted incompatibly with an existing entitlement');
+  perform app.renew_customer_package(pg_temp.id_of('shared_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0c0000-0000-4000-8000-00000000000c', app.preview_package_renewal(pg_temp.id_of('shared_cp'))->>'terms_fingerprint');
+  perform pg_temp.ok(false, 'S51 renewal should be refused when catalog per_pet terms drifted incompatibly with an existing entitlement');
 exception when check_violation then
   perform pg_temp.ok(sqlerrm like '%catalog_terms_changed_incompatible_with_existing_entitlement%', 'S51 renewal correctly refuses to charge for a now-incompatible catalog product rather than silently topping it up');
 end $$;
+update public.packages set per_pet = false where id = '02000000-0000-4000-8000-00000000ca01';
+
+-- --- finding #3: service compatibility (cp.service_id is the immutable
+-- purchase-time snapshot; NULL on either side is never itself a mismatch).
+-- per_pet_cp already carries a HELD reservation throughout this file (from
+-- S2), so these checks are exercised WITH a held reservation present. ---
+insert into public.service_catalog (id, organization_id, name, base_price, currency, duration_minutes, is_active) values
+  ('02000000-0000-4000-8000-00000000ea02', '02000000-0000-4000-8000-000000000001', 'Spa', 150000, 'IDR', 45, true);
+update public.packages set service_id = '02000000-0000-4000-8000-00000000ea02' where id = '02000000-0000-4000-8000-00000000ca02';
+do $$ declare v_preview jsonb; begin
+  v_preview := app.preview_package_renewal(pg_temp.id_of('per_pet_cp'));
+  perform pg_temp.ok((v_preview->>'service_scope_incompatible')::boolean, 'S52 catalog service_id changing from the purchased service (Grooming) to a DIFFERENT specific service (Spa) is incompatible (a real held reservation is present throughout this check)');
+end $$;
+do $$ begin
+  perform app.renew_customer_package(pg_temp.id_of('per_pet_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff0f0000-0000-4000-8000-00000000000f', app.preview_package_renewal(pg_temp.id_of('per_pet_cp'))->>'terms_fingerprint');
+  perform pg_temp.ok(false, 'S53 renewal should be refused when the catalog service scope drifted to a different specific service');
+exception when check_violation then
+  perform pg_temp.ok(sqlerrm like '%catalog_terms_changed_incompatible_with_existing_entitlement%', 'S53 renewal correctly refuses a service A->B drift, not silently charging for Spa while topping up a Grooming entitlement');
+end $$;
+update public.packages set service_id = null where id = '02000000-0000-4000-8000-00000000ca02';
+do $$ declare v_preview jsonb; begin
+  v_preview := app.preview_package_renewal(pg_temp.id_of('per_pet_cp'));
+  perform pg_temp.ok(not (v_preview->>'service_scope_incompatible')::boolean, 'S54 catalog service_id broadening from a specific service to NULL ("any service") is compatible -- the purchased entitlement keeps its own specific scope regardless');
+end $$;
+update public.packages set service_id = '02000000-0000-4000-8000-00000000ea01' where id = '02000000-0000-4000-8000-00000000ca02';
+
+-- norollover_cp's package (ca03) was created with service_id=null, so
+-- norollover_cp.service_id is null (an "any service" purchase). Catalog
+-- narrowing from null to a specific service is likewise compatible, and
+-- (finding #3's "legitimate unchanged renewal" case, exercised as a REAL
+-- second renewal, not merely a preview) the renewal actually succeeds.
+update public.packages set service_id = '02000000-0000-4000-8000-00000000ea01' where id = '02000000-0000-4000-8000-00000000ca03';
+do $$ declare v_preview jsonb; begin
+  v_preview := app.preview_package_renewal(pg_temp.id_of('norollover_cp'));
+  perform pg_temp.ok(not (v_preview->>'service_scope_incompatible')::boolean, 'S55 catalog service_id narrowing from NULL to a specific service, for a membership purchased under "any service", is compatible');
+end $$;
+do $$ declare v_invoice public.invoices; begin
+  v_invoice := app.renew_customer_package(pg_temp.id_of('norollover_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff100000-0000-4000-8000-000000000010', app.preview_package_renewal(pg_temp.id_of('norollover_cp'))->>'terms_fingerprint');
+  perform pg_temp.ok(v_invoice.status = 'issued', 'S56 a legitimate renewal under a compatible (broadened-then-narrowed) service scope succeeds as a real RPC call, not merely a passing preview');
+end $$;
+update public.packages set service_id = null where id = '02000000-0000-4000-8000-00000000ca03';
 
 -- --- finding #4: deep invoice-link validation, missing reversal links, and
 -- duplicate consumption links. shared_cp was archived (canceled) at S29;
@@ -439,7 +559,7 @@ insert into public.customer_package_ledger (organization_id, customer_package_id
 values ('02000000-0000-4000-8000-000000000001', pg_temp.id_of('shared_cp'), 1, 'renewal', 'fixture: wrong-package invoice attached (review finding #4)', pg_temp.id_of('price_retry_invoice'));
 do $$ declare v_report jsonb; begin
   v_report := app.reconcile_customer_package(pg_temp.id_of('shared_cp'));
-  perform pg_temp.ok(v_report->'manual_review_issues' @> '"invalid_invoice_links"', 'S52 a renewal ledger row linked to an invoice belonging to a DIFFERENT package is flagged invalid_invoice_links -- a non-null invoice_id alone is not treated as proof of correct provenance');
+  perform pg_temp.ok(v_report->'manual_review_issues' @> '"invalid_invoice_links"', 'S57 a renewal ledger row linked to an invoice belonging to a DIFFERENT package is flagged invalid_invoice_links -- a non-null invoice_id alone is not treated as proof of correct provenance');
 end $$;
 
 insert into public.grooming_job_pet_services (id, organization_id, grooming_job_pet_id, service_id, service_name_snapshot, unit_price_snapshot, currency, quantity, duration_minutes) values
@@ -459,7 +579,7 @@ update public.package_reservations set status = 'released', released_at = now()
  where id = pg_temp.id_of('missing_reversal_r');
 do $$ declare v_report jsonb; begin
   v_report := app.reconcile_customer_package(pg_temp.id_of('shared_cp'));
-  perform pg_temp.ok(v_report->'manual_review_issues' @> '"missing_reversal_link"', 'S53 a reservation released after consumption with no reversal_ledger_id is flagged missing_reversal_link');
+  perform pg_temp.ok(v_report->'manual_review_issues' @> '"missing_reversal_link"', 'S58 a reservation released after consumption with no reversal_ledger_id is flagged missing_reversal_link');
 end $$;
 
 -- duplicate_consumption_links: point a SECOND reservation's
@@ -471,7 +591,199 @@ do $$ declare v_ledger_id uuid; begin
 end $$;
 do $$ declare v_report jsonb; begin
   v_report := app.reconcile_customer_package(pg_temp.id_of('shared_cp'));
-  perform pg_temp.ok(v_report->'manual_review_issues' @> '"duplicate_consumption_links"', 'S54 two reservations sharing the same consumption_ledger_id are flagged duplicate_consumption_links, not assumed impossible');
+  perform pg_temp.ok(v_report->'manual_review_issues' @> '"duplicate_consumption_links"', 'S59 two reservations sharing the same consumption_ledger_id are flagged duplicate_consumption_links, not assumed impossible');
+end $$;
+
+-- --- finding #4: the HISTORICAL source_invoice_id is now validated the
+-- same way as ledger-level links (previously only checked for NULL).
+-- fingerprint_cp (purchased earlier at 'ff0d0000-...-d') is a SECOND,
+-- separate purchase of the SAME catalog package (ca01) by the SAME
+-- customer as shared_cp -- exactly the "same customer, same product,
+-- different membership" scenario the review asked to be provably
+-- distinguished, not merely accepted on a customer-and-product match. A
+-- second customer (Cust A2) is added for a genuine wrong-CUSTOMER fixture. ---
+do $$ declare v_report jsonb; begin
+  v_report := app.reconcile_customer_package(pg_temp.id_of('fingerprint_cp'));
+  perform pg_temp.ok(not (v_report->>'missing_source_invoice')::boolean, 'S60 a healthy purchase with a real, correctly-linked source invoice is not missing_source_invoice');
+  perform pg_temp.ok(not (v_report->'manual_review_issues' @> '"invalid_source_invoice"'), 'S61 a healthy purchase''s source invoice validates correctly (right customer, right package, matching session snapshot)');
+end $$;
+
+insert into public.customers (id, organization_id, display_name) values ('02000000-0000-4000-8000-00000000c102', '02000000-0000-4000-8000-000000000001', 'Cust A2');
+insert into public.pets (id, organization_id, customer_id, name) values ('02000000-0000-4000-8000-00000000f201', '02000000-0000-4000-8000-000000000001', '02000000-0000-4000-8000-00000000c102', 'Pet A2-1');
+do $$ declare v_invoice public.invoices; begin
+  v_invoice := app.create_package_invoice('02000000-0000-4000-8000-0000000000a1', '02000000-0000-4000-8000-00000000c102', '02000000-0000-4000-8000-00000000ca01', now(), null, null, 'ff120000-0000-4000-8000-000000000012');
+  insert into smoke_ids (key, val) values ('wrong_customer_invoice', v_invoice.id);
+end $$;
+update public.customer_packages set source_invoice_id = pg_temp.id_of('wrong_customer_invoice') where id = pg_temp.id_of('fingerprint_cp');
+do $$ declare v_report jsonb; begin
+  v_report := app.reconcile_customer_package(pg_temp.id_of('fingerprint_cp'));
+  perform pg_temp.ok(v_report->'manual_review_issues' @> '"invalid_source_invoice"', 'S62 a historical source_invoice_id pointing at a REAL invoice for the right package but a DIFFERENT customer (Cust A2, not fingerprint_cp''s actual owner Cust A1) is flagged invalid_source_invoice');
+end $$;
+
+-- wrong-package source: price_retry_invoice genuinely belongs to customer
+-- c101 (the right customer) but package ca02 (the wrong package).
+update public.customer_packages set source_invoice_id = pg_temp.id_of('price_retry_invoice') where id = pg_temp.id_of('fingerprint_cp');
+do $$ declare v_report jsonb; begin
+  v_report := app.reconcile_customer_package(pg_temp.id_of('fingerprint_cp'));
+  perform pg_temp.ok(v_report->'manual_review_issues' @> '"invalid_source_invoice"', 'S63 a historical source_invoice_id pointing at an invoice for the right customer but a DIFFERENT package is flagged invalid_source_invoice');
+end $$;
+
+-- void source: a fresh, real invoice for the RIGHT customer/package, then marked void.
+do $$ declare v_invoice public.invoices; begin
+  v_invoice := app.create_package_invoice('02000000-0000-4000-8000-0000000000a1', '02000000-0000-4000-8000-00000000c101', '02000000-0000-4000-8000-00000000ca01', now(), null, null, 'ff110000-0000-4000-8000-000000000011');
+  insert into smoke_ids (key, val) values ('void_invoice', v_invoice.id);
+end $$;
+update public.invoices set status = 'void' where id = pg_temp.id_of('void_invoice');
+update public.customer_packages set source_invoice_id = pg_temp.id_of('void_invoice') where id = pg_temp.id_of('fingerprint_cp');
+do $$ declare v_report jsonb; begin
+  v_report := app.reconcile_customer_package(pg_temp.id_of('fingerprint_cp'));
+  perform pg_temp.ok(v_report->'manual_review_issues' @> '"invalid_source_invoice"', 'S64 a historical source_invoice_id pointing at a VOID invoice (right customer/package, wrong status) is flagged invalid_source_invoice');
+end $$;
+
+-- mismatched session snapshot: right customer/package/status, but the
+-- invoice line's snapshotted session count does not match the ledger
+-- movement it is supposed to have produced. invoice_lines is append-only
+-- (same as customer_package_ledger -- no UPDATE allowed), so this is
+-- constructed as a standalone raw insert (both the invoice and its one
+-- line) rather than corrupting a real create_package_invoice result, which
+-- would always be internally consistent by construction.
+do $$ declare v_invoice_id uuid; v_order_id uuid; begin
+  insert into public.orders (organization_id, branch_id, customer_id, status, currency)
+  values ('02000000-0000-4000-8000-000000000001', '02000000-0000-4000-8000-0000000000a1', '02000000-0000-4000-8000-00000000c101', 'confirmed', 'IDR')
+  returning id into v_order_id;
+  insert into public.invoices (organization_id, branch_id, customer_id, order_id, invoice_number, status, currency, subtotal, discount_total, tax_total, total, issued_at, billing_mode, document_type)
+  values ('02000000-0000-4000-8000-000000000001', '02000000-0000-4000-8000-0000000000a1', '02000000-0000-4000-8000-00000000c101', v_order_id, 'PKG-TEST-MISMATCH', 'issued', 'IDR', 300000, 0, 0, 300000, now(), 'package_sale', 'invoice')
+  returning id into v_invoice_id;
+  insert into public.invoice_lines (organization_id, invoice_id, item_type, package_id, name_snapshot, quantity, unit_price, line_total, pricing_breakdown)
+  values ('02000000-0000-4000-8000-000000000001', v_invoice_id, 'package', '02000000-0000-4000-8000-00000000ca01', '3x Grooming Monthly', 1, 300000, 300000, jsonb_build_object('sessions', 999));
+  insert into smoke_ids (key, val) values ('mismatched_invoice', v_invoice_id);
+end $$;
+update public.customer_packages set source_invoice_id = pg_temp.id_of('mismatched_invoice') where id = pg_temp.id_of('fingerprint_cp');
+do $$ declare v_report jsonb; begin
+  v_report := app.reconcile_customer_package(pg_temp.id_of('fingerprint_cp'));
+  perform pg_temp.ok(v_report->'manual_review_issues' @> '"invalid_source_invoice"', 'S65 a historical source invoice with the RIGHT customer/package/status but a MISMATCHED session snapshot (corrupted to 999) is flagged invalid_source_invoice -- never today''s catalog sessions, the actual invoice line snapshot at the time');
+end $$;
+
+-- restore a healthy source_invoice_id so the next checks below start clean.
+update public.customer_packages set source_invoice_id = (
+  select invoice_id from public.customer_package_ledger where customer_package_id = pg_temp.id_of('fingerprint_cp') and reason = 'purchase'
+) where id = pg_temp.id_of('fingerprint_cp');
+
+-- same-membership invoice for a DIFFERENT renewal: fingerprint_cp already
+-- has one real renewal (fingerprint_cp_invoice, from S48d). Give it a
+-- second real renewal, then fabricate a ledger row claiming to be linked
+-- to the SECOND renewal's invoice while carrying the FIRST renewal's
+-- request_key (a request_key mismatch) -- renewal_of alone (same
+-- membership) must not be accepted as sufficient; the SPECIFIC renewal
+-- event must match too.
+do $$ declare v_fp text; v_invoice public.invoices; begin
+  v_fp := app.preview_package_renewal(pg_temp.id_of('fingerprint_cp'))->>'terms_fingerprint';
+  v_invoice := app.renew_customer_package(pg_temp.id_of('fingerprint_cp'), '02000000-0000-4000-8000-0000000000a1', now(), null, null, 'ff150000-0000-4000-8000-000000000015', v_fp);
+  insert into smoke_ids (key, val) values ('fingerprint_cp_renewal2_invoice', v_invoice.id);
+end $$;
+insert into public.customer_package_ledger (organization_id, customer_package_id, delta, reason, notes, invoice_id, request_key)
+values ('02000000-0000-4000-8000-000000000001', pg_temp.id_of('fingerprint_cp'), 1, 'renewal', 'fixture: same-membership but WRONG renewal invoice (request_key mismatch)', pg_temp.id_of('fingerprint_cp_renewal2_invoice'), 'ff160000-0000-4000-8000-000000000016');
+do $$ declare v_report jsonb; begin
+  v_report := app.reconcile_customer_package(pg_temp.id_of('fingerprint_cp'));
+  perform pg_temp.ok(v_report->'manual_review_issues' @> '"invalid_invoice_links"', 'S66 a renewal ledger row for the SAME membership but linked to a DIFFERENT renewal''s invoice (request_key mismatch) is flagged invalid_invoice_links -- renewal_of matching alone is not sufficient proof');
+end $$;
+
+-- legacy: a ledger 'renewal' row with invoice_id NULL (simulating a row
+-- created before this migration, when renewal never produced an invoice at
+-- all) is flagged unlinked_renewal_invoice, an explicit disclosed-unknown-
+-- provenance state -- never silently treated as verified.
+insert into public.customer_package_ledger (organization_id, customer_package_id, delta, reason, notes)
+values ('02000000-0000-4000-8000-000000000001', pg_temp.id_of('fingerprint_cp'), 1, 'renewal', 'fixture: legacy pre-migration renewal row, no invoice ever existed');
+do $$ declare v_report jsonb; begin
+  v_report := app.reconcile_customer_package(pg_temp.id_of('fingerprint_cp'));
+  perform pg_temp.ok(v_report->'manual_review_issues' @> '"unlinked_renewal_invoice"', 'S67 a legacy renewal ledger row with invoice_id NULL (predating this migration) is flagged unlinked_renewal_invoice, an explicit disclosed gap, never invented history');
+end $$;
+
+-- --- finding #5: guarded purchased-term editing. terms_edit_cp is a
+-- fresh, never-reserved, never-renewed purchase (the ONLY state pet/service
+-- may be corrected in). ---
+do $$ declare v_invoice public.invoices; begin
+  v_invoice := app.create_package_invoice(
+    '02000000-0000-4000-8000-0000000000a1', '02000000-0000-4000-8000-00000000c101', '02000000-0000-4000-8000-00000000ca01',
+    now(), null, null, 'ff170000-0000-4000-8000-000000000017');
+  insert into smoke_ids (key, val) select 'terms_edit_cp', id from public.customer_packages
+    where organization_id = '02000000-0000-4000-8000-000000000001' and source_invoice_id = v_invoice.id;
+end $$;
+
+-- S68: allowed correction -- expires_at, pet_id (to the customer's own
+-- pet), and service_id, with a valid reason and the current revision.
+-- Verifies sessions_remaining/invoices are untouched and an audited
+-- before/after timeline_events row exists.
+do $$ declare v_before public.customer_packages; v_row public.customer_packages; v_event record; v_invoice_total numeric; begin
+  select * into v_before from public.customer_packages where id = pg_temp.id_of('terms_edit_cp');
+  select total into v_invoice_total from public.invoices where id = v_before.source_invoice_id;
+  v_row := app.update_customer_package_terms(pg_temp.id_of('terms_edit_cp'), v_before.revision, 'data entry correction: wrong pet selected at sale',
+    (now() + interval '90 days'), '02000000-0000-4000-8000-00000000f102', '02000000-0000-4000-8000-00000000ea01');
+  perform pg_temp.ok(v_row.pet_id = '02000000-0000-4000-8000-00000000f102', 'S68 allowed correction updates pet_id');
+  perform pg_temp.ok(v_row.service_id = '02000000-0000-4000-8000-00000000ea01', 'S68b allowed correction updates service_id');
+  perform pg_temp.ok(v_row.revision = v_before.revision + 1, 'S68c the revision is bumped so a concurrent stale request is now detectable');
+  perform pg_temp.ok(v_row.sessions_remaining = v_before.sessions_remaining, 'S69 a terms correction never touches sessions_remaining (no balance edit)');
+  select total into v_invoice_total from public.invoices where id = v_row.source_invoice_id;
+  perform pg_temp.ok(v_invoice_total = 300000, 'S69b the source invoice''s total is untouched by a terms correction (no retroactive rewriting of invoice terms)');
+  select * into v_event from public.timeline_events where subject_type = 'package' and subject_id = pg_temp.id_of('terms_edit_cp') and event_type = 'membership.terms_corrected';
+  perform pg_temp.ok(v_event.data->>'reason' = 'data entry correction: wrong pet selected at sale', 'S70 the correction is audited in timeline_events with the reason');
+  perform pg_temp.ok((v_event.data->'before'->>'pet_id') is distinct from (v_event.data->'after'->>'pet_id'), 'S70b the audit row records both the before and after pet_id');
+end $$;
+
+-- S71: a stale revision (the row has already moved on) is rejected, not
+-- silently applied over a concurrent change.
+do $$ begin
+  perform app.update_customer_package_terms(pg_temp.id_of('terms_edit_cp'), 1, 'stale attempt', now(), null, null);
+  perform pg_temp.ok(false, 'S71 a stale revision should be rejected');
+exception when sqlstate '40001' then
+  perform pg_temp.ok(sqlerrm like '%stale_correction_request%', 'S71 a stale revision on a terms correction is rejected (40001), matching repair_customer_package_balance''s pattern');
+end $$;
+
+-- S72: a same-organization READ-ONLY member (membership.read only) cannot
+-- correct terms.
+do $$ begin perform pg_temp.act_as('02000000-0000-4000-8000-0000000000c3', '02000000-0000-4000-8000-000000000001'); end $$;
+do $$ declare v_revision int; begin
+  select revision into v_revision from public.customer_packages where id = pg_temp.id_of('terms_edit_cp');
+  perform app.update_customer_package_terms(pg_temp.id_of('terms_edit_cp'), v_revision, 'unauthorized attempt', now(), null, null);
+  perform pg_temp.ok(false, 'S72 a read-only member should not be able to correct terms');
+exception when insufficient_privilege then
+  perform pg_temp.ok(sqlerrm like '%missing_permission:membership.manage%' or sqlerrm like '%not_authorized%', 'S72 read-only member is denied terms correction (membership.manage required)');
+end $$;
+do $$ begin perform pg_temp.act_as('02000000-0000-4000-8000-0000000000c1', '02000000-0000-4000-8000-000000000001'); end $$;
+
+-- S73: cross-customer pet -- pet_id must belong to the SAME customer as
+-- the membership being corrected. First confirm the SAME-customer case
+-- (f101 belongs to c101, same as terms_edit_cp) succeeds, establishing the
+-- baseline before the negative cross-customer case.
+do $$ declare v_revision int; v_row public.customer_packages; begin
+  select revision into v_revision from public.customer_packages where id = pg_temp.id_of('terms_edit_cp');
+  v_row := app.update_customer_package_terms(pg_temp.id_of('terms_edit_cp'), v_revision, 'same-customer pet reassignment', now(), '02000000-0000-4000-8000-00000000f101', null);
+  perform pg_temp.ok(v_row.pet_id = '02000000-0000-4000-8000-00000000f101', 'S73 a pet belonging to the SAME customer is accepted');
+end $$;
+do $$ declare v_revision int; begin
+  -- Attempt a pet belonging to Cust A2 (c102, created for the finding #4
+  -- fixtures above) while correcting a membership owned by Cust A1 (c101).
+  select revision into v_revision from public.customer_packages where id = pg_temp.id_of('terms_edit_cp');
+  perform app.update_customer_package_terms(pg_temp.id_of('terms_edit_cp'), v_revision, 'cross-customer pet attempt', now(), '02000000-0000-4000-8000-00000000f201', null);
+  perform pg_temp.ok(false, 'S74 a pet belonging to a DIFFERENT customer should be rejected');
+exception when sqlstate 'P0002' then
+  perform pg_temp.ok(sqlerrm like '%pet_not_found_for_customer%', 'S74 assigning a pet that belongs to a different customer is rejected (pet_not_found_for_customer)');
+end $$;
+
+-- S75/S76: held/consumed restriction -- pet_id/service_id cannot be
+-- corrected once ANY reservation has ever existed (per_pet_cp has one from
+-- S2), but expires_at alone remains correctable even then.
+do $$ declare v_revision int; begin
+  select revision into v_revision from public.customer_packages where id = pg_temp.id_of('per_pet_cp');
+  perform app.update_customer_package_terms(pg_temp.id_of('per_pet_cp'), v_revision, 'attempt to retarget a held membership', now(), null, null);
+  perform pg_temp.ok(false, 'S75 changing pet_id on a membership with reservation history should be rejected');
+exception when check_violation then
+  perform pg_temp.ok(sqlerrm like '%entitlement_scope_locked_after_first_reservation%' or sqlerrm like '%entitlement_scope_locked_after_renewal%', 'S75 pet/service scope is locked once a membership has ANY reservation history or has been renewed');
+end $$;
+do $$ declare v_revision int; v_row public.customer_packages; v_pet uuid; v_service uuid; begin
+  select revision, pet_id, service_id into v_revision, v_pet, v_service from public.customer_packages where id = pg_temp.id_of('per_pet_cp');
+  v_row := app.update_customer_package_terms(pg_temp.id_of('per_pet_cp'), v_revision, 'expiry-only correction on a locked membership', (now() + interval '30 days'), v_pet, v_service);
+  perform pg_temp.ok(v_row.pet_id = v_pet and v_row.service_id = v_service, 'S76 expires_at remains correctable on a scope-locked membership as long as pet_id/service_id are resubmitted UNCHANGED');
 end $$;
 
 do $$ begin perform pg_temp.act_as('02000000-0000-4000-8000-0000000000c1', '02000000-0000-4000-8000-000000000001'); end $$;

@@ -1,4 +1,4 @@
-### migration upgrade replay (review finding #1)
+### migration upgrade replay (review round 3, strengthened content-hash verification)
 
 ########## fresh database: operro_upgrade_replay ##########
 
@@ -39,16 +39,26 @@ INSERT 0 1
 
                                                                                                                                                                                                                                                                       create_package_invoice                                                                                                                                                                                                                                                                       
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- (01a0dc0d-28db-70b6-b8ea-d247cd266a34,09000000-0000-4000-8000-000000000001,09000000-0000-4000-8000-0000000000a1,09000000-0000-4000-8000-00000000c101,01a0dc0d-28d4-71f4-a70b-328adbbc54e4,PKG-20260926-09000000,issued,IDR,300000.00,0.00,0.00,300000.00,"2026-09-26 04:50:45.038678+00",,,"{""package_id"": ""09000000-0000-4000-8000-00000000ca01""}","2026-09-26 04:50:45.038678+00","2026-09-26 04:50:45.038678+00",09000000-0000-4000-8000-0000000000c1,09000000-0000-4000-8000-0000000000c1,package_sale,invoice,,,,09000000-0000-4000-8000-0000000000f9,1)
+ (01a0dcc5-b9f4-717c-a52a-db2919a046ac,09000000-0000-4000-8000-000000000001,09000000-0000-4000-8000-0000000000a1,09000000-0000-4000-8000-00000000c101,01a0dcc5-b9ef-7f62-ab5c-5773c49427c0,PKG-20260926-09000000,issued,IDR,300000.00,0.00,0.00,300000.00,"2026-09-26 08:12:20.815735+00",,,"{""package_id"": ""09000000-0000-4000-8000-00000000ca01""}","2026-09-26 08:12:20.815735+00","2026-09-26 08:12:20.815735+00",09000000-0000-4000-8000-0000000000c1,09000000-0000-4000-8000-0000000000c1,package_sale,invoice,,,,09000000-0000-4000-8000-0000000000f9,1)
 (1 row)
 
 COMMIT
 real purchase ledger rows before upgrade: 1
 
+########## capturing pre-upgrade content hashes (row count alone does not prove 'untouched' -- review round 3) ##########
+pre-upgrade ledger content hash: 4ff79bc121b9abc751e860703e3fd45a
+pre-upgrade customer_packages content hash: f70f7e8d095c8868b1ab73481fee0f91
+
 ########## applying the migration under test on top of REAL DATA -- the actual regression check ##########
+psql:supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql:221: NOTICE:  function app.renew_customer_package(uuid,uuid,timestamptz,timestamptz,text,uuid) does not exist, skipping
 
-########## verifying the real purchase row survived untouched and the new column exists ##########
+########## verifying the real purchase row's PRE-EXISTING columns are byte-identical after the upgrade (not merely 'still exists'), invoice_id was NOT backfilled onto it, and append-only enforcement still holds ##########
+post-upgrade ledger content hash: 4ff79bc121b9abc751e860703e3fd45a
+post-upgrade customer_packages content hash: f70f7e8d095c8868b1ab73481fee0f91
 DO
-NOTICE:  UPGRADE_REPLAY_OK: 1 pre-existing purchase row(s) survived, invoice_id column present
+NOTICE:  UPGRADE_REPLAY_OK: 1 pre-existing purchase row(s) byte-identical, invoice_id column present and correctly left NULL (not backfilled)
 
-MIGRATION UPGRADE REPLAY PASSED (populated-database upgrade succeeded)
+########## verifying append-only enforcement itself still holds after the upgrade (the migration must not have weakened it) ##########
+append-only enforcement confirmed still active post-upgrade: ERROR:  Updates blocked on customer_package_ledger (append-only/immutable). Insert a correcting row instead. CONTEXT:  PL/pgSQL function app.tg_block_update() line 3 at RAISE 
+
+MIGRATION UPGRADE REPLAY PASSED (populated-database upgrade succeeded; pre-existing rows proven byte-identical, not merely present; append-only behavior preserved)
