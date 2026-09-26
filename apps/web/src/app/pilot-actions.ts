@@ -7,7 +7,7 @@
  * - createTaskAction / updateTaskStatusAction: manages operational tasks.
  * - transitionBookingAction / updatePetJobStatusAction: advances grooming work.
  * - setDispatchStageAction: advances a home-service booking's dispatch stage (scheduled/en_route/arrived/in_service), independent of bookings.status.
- * - uploadGroomingEvidenceAction: stores private, booking-linked grooming evidence for an assigned groomer.
+ * - uploadGroomingEvidenceAction / deleteGroomingEvidenceAction: stores/retracts private, booking-linked grooming evidence for an assigned groomer.
  * - updateGroomingChecklistAction / issueInvoiceForBookingAction / previewInvoiceDiscountsAction: closes the service-to-cash loop, including section-22 invoice/pet/service/category discounts, transport fee, and a pre-issuance preview.
  * - createServiceAction / updateServiceAction / overrideGroomingLinePriceAction / createResourceAction / updateResourceAction / archiveResourceAction: configures the operating catalog.
  * - adjustInventoryAction: appends an inventory adjustment movement.
@@ -393,6 +393,33 @@ export async function uploadGroomingEvidenceAction(_previous: PilotActionState, 
   }
   revalidatePath("/my-schedule"); revalidatePath("/operations");
   return { error: null, success: "Foto berhasil disimpan." };
+}
+
+/**
+ * Retracts a grooming evidence photo through app.delete_grooming_evidence
+ * (section 28), which re-checks the same job-assignment rule as upload (or
+ * evidence.read_all/booking.delete for a manager). The DB row is soft-deleted
+ * FIRST, then the storage object is removed - never the reverse, which would
+ * leave a live signed URL pointing at nothing.
+ */
+export async function deleteGroomingEvidenceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace();
+  if (!context) return databaseError("Foto", "sesi atau workspace aktif tidak tersedia");
+  const attachmentId = idValue(formData, "attachmentId");
+  if (!attachmentId) return databaseError("Foto", "ID foto tidak valid");
+  const result = await context.supabase.schema("app").rpc("delete_grooming_evidence", { p_attachment: attachmentId });
+  if (result.error) {
+    if (/not_authorized/.test(result.error.message)) return databaseError("Foto", "Anda tidak memiliki akses untuk menghapus foto ini");
+    if (/attachment_not_found/.test(result.error.message)) return databaseError("Foto", "foto tidak ditemukan");
+    console.error("delete_grooming_evidence RPC failed", { code: result.error.code, message: result.error.message });
+    return databaseError("Foto", "server tidak dapat menghapus foto. Coba lagi.");
+  }
+  const row = Array.isArray(result.data) ? result.data[0] : result.data;
+  if (row?.storage_bucket && row?.storage_path) {
+    await context.supabase.storage.from(row.storage_bucket).remove([row.storage_path]);
+  }
+  revalidatePath("/my-schedule"); revalidatePath("/operations");
+  return { error: null, success: "Foto berhasil dihapus." };
 }
 
 export async function recordAttendanceCheckinAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
