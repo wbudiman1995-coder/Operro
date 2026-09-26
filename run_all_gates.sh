@@ -77,6 +77,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20260924140000_invoice_discounts_charges.sql
   supabase/migrations/20260925100000_package_membership_lifecycle.sql
   supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql
+  supabase/migrations/20260927090000_membership_revision_null_guards.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -159,6 +160,8 @@ CONC_TMP="$(mktemp -d /tmp/operro-concurrency.XXXXXX)"
 trap 'rm -rf "$CONC_TMP"' EXIT
 
 cp -a supabase/tests/concurrency/. "$CONC_TMP/"
+# Execute portable copies from Windows checkouts without changing source files.
+find "$CONC_TMP" -type f -name '*.sh' -exec sed -i 's/\r$//' {} +
 chmod -R a+rX "$CONC_TMP"
 
 run_as_postgres env DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/operro_cc" \

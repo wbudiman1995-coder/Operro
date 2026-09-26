@@ -9,6 +9,7 @@ import {
   type MembershipHistoryEntry, type MembershipReservationEntry, type PackageRenewalPreview, type PackageReconciliationReport, type PilotActionState,
 } from "@/app/pilot-actions";
 import type { MembershipPackageRow, MembershipUrgency } from "@/lib/membership-admin";
+import { membershipExpiryDate } from "@/lib/membership-correction";
 
 const initialState: PilotActionState = { error: null, success: null };
 
@@ -54,7 +55,7 @@ export function MembershipManager({ row, canManage, branches, services }: { row:
   const [invoiceDate, setInvoiceDate] = useState(today);
   const [dueDate, setDueDate] = useState(nextDate(today, 14));
   const [editingTerms, setEditingTerms] = useState(false);
-  const [expiresAtInput, setExpiresAtInput] = useState(row.expiresAt ? row.expiresAt.slice(0, 10) : "");
+  const [expiresAtInput, setExpiresAtInput] = useState(membershipExpiryDate(row.expiresAt));
   const [petIdInput, setPetIdInput] = useState(row.petId ?? "");
   const [serviceIdInput, setServiceIdInput] = useState(row.serviceId ?? "");
   const [renewalPreview, setRenewalPreview] = useState<PackageRenewalPreview | null>(null);
@@ -208,6 +209,10 @@ export function MembershipManager({ row, canManage, branches, services }: { row:
           <p className="font-bold text-slate-700">Koreksi data paket (bukan saldo/invoice)</p>
           <input type="hidden" name="customerPackageId" value={row.id} />
           <input type="hidden" name="revision" value={row.revision} />
+          {scopeLocked ? <>
+            <input type="hidden" name="petId" value={row.petId ?? ""} />
+            <input type="hidden" name="serviceId" value={row.serviceId ?? ""} />
+          </> : null}
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="text-[11px] font-bold text-slate-600">Kedaluwarsa<input type="date" name="expiresAt" value={expiresAtInput} onChange={(event) => setExpiresAtInput(event.target.value)} className="mt-1 block h-9 w-full rounded-lg border border-slate-200 px-2 text-xs" /></label>
             <label className="text-[11px] font-bold text-slate-600">Hewan<select name="petId" value={petIdInput} onChange={(event) => setPetIdInput(event.target.value)} disabled={scopeLocked} className="mt-1 block h-9 w-full rounded-lg border border-slate-200 px-2 text-xs disabled:bg-slate-100"><option value="">Semua hewan pelanggan</option>{row.customerPets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}</select></label>

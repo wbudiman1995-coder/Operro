@@ -142,7 +142,7 @@ test("review round 3, finding #2: renew_customer_package requires a terms_finger
   assert.match(renewFn, /if p_terms_fingerprint is null then raise exception 'renewal_preview_required'/);
   assert.match(renewFn, /if p_terms_fingerprint <> app\.fn_renewal_terms_fingerprint\(pkg, cp, v_reserved_count\) then\s*\n\s*raise exception 'renewal_terms_changed_since_preview' using errcode = '40001';/);
   assert.match(fingerprintFn, /language sql immutable/); // pure, no queries -- no TOCTOU window
-  assert.doesNotMatch(fingerprintFn, /select .* from public\./is);
+  assert.doesNotMatch(fingerprintFn, /select [\s\S]* from public\./i);
   assert.match(previewRenewFn, /'terms_fingerprint', app\.fn_renewal_terms_fingerprint\(pkg, cp, v_reserved_count\)/);
 });
 

@@ -1,0 +1,240 @@
+
+########## GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150) ##########
+psql:integration/gate_bootstrap_extensions.sql:2: NOTICE:  schema "extensions" already exists, skipping
+psql:integration/gate_bootstrap_extensions.sql:3: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721000100_extensions_and_helpers.sql:47: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721000150_fix_uuidv7_supabase.sql:22: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql:488: NOTICE:  BACKFILL OK: all legacy grooming pet/service values mapped; no non-grooming booking carries pet_id/service_id.
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "membership_plans_org_isolation" for relation "public.membership_plans" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_memberships_org_isolation" for relation "public.customer_memberships" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "packages_org_isolation" for relation "public.packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_packages_org_isolation" for relation "public.customer_packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_package_ledger_org_isolation" for relation "public.customer_package_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_accounts_org_isolation" for relation "public.loyalty_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_ledger_org_isolation" for relation "public.loyalty_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_accounts_org_isolation" for relation "public.wallet_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_ledger_org_isolation" for relation "public.wallet_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "referrals_org_isolation" for relation "public.referrals" does not exist, skipping
+psql:supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql:221: NOTICE:  function app.renew_customer_package(uuid,uuid,timestamptz,timestamptz,text,uuid) does not exist, skipping
+assembly fns: 8
+
+########## GATE 5 — assembly RPC tests ##########
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 4
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 3
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:84: NOTICE:  PASS: C1 add_pet accepts pet owned by booking customer
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:92: NOTICE:  PASS: C2 cross-customer pet rejected pet_customer_mismatch
+psql:supabase/tests/20260721001350_test_assembly.sql:100: NOTICE:  PASS: C3 add_line snapshots catalog duration 90 (not default 60)
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:109: NOTICE:  PASS: C4 inactive service rejected
+psql:supabase/tests/20260721001350_test_assembly.sql:109: NOTICE:  PASS: C5 soft-deleted service rejected
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C6 assign_pet_resource sets the groomer
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C7 reassignment writes a reassigned audit event
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C8 retired/inactive resource rejected
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C8b cross-branch resource rejected (not_active_or_not_in_branch)
+psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C9 reserve rejects qty<>1 line (package_requires_unit_quantity)
+psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C10 qty=1 line reserves a package session
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C11 set_qty rejects line with package reservation (any status)
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C12 availability is 2 (1 reserved of 3) before removal
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C13 remove_pet released the reservation; availability back to 3
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C14 reservation row preserved with status released
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C15 repeated removal cannot double-release (pet_not_found)
+psql:supabase/tests/20260721001350_test_assembly.sql:174: NOTICE:  PASS: C16 re-adding a removed pet raises stable pet_removal_is_permanent
+DO
+ROLLBACK
+
+########## GATE 6 — package-reservation regression tests ##########
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 4
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 5
+INSERT 0 5
+DO
+CREATE SEQUENCE
+CREATE FUNCTION
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:86: NOTICE:  PASS: R1 qty<>1 rejected (package_requires_unit_quantity)
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:93: NOTICE:  PASS: R2 qty=1 accepted
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:101: NOTICE:  PASS: R3 expired package rejected (package_expired)
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:109: NOTICE:  PASS: R4 service mismatch rejected
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:117: NOTICE:  PASS: R5 customer mismatch rejected
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:125: NOTICE:  PASS: R6 missing package rejected (package_not_found)
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7a exactly three reserved lifecycle rows exist
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7b availability is 0 before expiration processing (three stale-but-reserved holds)
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7c new reservation succeeds after stale holds expired
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7d the three stale rows changed to expired
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7e the new reservation is reserved
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7f final availability is correct (3 total - 1 active = 2)
+psql:supabase/tests/20260721001350_test_reservation.sql:189: NOTICE:  PASS: R8a set_qty rejected while RESERVED
+psql:supabase/tests/20260721001350_test_reservation.sql:189: NOTICE:  PASS: R8b set_qty rejected while CONSUMED
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:189: NOTICE:  PASS: R8c set_qty rejected while REVERSED/RELEASED
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:196: NOTICE:  PASS: R8d set_qty rejected while RELEASED
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:203: NOTICE:  PASS: R8e set_qty rejected while EXPIRED
+psql:supabase/tests/20260721001350_test_reservation.sql:213: NOTICE:  PASS: R9 reserve rejected on completed booking (booking_not_open_for_assembly)
+DO
+ROLLBACK
+
+########## GATE 7 — real authenticated-role integration (incl reserve_package_session) ##########
+NOTICE:  role "operro_gate_client" has already been granted membership in role "anon" by role "postgres"
+NOTICE:  role "operro_gate_client" has already been granted membership in role "authenticated" by role "postgres"
+CREATE FUNCTION
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+ ok 
+----
+ 
+(1 row)
+
+psql:integration/0100_integration_client.sql:16: NOTICE:  PASS: I1 authenticated can assembly_add_pet via RPC
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/0100_integration_client.sql:35: NOTICE:  PASS: I2 authenticated can assembly_add_line via RPC
+DO
+psql:integration/0100_integration_client.sql:35: NOTICE:  PASS: I3 line visible via RLS with quantity 2
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/0100_integration_client.sql:61: NOTICE:  PASS: I4 direct quantity UPDATE still blocked under real authenticated role
+psql:integration/0100_integration_client.sql:61: NOTICE:  PASS: I5 assembly_set_line_quantity via RPC works under real role
+DO
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/0100_integration_client.sql:76: NOTICE:  PASS: I6 cross-customer pet rejected (pet_customer_mismatch) under real role
+DO
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/0100_integration_client.sql:92: NOTICE:  PASS: I7 assembly_assign_pet_resource works under real authenticated role
+DO
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/0100_integration_client.sql:134: NOTICE:  PASS: I8 authenticated can reserve_package_session via RPC (EXECUTE grant works)
+psql:integration/0100_integration_client.sql:134: NOTICE:  PASS: I9 reservation visible through RLS as authenticated
+psql:integration/0100_integration_client.sql:134: NOTICE:  PASS: I10 reservation org/line/package/status are correct
+psql:integration/0100_integration_client.sql:134: NOTICE:  PASS: I11 availability decremented to 2 after reservation (authenticated read RPC)
+DO
+COMMIT
+
+########## GATE 8 — completion vs assembly/reservation concurrency ##########
+psql:integration/gate_bootstrap_extensions.sql:2: NOTICE:  schema "extensions" already exists, skipping
+psql:integration/gate_bootstrap_extensions.sql:3: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721000100_extensions_and_helpers.sql:47: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721000150_fix_uuidv7_supabase.sql:22: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql:488: NOTICE:  BACKFILL OK: all legacy grooming pet/service values mapped; no non-grooming booking carries pet_id/service_id.
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "membership_plans_org_isolation" for relation "public.membership_plans" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_memberships_org_isolation" for relation "public.customer_memberships" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "packages_org_isolation" for relation "public.packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_packages_org_isolation" for relation "public.customer_packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_package_ledger_org_isolation" for relation "public.customer_package_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_accounts_org_isolation" for relation "public.loyalty_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_ledger_org_isolation" for relation "public.loyalty_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_accounts_org_isolation" for relation "public.wallet_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_ledger_org_isolation" for relation "public.wallet_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "referrals_org_isolation" for relation "public.referrals" does not exist, skipping
+psql:supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql:221: NOTICE:  function app.renew_customer_package(uuid,uuid,timestamptz,timestamptz,text,uuid) does not exist, skipping
+                                                 set_config                                                 
+------------------------------------------------------------------------------------------------------------
+ {"sub" : "0c100000-0000-4000-8000-0000000000c1", "active_org_id" : "0c100000-0000-4000-8000-000000000001"}
+(1 row)
+
+== case: complete_booking vs set_line_quantity ==
+  A_RC=0 B_RC=0
+  blocking OK (causal): B saw frozen booking; A~1790443234.68 B~1790443234.69
+  OK: complete_booking vs set_line_quantity — no deadlock, A committed, B blocked then rejected, booking=completed
+== case: complete_booking vs void_line ==
+  A_RC=0 B_RC=0
+  blocking OK (causal): B saw frozen booking; A~1790443238.56 B~1790443238.57
+  OK: complete_booking vs void_line — no deadlock, A committed, B blocked then rejected, booking=completed
+== case: complete_booking vs reserve_package_session ==
+  A_RC=0 B_RC=0
+  blocking OK (causal): B saw frozen booking; A~1790443242.41 B~1790443242.41
+  OK: complete_booking vs reserve_package_session — no deadlock, A committed, B blocked then rejected, booking=completed
+CONC PASS: all three cases serialized; no deadlock; A committed; B blocked then rejected; final state correct.
+
+ALL GATES PASSED

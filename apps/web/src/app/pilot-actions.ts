@@ -1,5 +1,7 @@
 "use server";
 
+import { correctedMembershipExpiry } from "@/lib/membership-correction";
+
 /**
  * Function index:
  * - createCustomerAction: creates a customer and optional first pet and address.
@@ -855,7 +857,12 @@ export async function updateCustomerPackageTermsAction(_previous: PilotActionSta
   const serviceId = idValue(formData, "serviceId");
   if (!customerPackageId || revision === null || !Number.isInteger(revision)) return databaseError("Koreksi", "data tidak valid");
   if (reason.length < 3) return databaseError("Koreksi", "alasan koreksi wajib diisi (minimal 3 karakter)");
-  const expiresAt = expiresDate ? new Date(`${expiresDate}T23:59:59+07:00`).toISOString() : null;
+  const current = await context.supabase.from("customer_packages").select("expires_at")
+    .eq("organization_id", context.organizationId).eq("id", customerPackageId).single();
+  if (current.error) return databaseError("Koreksi", current.error.message);
+  let expiresAt: string | null;
+  try { expiresAt = correctedMembershipExpiry(expiresDate, current.data.expires_at); }
+  catch { return databaseError("Koreksi", "tanggal kedaluwarsa tidak valid"); }
   const result = await context.supabase.schema("app").rpc("update_customer_package_terms", {
     p_customer_package: customerPackageId, p_revision: revision, p_reason: reason,
     p_expires_at: expiresAt, p_pet: petId, p_service: serviceId,

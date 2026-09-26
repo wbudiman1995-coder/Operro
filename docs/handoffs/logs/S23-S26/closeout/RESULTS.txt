@@ -1,0 +1,22 @@
+Codex closeout verification, 2026-09-27 Asia/Jakarta
+Base: 68a846f9602c58fdd0f1f79b1d6f58d6aaebc0d5
+Node v22.22.1; npm 9.2.0; Next.js 16.2.12
+Gate database: PostgreSQL 16.15; browser Supabase: PostgreSQL 17.6
+
+Final run_all_gates.sh (CRLF-normalized execution copy, original complete gate logic, docker-exec psql/createdb/dropdb transport): exit 0, ALL GATES PASSED.
+GATE 1: strict root typecheck exit 0
+GATE 2: all workspace builds including apps/web production build exit 0
+GATE 3: backend 12 assertions / preset 13 assertions passed
+GATE 4: full 44-migration fresh lineage passed, assembly functions=8
+GATE 5-7: original RPC/reservation/authenticated integration suites passed
+GATE 8: all three completion concurrency cases passed
+
+npm run typecheck -w apps/web: exit 0
+npm run lint -w apps/web: exit 0
+npm run test:batch1a -w apps/web: exit 0, 107/107
+npm run test:batch1b -w apps/web: exit 0, 286/286
+integration/package_lifecycle_smoke.sql: exit 0, 96 PASS assertions
+integration/invoice_parity_smoke.sql: exit 0
+integration/migration_upgrade_replay.sh: exit 0; original content hashes preserved; immutability retained; later migration and entire lifecycle smoke passed
+integration/membership_closeout_http.mjs: exit 0, 7 PASS checks
+Actual browser owner, membership reader, and no-access groomer verification completed; see handoff and saved PNGs.

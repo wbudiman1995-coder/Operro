@@ -48,7 +48,7 @@ if [ ! -f "$MIGRATION_UNDER_TEST" ]; then
   exit 1
 fi
 
-mapfile -t PRIOR_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' ! -name "$(basename "$MIGRATION_UNDER_TEST")" -print | sort)
+mapfile -t PRIOR_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort | awk -v target="$MIGRATION_UNDER_TEST" '$0 < target')
 
 step "fresh database: $DB"
 dropdb --if-exists "$DB"
@@ -135,17 +135,25 @@ end $$;
 SQL
 
 step "verifying append-only enforcement itself still holds after the upgrade (the migration must not have weakened it)"
+BLOCK_CHECK_LOG="$(mktemp /tmp/operro-upgrade-block.XXXXXX)"
 set +e
-psql -d "$DB" -v ON_ERROR_STOP=1 -tAc "update public.customer_package_ledger set notes = 'tampered' where reason = 'purchase';" 2>/tmp_upgrade_replay_block_check.log
+psql -d "$DB" -v ON_ERROR_STOP=1 -tAc "update public.customer_package_ledger set notes = 'tampered' where reason = 'purchase';" 2>"$BLOCK_CHECK_LOG"
 BLOCK_RC=$?
 set -e
 if [ "$BLOCK_RC" -eq 0 ]; then
   echo "FAIL: an UPDATE against customer_package_ledger succeeded after the upgrade -- append-only enforcement was weakened"
   exit 1
 fi
-grep -qi "append-only\|immutable\|restrict_violation" /tmp_upgrade_replay_block_check.log || { echo "FAIL: the UPDATE failed for an unexpected reason (not the append-only trigger)"; cat /tmp_upgrade_replay_block_check.log; exit 1; }
-echo "append-only enforcement confirmed still active post-upgrade: $(cat /tmp_upgrade_replay_block_check.log | tr '\n' ' ')"
-rm -f /tmp_upgrade_replay_block_check.log
+grep -qi "append-only\|immutable\|restrict_violation" "$BLOCK_CHECK_LOG" || { echo "FAIL: the UPDATE failed for an unexpected reason (not the append-only trigger)"; cat "$BLOCK_CHECK_LOG"; exit 1; }
+echo "append-only enforcement confirmed still active post-upgrade: $(cat "$BLOCK_CHECK_LOG" | tr '\n' ' ')"
+rm -f "$BLOCK_CHECK_LOG"
 
 echo ""
 echo "MIGRATION UPGRADE REPLAY PASSED (populated-database upgrade succeeded; pre-existing rows proven byte-identical, not merely present; append-only behavior preserved)"
+
+step "apply later migrations in order to the same populated upgraded database"
+while IFS= read -r migration; do
+  psql -d "$DB" -v ON_ERROR_STOP=1 -f "$migration"
+done < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort | awk -v target="$MIGRATION_UNDER_TEST" '$0 > target')
+psql -d "$DB" -v ON_ERROR_STOP=1 -f integration/package_lifecycle_smoke.sql
+echo "FOLLOW-ON MIGRATIONS AND COMPLETE LIFECYCLE SMOKE PASSED"

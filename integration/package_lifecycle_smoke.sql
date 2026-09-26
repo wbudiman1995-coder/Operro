@@ -788,5 +788,69 @@ end $$;
 
 do $$ begin perform pg_temp.act_as('02000000-0000-4000-8000-0000000000c1', '02000000-0000-4000-8000-000000000001'); end $$;
 
+-- Closeout: direct RPC calls must not bypass optimistic concurrency with NULL.
+do $$
+declare before_row public.customer_packages; after_row public.customer_packages; events_before bigint;
+begin
+  select * into before_row from public.customer_packages where id = pg_temp.id_of('per_pet_cp');
+  select count(*) into events_before from public.timeline_events where subject_id = before_row.id;
+  begin
+    perform app.update_customer_package_terms(before_row.id, null, 'null revision regression', now() + interval '300 days', before_row.pet_id, before_row.service_id);
+    raise exception 'NULL correction revision unexpectedly accepted';
+  exception when serialization_failure then
+    perform pg_temp.ok(sqlerrm = 'stale_correction_request', 'C1 NULL correction revision rejected');
+  end;
+  select * into after_row from public.customer_packages where id = before_row.id;
+  perform pg_temp.ok(after_row is not distinct from before_row and events_before = (select count(*) from public.timeline_events where subject_id = before_row.id), 'C2 rejected correction leaves row and audit untouched');
+  begin
+    perform app.update_customer_package_terms(before_row.id, before_row.revision - 1, 'stale revision regression', now(), before_row.pet_id, before_row.service_id);
+    raise exception 'Stale correction unexpectedly accepted';
+  exception when serialization_failure then
+    perform pg_temp.ok(sqlerrm = 'stale_correction_request', 'C3 stale correction revision rejected');
+  end;
+  after_row := app.update_customer_package_terms(before_row.id, before_row.revision, 'current revision regression', now() + interval '90 days', before_row.pet_id, before_row.service_id);
+  perform pg_temp.ok(after_row.revision = before_row.revision + 1 and after_row.pet_id is not distinct from before_row.pet_id and after_row.service_id is not distinct from before_row.service_id and after_row.expires_at = now() + interval '90 days', 'C4 valid expiry correction preserves locked scope and advances revision');
+end $$;
+
+-- Drift is injected only into the disposable cache fixture, not the immutable ledger.
+update public.customer_packages set sessions_remaining = sessions_remaining + 7 where id = pg_temp.id_of('per_pet_cp');
+do $$
+declare before_row public.customer_packages; after_row public.customer_packages; repaired public.customer_packages;
+  events_before bigint; ledger_balance numeric; repair_key uuid := 'ffcf0000-0000-4000-8000-000000000001';
+begin
+  select * into before_row from public.customer_packages where id = pg_temp.id_of('per_pet_cp');
+  select count(*) into events_before from public.timeline_events where subject_id = before_row.id and event_type = 'membership.balance_repaired';
+  select sum(delta) into ledger_balance from public.customer_package_ledger where customer_package_id = before_row.id;
+  perform pg_temp.ok(before_row.sessions_remaining <> ledger_balance, 'C5 repair fixture contains actual drift');
+  begin
+    perform app.repair_customer_package_balance(before_row.id, null, repair_key);
+    raise exception 'NULL repair revision unexpectedly accepted';
+  exception when serialization_failure then
+    perform pg_temp.ok(sqlerrm = 'stale_repair_request', 'C6 NULL revision with fresh repair key rejected');
+  end;
+  select * into after_row from public.customer_packages where id = before_row.id;
+  perform pg_temp.ok(after_row is not distinct from before_row and events_before = (select count(*) from public.timeline_events where subject_id = before_row.id and event_type = 'membership.balance_repaired'), 'C7 rejected repair leaves drift, revision and audit untouched');
+  repaired := app.repair_customer_package_balance(before_row.id, before_row.revision, repair_key);
+  after_row := app.repair_customer_package_balance(before_row.id, before_row.revision, repair_key);
+  perform pg_temp.ok(repaired.sessions_remaining = ledger_balance and repaired.revision = before_row.revision + 1 and after_row is not distinct from repaired and events_before + 1 = (select count(*) from public.timeline_events where subject_id = before_row.id and event_type = 'membership.balance_repaired'), 'C8 valid repair and original-revision retry have one effect');
+end $$;
+
+-- Run these denials as the actual SQL authenticated role, not just a superuser JWT.
+do $$ begin perform pg_temp.act_as('02000000-0000-4000-8000-0000000000c3', '02000000-0000-4000-8000-000000000001'); end $$;
+set local role authenticated;
+do $$ begin
+  perform app.repair_customer_package_balance(pg_temp.id_of('per_pet_cp'), null, 'ffcf0000-0000-4000-8000-000000000001');
+  raise exception 'Read-only repair retry unexpectedly accepted';
+exception when insufficient_privilege then
+  perform pg_temp.ok(true, 'C9 successful repair key cannot bypass read-only authorization');
+end $$;
+do $$ begin
+  perform app.update_customer_package_terms(pg_temp.id_of('per_pet_cp'), null, 'unauthorized', now(), null, null);
+  raise exception 'Read-only correction unexpectedly accepted';
+exception when insufficient_privilege then
+  perform pg_temp.ok(true, 'C10 read-only correction denied before revision checks');
+end $$;
+reset role;
+
 rollback;
 -- END package_lifecycle_smoke

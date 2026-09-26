@@ -1,5 +1,75 @@
 # Handoff: HomePaw parity sections 23-26 (package/membership lifecycle)
 
+## Codex closeout — 2026-09-27 (authoritative)
+
+Completed directly by Codex on the existing Engine 1 branch, starting from `68a846f9602c58fdd0f1f79b1d6f58d6aaebc0d5`. Engines 2/3, production, and shared branches were untouched. This section supersedes the older remaining-gap statements below.
+
+### Changes and why
+
+- Locked correction forms now submit exactly one successful pet/service control using conditional hidden fields. Actual browser corrections succeeded for both a held membership and a renewed membership with non-null pet AND service IDs.
+- New forward migration `20260927090000_membership_revision_null_guards.sql` replaces only the revision comparison in correction and repair RPCs with `IS DISTINCT FROM`. Existing successful repair retry handling and grants are preserved. Historical migrations were not changed.
+- Browser testing reproduced an additional expiry defect: slicing a UTC timestamp showed December 25 for a December 26 Jakarta expiry. The form now uses the existing timezone utility; the server preserves the exact stored timestamp when its local calendar date is unchanged. Explicit date changes still select Jakarta end-of-day, matching the existing policy. Invalid dates return validation errors. Three permanent behavior tests cover these cases.
+- The final web typecheck exposed a pre-existing `/s` regular-expression flag incompatible with the web project's ES2017 target. Replaced it with equivalent `[\\s\\S]` matching without changing the assertion.
+- Fixed gate infrastructure failures encountered by an actual full-script run: extension bootstrap now respects pgcrypto's installed schema; temporary concurrency scripts normalize CRLF; upgrade replay orders migrations correctly, uses a writable temporary error log, retains the original content-hash/immutability proof, then applies subsequent migrations and runs the complete lifecycle smoke.
+
+### Evidence and results
+
+All paths below are relative to this handoff. Full evidence directory:
+`E:\Claude\operro-review-s23-s26\docs\handoffs\logs\S23-S26\closeout\`.
+
+| Acceptance case | Result | Evidence |
+|---|---|---|
+| Held and renewed scoped-membership expiry correction | PASS: pet/service IDs unchanged; dates saved | [DB results](logs/S23-S26/closeout/browser_database_results.log), [owner screenshot](logs/S23-S26/closeout/owner-corrections.png) |
+| Enabled scope fields | PASS: one enabled select per name; no duplicate hidden inputs | Browser execution record below |
+| Renewal → correction without page reload | PASS: new July 9, 2027 expiry prefilled, then correction submitted | [post-renewal screenshot](logs/S23-S26/closeout/owner-after-renewal.png) |
+| Jakarta midnight and unchanged expiry | PASS: `2026-12-25T17:15:58.919207Z` displayed as December 26; full precision preserved after submission | [screenshot](logs/S23-S26/closeout/jakarta-expiry.png), DB results, new unit tests |
+| Null/stale/current correction revision | PASS: C1–C4 | [SQL log](logs/S23-S26/closeout/package_lifecycle_smoke.log) |
+| Null/current/idempotent repair | PASS: C5–C8, actual cache drift fixture, one repair event | SQL log |
+| Unauthorized RPC and retry | PASS: C9–C10 as actual authenticated SQL role; HTTP denials 42501 | [HTTP log](logs/S23-S26/closeout/http_authorization.log) |
+| Real view-only browser role | PASS: rows/history/reconcile visible; mutation buttons absent | [reader screenshot](logs/S23-S26/closeout/read-only-membership.png) |
+| No-access groomer | PASS: empty membership view and zero HTTP rows | [groomer screenshot](logs/S23-S26/closeout/groomer-no-access.png), HTTP log |
+| Typecheck / lint | PASS, exit 0 | [typecheck](logs/S23-S26/closeout/typecheck.log), [lint](logs/S23-S26/closeout/lint.log) |
+| Batch1a / batch1b | PASS, 107/107 and 286/286 | [batch1a](logs/S23-S26/closeout/test_batch1a.log), [batch1b](logs/S23-S26/closeout/test_batch1b.log) |
+| Complete lifecycle SQL smoke | PASS, 96 assertions, including 10 new closeout assertions | SQL log |
+| Invoice smoke | PASS | [invoice log](logs/S23-S26/closeout/invoice_parity_smoke.log) |
+| Populated upgrade + follow-on migration | PASS, hashes preserved and immutable ledger still rejects updates; full lifecycle suite passes afterward | [upgrade log](logs/S23-S26/closeout/migration_upgrade.log) |
+| Final full gate script / production build | PASS, exit 0; ALL GATES PASSED; final production build succeeded | [final full output](logs/S23-S26/closeout/run_all_gates_final.log) |
+
+The initial failed full run is retained as `run_all_gates.log` to show the extension-bootstrap failure. `database_gates.log` is the successful gates 4–8 rerun after the bootstrap/CRLF fixes. Neither is misrepresented as the final full-script result.
+
+### Actual browser execution
+
+Local app: `http://127.0.0.1:3011`. Local Supabase: `operro-codex-closeout`, API/DB/Studio/mail ports 54361–54364, PostgreSQL 17. Isolated PostgreSQL 16 gate container: `operro_codex_closeout_pg16`. No other local projects were reset or stopped.
+
+1. Applied existing local seeds, then `integration/membership_closeout_browser_seed.sql`. Creates synthetic H (reserved), R (renewed), and U (unused) memberships with actual invoice/reservation/renewal RPCs.
+2. Owner opened H's correction form. DOM inspection showed one enabled hidden control and one disabled select for each scope field. An actual submitted expiry change persisted January 10, 2027 with the original IDs.
+3. R's correction saved April 10 with IDs preserved. A subsequent real UI renewal extended expiry to July 9; reopening correction immediately showed July 9. Blank-reason submission remained on the form; supplying the reason succeeded.
+4. U's unlocked form had one enabled select per field and no corresponding hidden duplicate. Its unchanged-date submission initially revealed the UTC truncation bug. After the timezone fix and fresh dev-server compilation, the browser showed December 26 and a no-date-change submission preserved `2026-12-25 17:15:58.919207+00` exactly. See final DB log.
+5. Signed in as `membership-reader@homepaw.local`: saw H/R/U; opened real history and reconciliation with matching ledger/cache balance. Counts for renewal/correction/archive/repair buttons were all zero.
+6. Signed in as `groomer@homepaw.local`: membership page showed `Belum ada paket pelanggan`. HTTP test independently returned zero rows.
+7. Browser console errors at final inspection: none. Captured screenshots are actual files, not references to another assistant's session.
+
+The QA reader has exactly `booking.read`, `customer.read`, and `membership.read`, plus active organization/module/branch membership. No membership.manage or invoice.issue. It does not gain Finance access. The seed lists additional optional read keys only when they exist in the permission catalog.
+
+WSL did not pick up a Windows-side source edit via HMR during this run; restarting only our dev server made the fresh implementation visible. This is why the timezone screenshot and DB proof were repeated after restart.
+
+### Reproduction
+
+- Run the app checks from this worktree: `npm run typecheck -w apps/web`, `npm run lint -w apps/web`, `npm run test:batch1a -w apps/web`, `npm run test:batch1b -w apps/web`.
+- Full gates: `bash run_all_gates.sh` with PGHOST/PGPORT/PGUSER/PGPASSWORD pointed ONLY at a disposable PostgreSQL 16 server. This run used tiny psql/createdb/dropdb wrappers that invoke those exact binaries via `docker exec -i -w "$PWD"` in the dedicated PG16 container, with the checkout mounted at the same path and /tmp shared for the original concurrency harness. Gate scenarios/assertions were unchanged. The shell execution copy strips CRLF; source content otherwise identical.
+- With the same PG connection, run `psql operro_gate -v ON_ERROR_STOP=1 -f integration/package_lifecycle_smoke.sql`, `psql operro_gate -v ON_ERROR_STOP=1 -f integration/invoice_parity_smoke.sql`, and `bash integration/migration_upgrade_replay.sh operro_closeout_upgrade`.
+- Local browser setup: copy this worktree's supabase directory to a dedicated temp workdir; change project_id/ports to the values above, enable storage (required by existing migrations), disable analytics to avoid other stacks' default analytics port, and start that project. The tracked supabase/config.toml and existing .env.local were not changed.
+- Apply `integration/membership_closeout_browser_seed.sql` ONLY to that local seeded database. Local QA password is the repository's existing `operro-local-qa`. Owner uses `wbudiman1995@gmail.com`; reader/groomer addresses above.
+- Pass that local stack's URL and anon key through NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to the dev process. No actual credentials/keys are committed in this handoff.
+- Run `node integration/membership_closeout_http.mjs` with those variables. It refuses non-local/non-54361 URLs, checks real Auth/PostgREST behavior, and signs out only its own test sessions.
+- For the midnight regression, use the authorized correction RPC to set U's expiry to `2026-12-25T17:15:58.919207Z`, reload, open correction, leave the date unchanged, submit a reason, and compare the exact DB timestamp. The fixture is synthetic and disposable.
+
+### Integration boundary
+
+This completes the targeted Engine 1 closeout. No production schema changes, deployments, PRs, or merges. Engine 2/3 integration still needs combined migration and application validation. Their worktrees/containers were not modified. The existing unpaginated history and catalog-policy concerns recorded earlier are not claimed to have received a new broad audit here.
+
+
+
 ## Review round 3 (2026-09-26) — READ THIS FIRST, supersedes everything below
 
 Codex reviewed commit `6b4dc27` (the "Review round 2" work below) against

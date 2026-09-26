@@ -1,0 +1,141 @@
+
+########## GATE 1 — strict TypeScript typecheck ##########
+
+added 384 packages, and audited 390 packages in 3m
+
+150 packages are looking for funding
+  run `npm fund` for details
+
+6 vulnerabilities (5 high, 1 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues, run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+Version 5.9.3
+typecheck exit=0
+
+########## GATE 2 — workspace build ##########
+
+> web@0.1.0 build
+> next build
+
+▲ Next.js 16.2.12 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  · serverActions
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 19.2s
+  Running TypeScript ...
+  Finished TypeScript in 30.2s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/31) ...
+  Generating static pages using 11 workers (7/31) 
+  Generating static pages using 11 workers (15/31) 
+  Generating static pages using 11 workers (23/31) 
+✓ Generating static pages using 11 workers (31/31) in 3.0s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/availability/slots
+├ ƒ /api/complaints/export
+├ ƒ /api/health/supabase
+├ ƒ /api/maps/expand
+├ ƒ /api/onboarding/[token]
+├ ƒ /api/search
+├ ƒ /attendance
+├ ƒ /bookings
+├ ƒ /catalog
+├ ƒ /complaints
+├ ƒ /customers
+├ ƒ /customers/[customerId]
+├ ƒ /customers/onboarding
+├ ƒ /dashboard
+├ ƒ /finance
+├ ƒ /followups
+├ ƒ /inventory
+├ ƒ /invoices/new
+├ ƒ /join/[token]
+├ ƒ /leaderboard
+├ ƒ /leaderboard/[resourceId]
+├ ƒ /login
+├ ƒ /my-schedule
+├ ƒ /operations
+├ ƒ /organizations
+├ ƒ /payroll
+├ ƒ /programs
+├ ƒ /programs/memberships
+├ ƒ /reports
+├ ƒ /schedule
+└ ƒ /tasks
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+> @operro/sdk@0.1.0 build
+> tsc -b --force
+
+
+> @operro/preset-grooming@0.1.0 build
+> tsc -b --force
+
+
+> @operro/backend@0.1.0 build
+> tsc -b --force
+
+-rwxrwxrwx 1 dw_winston dw_winston 403 Sep 27 00:15 packages/backend/dist/index.d.ts
+-rwxrwxrwx 1 dw_winston dw_winston 368 Sep 27 00:15 packages/backend/dist/index.js
+-rwxrwxrwx 1 dw_winston dw_winston 329 Sep 27 00:15 packages/preset-grooming/dist/index.d.ts
+-rwxrwxrwx 1 dw_winston dw_winston 294 Sep 27 00:15 packages/preset-grooming/dist/index.js
+-rwxrwxrwx 1 dw_winston dw_winston 222 Sep 27 00:15 packages/sdk/dist/index.d.ts
+-rwxrwxrwx 1 dw_winston dw_winston 187 Sep 27 00:15 packages/sdk/dist/index.js
+
+########## GATE 3 — in-memory + preset-contract tests ##########
+PASS: 1 authorized addPet delegates to repo/RPC
+PASS: 2 addLine defaults quantity to 1
+PASS: 3 missing module denied
+PASS: 4 wrong-branch denied
+PASS: 5 missing permission denied
+PASS: 6 voidLine without reason -> BUSINESS_RULE, no RPC
+PASS: 7 setLineQuantity(0) -> BUSINESS_RULE
+PASS: 8 repo 42501 -> AUTHORIZATION
+PASS: 9 repo 23505 -> CONFLICT
+PASS: 10 repo pet_customer_mismatch -> BUSINESS_RULE
+PASS: 11 assignPetResource delegates to repo/RPC
+PASS: 12 getJob returns empty job with real branchId (item 5)
+
+12 assertions passed.
+PASS: 1 42501/wrong_branch -> AUTHORIZATION
+PASS: 2 pet_already_on_booking -> CONFLICT
+PASS: 3 line_not_found -> NOT_FOUND
+PASS: 4 pet_customer_mismatch -> BUSINESS_RULE
+PASS: 5 resource_not_active_or_not_in_branch classified
+PASS: 6 package_requires_unit_quantity -> BUSINESS_RULE
+PASS: 7 unknown -> INTERNAL
+PASS: 8 prefix match returns stable code
+PASS: 9 contract includes resource_not_active_or_not_in_branch
+PASS: 10 obsolete resource_not_active_or_not_in_org removed
+PASS: 11 RPC name from preset
+PASS: 12 gate from preset
+PASS: 13 repository methods accept preset Repo* input types (compile-time)
+
+13 assertions passed.
+
+########## GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150) ##########
+NOTICE:  database "operro_gate" does not exist, skipping
+psql:integration/gate_bootstrap_extensions.sql:2: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:integration/gate_bootstrap_extensions.sql:3: NOTICE:  schema "extensions" already exists, skipping
+psql:integration/gate_bootstrap_extensions.sql:6: ERROR:  function public.digest(text, text) does not exist
+LINE 2: returns bytea language sql immutable as $$ select public.dig...
+                                                          ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.

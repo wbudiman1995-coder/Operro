@@ -1,0 +1,128 @@
+- complementary:
+  - generic "Operro":
+    - generic: O
+    - generic: Operro
+  - navigation "Navigasi utama":
+    - link "Ringkasan":
+      - /url: /dashboard
+      - text: Ringkasan
+    - link "Kalender":
+      - /url: /schedule
+      - text: Kalender
+    - link "Booking":
+      - /url: /bookings
+      - text: Booking
+    - link "Pelanggan":
+      - /url: /customers
+      - text: Pelanggan
+    - link "Tugas":
+      - /url: /tasks
+      - text: Tugas
+  - paragraph: Pengelolaan
+  - navigation "Navigasi pengelolaan":
+    - link "Operasional":
+      - /url: /operations
+      - text: Operasional
+    - link "Jadwal saya":
+      - /url: /my-schedule
+      - text: Jadwal saya
+    - link "Layanan & tim":
+      - /url: /catalog
+      - text: Layanan & tim
+    - link "Paket":
+      - /url: /programs
+      - text: Paket
+    - link "Inventaris":
+      - /url: /inventory
+      - text: Inventaris
+    - link "Keuangan":
+      - /url: /finance
+      - text: Keuangan
+    - link "Payroll":
+      - /url: /payroll
+      - text: Payroll
+    - link "Kehadiran":
+      - /url: /attendance
+      - text: Kehadiran
+    - link "Laporan":
+      - /url: /reports
+      - text: Laporan
+    - link "Leaderboard":
+      - /url: /leaderboard
+      - text: Leaderboard
+    - link "Follow-up":
+      - /url: /followups
+      - text: Follow-up
+    - link "Keluhan":
+      - /url: /complaints
+      - text: Keluhan
+  - generic: w
+  - generic: Akun masuk
+  - generic: wbudiman1995@gmail.com
+  - button "Keluar"
+- banner:
+  - paragraph: Workspace aktif
+  - paragraph: HomePaw Demo
+  - button "Cari pelanggan, hewan, booking… ⌘K":
+    - generic: Cari pelanggan, hewan, booking…
+    - generic: ⌘K
+  - generic: Pilih organisasi aktif
+  - combobox "Pilih organisasi aktif":
+    - option "HomePaw Demo" [selected]
+  - button "Ganti" [disabled]
+- main:
+  - paragraph: Retensi pelanggan
+  - heading "Administrasi paket" [level=1]
+  - paragraph: Kelola status, perpanjangan, dan rekonsiliasi saldo paket pelanggan. Setiap perbaikan saldo memerlukan izin terpisah dan tercatat di ledger.
+  - link "Kembali ke ringkasan":
+    - /url: /programs
+  - textbox "Cari pelanggan, hewan, atau paket"
+  - button "Semua"
+  - button "Segera berakhir"
+  - button "Kedaluwarsa"
+  - button "Normal"
+  - button "Diarsipkan"
+  - article:
+    - link "Pelanggan · Mochi":
+      - /url: /customers/d0000000-0000-4000-8000-000000000302
+    - generic: Normal
+    - paragraph: QA H Held scope · Basic Grooming · 4/5 sesi tersedia (1 dipesan)
+    - paragraph: Dibeli 27/9/2026 · s.d. 10/1/2027 · PKG-20260927-E1C00001
+    - button "Riwayat"
+    - button "Kelola"
+  - article:
+    - link "Pelanggan · Oreo":
+      - /url: /customers/d0000000-0000-4000-8000-000000000303
+    - generic: Normal
+    - paragraph: QA R Renewed scope · De-shedding · 5/5 sesi tersedia
+    - paragraph: Dibeli 27/9/2026 · s.d. 9/7/2027 · PKG-20260927-E1C00002 · diperpanjang 2x
+    - button "Riwayat"
+    - button "Kelola"
+  - article:
+    - link "Pelanggan · Leo":
+      - /url: /customers/d0000000-0000-4000-8000-000000000304
+    - generic: Normal
+    - paragraph: QA U Editable scope · Full Grooming · 5/5 sesi tersedia
+    - paragraph: Dibeli 27/9/2026 · s.d. 26/12/2026 · PKG-20260927-E1C00003
+    - button "Riwayat"
+    - button "Kelola"
+  - article:
+    - link "Pelanggan":
+      - /url: /customers/d0000000-0000-4000-8000-000000000305
+    - generic: Normal
+    - generic "Tidak memiliki invoice sumber tercatat": Data lama
+    - paragraph: Paket Bebas 3x · semua layanan · 2/2 sesi tersedia
+    - paragraph: Dibeli 17/9/2026 · s.d. 15/1/2027
+    - button "Riwayat"
+    - button "Kelola"
+  - article:
+    - link "Pelanggan":
+      - /url: /customers/d0000000-0000-4000-8000-000000000302
+    - generic: Normal
+    - generic "Tidak memiliki invoice sumber tercatat": Data lama
+    - paragraph: Paket Basic 5x · Basic Grooming · 3/3 sesi tersedia
+    - paragraph: Dibeli 28/8/2026 · s.d. 24/2/2027
+    - button "Riwayat"
+    - button "Kelola"
+- button "Open Next.js Dev Tools":
+- alert
