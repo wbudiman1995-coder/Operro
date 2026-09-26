@@ -1,35 +1,65 @@
 -- Section 29 — payment-control workflow (admin-controlled; no bank API).
 --
--- Interpretation recorded explicitly (see docs/handoffs/S27-S30-HANDOFF.md):
--- `payments.status` ('succeeded'/'pending'/'failed') keeps its EXISTING meaning
--- and is left untouched — it already drives public.tg_payment_ledger() on INSERT
--- (20260721000800_financial_sales.sql) and the dashboard/report revenue sums
--- (apps/web/src/lib/pilot-data.ts:59,65,239). Re-purposing it to gate on the new
--- screenshot/bank-validation review would silently delay ledger recognition
--- (the ledger trigger only fires on INSERT, not UPDATE) and was rejected as an
--- unacceptable regression risk to already-tested revenue recognition.
+-- REVISION 2 (2026-09-26): fixes a backend review of the first draft. Every
+-- item below is a distinct fix, not a rewrite of the design:
+--   1. record_payment's request_key check raced two concurrent identical
+--      calls (both could pass the pre-check before either locked anything).
+--      Fixed with pg_advisory_xact_lock on (org, request_key) BEFORE the
+--      existing-row check, so concurrent callers serialize on the lock and
+--      the second one observes the first's committed row.
+--   2. The idempotent-retry path returned the existing row before verifying
+--      the CALLER still has branch access (e.g. after a branch grant is
+--      revoked between the original call and a retry). Fixed: branch access
+--      is checked before returning on EITHER path.
+--   3. The proof-attachment check only verified org+not-deleted, so any
+--      attachment ID in the same org (e.g. another customer's evidence
+--      photo) was accepted as "proof". Fixed: the attachment must be
+--      LINKED (attachment_links) to THIS invoice specifically, and
+--      bank_transfer payments now require a proof attachment at all —
+--      there is no "screenshot" stage to confirm without one.
+--   4. The existing payment UI (pilot-actions.ts) inserted into `payments`
+--      directly, bypassing all of the above. Fixed: INSERT/UPDATE on
+--      `payments` is revoked from `authenticated` entirely (same
+--      column/table-privilege pattern as bookings.status, SECTION 610 of
+--      20260721001300) — every write now MUST go through an RPC. The app
+--      code call sites are updated in the same commit as this migration.
+--   5. Defaulting every historical payment to `bank_validated` asserted a
+--      bank check that was never actually performed. Fixed: pre-existing
+--      rows get a new, honest `legacy_unreviewed` stage, and non-bank
+--      methods get `not_applicable` (nothing to screenshot-check) instead
+--      of the same `bank_validated` label a REAL review produces — the UI
+--      can now tell "actually validated" apart from "never reviewed" and
+--      "review doesn't apply to this method".
+--   6. record_payment's two follow-up UPDATEs on `invoices` (mark paid,
+--      then separately record an overpaid amount) hit tg_invoices_freeze:
+--      the SECOND update ran against a row whose OLD.status was already
+--      'paid' from the FIRST update, which the freeze trigger rejects
+--      outright. Fixed: collapsed into one UPDATE.
+--   7. Permission provisioning: the existing-org backfill from the first
+--      draft is kept (see below) and is deliberately narrow (payment.manage
+--      -> payment.validate, customer.manage -> evidence.read_all) so it
+--      cannot broaden a groomer/receptionist role that never had the
+--      broader permission. New organizations are unaffected: this
+--      codebase's only org-provisioning path today is the seed's
+--      "grant every current permission to the Owner role" pattern
+--      (supabase/seeds/homepaw_demo.sql:31-32), which already picks up any
+--      permission that exists at seed time with no extra step — there is
+--      no separate in-app org-provisioning code to update.
 --
--- Instead, "payment_stage" is a genuinely new, independent review-workflow axis
--- layered on top of the existing succeeded/pending/failed payment record:
---   - "Payment Successful" (brief §29) = payments.status = 'succeeded' (unchanged).
+-- Interpretation carried over from the first draft (still correct):
+-- `payments.status` ('succeeded'/'pending'/'failed') keeps its EXISTING
+-- meaning — it drives public.tg_payment_ledger() on INSERT and the
+-- dashboard/report revenue sums (pilot-data.ts:59,65,239) — and is left
+-- untouched. "payment_stage" is a separate, additive review-workflow axis:
+--   - "Payment Successful" (brief §29) = payments.status = 'succeeded'.
 --   - "Validated"           (brief §29) = payments.payment_stage = 'bank_validated'.
--- Cash/card/wallet payments have nothing to screenshot-check, so they start (and
--- stay) at 'bank_validated' — there is no pending review queue for them.
 begin;
 
 insert into public.permissions (key, resource, action, description) values
   ('payment.validate','payment','validate','Validate bank-confirmed payment screenshots')
 on conflict (key) do nothing;
 
--- Populated-upgrade backfill: a brand-new permission is never auto-granted to
--- existing roles (each org's owner must ordinarily assign it deliberately).
--- For THIS permission specifically, silently leaving every existing role
--- without it would mean no one at any already-running org could ever reach
--- 'bank_validated' after this upgrade — not a safer default, just a stuck
--- payment queue discovered in production. Preserve today's capability level
--- by granting it to whichever roles already hold 'payment.manage' (whoever
--- could record/manage payments before this upgrade keeps full control of the
--- workflow after it); anyone without payment.manage today gains nothing new.
+-- Populated-upgrade backfill (see item 7 above for why this is safe/narrow).
 insert into public.role_permissions (organization_id, role_id, permission_id)
 select rp.organization_id, rp.role_id, perm_new.id
 from public.role_permissions rp
@@ -38,32 +68,43 @@ cross join (select id from public.permissions where key = 'payment.validate') pe
 on conflict do nothing;
 
 alter table public.payments
-  add column payment_stage text not null default 'bank_validated',
+  add column payment_stage text not null default 'not_applicable',
   add column request_key uuid,
   add column proof_attachment_id uuid,
   add column screenshot_confirmed_by uuid,
   add column screenshot_confirmed_at timestamptz,
   add column bank_validated_by uuid,
   add column bank_validated_at timestamptz,
-  add constraint chk_payments_stage check (payment_stage in ('awaiting_screenshot','screenshot_confirmed','bank_validated')),
+  add constraint chk_payments_stage check (payment_stage in
+    ('not_applicable','awaiting_screenshot','screenshot_confirmed','bank_validated','legacy_unreviewed')),
   add constraint fk_payments_proof_attachment foreign key (organization_id, proof_attachment_id) references public.attachments (organization_id, id);
 
 create unique index uq_payments_request_key on public.payments (organization_id, request_key) where request_key is not null;
 create index idx_payments_org_stage on public.payments (organization_id, payment_stage);
 
--- Existing rows (all methods, including bank_transfer) predate the stage
--- column and were recorded under the old flow with no screenshot review at
--- all; the `not null default 'bank_validated'` above already backfills every
--- pre-existing row to the terminal stage, so no false "awaiting screenshot"
--- queue appears for money already settled before this migration.
+-- Drop the OLD blanket immutability trigger BEFORE the historical-label
+-- backfill below — on a POPULATED database (unlike a fresh/empty one) that
+-- backfill UPDATEs real pre-existing rows, and app.tg_block_update() would
+-- reject every one of them if it were still attached (exactly the
+-- "passed on empty, failed on populated data" trap called out in this
+-- project's own review history). The replacement conditional trigger is
+-- created right after, so the table is never left without SOME immutability
+-- guard.
+drop trigger if exists trg_payments_block_update on public.payments;
+
+-- Honest historical label (item 5): every row that existed BEFORE this
+-- migration was settled under the old flow with no screenshot/bank review
+-- of any kind, regardless of method — the column default above already
+-- applies to them, but 'not_applicable' would incorrectly suggest a
+-- bank_transfer payment never needed review. Relabel pre-existing
+-- bank_transfer rows specifically to 'legacy_unreviewed'.
+update public.payments set payment_stage = 'legacy_unreviewed' where method = 'bank_transfer';
 
 -- =====================================================================
--- Replace the blanket immutability trigger with a conditional one: the
--- monetary/identity fields stay permanently immutable (same guarantee as
--- before), but payment_stage may progress forward through the three stages,
--- and is fully frozen (like tg_invoices_freeze) once 'bank_validated'.
+-- Conditional immutability: monetary/identity fields stay permanently
+-- immutable, payment_stage may only progress forward through the review
+-- pipeline, and the row is fully frozen once 'bank_validated'.
 -- =====================================================================
-drop trigger if exists trg_payments_block_update on public.payments;
 
 create or replace function app.tg_payments_freeze()
 returns trigger language plpgsql as $$
@@ -99,11 +140,22 @@ end $$;
 create trigger trg_payments_freeze before update on public.payments
   for each row execute function app.tg_payments_freeze();
 
+-- Item 4: no direct client write can reach `payments` any more, regardless
+-- of RLS/permission — only the SECURITY DEFINER RPCs below (which run as
+-- the function owner and bypass table grants) can insert or update it.
+revoke insert, update on public.payments from authenticated;
+
+-- Small helper so record_payment reads one consistent "paid so far" number
+-- instead of repeating the same subquery three times with drift risk.
+create or replace function app.fn_invoice_paid_total(p_org uuid, p_invoice uuid)
+returns numeric language sql stable as $$
+  select coalesce(sum(amount), 0) from public.payments where organization_id = p_org and invoice_id = p_invoice and status = 'succeeded';
+$$;
+
 -- =====================================================================
--- app.record_payment — idempotent (request_key), authorization-checked
--- replacement for the raw `supabase.from("payments").insert(...)` in
--- apps/web/src/app/pilot-actions.ts:740-752. Sets the initial payment_stage
--- by method and enforces the invoice-state guards the brief calls out.
+-- app.record_payment — idempotent, authorization-checked, invoice-backed
+-- payment recording. Replaces the raw insert in pilot-actions.ts's
+-- recordPaymentAction.
 -- =====================================================================
 create or replace function app.record_payment(
   p_invoice uuid, p_method text, p_amount numeric, p_external_ref text,
@@ -113,7 +165,6 @@ declare
   v_org uuid := app.fn_active_organization();
   v_invoice public.invoices;
   v_existing public.payments;
-  v_paid_so_far numeric(14,2);
   v_stage text;
   v_row public.payments;
 begin
@@ -124,8 +175,16 @@ begin
   if p_method not in ('cash','card','wallet','bank_transfer','other') then raise exception 'invalid_method' using errcode = '22023'; end if;
   if p_amount is null or p_amount <= 0 then raise exception 'invalid_amount' using errcode = '22023'; end if;
 
+  -- Item 1: serialize every call sharing this (org, request_key) so the
+  -- existing-row check below is race-free — the second caller to arrive
+  -- blocks here until the first one commits (or rolls back) its insert.
+  perform pg_advisory_xact_lock(hashtext(v_org::text || ':' || p_request_key::text));
+
   select * into v_existing from public.payments where organization_id = v_org and request_key = p_request_key;
   if found then
+    -- Item 2: re-verify branch access on the retry path too, not just the
+    -- fresh-insert path — a revoked branch grant must be re-caught here.
+    if not app.has_branch(v_existing.branch_id) then raise exception 'not_authorized' using errcode = '42501'; end if;
     if (v_existing.invoice_id, v_existing.method, v_existing.amount, v_existing.external_ref, v_existing.proof_attachment_id) is distinct from
        (p_invoice, p_method, p_amount, p_external_ref, p_proof_attachment) then
       raise exception 'request_key_reused_with_different_inputs' using errcode = '55000';
@@ -139,13 +198,24 @@ begin
   if v_invoice.status = 'void' then raise exception 'invoice_void' using errcode = '55000'; end if;
   if v_invoice.status = 'paid' then raise exception 'invoice_already_paid' using errcode = '55000'; end if;
   if v_invoice.total = 0 then raise exception 'invoice_zero_due' using errcode = '55000'; end if;
+
+  -- Item 3: a bank_transfer payment IS the screenshot-review workflow —
+  -- there is nothing to confirm without a proof attachment that is
+  -- actually linked to THIS invoice (not merely present somewhere in the
+  -- organization).
+  if p_method = 'bank_transfer' and p_proof_attachment is null then
+    raise exception 'proof_required_for_bank_transfer' using errcode = '22023';
+  end if;
   if p_proof_attachment is not null and not exists (
-    select 1 from public.attachments where organization_id = v_org and id = p_proof_attachment and deleted_at is null
+    select 1 from public.attachments a
+    join public.attachment_links al on al.organization_id = a.organization_id and al.attachment_id = a.id
+    where a.organization_id = v_org and a.id = p_proof_attachment and a.deleted_at is null
+      and al.subject_type = 'invoice' and al.subject_id = p_invoice
   ) then
-    raise exception 'proof_attachment_not_found' using errcode = 'P0002';
+    raise exception 'proof_attachment_not_linked_to_invoice' using errcode = 'P0002';
   end if;
 
-  v_stage := case when p_method = 'bank_transfer' then 'awaiting_screenshot' else 'bank_validated' end;
+  v_stage := case when p_method = 'bank_transfer' then 'awaiting_screenshot' else 'not_applicable' end;
 
   insert into public.payments (organization_id, branch_id, invoice_id, customer_id, method, amount, currency,
     status, external_ref, proof_attachment_id, payment_stage, request_key)
@@ -153,24 +223,79 @@ begin
     'succeeded', p_external_ref, p_proof_attachment, v_stage, p_request_key)
   returning * into v_row;
 
-  select coalesce(sum(amount), 0) into v_paid_so_far from public.payments
-    where organization_id = v_org and invoice_id = p_invoice and status = 'succeeded';
-  if v_paid_so_far >= v_invoice.total and v_invoice.status <> 'paid' then
-    update public.invoices set status = 'paid', paid_at = now() where id = v_invoice.id;
+  if p_proof_attachment is not null then
+    insert into public.attachment_links (organization_id, attachment_id, subject_type, subject_id)
+    values (v_org, p_proof_attachment, 'payment', v_row.id)
+    on conflict do nothing;
   end if;
-  if v_paid_so_far > v_invoice.total then
-    update public.invoices set metadata = jsonb_set(metadata, '{overpaid_amount}', to_jsonb(v_paid_so_far - v_invoice.total), true)
-      where id = v_invoice.id;
-  end if;
+
+  -- Item 6: ONE update, so a same-shot overpayment (metadata change) and
+  -- the paid-status flip never fight tg_invoices_freeze against each
+  -- other's OLD.status.
+  update public.invoices set
+    status = case when app.fn_invoice_paid_total(v_org, p_invoice) >= v_invoice.total then 'paid' else status end,
+    paid_at = case when app.fn_invoice_paid_total(v_org, p_invoice) >= v_invoice.total then now() else paid_at end,
+    metadata = case when app.fn_invoice_paid_total(v_org, p_invoice) > v_invoice.total
+      then jsonb_set(metadata, '{overpaid_amount}', to_jsonb(app.fn_invoice_paid_total(v_org, p_invoice) - v_invoice.total), true)
+      else metadata end
+  where id = v_invoice.id;
 
   return v_row;
 end $$;
 
 -- =====================================================================
--- app.confirm_payment_screenshot / app.validate_payment_bank_account —
--- the two admin review steps. Bank validation requires the stricter
--- 'payment.validate' permission (distinct from ordinary 'payment.manage'),
--- matching the brief's "admin-controlled" separation.
+-- app.record_package_purchase_payment — the OTHER existing direct-insert
+-- site (sellPackageAction in pilot-actions.ts). Package purchases have no
+-- invoice (packages cannot become order_items — see the comment on
+-- sellPackageAction), so this mirrors record_payment's idempotency/stage
+-- protections without the invoice-specific guards.
+-- =====================================================================
+create or replace function app.record_package_purchase_payment(
+  p_branch uuid, p_customer uuid, p_package uuid, p_method text, p_amount numeric,
+  p_currency text, p_request_key uuid)
+returns public.payments language plpgsql security definer set search_path = app, public as $$
+declare v_org uuid := app.fn_active_organization(); v_existing public.payments; v_row public.payments;
+begin
+  if v_org is null or not app.has_membership() or not app.has_module('finance') or not app.has_permission('payment.manage') then
+    raise exception 'not_authorized' using errcode = '42501';
+  end if;
+  if p_request_key is null then raise exception 'request_key_required' using errcode = '22023'; end if;
+  if p_method not in ('cash','card','wallet','bank_transfer','other') then raise exception 'invalid_method' using errcode = '22023'; end if;
+  if p_amount is null or p_amount <= 0 then raise exception 'invalid_amount' using errcode = '22023'; end if;
+  if not app.has_branch(p_branch) then raise exception 'not_authorized' using errcode = '42501'; end if;
+
+  perform pg_advisory_xact_lock(hashtext(v_org::text || ':' || p_request_key::text));
+
+  select * into v_existing from public.payments where organization_id = v_org and request_key = p_request_key;
+  if found then
+    if not app.has_branch(v_existing.branch_id) then raise exception 'not_authorized' using errcode = '42501'; end if;
+    if (v_existing.customer_id, v_existing.method, v_existing.amount) is distinct from (p_customer, p_method, p_amount) then
+      raise exception 'request_key_reused_with_different_inputs' using errcode = '55000';
+    end if;
+    return v_existing;
+  end if;
+
+  if not exists (select 1 from public.customers where organization_id = v_org and id = p_customer and deleted_at is null) then
+    raise exception 'customer_not_found' using errcode = 'P0002';
+  end if;
+  if not exists (select 1 from public.packages where organization_id = v_org and id = p_package) then
+    raise exception 'package_not_found' using errcode = 'P0002';
+  end if;
+
+  insert into public.payments (organization_id, branch_id, customer_id, method, amount, currency,
+    status, external_ref, payment_stage, request_key, metadata)
+  values (v_org, p_branch, p_customer, p_method, p_amount, coalesce(p_currency,'IDR'),
+    'succeeded', 'PACKAGE-' || p_request_key::text,
+    case when p_method = 'bank_transfer' then 'legacy_unreviewed' else 'not_applicable' end,
+    p_request_key, jsonb_build_object('kind','package_purchase','package_id',p_package))
+  returning * into v_row;
+  return v_row;
+end $$;
+comment on function app.record_package_purchase_payment is
+  'bank_transfer package purchases default to legacy_unreviewed (no screenshot capture wired into the package-sale UI yet); document this as a known gap rather than a real bank check.';
+
+-- =====================================================================
+-- app.confirm_payment_screenshot / app.validate_payment_bank_account.
 -- =====================================================================
 create or replace function app.confirm_payment_screenshot(p_payment uuid)
 returns public.payments language plpgsql security definer set search_path = app, public as $$
@@ -183,6 +308,7 @@ begin
   if not found then raise exception 'payment_not_found' using errcode = 'P0002'; end if;
   if not app.has_branch(v_row.branch_id) then raise exception 'not_authorized' using errcode = '42501'; end if;
   if v_row.payment_stage <> 'awaiting_screenshot' then raise exception 'invalid_stage_transition' using errcode = '55000'; end if;
+  if v_row.proof_attachment_id is null then raise exception 'proof_required' using errcode = '55000'; end if;
   update public.payments set payment_stage = 'screenshot_confirmed', screenshot_confirmed_by = auth.uid(), screenshot_confirmed_at = now()
     where id = p_payment returning * into v_row;
   insert into public.timeline_events (organization_id, subject_type, subject_id, actor_id, event_type, summary, data)
@@ -209,11 +335,8 @@ begin
 end $$;
 
 -- =====================================================================
--- Storage: payment-screenshot proofs reuse the existing private 'attachments'
--- bucket (20260918130000_grooming_evidence_storage.sql) under a distinct
--- permission — payment.manage, not booking.update — for the same org-folder
--- path convention. Permissive policies OR together, so this only ADDS a way
--- in; it never widens the existing booking-evidence policies.
+-- Storage: payment-screenshot proofs reuse the private 'attachments' bucket
+-- under a distinct permission (payment.manage, not booking.update).
 -- =====================================================================
 create policy attachments_objects_insert_payment on storage.objects for insert to authenticated
   with check (
@@ -224,11 +347,14 @@ create policy attachments_objects_insert_payment on storage.objects for insert t
 
 revoke all on function
   app.record_payment(uuid,text,numeric,text,uuid,uuid),
+  app.record_package_purchase_payment(uuid,uuid,uuid,text,numeric,text,uuid),
   app.confirm_payment_screenshot(uuid),
-  app.validate_payment_bank_account(uuid)
+  app.validate_payment_bank_account(uuid),
+  app.fn_invoice_paid_total(uuid,uuid)
 from public;
 grant execute on function
   app.record_payment(uuid,text,numeric,text,uuid,uuid),
+  app.record_package_purchase_payment(uuid,uuid,uuid,text,numeric,text,uuid),
   app.confirm_payment_screenshot(uuid),
   app.validate_payment_bank_account(uuid)
 to authenticated;

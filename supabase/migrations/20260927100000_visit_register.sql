@@ -396,8 +396,17 @@ begin
     raise exception 'invalid_invoice_details' using errcode = '22023';
   end if;
 
+  -- Serialize concurrent calls sharing this request_key BEFORE the existing-row
+  -- check (backend review finding, same class as app.record_payment): without
+  -- this, two identical retries can both miss the check and race the unique
+  -- index on invoices(organization_id, request_key).
+  perform pg_advisory_xact_lock(hashtext(v_org::text || ':' || p_request_key::text));
+
   select * into v_invoice from public.invoices where organization_id = v_org and request_key = p_request_key;
-  if found then return v_invoice; end if;
+  if found then
+    if not app.has_branch(v_invoice.branch_id) then raise exception 'not_authorized' using errcode = '42501'; end if;
+    return v_invoice;
+  end if;
 
   select * into v_visit from public.manual_visits where organization_id = v_org and id = p_visit and deleted_at is null for update;
   if not found then raise exception 'visit_not_found' using errcode = 'P0002'; end if;

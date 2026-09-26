@@ -89,6 +89,10 @@ begin
   if length(trim(coalesce(p_bank_name,''))) = 0 or length(trim(coalesce(p_account_number,''))) = 0 or length(trim(coalesce(p_account_holder,''))) = 0 then
     raise exception 'invalid_bank_account' using errcode = '22023';
   end if;
+  -- Serialize concurrent "add new account" calls for this org so the cap-of-2
+  -- count-then-insert below cannot race into 3 rows (same class of fix as
+  -- app.record_payment's request_key race).
+  perform pg_advisory_xact_lock(hashtext(v_org::text || ':bank_accounts'));
   if p_id is null then
     select count(*) into v_count from public.organization_bank_accounts where organization_id = v_org and deleted_at is null;
     if v_count >= 2 then raise exception 'bank_account_limit_reached' using errcode = '55000'; end if;

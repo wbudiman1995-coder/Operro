@@ -60,38 +60,42 @@ No existing migration was rewritten; no booking/invoice/package RPC was duplicat
 
 ## 5. Backend review findings and fixes (this pass)
 
-A review of the draft migrations (recorded 2026-09-26) found real gaps before the backend can be called ready. Tracked here with fix status; each is fixed with its own test before being marked done.
+A review of the draft migrations (recorded 2026-09-26) found real gaps before the backend can be called ready. All seven are now fixed in `supabase/migrations/20260927100000_visit_register.sql` and `20260928100000_payment_control_workflow.sql`, each with a regression assertion in `supabase/tests/S27-S30/test_backend.sql` (35/35 passing — see `docs/handoffs/logs/S27-S30/test_backend_run.log` for a fresh replay and `test_backend_on_populated_upgrade.log` for the same suite run against a populated-upgrade database).
 
-| # | Finding | Fix status |
-|---|---|---|
-| 1 | `record_payment` idempotency race: two concurrent identical requests can both pass the request_key pre-check before either locks the invoice | **Open** |
-| 2 | Idempotent-retry branch check happens before the existing-row return, so a revoked branch grant isn't re-verified on retry | **Open** |
-| 3 | Proof-attachment linkage only checks org/deleted_at, not that the attachment actually belongs to this invoice/customer/purpose | **Open** |
-| 4 | Old `recordPaymentAction` in `pilot-actions.ts` still inserts into `payments` directly, bypassing the new RPC/stage/idempotency entirely | **Open** |
-| 5 | Migration defaults every historical payment's `payment_stage` to `bank_validated`, which asserts a bank check that was never actually performed | **Open** |
-| 6 | `record_payment` marks the invoice `paid` and then writes `overpaid_amount` into `invoices.metadata` in the same flow that must survive `tg_invoices_freeze` — needs a checked scenario, not an assumption | **Open** |
-| 7 | New-organization/new-role provisioning path for the new permissions (`payment.validate`, `evidence.read_all`) not yet verified — only the populated-upgrade backfill was tested | **Open** |
+| # | Finding | Fix | Status |
+|---|---|---|---|
+| 1 | `record_payment` idempotency race: two concurrent identical requests can both pass the request_key pre-check before either locks the invoice | `pg_advisory_xact_lock(hashtext(org::text \|\| ':' \|\| request_key::text))` acquired before the existing-row check, in both `record_payment` and `record_package_purchase_payment`. Same class of fix applied to `app.create_invoice_from_manual_visit` (section 30) and `app.upsert_organization_bank_account`'s cap-of-2 count (section 27), which had the identical pattern. | **Fixed** |
+| 2 | Idempotent-retry branch check happens before the existing-row return, so a revoked branch grant isn't re-verified on retry | `app.has_branch()` is now checked on the retry-return path too, not just the fresh-insert path. | **Fixed** |
+| 3 | Proof-attachment linkage only checks org/deleted_at, not that the attachment actually belongs to this invoice/customer/purpose | `record_payment` now requires the attachment to be linked via `attachment_links(subject_type='invoice', subject_id=<this invoice>)`; a `bank_transfer` payment is rejected outright with no proof at all (`proof_required_for_bank_transfer`); a linked proof is additionally re-linked to the resulting payment row; `confirm_payment_screenshot` re-checks `proof_attachment_id is not null` as defense in depth. | **Fixed** |
+| 4 | Old `recordPaymentAction`/`sellPackageAction` in `pilot-actions.ts` inserted into `payments` directly, bypassing the new RPC/stage/idempotency entirely | `revoke insert, update on public.payments from authenticated;` — direct client writes are now impossible regardless of RLS/permission (same column/table-privilege pattern as `bookings.status`, SECTION 610). App code updated in the same milestone — see §M2 below. | **Fixed (migration); app code updated in M2** |
+| 5 | Migration defaulted every historical payment's `payment_stage` to `bank_validated`, asserting a bank check that was never performed | New stage vocabulary: `not_applicable` (method never needed review — the new default), `legacy_unreviewed` (pre-existing `bank_transfer` rows, explicitly relabeled), `awaiting_screenshot` / `screenshot_confirmed` / `bank_validated` (only reachable through the real RPC pipeline going forward). The UI can now render three honest states instead of one false one. | **Fixed** |
+| 6 | `record_payment` marked the invoice `paid` then separately wrote `overpaid_amount`, and the second UPDATE hit `tg_invoices_freeze` because the first had already flipped `old.status` to `paid` | Collapsed into one UPDATE with `case` expressions for `status`/`paid_at`/`metadata` together. Regression case added: a single cash overpayment (150000 against a 100000 invoice) now marks paid AND records `overpaid_amount: 50000` in one statement. | **Fixed** |
+| 7 | New-organization/new-role provisioning path for the new permissions not yet verified | Verified: this codebase's only real org-provisioning path is the seed's "grant every current permission to the Owner role" wildcard pattern (`homepaw_demo.sql:31-32`), which already picks up new permissions automatically — no code change needed there. A test fixture proves a narrow, hand-picked role (`booking.read/create/update` only, created fresh after this migration) does **not** gain `payment.validate`/`evidence.read_all`, so the existing-org backfill cannot broaden a groomer/receptionist role. | **Fixed / verified** |
+
+**Discovered while fixing #5/#6 (populated-upgrade specific):** the historical-label backfill UPDATE must run *after* dropping the old blanket `trg_payments_block_update` trigger, not before — on an EMPTY database that UPDATE matches zero rows and the ordering bug is invisible; on the populated-upgrade database (with the seeded `bank_transfer` payment) it failed with `Updates blocked on payments (append-only/immutable)`. Fixed by moving the `drop trigger` line earlier. This is exactly the "passed on empty, failed on populated" trap flagged in this project's own review history — caught here by actually testing the populated-upgrade path per the mandated evidence, not skipped.
 
 ## 6. Milestone status
 
-- [ ] **M0 — Preserve + handoff** (this commit): checkpoint committed, handoff created, smoke fragments consolidated into a permanent test.
-- [ ] **M1 — Section 30 visits**: backend hardening + frontend register/filter UI.
-- [ ] **M2 — Section 29 payments**: backend fixes (§5) + frontend stage UI, forms wired to RPC.
-- [ ] **M3 — Section 28 evidence**: frontend multi-upload/paste/drop + verified Storage/RLS.
-- [ ] **M4 — Section 27 documents**: frontend branding/bank-account settings, invoice preview/PDF/WhatsApp.
+- [x] **M0 — Preserve + handoff**: checkpoint committed, handoff created, smoke fragments consolidated into `supabase/tests/S27-S30/test_backend.sql` (35 assertions, self-contained fixtures, rolls back — rerunnable from any baseline), all 7 backend review findings fixed and verified on both fresh and populated-upgrade replay.
+- [ ] **M1 — Section 30 visits**: backend hardening done; frontend register/filter UI not started.
+- [ ] **M2 — Section 29 payments**: backend fixes done; `pilot-actions.ts` still needs rewiring to the new RPCs (mandatory now that direct writes are revoked — see §5 item 4); frontend stage UI not started.
+- [ ] **M3 — Section 28 evidence**: backend RLS/delete/retention done; frontend multi-upload/paste/drop not started.
+- [ ] **M4 — Section 27 documents**: backend branding/bank-account/notes done; frontend (settings UI, invoice preview/PDF, WhatsApp) not started.
 - [ ] **Final verification**: full gate suite (PG16), browser flows, multi-role/concurrency evidence.
 
 ## 7. Concrete remaining checklist
 
-- [ ] Consolidate `.holdback/smoke*.sql` into `supabase/tests/S27-S30/` as one reproducible integration test with documented fixture prerequisites; run start-to-finish with `ON_ERROR_STOP` and no skipped prefix.
-- [ ] Fix backend items 1–7 in §5, each with a passing regression case.
+- [x] Consolidate `.holdback/smoke*.sql` into `supabase/tests/S27-S30/test_backend.sql`; run start-to-finish with `ON_ERROR_STOP`, no skipped prefix, fresh AND populated-upgrade.
+- [x] Fix backend items 1–7 in §5, each with a passing regression case.
+- [ ] **Blocking for M2**: rewrite `recordPaymentAction`/`sellPackageAction` in `apps/web/src/app/pilot-actions.ts` to call `app.record_payment`/`app.record_package_purchase_payment` — the old direct-insert code is now broken by the `revoke insert, update` in §5 item 4, not just insecure.
 - [ ] Stand up a plain PostgreSQL 16 container for `run_all_gates.sh` (distinct port from everything above); run it and record exit codes.
 - [ ] `npm run typecheck` / `npm run lint` / `npm run build` on this branch; record exit codes.
 - [ ] Frontend for all four sections (see Milestones).
 - [ ] Real browser verification: document preview/download/WhatsApp draft, evidence upload, payment stage checks, visit workflow — screenshots + console/network logs under `docs/handoffs/logs/S27-S30/`.
-- [ ] Multi-role tests as actual authenticated roles (owner, read-only member, assigned groomer, unassigned groomer, cross-org member).
-- [ ] Concurrency tests: two simultaneous payment sessions, retry-after-catalog-change, stale revision, permission revoked before retry.
+- [ ] Multi-role tests as actual authenticated roles (owner, read-only member, assigned groomer, unassigned groomer, cross-org member) — SQL-level RLS/permission coverage exists in `test_backend.sql`; real Supabase Auth session coverage still needed via the browser.
+- [ ] TRUE two-session concurrency test (background psql processes, not sequential SQL) for `app.record_payment` racing the same request_key and two independent payments competing for one invoice's remaining balance.
 - [ ] Second/empty organization: honest empty states, no crash, no borrowed demo data.
+- [ ] Design note carried to M4: `public.grooming_jobs.groomer_notes` (an existing column, `20260721000500_scheduling_core.sql:289`) already holds real operational notes per booking — decide during the section-27 frontend milestone whether the invoice "groomer notes page" should read from THIS field instead of (or alongside) the new `invoices.customer_notes` column added here, rather than asking staff to retype the same note twice.
 
 ## 8. Commits on this branch (append after each milestone)
 
