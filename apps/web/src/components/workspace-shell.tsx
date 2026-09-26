@@ -70,6 +70,7 @@ const managementNavigation: NavigationItemConfig[] = [
   { label: "Leaderboard", href: "/leaderboard", icon: LeaderboardIcon, permission: "booking.read" },
   { label: "Follow-up", href: "/followups", icon: FollowupIcon, permission: "customer.read" },
   { label: "Keluhan", href: "/complaints", icon: TasksIcon, anyPermission: ["customer.read", "task.manage", "reports.view"] },
+  { label: "Pengaturan dokumen", href: "/settings/documents", icon: FinanceIcon, permission: "settings.manage" },
 ];
 
 function NavigationItem({
