@@ -58,6 +58,7 @@ const primaryNavigation: NavigationItemConfig[] = [
 
 const managementNavigation: NavigationItemConfig[] = [
   { label: "Operasional", href: "/operations", icon: GroomingIcon, permission: "booking.update" },
+  { label: "Kunjungan", href: "/visits", icon: GroomingIcon, permission: "booking.read" },
   { label: "Jadwal saya", href: "/my-schedule", icon: MyScheduleIcon, permission: "booking.read" },
   { label: "Layanan & tim", href: "/catalog", icon: CatalogIcon, anyPermission: ["service.manage", "resource.manage"] },
   { label: "Paket", href: "/programs", icon: ProgramsIcon, permission: "membership.read" },

@@ -52,17 +52,22 @@ export async function loadDashboardData(supabase: SupabaseClient, organizationId
   const start = new Date(now); start.setHours(0, 0, 0, 0);
   const end = new Date(start); end.setDate(end.getDate() + 1);
   const upcomingEnd = new Date(start); upcomingEnd.setDate(upcomingEnd.getDate() + 7);
-  const [bookingCount, customerCount, taskCount, paymentRows, bookingRows] = await Promise.all([
+  const [bookingCount, customerCount, taskCount, paymentRows, manualBillingRows, bookingRows] = await Promise.all([
     supabase.from("bookings").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).gte("starts_at", start.toISOString()).lt("starts_at", end.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).in("status", ["todo", "in_progress"]).is("deleted_at", null),
     supabase.from("payments").select("amount").eq("organization_id", organizationId).eq("status", "succeeded").gte("paid_at", start.toISOString()).lt("paid_at", end.toISOString()),
+    // Section 30: manual-billing revenue (a visit marked "manually billed" instead
+    // of invoiced). Never overlaps with `payments` — a source can only be actively
+    // manually billed OR invoiced, never both (enforced by the RPCs), so summing
+    // both here cannot double count.
+    supabase.from("visit_manual_billing").select("amount").eq("organization_id", organizationId).is("undone_at", null).gte("billed_at", start.toISOString()).lt("billed_at", end.toISOString()),
     supabase.from("bookings").select("id,starts_at,status,customers(display_name),grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", now.toISOString()).lt("starts_at", upcomingEnd.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null).order("starts_at").limit(6),
   ]);
-  for (const [scope, result] of [["dashboard_bookings", bookingCount], ["dashboard_customers", customerCount], ["dashboard_tasks", taskCount], ["dashboard_payments", paymentRows], ["dashboard_upcoming", bookingRows]] as const) assertResult(scope, result.error);
+  for (const [scope, result] of [["dashboard_bookings", bookingCount], ["dashboard_customers", customerCount], ["dashboard_tasks", taskCount], ["dashboard_payments", paymentRows], ["dashboard_manual_billing", manualBillingRows], ["dashboard_upcoming", bookingRows]] as const) assertResult(scope, result.error);
   return {
     bookingToday: bookingCount.count ?? 0,
-    revenueToday: (paymentRows.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
+    revenueToday: (paymentRows.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0) + (manualBillingRows.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
     activeCustomers: customerCount.count ?? 0,
     openTasks: taskCount.count ?? 0,
     upcoming: (bookingRows.data ?? []).map((row) => ({ id: row.id, startsAt: row.starts_at, status: row.status, customerName: embeddedCustomerName(row.customers), petNames: embeddedPetNames(row.grooming_jobs) })),
@@ -230,18 +235,24 @@ export async function loadFinanceWorkspace(supabase: SupabaseClient, organizatio
 
 export async function loadReportWorkspace(supabase: SupabaseClient, organizationId: string) {
   const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
-  const [bookings, payments, expenses] = await Promise.all([
+  const [bookings, payments, expenses, manualBilling] = await Promise.all([
     supabase.from("bookings").select("status,fulfillment_mode").eq("organization_id", organizationId).gte("starts_at", start.toISOString()).is("deleted_at", null),
     supabase.from("payments").select("amount,method,status").eq("organization_id", organizationId).gte("paid_at", start.toISOString()),
     supabase.from("expenses").select("amount,status").eq("organization_id", organizationId).gte("incurred_at", start.toISOString().slice(0, 10)).is("deleted_at", null),
+    // Section 30: manually billed visits are real revenue that never flows through
+    // `payments` (that's the point of the manual-billing state) - reported as its
+    // own line so it is visible, not silently folded into "revenue" and mistaken
+    // for a payment-method total.
+    supabase.from("visit_manual_billing").select("amount").eq("organization_id", organizationId).is("undone_at", null).gte("billed_at", start.toISOString()),
   ]);
-  assertResult("report_bookings", bookings.error); assertResult("report_payments", payments.error); assertResult("report_expenses", expenses.error);
+  assertResult("report_bookings", bookings.error); assertResult("report_payments", payments.error); assertResult("report_expenses", expenses.error); assertResult("report_manual_billing", manualBilling.error);
   const revenue = (payments.data ?? []).filter((row) => row.status === "succeeded").reduce((sum, row) => sum + Number(row.amount), 0);
+  const manualBilledRevenue = (manualBilling.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
   const expense = (expenses.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
   const completed = (bookings.data ?? []).filter((row) => row.status === "completed").length;
   const canceled = (bookings.data ?? []).filter((row) => ["canceled", "no_show"].includes(row.status)).length;
   const methodTotals = new Map<string, number>(); for (const row of payments.data ?? []) if (row.status === "succeeded") methodTotals.set(row.method, (methodTotals.get(row.method) ?? 0) + Number(row.amount));
-  return { revenue, expense, net: revenue - expense, totalBookings: (bookings.data ?? []).length, completed, canceled, completionRate: (bookings.data ?? []).length ? Math.round(completed / (bookings.data ?? []).length * 100) : 0, methodTotals: [...methodTotals.entries()].map(([method, total]) => ({ method, total })) };
+  return { revenue, manualBilledRevenue, expense, net: revenue + manualBilledRevenue - expense, totalBookings: (bookings.data ?? []).length, completed, canceled, completionRate: (bookings.data ?? []).length ? Math.round(completed / (bookings.data ?? []).length * 100) : 0, methodTotals: [...methodTotals.entries()].map(([method, total]) => ({ method, total })) };
 }
 
 function embeddedStaffName(value: unknown) {
