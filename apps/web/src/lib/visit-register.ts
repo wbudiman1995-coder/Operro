@@ -19,6 +19,7 @@ export interface VisitRow {
   customerId: string;
   customerName: string;
   petNames: string[];
+  petIds: string[];
   fulfillmentMode: string;
   visitAt: string;
   description: string;
@@ -35,16 +36,50 @@ export interface VisitRegisterFilters {
   petId?: string;
   invoicedStatus?: InvoicedStatus | "all";
   sort?: "newest" | "oldest";
+  /** "Automatically include completed bookings in the visit register." Off suppresses the booking-derived projection only; manual visits are unaffected. Defaults to true. */
+  autoLogEnabled?: boolean;
 }
 
 function assertResult(scope: string, error: { message: string } | null) {
   if (error) throw new Error(`visit_register_${scope}_failed:${error.message}`);
 }
 
+// ponytail: flat cap, not real pagination — raise it (or switch to a keyset
+// query) if a single organization's visit history outgrows this. customerId
+// and petId are pushed into the queries themselves specifically so THOSE
+// filtered views are never truncated behind this cap regardless of how big
+// the organization's total history gets.
+const VISIT_REGISTER_ROW_CAP = 3000;
+
 export async function loadVisitRegister(supabase: SupabaseClient, organizationId: string, filters: VisitRegisterFilters = {}): Promise<VisitRow[]> {
+  // A pet filter is resolved to exact booking/manual-visit ids FIRST (bounded
+  // by that pet's real visit count, not by VISIT_REGISTER_ROW_CAP) so it can
+  // never be discarded behind the flat cap below (P4-class bug: comparing by
+  // name was also a correctness bug — two pets can share a name).
+  let petBookingIds: string[] | null = null;
+  let petManualVisitIds: string[] | null = null;
+  if (filters.petId) {
+    const [gjpForPet, manualForPet] = await Promise.all([
+      supabase.from("grooming_job_pets").select("grooming_job_id").eq("organization_id", organizationId).eq("pet_id", filters.petId).is("deleted_at", null),
+      supabase.from("manual_visits").select("id").eq("organization_id", organizationId).eq("pet_id", filters.petId).is("deleted_at", null),
+    ]);
+    assertResult("pet_bookings", gjpForPet.error);
+    assertResult("pet_manual_visits", manualForPet.error);
+    petBookingIds = Array.from(new Set((gjpForPet.data ?? []).map((r) => r.grooming_job_id)));
+    petManualVisitIds = (manualForPet.data ?? []).map((r) => r.id);
+    if (petBookingIds.length === 0 && petManualVisitIds.length === 0) return [];
+  }
+
+  let bookingsQuery = supabase.from("bookings").select("id,branch_id,customer_id,fulfillment_mode,starts_at,status").eq("organization_id", organizationId).eq("status", "completed").is("deleted_at", null);
+  let manualVisitsQuery = supabase.from("manual_visits").select("id,branch_id,customer_id,pet_id,fulfillment_mode,visit_at,description,invoice_id").eq("organization_id", organizationId).is("deleted_at", null);
+  if (filters.customerId) { bookingsQuery = bookingsQuery.eq("customer_id", filters.customerId); manualVisitsQuery = manualVisitsQuery.eq("customer_id", filters.customerId); }
+  if (petBookingIds) bookingsQuery = bookingsQuery.in("id", petBookingIds.length ? petBookingIds : ["00000000-0000-0000-0000-000000000000"]);
+  if (petManualVisitIds) manualVisitsQuery = manualVisitsQuery.in("id", petManualVisitIds.length ? petManualVisitIds : ["00000000-0000-0000-0000-000000000000"]);
+
+  const includeBookings = filters.autoLogEnabled !== false;
   const [bookings, manualVisits, customers] = await Promise.all([
-    supabase.from("bookings").select("id,branch_id,customer_id,fulfillment_mode,starts_at,status").eq("organization_id", organizationId).eq("status", "completed").is("deleted_at", null).order("starts_at", { ascending: false }).limit(300),
-    supabase.from("manual_visits").select("id,branch_id,customer_id,pet_id,fulfillment_mode,visit_at,description,invoice_id").eq("organization_id", organizationId).is("deleted_at", null).order("visit_at", { ascending: false }).limit(300),
+    includeBookings ? bookingsQuery.order("starts_at", { ascending: false }).limit(VISIT_REGISTER_ROW_CAP) : Promise.resolve({ data: [] as { id: string; branch_id: string; customer_id: string; fulfillment_mode: string; starts_at: string; status: string }[], error: null }),
+    manualVisitsQuery.order("visit_at", { ascending: false }).limit(VISIT_REGISTER_ROW_CAP),
     supabase.from("customers").select("id,display_name").eq("organization_id", organizationId).is("deleted_at", null),
   ]);
   assertResult("bookings", bookings.error);
@@ -66,35 +101,50 @@ export async function loadVisitRegister(supabase: SupabaseClient, organizationId
   assertResult("billing_bookings", billingBookings.error);
   assertResult("billing_manual", billingManual.error);
 
+  // A booking is only really "invoiced" when its order resolved to a REAL,
+  // non-void invoice — order existence alone (the previous check) claims
+  // "invoiced" for a booking whose invoice was voided, and never surfaced
+  // the invoice id/number at all (both bugs from the same root cause: no
+  // invoice was ever actually looked up here).
+  const orderIds = Array.from(new Set((orders.data ?? []).map((o) => o.id)));
+  const orderInvoices = orderIds.length
+    ? await supabase.from("invoices").select("id,invoice_number,order_id,status").eq("organization_id", organizationId).in("order_id", orderIds).neq("status", "void")
+    : { data: [] as { id: string; invoice_number: string; order_id: string; status: string }[], error: null };
+  assertResult("order_invoices", orderInvoices.error);
+  const orderIdByBookingId = new Map((orders.data ?? []).map((o) => [o.booking_id, o.id]));
+  const invoiceByOrderId = new Map((orderInvoices.data ?? []).map((i) => [i.order_id, i]));
+
   const petIds = Array.from(new Set([...(gjp.data ?? []).map((r) => r.pet_id), ...(manualVisits.data ?? []).map((v) => v.pet_id).filter((v): v is string => Boolean(v))]));
   const pets = petIds.length ? await supabase.from("pets").select("id,name").eq("organization_id", organizationId).in("id", petIds) : { data: [] as { id: string; name: string }[], error: null };
   assertResult("pets", pets.error);
   const petMap = new Map((pets.data ?? []).map((p) => [p.id, p.name]));
 
-  const invoiceIds = Array.from(new Set((manualVisits.data ?? []).map((v) => v.invoice_id).filter((v): v is string => Boolean(v))));
-  const invoices = invoiceIds.length ? await supabase.from("invoices").select("id,invoice_number").eq("organization_id", organizationId).in("id", invoiceIds) : { data: [] as { id: string; invoice_number: string }[], error: null };
-  assertResult("invoices", invoices.error);
-  const invoiceMap = new Map((invoices.data ?? []).map((i) => [i.id, i.invoice_number]));
+  const manualInvoiceIds = Array.from(new Set((manualVisits.data ?? []).map((v) => v.invoice_id).filter((v): v is string => Boolean(v))));
+  const manualInvoices = manualInvoiceIds.length ? await supabase.from("invoices").select("id,invoice_number").eq("organization_id", organizationId).in("id", manualInvoiceIds) : { data: [] as { id: string; invoice_number: string }[], error: null };
+  assertResult("invoices", manualInvoices.error);
+  const invoiceMap = new Map((manualInvoices.data ?? []).map((i) => [i.id, i.invoice_number]));
 
   const bookingPetsMap = new Map<string, string[]>();
+  const bookingPetIdsMap = new Map<string, string[]>();
   for (const row of gjp.data ?? []) {
     const name = petMap.get(row.pet_id) ?? "Hewan";
     bookingPetsMap.set(row.grooming_job_id, [...(bookingPetsMap.get(row.grooming_job_id) ?? []), name]);
+    bookingPetIdsMap.set(row.grooming_job_id, [...(bookingPetIdsMap.get(row.grooming_job_id) ?? []), row.pet_id]);
   }
-  const activeOrderBookingIds = new Set((orders.data ?? []).map((o) => o.booking_id));
   const bookingBillingMap = new Map((billingBookings.data ?? []).map((b) => [b.source_id, b]));
   const manualBillingMap = new Map((billingManual.data ?? []).map((b) => [b.source_id, b]));
 
   const rows: VisitRow[] = [];
   for (const booking of bookings.data ?? []) {
     const billing = bookingBillingMap.get(booking.id);
-    const invoiced = activeOrderBookingIds.has(booking.id);
+    const orderId = orderIdByBookingId.get(booking.id);
+    const invoice = orderId ? invoiceByOrderId.get(orderId) : undefined;
     rows.push({
       id: booking.id, sessionSource: "booking", branchId: booking.branch_id, customerId: booking.customer_id,
-      customerName: customerMap.get(booking.customer_id) ?? "Pelanggan", petNames: bookingPetsMap.get(booking.id) ?? [],
+      customerName: customerMap.get(booking.customer_id) ?? "Pelanggan", petNames: bookingPetsMap.get(booking.id) ?? [], petIds: bookingPetIdsMap.get(booking.id) ?? [],
       fulfillmentMode: booking.fulfillment_mode, visitAt: booking.starts_at, description: "Booking selesai",
-      invoicedStatus: invoiced ? "invoiced" : billing ? "manually_billed" : "unbilled",
-      invoiceId: null, invoiceNumber: null,
+      invoicedStatus: invoice ? "invoiced" : billing ? "manually_billed" : "unbilled",
+      invoiceId: invoice?.id ?? null, invoiceNumber: invoice?.invoice_number ?? null,
       manualBilling: billing ? { id: billing.id, amount: Number(billing.amount), note: billing.note, billedAt: billing.billed_at } : null,
       canDelete: false,
     });
@@ -103,7 +153,7 @@ export async function loadVisitRegister(supabase: SupabaseClient, organizationId
     const billing = manualBillingMap.get(visit.id);
     rows.push({
       id: visit.id, sessionSource: "manual", branchId: visit.branch_id, customerId: visit.customer_id,
-      customerName: customerMap.get(visit.customer_id) ?? "Pelanggan", petNames: visit.pet_id && petMap.has(visit.pet_id) ? [petMap.get(visit.pet_id)!] : [],
+      customerName: customerMap.get(visit.customer_id) ?? "Pelanggan", petNames: visit.pet_id && petMap.has(visit.pet_id) ? [petMap.get(visit.pet_id)!] : [], petIds: visit.pet_id ? [visit.pet_id] : [],
       fulfillmentMode: visit.fulfillment_mode, visitAt: visit.visit_at, description: visit.description,
       invoicedStatus: visit.invoice_id ? "invoiced" : billing ? "manually_billed" : "unbilled",
       invoiceId: visit.invoice_id, invoiceNumber: visit.invoice_id ? invoiceMap.get(visit.invoice_id) ?? null : null,
@@ -113,8 +163,6 @@ export async function loadVisitRegister(supabase: SupabaseClient, organizationId
   }
 
   let result = rows;
-  if (filters.customerId) result = result.filter((r) => r.customerId === filters.customerId);
-  if (filters.petId) result = result.filter((r) => r.petNames.length === 0 ? false : petMap.get(filters.petId!) ? r.petNames.includes(petMap.get(filters.petId!)!) : false);
   if (filters.invoicedStatus && filters.invoicedStatus !== "all") result = result.filter((r) => r.invoicedStatus === filters.invoicedStatus);
   if (filters.search) {
     const needle = filters.search.trim().toLowerCase();

@@ -108,17 +108,21 @@ export function VisitRegister({ rows, autoLogEnabled, branches, customers, pets 
 }) {
   const [search, setSearch] = useState("");
   const [customerId, setCustomerId] = useState("");
+  const [petId, setPetId] = useState("");
   const [invoicedStatus, setInvoicedStatus] = useState<InvoicedStatus | "all">("all");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
+  const petsForFilter = customerId ? pets.filter((p) => p.customerId === customerId) : pets;
 
   const filtered = useMemo(() => {
+    // Matched by pet ID, not name — two pets can share a display name.
     let result = rows.filter((r) =>
       (!customerId || r.customerId === customerId)
+      && (!petId || r.petIds.includes(petId))
       && (invoicedStatus === "all" || r.invoicedStatus === invoicedStatus)
       && (!search.trim() || r.customerName.toLowerCase().includes(search.trim().toLowerCase()) || r.petNames.some((n) => n.toLowerCase().includes(search.trim().toLowerCase())) || r.description.toLowerCase().includes(search.trim().toLowerCase())));
     result = [...result].sort((a, b) => sort === "oldest" ? a.visitAt.localeCompare(b.visitAt) : b.visitAt.localeCompare(a.visitAt));
     return result;
-  }, [rows, search, customerId, invoicedStatus, sort]);
+  }, [rows, search, customerId, petId, invoicedStatus, sort]);
 
   return <div className="space-y-6">
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -129,9 +133,10 @@ export function VisitRegister({ rows, autoLogEnabled, branches, customers, pets 
       <ManualVisitForm branches={branches} customers={customers} pets={pets} />
     </section>
 
-    <div className="grid gap-3 sm:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-5">
       <input className={inputClass()} placeholder="Cari pelanggan, hewan, layanan" value={search} onChange={(e) => setSearch(e.target.value)} />
-      <select className={inputClass()} value={customerId} onChange={(e) => setCustomerId(e.target.value)}><option value="">Semua pelanggan</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <select className={inputClass()} value={customerId} onChange={(e) => { setCustomerId(e.target.value); setPetId(""); }}><option value="">Semua pelanggan</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <select className={inputClass()} value={petId} onChange={(e) => setPetId(e.target.value)}><option value="">Semua hewan</option>{petsForFilter.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
       <select className={inputClass()} value={invoicedStatus} onChange={(e) => setInvoicedStatus(e.target.value as InvoicedStatus | "all")}>
         <option value="all">Semua status tagihan</option>
         <option value="unbilled">Belum tertagih</option>
