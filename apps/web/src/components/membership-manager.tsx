@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 
 import {
   loadMembershipHistoryAction, previewPackageRenewalAction, previewPackageReconciliationAction, renewCustomerPackageAction,
@@ -46,8 +46,13 @@ function Message({ state }: { state: PilotActionState }) {
 }
 
 /** Section 25 (membership administration) + section 26 (reconciliation) for one customer_packages row. */
-export function MembershipManager({ row, canManage, branches, services }: { row: MembershipPackageRow; canManage: boolean; branches: Array<{ id: string; name: string }>; services: Array<{ id: string; name: string }> }) {
-  const [expanded, setExpanded] = useState(false);
+export function MembershipManager({
+  row, canManage, branches, services, autoExpand, returnTo,
+}: {
+  row: MembershipPackageRow; canManage: boolean; branches: Array<{ id: string; name: string }>; services: Array<{ id: string; name: string }>;
+  autoExpand?: boolean; returnTo?: string | null;
+}) {
+  const [expanded, setExpanded] = useState(Boolean(autoExpand));
   const [report, setReport] = useState<PackageReconciliationReport | null>(null);
   const [renewKey, setRenewKey] = useState(() => crypto.randomUUID());
   const [repairKey, setRepairKey] = useState(() => crypto.randomUUID());
@@ -102,6 +107,21 @@ export function MembershipManager({ row, canManage, branches, services }: { row:
     if (next && !renewalPreview) loadPreview();
   }
 
+  useEffect(() => {
+    if (!autoExpand) return;
+    // Not a direct loadPreview() call: the lint rule for this repo flags a *synchronous*
+    // setState reachable straight from an effect body, and loadPreview's leading
+    // `setPreviewError(null)` is exactly that. Deferring both state writes into the
+    // transition's own async callback keeps the effect body itself synchronous-setState-free
+    // while still auto-loading the deep-linked row's preview exactly once on mount.
+    startPreview(async () => {
+      const result = await previewPackageRenewalAction(row.id);
+      if (result.error) { setPreviewError(result.error); setRenewalPreview(null); } else { setPreviewError(null); setRenewalPreview(result.preview); }
+    });
+    // Runs once for the row this component was mounted with (deep-link focus target).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function runReconcile() {
     setReconcileError(null);
     startReconcile(async () => {
@@ -139,6 +159,7 @@ export function MembershipManager({ row, canManage, branches, services }: { row:
         </p>
       </div>
       <div className="flex shrink-0 gap-2">
+        {returnTo ? <Link href={returnTo} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">← Kembali ke antrean</Link> : null}
         <button type="button" onClick={loadHistory} disabled={loadingHistory} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 disabled:opacity-50">{loadingHistory ? "Memuat…" : history ? "Tutup riwayat" : "Riwayat"}</button>
         <button type="button" onClick={toggleExpanded} className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">{expanded ? "Tutup" : "Kelola"}</button>
       </div>

@@ -11,17 +11,31 @@ const URGENCY_OPTIONS: Array<{ value: MembershipUrgency | "all"; label: string }
 ];
 
 /** Section 25: status/urgency filters over the membership administration list. */
-export function MembershipFilterList({ rows, canManage, branches, services }: { rows: MembershipPackageRow[]; canManage: boolean; branches: Array<{ id: string; name: string }>; services: Array<{ id: string; name: string }> }) {
+export function MembershipFilterList({
+  rows, canManage, branches, services, focusMembershipId, returnTo,
+}: {
+  rows: MembershipPackageRow[]; canManage: boolean; branches: Array<{ id: string; name: string }>; services: Array<{ id: string; name: string }>;
+  focusMembershipId?: string | null; returnTo?: string | null;
+}) {
   const [urgency, setUrgency] = useState<MembershipUrgency | "all">("all");
   const [search, setSearch] = useState("");
 
+  const focusRow = focusMembershipId ? rows.find((row) => row.id === focusMembershipId) ?? null : null;
+
   const filtered = useMemo(() => rows.filter((row) => {
+    if (focusMembershipId && row.id === focusMembershipId) return false; // shown pinned above, not duplicated below
     if (urgency !== "all" && row.urgency !== urgency) return false;
     if (search && !`${row.customerName} ${row.petName ?? ""} ${row.packageName}`.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
-  }), [rows, urgency, search]);
+  }), [rows, urgency, search, focusMembershipId]);
 
   return <div>
+    {focusRow ? <div className="border-b border-emerald-100 bg-emerald-50/40 p-5">
+      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-700">Rekaman terpilih dari tautan langsung -- filter di bawah diabaikan untuk rekaman ini</p>
+      <div className="rounded-2xl border border-emerald-200 bg-white">
+        <MembershipManager row={focusRow} canManage={canManage} branches={branches} services={services} autoExpand returnTo={returnTo} />
+      </div>
+    </div> : null}
     <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-5">
       <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari pelanggan, hewan, atau paket" className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" />
       <div className="flex flex-wrap gap-1">
