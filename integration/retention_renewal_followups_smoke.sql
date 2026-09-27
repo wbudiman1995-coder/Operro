@@ -32,6 +32,13 @@ begin;
 insert into public.organizations (id, name, slug, status) values
   ('04000000-0000-4000-8000-000000000001', 'S35 Org P', 's35-org-p', 'active'),
   ('04000000-0000-4000-8000-000000000002', 'S35 Org Q', 's35-org-q', 'active');
+-- Org P is a fresh org created BY THIS TEST, not a pre-migration org, so its
+-- followup_retention setting has no explicit value yet and would read the
+-- new-org 14-day fallback -- explicitly set 30 here (superuser fixture setup,
+-- not the RPC under test) so F01's 29-vs-30-day fixtures exercise the
+-- documented "explicit 30" default most real existing orgs actually have.
+update public.organizations set settings = settings || '{"followup_retention": {"inactivity_threshold_days": 30}}'::jsonb
+ where id = '04000000-0000-4000-8000-000000000001';
 insert into public.branches (id, organization_id, name, is_default, status) values
   ('04000000-0000-4000-8000-0000000000a1', '04000000-0000-4000-8000-000000000001', 'Main P', true, 'active'),
   ('04000000-0000-4000-8000-0000000000a2', '04000000-0000-4000-8000-000000000001', 'Second P', false, 'active'),
@@ -147,69 +154,83 @@ begin
 end; $$;
 
 -- F01: 30-day pet included, 29-day pet excluded (threshold defaults to 30 for existing orgs).
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b001', '04000000-0000-4000-8000-00000000f101',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b001', '04000000-0000-4000-8000-00000000f101',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed', pg_temp.jkt_midnight() - interval '30 days' + interval '2 hours', pg_temp.jkt_midnight() - interval '30 days');
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b002', '04000000-0000-4000-8000-00000000f102',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b002', '04000000-0000-4000-8000-00000000f102',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed', pg_temp.jkt_midnight() - interval '29 days' + interval '2 hours', pg_temp.jkt_midnight() - interval '29 days');
 -- F02: completed 00:30 Jakarta "yesterday" -- must count as exactly 1 day, not 0 or 2.
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b003', '04000000-0000-4000-8000-00000000f103',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b003', '04000000-0000-4000-8000-00000000f103',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed', pg_temp.jkt_midnight() - interval '1 day' + interval '30 minutes', pg_temp.jkt_midnight() - interval '1 day');
 
 -- F05: overdue(35d)/recent(5d)/never-groomed/future-booked, same customer.
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b005', '04000000-0000-4000-8000-00000000f105',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b005', '04000000-0000-4000-8000-00000000f105',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed', pg_temp.jkt_midnight() - interval '35 days' + interval '2 hours', pg_temp.jkt_midnight() - interval '35 days');
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b006', '04000000-0000-4000-8000-00000000f106',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b006', '04000000-0000-4000-8000-00000000f106',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed', pg_temp.jkt_midnight() - interval '5 days' + interval '2 hours', pg_temp.jkt_midnight() - interval '5 days');
 -- PetFutureBooked40: overdue AND has an upcoming (future, non-canceled) booking -- must still show, badged.
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b008', '04000000-0000-4000-8000-00000000f108',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b008', '04000000-0000-4000-8000-00000000f108',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed', pg_temp.jkt_midnight() - interval '40 days' + interval '2 hours', pg_temp.jkt_midnight() - interval '40 days');
-insert into public.bookings (id, organization_id, branch_id, customer_id, pet_id, booking_type, status, starts_at, ends_at) values
-  ('04000000-0000-4000-8000-0000000b108', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-0000000000a1',
-   '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000f108', 'grooming', 'confirmed', now() + interval '3 days', now() + interval '3 days 1 hour');
-insert into public.grooming_jobs (organization_id, booking_id) values ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-0000000b108');
+insert into public.bookings (id, organization_id, branch_id, customer_id, booking_type, status, starts_at, ends_at) values
+  ('04000000-0000-4000-8000-00000000b108', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-0000000000a1',
+   '04000000-0000-4000-8000-00000000c105', 'grooming', 'confirmed', now() + interval '3 days', now() + interval '3 days 1 hour');
+insert into public.grooming_jobs (organization_id, booking_id) values ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000b108');
 insert into public.grooming_job_pets (organization_id, grooming_job_id, pet_id, status)
-  values ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-0000000b108', '04000000-0000-4000-8000-00000000f108', 'pending');
+  values ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000b108', '04000000-0000-4000-8000-00000000f108', 'pending');
 
 -- F06a: future-dated legacy anomaly -- must NOT show as a negative-day overdue pet.
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b009', '04000000-0000-4000-8000-00000000f109',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b009', '04000000-0000-4000-8000-00000000f109',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed', now() + interval '5 days', now() + interval '5 days');
 -- F06b: canceled booking's completed pet must not count as real history.
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b013', '04000000-0000-4000-8000-00000000f113',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b013', '04000000-0000-4000-8000-00000000f113',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'canceled', pg_temp.jkt_midnight() - interval '50 days', pg_temp.jkt_midnight() - interval '50 days');
 
 -- F04: two service lines in one visit -> one visit, no duplicated history (grooming_job_pet_services
 -- is per-pet-per-visit, not per-pet-per-day, so this is proven by a pet having only ONE
 -- grooming_job_pets row regardless of how many service lines it carries -- add two lines here).
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b010', '04000000-0000-4000-8000-00000000f110',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b010', '04000000-0000-4000-8000-00000000f110',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed', pg_temp.jkt_midnight() - interval '31 days' + interval '2 hours', pg_temp.jkt_midnight() - interval '31 days');
 insert into public.grooming_job_pet_services (organization_id, grooming_job_pet_id, service_id, service_name_snapshot, unit_price_snapshot, currency)
   select '04000000-0000-4000-8000-000000000001', gjp.id, '04000000-0000-4000-8000-00000000ea01', 'Grooming', 100000, 'IDR'
-  from public.grooming_job_pets gjp where gjp.grooming_job_id = '04000000-0000-4000-8000-0000000b010' and gjp.pet_id = '04000000-0000-4000-8000-00000000f110';
+  from public.grooming_job_pets gjp where gjp.grooming_job_id = '04000000-0000-4000-8000-00000000b010' and gjp.pet_id = '04000000-0000-4000-8000-00000000f110';
 insert into public.grooming_job_pet_services (organization_id, grooming_job_pet_id, service_id, service_name_snapshot, unit_price_snapshot, currency)
   select '04000000-0000-4000-8000-000000000001', gjp.id, '04000000-0000-4000-8000-00000000ea01', 'Grooming (add-on)', 50000, 'IDR'
-  from public.grooming_job_pets gjp where gjp.grooming_job_id = '04000000-0000-4000-8000-0000000b010' and gjp.pet_id = '04000000-0000-4000-8000-00000000f110';
+  from public.grooming_job_pets gjp where gjp.grooming_job_id = '04000000-0000-4000-8000-00000000b010' and gjp.pet_id = '04000000-0000-4000-8000-00000000f110';
 
 -- F03: two pets share ONE booking; only one is individually 'complete' -- the completed
 -- pet must gain history even though the booking overall is still 'in_progress'.
 insert into public.bookings (id, organization_id, branch_id, customer_id, booking_type, status, starts_at, ends_at) values
-  ('04000000-0000-4000-8000-0000000b011', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-0000000000a1',
+  ('04000000-0000-4000-8000-00000000b011', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-0000000000a1',
    '04000000-0000-4000-8000-00000000c105', 'grooming', 'in_progress', pg_temp.jkt_midnight() - interval '32 days', pg_temp.jkt_midnight() - interval '32 days' + interval '2 hours');
-insert into public.grooming_jobs (organization_id, booking_id) values ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-0000000b011');
+insert into public.grooming_jobs (organization_id, booking_id) values ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000b011');
 insert into public.grooming_job_pets (organization_id, grooming_job_id, pet_id, status, completed_at) values
-  ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-0000000b011', '04000000-0000-4000-8000-00000000f111', 'complete', pg_temp.jkt_midnight() - interval '32 days' + interval '1 hour'),
-  ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-0000000b011', '04000000-0000-4000-8000-00000000f112', 'pending', null);
+  ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000b011', '04000000-0000-4000-8000-00000000f111', 'complete', pg_temp.jkt_midnight() - interval '32 days' + interval '1 hour'),
+  ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000b011', '04000000-0000-4000-8000-00000000f112', 'pending', null);
+-- The migration's own trg_gjp_stamp_completed_at trigger overwrites completed_at to
+-- now() on any INSERT with status='complete' (matching real completion behavior) --
+-- push the intended backdated value in with a follow-up UPDATE, exactly like
+-- pg_temp.fixture_visit() does for every other fixture in this file.
+update public.grooming_job_pets set completed_at = pg_temp.jkt_midnight() - interval '32 days' + interval '1 hour'
+ where organization_id = '04000000-0000-4000-8000-000000000001' and grooming_job_id = '04000000-0000-4000-8000-00000000b011' and pet_id = '04000000-0000-4000-8000-00000000f111';
 
 -- F14: names with &, apostrophe, emoji; malformed phone (RPC must pass these through
 -- byte-for-byte -- no HTML entity mangling at the SQL layer, that is the UI's job).
-select pg_temp.fixture_visit('04000000-0000-4000-8000-0000000b014', '04000000-0000-4000-8000-00000000f120',
+select pg_temp.fixture_visit('04000000-0000-4000-8000-00000000b014', '04000000-0000-4000-8000-00000000f120',
   '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed', pg_temp.jkt_midnight() - interval '33 days' + interval '2 hours', pg_temp.jkt_midnight() - interval '33 days');
 
 -- --- F13: >1000 relevant records (a single very-overdue customer with 1100 pets) ------
 insert into public.customers (id, organization_id, display_name) values
   ('04000000-0000-4000-8000-00000000c113', '04000000-0000-4000-8000-000000000001', 'Cust F13 Bulk');
-insert into public.pets (id, organization_id, customer_id, name)
-  select gen_random_uuid(), '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c113', 'BulkPet' || i
-  from generate_series(1, 1100) i;
+do $$
+declare i integer; v_pet uuid; v_booking uuid;
+begin
+  for i in 1..1100 loop
+    v_pet := gen_random_uuid(); v_booking := gen_random_uuid();
+    insert into public.pets (id, organization_id, customer_id, name)
+      values (v_pet, '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c113', 'BulkPet' || i);
+    perform pg_temp.fixture_visit(v_booking, v_pet, '04000000-0000-4000-8000-0000000000a1', 'complete', 'completed',
+      pg_temp.jkt_midnight() - interval '45 days', pg_temp.jkt_midnight() - interval '45 days');
+  end loop;
+end $$;
 -- Also 1100 DISTINCT overdue customers (one pet each) so total_groups pagination is exercised
 -- past a single PostgREST-style 1000-row cap, not just a single customer's pet array.
 insert into public.customers (id, organization_id, display_name)
@@ -226,10 +247,65 @@ begin
   end loop;
 end $$;
 
-commit; -- fixture inserts above are cheap (~2200 rows); commit so the bulk loop's per-row
-        -- inserts are not held in one giant uncommitted transaction, then continue testing
-        -- inside a fresh transaction (rolled back at the very end, same as the rest).
-begin;
+-- The F13 bulk loops above just inserted ~2200 rows each into pets/bookings/
+-- grooming_job_pets within THIS transaction; autovacuum/autoanalyze never runs on
+-- uncommitted data, so the planner is still using pre-bulk-insert statistics and
+-- picks a nested-loop plan across what it (wrongly) still thinks are tiny tables --
+-- this made app.list_overdue_customers(null, null, ...) (the F13 unfiltered-search
+-- assertion) take 11+ minutes before this fix. An explicit mid-transaction ANALYZE
+-- is real, supported Postgres behavior (unlike autovacuum, it runs synchronously
+-- and is visible to later statements in the SAME transaction) and reflects what a
+-- real deployment's autovacuum would already have done for data that accumulated
+-- normally instead of arriving in one test-fixture burst.
+analyze public.pets;
+analyze public.bookings;
+analyze public.grooming_job_pets;
+analyze public.grooming_job_pet_services;
+analyze public.customers;
+
+-- (Deliberately NOT committing here, unlike an earlier draft of this file: a mid-script
+-- commit left fixture rows permanently in the shared gate database whenever a LATER
+-- assertion failed, breaking every subsequent re-run with duplicate-key errors. Staying in
+-- one transaction, rolled back at the very end -- same convention as package_lifecycle_smoke.sql
+-- -- makes this file safely re-runnable no matter where it fails.)
+
+-- --- F07/F08/F09 fixtures (packages/customer_packages/ledger/reservations) --
+-- Inserted here, still as superuser, like every other fixture above --
+-- `customer_package_ledger.id` defaults via app.fn_uuid_v7(), which calls
+-- pgcrypto's gen_random_bytes(); the `authenticated` role (switched to
+-- immediately below) is not granted EXECUTE on it in this gate database, so
+-- this must happen before the role switch, not after.
+insert into public.packages (id, organization_id, name, service_id, total_sessions, price, currency, validity_days, rollover_policy, recurrence_interval, is_active) values
+  ('04000000-0000-4000-8000-00000000da07', '04000000-0000-4000-8000-000000000001', 'F07 Package', null, 4, 400000, 'IDR', 90, 'none', 'month', true),
+  ('04000000-0000-4000-8000-00000000da08', '04000000-0000-4000-8000-000000000001', 'F08 Recurring NullExpiry', null, 4, 100000, 'IDR', null, 'none', 'week', true),
+  ('04000000-0000-4000-8000-00000000da09', '04000000-0000-4000-8000-000000000001', 'F08 Token', null, 1, 50000, 'IDR', 365, 'none', 'none', true);
+
+insert into public.customer_packages (id, organization_id, customer_id, package_id, sessions_remaining, purchased_at, expires_at, status) values
+  -- sessions_remaining starts at 0 here, not the intended net 2: the ledger inserts just
+  -- below (+4 purchase, -2 consumption) drive it via trg_cpl_apply, the same "derived
+  -- cache" invariant the real system relies on -- setting an explicit non-zero value here
+  -- AND applying ledger deltas on top double-counted (a real bug this test caught: it
+  -- first reported available=2 instead of 0).
+  ('04000000-0000-4000-8000-00000000db07', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000da07', 0, now() - interval '10 days', now() + interval '80 days', 'active'),
+  ('04000000-0000-4000-8000-00000000db08', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000da08', 4, now() - interval '5 days', null, 'active'),
+  ('04000000-0000-4000-8000-00000000db0e', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000da07', 4, now() - interval '400 days', now() - interval '10 days', 'active'),
+  ('04000000-0000-4000-8000-00000000db0a', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000da07', 0, now() - interval '400 days', now() - interval '300 days', 'canceled'),
+  ('04000000-0000-4000-8000-00000000db09', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000da09', 1, now() - interval '2 days', now() + interval '363 days', 'active');
+insert into public.customer_package_ledger (organization_id, customer_package_id, delta, reason) values
+  ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000db07', 4, 'purchase'),
+  ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000db07', -2, 'consumption');
+-- F07: consumed=2, held=2 (both reserved), total sessions_remaining=2 -> available MUST be 0, never "4 consumed".
+insert into public.package_reservations (organization_id, customer_package_id, grooming_job_pet_service_id, status)
+  select '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000db07', gjps.id, 'reserved'
+  from public.grooming_job_pet_services gjps
+  join public.grooming_job_pets gjp on gjp.id = gjps.grooming_job_pet_id
+  where gjp.grooming_job_id = '04000000-0000-4000-8000-00000000b010' limit 1;
+insert into public.package_reservations (organization_id, customer_package_id, grooming_job_pet_service_id, status)
+  select '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000db07', gjps2.id, 'reserved'
+  from public.grooming_job_pet_services gjps2
+  join public.grooming_job_pets gjp2 on gjp2.id = gjps2.grooming_job_pet_id
+  where gjp2.grooming_job_id = '04000000-0000-4000-8000-00000000b010'
+  offset 1 limit 1;
 
 -- =====================================================================
 -- Assertions run AS THE ACTUAL AUTHENTICATED ROLE, never a superuser bypass.
@@ -356,40 +432,13 @@ begin
 end $$;
 
 -- =====================================================================
--- Renewal queue: F07/F08/F09
+-- Renewal queue: F07/F08/F09 (fixtures inserted earlier, above the role switch)
 -- =====================================================================
-insert into public.packages (id, organization_id, name, service_id, total_sessions, price, currency, validity_days, rollover_policy, recurrence_interval, is_active) values
-  ('04000000-0000-4000-8000-00000000pk07', '04000000-0000-4000-8000-000000000001', 'F07 Package', null, 4, 400000, 'IDR', 90, 'none', 'month', true),
-  ('04000000-0000-4000-8000-00000000pk08', '04000000-0000-4000-8000-000000000001', 'F08 Recurring NullExpiry', null, 4, 100000, 'IDR', null, 'none', 'week', true),
-  ('04000000-0000-4000-8000-00000000pk09', '04000000-0000-4000-8000-000000000001', 'F08 Token', null, 1, 50000, 'IDR', 365, 'none', 'none', true);
-
-insert into public.customer_packages (id, organization_id, customer_id, package_id, sessions_remaining, purchased_at, expires_at, status) values
-  ('04000000-0000-4000-8000-00000000cp07', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000pk07', 2, now() - interval '10 days', now() + interval '80 days', 'active'),
-  ('04000000-0000-4000-8000-00000000cp08', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000pk08', 4, now() - interval '5 days', null, 'active'),
-  ('04000000-0000-4000-8000-00000000cp0e', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000pk07', 4, now() - interval '400 days', now() - interval '10 days', 'active'),
-  ('04000000-0000-4000-8000-00000000cp0a', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000pk07', 0, now() - interval '400 days', now() - interval '300 days', 'canceled'),
-  ('04000000-0000-4000-8000-00000000cp09', '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000c105', '04000000-0000-4000-8000-00000000pk09', 1, now() - interval '2 days', now() + interval '363 days', 'active');
-insert into public.customer_package_ledger (organization_id, customer_package_id, delta, reason) values
-  ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000cp07', 4, 'purchase'),
-  ('04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000cp07', -2, 'consumption');
--- F07: consumed=2, held=2 (both reserved), total sessions_remaining=2 -> available MUST be 0, never "4 consumed".
-insert into public.package_reservations (organization_id, customer_package_id, grooming_job_pet_service_id, status)
-  select '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000cp07', gjps.id, 'reserved'
-  from public.grooming_job_pet_services gjps
-  join public.grooming_job_pets gjp on gjp.id = gjps.grooming_job_pet_id
-  where gjp.grooming_job_id = '04000000-0000-4000-8000-0000000b010' limit 1;
-insert into public.package_reservations (organization_id, customer_package_id, grooming_job_pet_service_id, status)
-  select '04000000-0000-4000-8000-000000000001', '04000000-0000-4000-8000-00000000cp07', gjps2.id, 'reserved'
-  from public.grooming_job_pet_services gjps2
-  join public.grooming_job_pets gjp2 on gjp2.id = gjps2.grooming_job_pet_id
-  where gjp2.grooming_job_id = '04000000-0000-4000-8000-0000000b010'
-  offset 1 limit 1;
-
 do $$
 declare v_result jsonb; v_m jsonb;
 begin
   v_result := app.list_renewal_queue('all', 'F07', false, 1, 25);
-  select m into v_m from jsonb_array_elements(v_result -> 'groups' -> 0 -> 'memberships') m where m ->> 'id' = '04000000-0000-4000-8000-00000000cp07';
+  select m into v_m from jsonb_array_elements(v_result -> 'groups' -> 0 -> 'memberships') m where m ->> 'id' = '04000000-0000-4000-8000-00000000db07';
   perform pg_temp.ok((v_m ->> 'available_count')::integer = 0, format('F07 available=0 when all remaining sessions are held, got %s', v_m ->> 'available_count'));
   perform pg_temp.ok((v_m ->> 'reserved_count')::integer = 2, format('F07 held=2, got %s', v_m ->> 'reserved_count'));
   perform pg_temp.ok((v_m ->> 'consumed_count')::integer = 2, format('F07 consumed=2 from the ledger, not inferred as total-available, got %s', v_m ->> 'consumed_count'));
@@ -401,29 +450,33 @@ end $$;
 do $$
 declare v_actionable jsonb; v_historical jsonb; v_all jsonb; v_m jsonb; v_ids text[];
 begin
-  v_actionable := app.list_renewal_queue('actionable', 'F08', false, 1, 25);
+  -- search=null: db0e/db0a intentionally reuse the F07 package (da07) to test lifecycle
+  -- status independent of the catalog item, so a package-name search for 'F08' would miss
+  -- them. All five F07/F08/F09 fixture memberships belong to the one customer (c105) with
+  -- any customer_packages row in this org, so an unfiltered query still scopes correctly.
+  v_actionable := app.list_renewal_queue('actionable', null, false, 1, 25);
   select array_agg(m ->> 'id') into v_ids from jsonb_array_elements(v_actionable -> 'groups' -> 0 -> 'memberships') m;
-  perform pg_temp.ok(v_ids @> array['04000000-0000-4000-8000-00000000cp08'], 'F08 null-expiry recurring membership shown as actionable');
-  perform pg_temp.ok(v_ids @> array['04000000-0000-4000-8000-00000000cp0e'], 'F08 expired-but-not-archived membership still shown as actionable');
-  perform pg_temp.ok(not (v_ids @> array['04000000-0000-4000-8000-00000000cp0a']), 'F08 archived (canceled) membership NOT shown under actionable');
-  perform pg_temp.ok(not (v_ids @> array['04000000-0000-4000-8000-00000000cp09']), 'F08 one-off token NOT shown under actionable by default (include_tokens=false)');
+  perform pg_temp.ok(v_ids @> array['04000000-0000-4000-8000-00000000db08'], 'F08 null-expiry recurring membership shown as actionable');
+  perform pg_temp.ok(v_ids @> array['04000000-0000-4000-8000-00000000db0e'], 'F08 expired-but-not-archived membership still shown as actionable');
+  perform pg_temp.ok(not (v_ids @> array['04000000-0000-4000-8000-00000000db0a']), 'F08 archived (canceled) membership NOT shown under actionable');
+  perform pg_temp.ok(not (v_ids @> array['04000000-0000-4000-8000-00000000db09']), 'F08 one-off token NOT shown under actionable by default (include_tokens=false)');
 
-  select m into v_m from jsonb_array_elements(v_actionable -> 'groups' -> 0 -> 'memberships') m where m ->> 'id' = '04000000-0000-4000-8000-00000000cp08';
+  select m into v_m from jsonb_array_elements(v_actionable -> 'groups' -> 0 -> 'memberships') m where m ->> 'id' = '04000000-0000-4000-8000-00000000db08';
   perform pg_temp.ok(v_m ->> 'expires_at' is null, 'F08 null expires_at means no expiry, never rendered as expired');
   perform pg_temp.ok(not (v_m ->> 'is_expired')::boolean, 'F08 null-expiry membership is_expired=false');
 
-  select m into v_m from jsonb_array_elements(v_actionable -> 'groups' -> 0 -> 'memberships') m where m ->> 'id' = '04000000-0000-4000-8000-00000000cp0e';
+  select m into v_m from jsonb_array_elements(v_actionable -> 'groups' -> 0 -> 'memberships') m where m ->> 'id' = '04000000-0000-4000-8000-00000000db0e';
   perform pg_temp.ok((v_m ->> 'is_expired')::boolean, 'F08 an expired membership is flagged is_expired=true');
 
-  v_historical := app.list_renewal_queue('historical', 'F08', false, 1, 25);
+  v_historical := app.list_renewal_queue('historical', null, false, 1, 25);
   select array_agg(m ->> 'id') into v_ids from jsonb_array_elements(v_historical -> 'groups' -> 0 -> 'memberships') m;
-  perform pg_temp.ok(v_ids @> array['04000000-0000-4000-8000-00000000cp0a'], 'F08 historical view shows the archived membership');
-  perform pg_temp.ok(not (v_ids @> array['04000000-0000-4000-8000-00000000cp0e']), 'F08 historical view excludes a still-active (not archived) expired membership');
+  perform pg_temp.ok(v_ids @> array['04000000-0000-4000-8000-00000000db0a'], 'F08 historical view shows the archived membership');
+  perform pg_temp.ok(not (v_ids @> array['04000000-0000-4000-8000-00000000db0e']), 'F08 historical view excludes a still-active (not archived) expired membership');
 
-  v_all := app.list_renewal_queue('all', 'F08', true, 1, 25);
+  v_all := app.list_renewal_queue('all', null, true, 1, 25);
   select array_agg(m ->> 'id') into v_ids from jsonb_array_elements(v_all -> 'groups' -> 0 -> 'memberships') m;
-  select m into v_m from jsonb_array_elements(v_all -> 'groups' -> 0 -> 'memberships') m where m ->> 'id' = '04000000-0000-4000-8000-00000000cp09';
-  perform pg_temp.ok(v_ids @> array['04000000-0000-4000-8000-00000000cp09'], 'F08 with include_tokens=true the one-off token becomes visible');
+  select m into v_m from jsonb_array_elements(v_all -> 'groups' -> 0 -> 'memberships') m where m ->> 'id' = '04000000-0000-4000-8000-00000000db09';
+  perform pg_temp.ok(v_ids @> array['04000000-0000-4000-8000-00000000db09'], 'F08 with include_tokens=true the one-off token becomes visible');
   perform pg_temp.ok(not (v_m ->> 'is_recurring')::boolean, 'F08 the token is explicitly labeled is_recurring=false, never presented as a subscription');
 end $$;
 
@@ -437,7 +490,7 @@ end $$;
 do $$
 declare v_preview jsonb;
 begin
-  v_preview := app.preview_package_renewal('04000000-0000-4000-8000-00000000cp0a');
+  v_preview := app.preview_package_renewal('04000000-0000-4000-8000-00000000db0a');
   perform pg_temp.ok((v_preview ->> 'blocking_reason') = 'package_canceled_cannot_renew',
     'F09 a canceled membership''s own preview reports a real blocking_reason for the UI to surface, not a fabricated amount');
 end $$;
@@ -531,17 +584,25 @@ do $$
 declare v_stale_updated_at timestamptz; v_result jsonb; v_branding jsonb;
 begin
   select updated_at into v_stale_updated_at from public.organizations where id = '04000000-0000-4000-8000-000000000001';
-  -- Editor A saves successfully (bumps updated_at).
-  perform app.update_followup_retention_settings(v_stale_updated_at, 21, 'A {nama} {days} {dogs} {biz}', 'A {nama} {tier} {amount} {biz}');
+  -- The existing app.tg_set_updated_at trigger stamps updated_at from now(), which Postgres
+  -- freezes for an entire transaction -- a real second writer's stale copy differs from the
+  -- CURRENT row because real concurrent edits are separate transactions, each with its own
+  -- now(). That real elapsed-time difference cannot be reproduced inside this single-transaction
+  -- test script (an UPDATE here would get the same frozen now() no matter what). What IS
+  -- provable here, and is the guard's actual contract: a caller presenting ANY updated_at that
+  -- does not match the current row is rejected (Editor B, holding a copy from before Editor A's
+  -- edit), while the caller presenting the true current value succeeds (Editor A). "Editor B
+  -- first" order below only exercises the rejection path before consuming the correct token.
   begin
-    -- Editor B, still holding the now-stale updated_at from before A saved, must be rejected.
-    perform app.update_followup_retention_settings(v_stale_updated_at, 45, 'B {nama} {days} {dogs} {biz}', 'B {nama} {tier} {amount} {biz}');
-    raise exception 'F12 FAIL: a stale concurrent settings write was unexpectedly accepted';
+    perform app.update_followup_retention_settings(v_stale_updated_at - interval '1 second', 45, 'B {nama} {days} {dogs} {biz}', 'B {nama} {tier} {amount} {biz}');
+    raise exception 'F12 FAIL: a settings write presenting a non-matching updated_at was unexpectedly accepted';
   exception when sqlstate '40001' then
-    perform pg_temp.ok(true, 'F12 a stale concurrent settings write is rejected (40001), not silently overwritten');
+    perform pg_temp.ok(true, 'F12 a settings write presenting a non-matching (stale) updated_at is rejected (40001), not silently overwritten');
   end;
+  -- Editor A, holding the actually-current value, succeeds.
+  perform app.update_followup_retention_settings(v_stale_updated_at, 21, 'A {nama} {days} {dogs} {biz}', 'A {nama} {tier} {amount} {biz}');
   v_result := app.get_followup_retention_settings();
-  perform pg_temp.ok((v_result ->> 'inactivity_threshold_days')::integer = 21, 'F12 the SUCCESSFUL editor''s value (21) is what persisted, not the rejected one (45)');
+  perform pg_temp.ok((v_result ->> 'inactivity_threshold_days')::integer = 21, 'F12 the successful editor''s value (21) is what persisted, not the rejected one (45)');
   select settings -> 'branding' into v_branding from public.organizations where id = '04000000-0000-4000-8000-000000000001';
   perform pg_temp.ok(v_branding = '{"logo_url": "https://example.test/logo.png"}'::jsonb, 'F12 an unrelated settings key (branding) is untouched by the followup_retention merge');
   -- Restore the default templates for tidiness (harmless -- this whole script rolls back).

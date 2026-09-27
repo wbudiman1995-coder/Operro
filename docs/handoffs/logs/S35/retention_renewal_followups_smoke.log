@@ -1,0 +1,1579 @@
+Error response from daemon: container d16f2795c0760247a427adf3522b14a13370c8685ee0fa6730e1423c13f0be3c is not running
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+INSERT 0 3
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ERROR:  invalid input syntax for type uuid: "04000000-0000-4000-8000-0000000b001"
+LINE 1: select pg_temp.fixture_visit('04000000-0000-4000-8000-000000...
+                                     ^
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+INSERT 0 3
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ERROR:  column "pet_id" of relation "bookings" does not exist
+LINE 1: ...ngs (id, organization_id, branch_id, customer_id, pet_id, bo...
+                                                             ^
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+INSERT 0 3
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1100
+INSERT 0 1100
+DO
+COMMIT
+BEGIN
+SET
+DO
+NOTICE:  PASS: F01 30-day pet included
+ERROR:  FAIL: F01 29-day pet excluded
+CONTEXT:  PL/pgSQL function pg_temp_3.ok(boolean,text) line 2 at RAISE
+SQL statement "SELECT pg_temp.ok(not (v_names @> array['PetF01-29d']), 'F01 29-day pet excluded')"
+PL/pgSQL function inline_code_block line 8 at PERFORM
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+ERROR:  duplicate key value violates unique constraint "pk_organizations"
+DETAIL:  Key (id)=(04000000-0000-4000-8000-000000000001) already exists.
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+DELETE 2
+=== 2026-09-27T16:08:12+07:00 rerunning smoke test ===
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+UPDATE 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1100
+INSERT 0 1100
+DO
+SET
+DO
+DO
+NOTICE:  PASS: F01 30-day pet included
+NOTICE:  PASS: F01 29-day pet excluded
+NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
+DO
+ERROR:  FAIL: F03 completed pet visible although sibling pet on the same booking is still pending
+CONTEXT:  PL/pgSQL function pg_temp_3.ok(boolean,text) line 2 at RAISE
+SQL statement "SELECT pg_temp.ok(v_found, 'F03 completed pet visible although sibling pet on the same booking is still pending')"
+PL/pgSQL function inline_code_block line 9 at PERFORM
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+DELETE 0
+=== 2026-09-27T23:48:52+07:00 rerunning smoke test ===
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+UPDATE 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+UPDATE 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1100
+INSERT 0 1100
+DO
+SET
+DO
+NOTICE:  PASS: F01 30-day pet included
+NOTICE:  PASS: F01 29-day pet excluded
+DO
+NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
+DO
+NOTICE:  PASS: F03 completed pet visible although sibling pet on the same booking is still pending
+DO
+NOTICE:  PASS: F03 the still-pending sibling pet does not falsely appear as overdue history
+NOTICE:  PASS: F04 one visit with two service lines yields exactly one pet entry, got 1
+DO
+NOTICE:  PASS: F05 overdue pet shown under default filter
+NOTICE:  PASS: F05 recently-groomed pet NOT shown under default filter
+NOTICE:  PASS: F05 never-groomed pet NOT shown under default filter (separate filter exists for it)
+NOTICE:  PASS: F05 overdue pet WITH an upcoming booking still shown (not hidden)
+NOTICE:  PASS: F05 PetFutureBooked40 is badged has_upcoming_booking=true
+DO
+NOTICE:  PASS: F05 never_groomed filter surfaces the never-groomed pet
+NOTICE:  PASS: F05 never_groomed filter excludes a pet that DOES have history
+NOTICE:  PASS: F06 future-dated legacy record flagged as an anomaly, not a negative day count
+DO
+NOTICE:  PASS: F06 a completed pet on a since-canceled booking does not count as real history
+DO
+NOTICE:  PASS: F14 customer name preserved verbatim, got Cust F14 O'Brien & Co 🐶
+NOTICE:  PASS: F14 malformed phone preserved verbatim (client decides validity, not the RPC)
+NOTICE:  PASS: F13 total_groups counts past 1000 (>=1101 expected), got 1103
+NOTICE:  PASS: F13 page 1 returns exactly page_size=100 groups, got 100
+NOTICE:  PASS: F13 the final page is still reachable, not silently dropped
+ERROR:  FAIL: F13 an exceptionally large single-customer group reports a truncated count rather than truncating silently
+CONTEXT:  PL/pgSQL function pg_temp_3.ok(boolean,text) line 2 at RAISE
+SQL statement "SELECT pg_temp.ok(exists (
+    select 1 from jsonb_array_elements((app.list_overdue_customers(null, 'Cust F13 Bulk', 'default', 1, 25) -> 'groups')) g
+    where (g ->> 'pets_truncated_count')::integer > 0
+  ), 'F13 an exceptionally large single-customer group reports a truncated count rather than truncating silently')"
+PL/pgSQL function inline_code_block line 13 at PERFORM
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+DELETE 0
+=== 2026-09-27T23:51:10+07:00 rerunning smoke test ===
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+UPDATE 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+UPDATE 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+DO
+INSERT 0 1100
+DO
+SET
+DO
+DO
+NOTICE:  PASS: F01 30-day pet included
+NOTICE:  PASS: F01 29-day pet excluded
+NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
+DO
+NOTICE:  PASS: F03 completed pet visible although sibling pet on the same booking is still pending
+NOTICE:  PASS: F03 the still-pending sibling pet does not falsely appear as overdue history
+DO
+DO
+NOTICE:  PASS: F04 one visit with two service lines yields exactly one pet entry, got 1
+NOTICE:  PASS: F05 overdue pet shown under default filter
+NOTICE:  PASS: F05 recently-groomed pet NOT shown under default filter
+NOTICE:  PASS: F05 never-groomed pet NOT shown under default filter (separate filter exists for it)
+NOTICE:  PASS: F05 overdue pet WITH an upcoming booking still shown (not hidden)
+NOTICE:  PASS: F05 PetFutureBooked40 is badged has_upcoming_booking=true
+NOTICE:  PASS: F05 never_groomed filter surfaces the never-groomed pet
+NOTICE:  PASS: F05 never_groomed filter excludes a pet that DOES have history
+DO
+NOTICE:  PASS: F06 future-dated legacy record flagged as an anomaly, not a negative day count
+DO
+NOTICE:  PASS: F06 a completed pet on a since-canceled booking does not count as real history
+DO
+NOTICE:  PASS: F14 customer name preserved verbatim, got Cust F14 O'Brien & Co 🐶
+NOTICE:  PASS: F14 malformed phone preserved verbatim (client decides validity, not the RPC)
+NOTICE:  PASS: F13 total_groups counts past 1000 (>=1101 expected), got 1104
+NOTICE:  PASS: F13 page 1 returns exactly page_size=100 groups, got 100
+NOTICE:  PASS: F13 the final page is still reachable, not silently dropped
+DO
+NOTICE:  PASS: F13 an exceptionally large single-customer group reports a truncated count rather than truncating silently
+INSERT 0 3
+INSERT 0 5
+ERROR:  function gen_random_bytes(integer) does not exist
+LINE 1: buf := ts_ms || gen_random_bytes(10)
+                        ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+QUERY:  buf := ts_ms || gen_random_bytes(10)
+CONTEXT:  PL/pgSQL function fn_uuid_v7() line 7 at assignment
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+DELETE 0
+=== 2026-09-27T23:55:51+07:00 rerunning smoke test ===
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+UPDATE 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+UPDATE 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+DO
+INSERT 0 1100
+DO
+INSERT 0 3
+INSERT 0 5
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+SET
+DO
+DO
+NOTICE:  PASS: F01 30-day pet included
+NOTICE:  PASS: F01 29-day pet excluded
+NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
+DO
+NOTICE:  PASS: F03 completed pet visible although sibling pet on the same booking is still pending
+NOTICE:  PASS: F03 the still-pending sibling pet does not falsely appear as overdue history
+DO
+NOTICE:  PASS: F04 one visit with two service lines yields exactly one pet entry, got 1
+DO
+NOTICE:  PASS: F05 overdue pet shown under default filter
+NOTICE:  PASS: F05 recently-groomed pet NOT shown under default filter
+NOTICE:  PASS: F05 never-groomed pet NOT shown under default filter (separate filter exists for it)
+NOTICE:  PASS: F05 overdue pet WITH an upcoming booking still shown (not hidden)
+NOTICE:  PASS: F05 PetFutureBooked40 is badged has_upcoming_booking=true
+NOTICE:  PASS: F05 never_groomed filter surfaces the never-groomed pet
+NOTICE:  PASS: F05 never_groomed filter excludes a pet that DOES have history
+DO
+NOTICE:  PASS: F06 future-dated legacy record flagged as an anomaly, not a negative day count
+DO
+NOTICE:  PASS: F06 a completed pet on a since-canceled booking does not count as real history
+DO
+NOTICE:  PASS: F14 customer name preserved verbatim, got Cust F14 O'Brien & Co 🐶
+NOTICE:  PASS: F14 malformed phone preserved verbatim (client decides validity, not the RPC)
+FATAL:  terminating connection due to administrator command
+CONTEXT:  SQL statement "with visits as (
+    select gjp.pet_id, gjp.completed_at, b.branch_id
+    from public.grooming_job_pets gjp
+    join public.bookings b on b.organization_id = gjp.organization_id and b.id = gjp.grooming_job_id
+    where gjp.organization_id = v_org and gjp.status = 'complete' and gjp.deleted_at is null
+      and b.deleted_at is null and b.status not in ('canceled', 'no_show')
+      and (v_all_branches or app.has_branch(b.branch_id))
+      and (p_branch is null or b.branch_id = p_branch)
+  ),
+  last_visit as (
+    select pet_id,
+           max(completed_at) filter (where completed_at <= now()) as last_at,
+           bool_or(completed_at > now()) as has_future_anomaly
+    from visits group by pet_id
+  ),
+  upcoming as (
+    select distinct gjp.pet_id
+    from public.grooming_job_pets gjp
+    join public.bookings b on b.organization_id = gjp.organization_id and b.id = gjp.grooming_job_id
+    where gjp.organization_id = v_org and gjp.deleted_at is null
+      and b.deleted_at is null and b.status not in ('canceled', 'no_show') and b.ends_at > now()
+      and (v_all_branches or app.has_branch(b.branch_id))
+  ),
+  eligible as (
+    select p.id as pet_id, p.customer_id, p.name as pet_name, c.display_name as customer_name, c.phone,
+           lv.last_at, coalesce(lv.has_future_anomaly, false) as has_future_anomaly,
+           case when lv.last_at is not null
+                then ((now() at time zone 'Asia/Jakarta')::date - (lv.last_at at time zone 'Asia/Jakarta')::date)
+                else null end as days_since,
+           (u.pet_id is not null) as has_upcoming
+    from public.pets p
+    join public.customers c on c.organization_id = p.organization_id and c.id = p.customer_id
+    left join last_visit lv on lv.pet_id = p.id
+    left join upcoming u on u.pet_id = p.id
+    where p.organization_id = v_org and p.status = 'active' and p.deleted_at is null
+      and (v_search is null or p.name ilike '%' || v_search || '%' or c.display_name ilike '%' || v_search || '%')
+  ),
+  filtered_pets as (
+    select * from eligible ep
+    where (
+      case p_filter
+        when 'never_groomed' then ep.last_at is null
+        else ep.last_at is not null and ep.days_since >= v_threshold
+      end
+      and (p_filter <> 'without_upcoming' or not ep.has_upcoming)
+    )
+  )
+  select count(distinct customer_id)              from filtered_pets"
+PL/pgSQL function list_overdue_customers(uuid,text,text,integer,integer) line 32 at SQL statement
+PL/pgSQL function inline_code_block line 4 at assignment
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+connection to server was lost
+smoke test exit=2
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+DELETE 0
+=== 2026-09-28T00:10:18+07:00 rerunning smoke test ===
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+UPDATE 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+UPDATE 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+DO
+INSERT 0 1100
+DO
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+INSERT 0 3
+INSERT 0 5
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+SET
+DO
+NOTICE:  PASS: F01 30-day pet included
+NOTICE:  PASS: F01 29-day pet excluded
+DO
+NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
+DO
+NOTICE:  PASS: F03 completed pet visible although sibling pet on the same booking is still pending
+DO
+NOTICE:  PASS: F03 the still-pending sibling pet does not falsely appear as overdue history
+DO
+NOTICE:  PASS: F04 one visit with two service lines yields exactly one pet entry, got 1
+NOTICE:  PASS: F05 overdue pet shown under default filter
+NOTICE:  PASS: F05 recently-groomed pet NOT shown under default filter
+NOTICE:  PASS: F05 never-groomed pet NOT shown under default filter (separate filter exists for it)
+NOTICE:  PASS: F05 overdue pet WITH an upcoming booking still shown (not hidden)
+NOTICE:  PASS: F05 PetFutureBooked40 is badged has_upcoming_booking=true
+DO
+NOTICE:  PASS: F05 never_groomed filter surfaces the never-groomed pet
+NOTICE:  PASS: F05 never_groomed filter excludes a pet that DOES have history
+NOTICE:  PASS: F06 future-dated legacy record flagged as an anomaly, not a negative day count
+DO
+NOTICE:  PASS: F06 a completed pet on a since-canceled booking does not count as real history
+DO
+NOTICE:  PASS: F14 customer name preserved verbatim, got Cust F14 O'Brien & Co 🐶
+NOTICE:  PASS: F14 malformed phone preserved verbatim (client decides validity, not the RPC)
+NOTICE:  PASS: F13 total_groups counts past 1000 (>=1101 expected), got 1104
+NOTICE:  PASS: F13 page 1 returns exactly page_size=100 groups, got 100
+NOTICE:  PASS: F13 the final page is still reachable, not silently dropped
+NOTICE:  PASS: F13 an exceptionally large single-customer group reports a truncated count rather than truncating silently
+DO
+ERROR:  FAIL: F07 available=0 when all remaining sessions are held, got 2
+CONTEXT:  PL/pgSQL function pg_temp_3.ok(boolean,text) line 2 at RAISE
+SQL statement "SELECT pg_temp.ok((v_m ->> 'available_count')::integer = 0, format('F07 available=0 when all remaining sessions are held, got %s', v_m ->> 'available_count'))"
+PL/pgSQL function inline_code_block line 6 at PERFORM
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+DELETE 0
+=== 2026-09-28T00:11:53+07:00 rerunning smoke test ===
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+UPDATE 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+UPDATE 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+DO
+INSERT 0 1100
+DO
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+INSERT 0 3
+INSERT 0 5
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+SET
+DO
+NOTICE:  PASS: F01 30-day pet included
+NOTICE:  PASS: F01 29-day pet excluded
+DO
+NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
+DO
+NOTICE:  PASS: F03 completed pet visible although sibling pet on the same booking is still pending
+DO
+NOTICE:  PASS: F03 the still-pending sibling pet does not falsely appear as overdue history
+DO
+NOTICE:  PASS: F04 one visit with two service lines yields exactly one pet entry, got 1
+NOTICE:  PASS: F05 overdue pet shown under default filter
+NOTICE:  PASS: F05 recently-groomed pet NOT shown under default filter
+NOTICE:  PASS: F05 never-groomed pet NOT shown under default filter (separate filter exists for it)
+NOTICE:  PASS: F05 overdue pet WITH an upcoming booking still shown (not hidden)
+NOTICE:  PASS: F05 PetFutureBooked40 is badged has_upcoming_booking=true
+NOTICE:  PASS: F05 never_groomed filter surfaces the never-groomed pet
+NOTICE:  PASS: F05 never_groomed filter excludes a pet that DOES have history
+DO
+NOTICE:  PASS: F06 future-dated legacy record flagged as an anomaly, not a negative day count
+NOTICE:  PASS: F06 a completed pet on a since-canceled booking does not count as real history
+DO
+NOTICE:  PASS: F14 customer name preserved verbatim, got Cust F14 O'Brien & Co 🐶
+NOTICE:  PASS: F14 malformed phone preserved verbatim (client decides validity, not the RPC)
+DO
+NOTICE:  PASS: F13 total_groups counts past 1000 (>=1101 expected), got 1104
+NOTICE:  PASS: F13 page 1 returns exactly page_size=100 groups, got 100
+NOTICE:  PASS: F13 the final page is still reachable, not silently dropped
+DO
+NOTICE:  PASS: F13 an exceptionally large single-customer group reports a truncated count rather than truncating silently
+NOTICE:  PASS: F07 available=0 when all remaining sessions are held, got 0
+NOTICE:  PASS: F07 held=2, got 2
+NOTICE:  PASS: F07 consumed=2 from the ledger, not inferred as total-available, got 2
+NOTICE:  PASS: F07 all_reserved=true (distinct from no_available_sessions)
+NOTICE:  PASS: F07 no_available_sessions=false -- these sessions are held, not exhausted
+DO
+NOTICE:  PASS: F08 null-expiry recurring membership shown as actionable
+ERROR:  FAIL: F08 expired-but-not-archived membership still shown as actionable
+CONTEXT:  PL/pgSQL function pg_temp_3.ok(boolean,text) line 2 at RAISE
+SQL statement "SELECT pg_temp.ok(v_ids @> array['04000000-0000-4000-8000-00000000db0e'], 'F08 expired-but-not-archived membership still shown as actionable')"
+PL/pgSQL function inline_code_block line 7 at PERFORM
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+DELETE 0
+=== 2026-09-28T01:03:33+07:00 rerunning smoke test ===
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+UPDATE 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+UPDATE 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+DO
+INSERT 0 1100
+DO
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+INSERT 0 3
+INSERT 0 5
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+SET
+DO
+DO
+NOTICE:  PASS: F01 30-day pet included
+NOTICE:  PASS: F01 29-day pet excluded
+NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
+DO
+NOTICE:  PASS: F03 completed pet visible although sibling pet on the same booking is still pending
+NOTICE:  PASS: F03 the still-pending sibling pet does not falsely appear as overdue history
+DO
+DO
+NOTICE:  PASS: F04 one visit with two service lines yields exactly one pet entry, got 1
+NOTICE:  PASS: F05 overdue pet shown under default filter
+NOTICE:  PASS: F05 recently-groomed pet NOT shown under default filter
+NOTICE:  PASS: F05 never-groomed pet NOT shown under default filter (separate filter exists for it)
+NOTICE:  PASS: F05 overdue pet WITH an upcoming booking still shown (not hidden)
+NOTICE:  PASS: F05 PetFutureBooked40 is badged has_upcoming_booking=true
+DO
+NOTICE:  PASS: F05 never_groomed filter surfaces the never-groomed pet
+NOTICE:  PASS: F05 never_groomed filter excludes a pet that DOES have history
+NOTICE:  PASS: F06 future-dated legacy record flagged as an anomaly, not a negative day count
+DO
+NOTICE:  PASS: F06 a completed pet on a since-canceled booking does not count as real history
+NOTICE:  PASS: F14 customer name preserved verbatim, got Cust F14 O'Brien & Co 🐶
+NOTICE:  PASS: F14 malformed phone preserved verbatim (client decides validity, not the RPC)
+DO
+NOTICE:  PASS: F13 total_groups counts past 1000 (>=1101 expected), got 1104
+NOTICE:  PASS: F13 page 1 returns exactly page_size=100 groups, got 100
+NOTICE:  PASS: F13 the final page is still reachable, not silently dropped
+DO
+NOTICE:  PASS: F13 an exceptionally large single-customer group reports a truncated count rather than truncating silently
+NOTICE:  PASS: F07 available=0 when all remaining sessions are held, got 0
+NOTICE:  PASS: F07 held=2, got 2
+NOTICE:  PASS: F07 consumed=2 from the ledger, not inferred as total-available, got 2
+NOTICE:  PASS: F07 all_reserved=true (distinct from no_available_sessions)
+NOTICE:  PASS: F07 no_available_sessions=false -- these sessions are held, not exhausted
+DO
+NOTICE:  PASS: F08 null-expiry recurring membership shown as actionable
+NOTICE:  PASS: F08 expired-but-not-archived membership still shown as actionable
+NOTICE:  PASS: F08 archived (canceled) membership NOT shown under actionable
+NOTICE:  PASS: F08 one-off token NOT shown under actionable by default (include_tokens=false)
+NOTICE:  PASS: F08 null expires_at means no expiry, never rendered as expired
+NOTICE:  PASS: F08 null-expiry membership is_expired=false
+NOTICE:  PASS: F08 an expired membership is flagged is_expired=true
+NOTICE:  PASS: F08 historical view shows the archived membership
+NOTICE:  PASS: F08 historical view excludes a still-active (not archived) expired membership
+NOTICE:  PASS: F08 with include_tokens=true the one-off token becomes visible
+NOTICE:  PASS: F08 the token is explicitly labeled is_recurring=false, never presented as a subscription
+DO
+NOTICE:  PASS: F09 a canceled membership's own preview reports a real blocking_reason for the UI to surface, not a fabricated amount
+DO
+DO
+NOTICE:  PASS: F11 ReadOnly can call list_overdue_customers (membership.read-shaped module/perm gate satisfied via booking.read+crm)
+DO
+NOTICE:  PASS: F11 ReadOnly can call list_renewal_queue (holds membership.read)
+DO
+NOTICE:  PASS: F11 ReadOnly (membership.read, no settings.manage) denied settings write directly at the RPC
+DO
+DO
+NOTICE:  PASS: F11 BranchRestricted denied direct p_branch access to Second P (branch it does not hold)
+DO
+NOTICE:  PASS: F11 BranchRestricted still sees history recorded at its own accessible branch
+DO
+DO
+NOTICE:  PASS: F11 NoAccess (zero permissions) denied list_overdue_customers
+DO
+NOTICE:  PASS: F11 NoAccess denied list_renewal_queue
+DO
+NOTICE:  PASS: F11 cross-org: Org Q sees zero of Org P's overdue customers
+NOTICE:  PASS: F11 cross-org: Org Q sees zero of Org P's memberships
+DO
+DO
+NOTICE:  PASS: F11 a real user authenticated for a DIFFERENT org (no membership in Org P) is denied Org P's queue, not just hidden by the UI
+DO
+DO
+UPDATE 1
+ERROR:  F12 FAIL: a stale concurrent settings write was unexpectedly accepted
+CONTEXT:  PL/pgSQL function inline_code_block line 10 at RAISE
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+DELETE 0
+=== 2026-09-28T01:06:04+07:00 rerunning smoke test ===
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+UPDATE 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+UPDATE 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+DO
+INSERT 0 1100
+DO
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+INSERT 0 3
+INSERT 0 5
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+SET
+DO
+DO
+NOTICE:  PASS: F01 30-day pet included
+NOTICE:  PASS: F01 29-day pet excluded
+NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
+DO
+NOTICE:  PASS: F03 completed pet visible although sibling pet on the same booking is still pending
+DO
+NOTICE:  PASS: F03 the still-pending sibling pet does not falsely appear as overdue history
+NOTICE:  PASS: F04 one visit with two service lines yields exactly one pet entry, got 1
+DO
+NOTICE:  PASS: F05 overdue pet shown under default filter
+NOTICE:  PASS: F05 recently-groomed pet NOT shown under default filter
+NOTICE:  PASS: F05 never-groomed pet NOT shown under default filter (separate filter exists for it)
+NOTICE:  PASS: F05 overdue pet WITH an upcoming booking still shown (not hidden)
+NOTICE:  PASS: F05 PetFutureBooked40 is badged has_upcoming_booking=true
+NOTICE:  PASS: F05 never_groomed filter surfaces the never-groomed pet
+NOTICE:  PASS: F05 never_groomed filter excludes a pet that DOES have history
+DO
+NOTICE:  PASS: F06 future-dated legacy record flagged as an anomaly, not a negative day count
+NOTICE:  PASS: F06 a completed pet on a since-canceled booking does not count as real history
+DO
+DO
+NOTICE:  PASS: F14 customer name preserved verbatim, got Cust F14 O'Brien & Co 🐶
+NOTICE:  PASS: F14 malformed phone preserved verbatim (client decides validity, not the RPC)
+NOTICE:  PASS: F13 total_groups counts past 1000 (>=1101 expected), got 1104
+NOTICE:  PASS: F13 page 1 returns exactly page_size=100 groups, got 100
+NOTICE:  PASS: F13 the final page is still reachable, not silently dropped
+DO
+NOTICE:  PASS: F13 an exceptionally large single-customer group reports a truncated count rather than truncating silently
+NOTICE:  PASS: F07 available=0 when all remaining sessions are held, got 0
+NOTICE:  PASS: F07 held=2, got 2
+NOTICE:  PASS: F07 consumed=2 from the ledger, not inferred as total-available, got 2
+DO
+NOTICE:  PASS: F07 all_reserved=true (distinct from no_available_sessions)
+NOTICE:  PASS: F07 no_available_sessions=false -- these sessions are held, not exhausted
+NOTICE:  PASS: F08 null-expiry recurring membership shown as actionable
+NOTICE:  PASS: F08 expired-but-not-archived membership still shown as actionable
+NOTICE:  PASS: F08 archived (canceled) membership NOT shown under actionable
+NOTICE:  PASS: F08 one-off token NOT shown under actionable by default (include_tokens=false)
+NOTICE:  PASS: F08 null expires_at means no expiry, never rendered as expired
+NOTICE:  PASS: F08 null-expiry membership is_expired=false
+NOTICE:  PASS: F08 an expired membership is flagged is_expired=true
+NOTICE:  PASS: F08 historical view shows the archived membership
+NOTICE:  PASS: F08 historical view excludes a still-active (not archived) expired membership
+NOTICE:  PASS: F08 with include_tokens=true the one-off token becomes visible
+NOTICE:  PASS: F08 the token is explicitly labeled is_recurring=false, never presented as a subscription
+DO
+DO
+NOTICE:  PASS: F09 a canceled membership's own preview reports a real blocking_reason for the UI to surface, not a fabricated amount
+DO
+NOTICE:  PASS: F11 ReadOnly can call list_overdue_customers (membership.read-shaped module/perm gate satisfied via booking.read+crm)
+NOTICE:  PASS: F11 ReadOnly can call list_renewal_queue (holds membership.read)
+DO
+NOTICE:  PASS: F11 ReadOnly (membership.read, no settings.manage) denied settings write directly at the RPC
+DO
+DO
+DO
+NOTICE:  PASS: F11 BranchRestricted denied direct p_branch access to Second P (branch it does not hold)
+DO
+NOTICE:  PASS: F11 BranchRestricted still sees history recorded at its own accessible branch
+DO
+DO
+NOTICE:  PASS: F11 NoAccess (zero permissions) denied list_overdue_customers
+DO
+NOTICE:  PASS: F11 NoAccess denied list_renewal_queue
+DO
+NOTICE:  PASS: F11 cross-org: Org Q sees zero of Org P's overdue customers
+DO
+NOTICE:  PASS: F11 cross-org: Org Q sees zero of Org P's memberships
+DO
+NOTICE:  PASS: F11 a real user authenticated for a DIFFERENT org (no membership in Org P) is denied Org P's queue, not just hidden by the UI
+DO
+DO
+UPDATE 1
+ERROR:  F12 FAIL: a stale concurrent settings write was unexpectedly accepted
+CONTEXT:  PL/pgSQL function inline_code_block line 17 at RAISE
+smoke test exit=3
+operro_pg16_gate
+/var/run/postgresql:5432 - accepting connections
+DELETE 0
+=== 2026-09-28T01:08:26+07:00 rerunning smoke test ===
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+UPDATE 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 5
+INSERT 0 5
+INSERT 0 5
+INSERT 0 1
+INSERT 0 0
+INSERT 0 12
+INSERT 0 2
+INSERT 0 5
+INSERT 0 8
+INSERT 0 2
+INSERT 0 4
+INSERT 0 13
+INSERT 0 1
+CREATE FUNCTION
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+UPDATE 1
+ fixture_visit 
+---------------
+ 
+(1 row)
+
+INSERT 0 1
+DO
+INSERT 0 1100
+DO
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+INSERT 0 3
+INSERT 0 5
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+SET
+DO
+NOTICE:  PASS: F01 30-day pet included
+NOTICE:  PASS: F01 29-day pet excluded
+DO
+NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
+DO
+NOTICE:  PASS: F03 completed pet visible although sibling pet on the same booking is still pending
+DO
+NOTICE:  PASS: F03 the still-pending sibling pet does not falsely appear as overdue history
+DO
+NOTICE:  PASS: F04 one visit with two service lines yields exactly one pet entry, got 1
+NOTICE:  PASS: F05 overdue pet shown under default filter
+NOTICE:  PASS: F05 recently-groomed pet NOT shown under default filter
+NOTICE:  PASS: F05 never-groomed pet NOT shown under default filter (separate filter exists for it)
+NOTICE:  PASS: F05 overdue pet WITH an upcoming booking still shown (not hidden)
+NOTICE:  PASS: F05 PetFutureBooked40 is badged has_upcoming_booking=true
+NOTICE:  PASS: F05 never_groomed filter surfaces the never-groomed pet
+NOTICE:  PASS: F05 never_groomed filter excludes a pet that DOES have history
+DO
+NOTICE:  PASS: F06 future-dated legacy record flagged as an anomaly, not a negative day count
+NOTICE:  PASS: F06 a completed pet on a since-canceled booking does not count as real history
+DO
+DO
+NOTICE:  PASS: F14 customer name preserved verbatim, got Cust F14 O'Brien & Co 🐶
+NOTICE:  PASS: F14 malformed phone preserved verbatim (client decides validity, not the RPC)
+NOTICE:  PASS: F13 total_groups counts past 1000 (>=1101 expected), got 1104
+NOTICE:  PASS: F13 page 1 returns exactly page_size=100 groups, got 100
+NOTICE:  PASS: F13 the final page is still reachable, not silently dropped
+NOTICE:  PASS: F13 an exceptionally large single-customer group reports a truncated count rather than truncating silently
+DO
+NOTICE:  PASS: F07 available=0 when all remaining sessions are held, got 0
+NOTICE:  PASS: F07 held=2, got 2
+NOTICE:  PASS: F07 consumed=2 from the ledger, not inferred as total-available, got 2
+NOTICE:  PASS: F07 all_reserved=true (distinct from no_available_sessions)
+DO
+NOTICE:  PASS: F07 no_available_sessions=false -- these sessions are held, not exhausted
+NOTICE:  PASS: F08 null-expiry recurring membership shown as actionable
+NOTICE:  PASS: F08 expired-but-not-archived membership still shown as actionable
+NOTICE:  PASS: F08 archived (canceled) membership NOT shown under actionable
+NOTICE:  PASS: F08 one-off token NOT shown under actionable by default (include_tokens=false)
+NOTICE:  PASS: F08 null expires_at means no expiry, never rendered as expired
+NOTICE:  PASS: F08 null-expiry membership is_expired=false
+NOTICE:  PASS: F08 an expired membership is flagged is_expired=true
+NOTICE:  PASS: F08 historical view shows the archived membership
+NOTICE:  PASS: F08 historical view excludes a still-active (not archived) expired membership
+NOTICE:  PASS: F08 with include_tokens=true the one-off token becomes visible
+DO
+NOTICE:  PASS: F08 the token is explicitly labeled is_recurring=false, never presented as a subscription
+NOTICE:  PASS: F09 a canceled membership's own preview reports a real blocking_reason for the UI to surface, not a fabricated amount
+DO
+DO
+NOTICE:  PASS: F11 ReadOnly can call list_overdue_customers (membership.read-shaped module/perm gate satisfied via booking.read+crm)
+DO
+NOTICE:  PASS: F11 ReadOnly can call list_renewal_queue (holds membership.read)
+DO
+NOTICE:  PASS: F11 ReadOnly (membership.read, no settings.manage) denied settings write directly at the RPC
+DO
+NOTICE:  PASS: F11 BranchRestricted denied direct p_branch access to Second P (branch it does not hold)
+DO
+DO
+NOTICE:  PASS: F11 BranchRestricted still sees history recorded at its own accessible branch
+DO
+DO
+NOTICE:  PASS: F11 NoAccess (zero permissions) denied list_overdue_customers
+NOTICE:  PASS: F11 NoAccess denied list_renewal_queue
+DO
+DO
+NOTICE:  PASS: F11 cross-org: Org Q sees zero of Org P's overdue customers
+NOTICE:  PASS: F11 cross-org: Org Q sees zero of Org P's memberships
+DO
+DO
+DO
+NOTICE:  PASS: F11 a real user authenticated for a DIFFERENT org (no membership in Org P) is denied Org P's queue, not just hidden by the UI
+DO
+UPDATE 1
+NOTICE:  PASS: F12 a settings write presenting a non-matching (stale) updated_at is rejected (40001), not silently overwritten
+NOTICE:  PASS: F12 the successful editor's value (21) is what persisted, not the rejected one (45)
+NOTICE:  PASS: F12 an unrelated settings key (branding) is untouched by the followup_retention merge
+DO
+NOTICE:  PASS: unknown placeholder rejected with a useful message, got: unknown_placeholder:totally_unknown_token
+NOTICE:  PASS: threshold=0 rejected
+NOTICE:  PASS: threshold=366 rejected
+NOTICE:  PASS: null threshold rejected
+DO
+RESET
+ROLLBACK
+smoke test exit=0
