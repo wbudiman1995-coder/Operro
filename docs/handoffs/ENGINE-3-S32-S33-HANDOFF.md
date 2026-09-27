@@ -402,11 +402,35 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
 - Local Supabase Postgres version used for tests: TBD
 - Dev port: TBD (must not collide with 54321-54324, 54341-54344 or other engines' dev ports)
 
-## 10. Final delivery (fill in at the end)
+## 10. Status as of this session's usage limit (NOT final — resume here)
 
-- Branch URL: TBD
-- Final SHA: TBD
+- Branch: `claude/sections-32-33-payroll-exports` (not pushed yet — local commits only)
+- SHA at pause: `4e62d832d1eca8d19bfac443e52310e214da583b`
 - Absolute handoff path: `E:\Claude\operro-payroll-s32-s33\docs\handoffs\ENGINE-3-S32-S33-HANDOFF.md`
-- Section 32 status: TBD
-- Section 33 status: TBD
-- Material blockers: TBD
+- **Section 32 (payroll engine): calculation + lifecycle backend DONE and verified (RPC-level,
+  via direct psql — recompute/approve/pay/idempotent-retry/undo/retention/publish all confirmed
+  correct). Frontend UI DONE, typechecks/lints clean, partially verified live in-browser (login +
+  full page render + one live override save, matching the RPC-level state exactly) before local
+  environment instability (Section 8) interrupted further click-through testing.**
+- **Section 33 (payroll exports): NOT STARTED.** No XLSX/CSV/PDF code written yet. `exceljs` and
+  `pdfkit` are installed (`apps/web/package.json`) and picked as the libraries, decision recorded
+  in Section 3, but no export route/RPC/UI exists.
+- **NOT DONE**: the permanent automated test suite (SQL functional tests under `supabase/tests/`,
+  a deterministic-fixture calculation unit test per brief section 10, concurrency tests, RLS
+  negative tests) — this session's psql checks were manual smoke tests only, not committed as
+  reusable tests. `run_all_gates.sh` has never actually been run in this session (needs a
+  disposable Postgres 16 container per Section 3's plan, not yet set up).
+- **NOT DONE**: retention-deposit UI has a button but the "eligible" boundary conditions
+  (no-term-yet, maturity boundary, already-paid, undo) are untested beyond the RPC's own
+  unique-index guarantee. Groomer-side "Gaji saya" card on `/my-schedule` — NOT built yet
+  (`loadMyPayrollSnapshot` exists in `payroll-data.ts` but nothing calls it from a page yet).
+- Material blockers: none in the code itself. The only real blocker hit this session was
+  environmental (Section 8) — concurrent-stack resource contention on this machine's WSL2 VM,
+  not anything wrong with this branch's implementation.
+- **Exact resume point**: build the `/my-schedule` "Gaji saya" card (small, `loadMyPayrollSnapshot`
+  already exists), then Section 33 exports (XLSX via `exceljs`, CSV with formula-injection
+  escaping, PDF payslip via `pdfkit`, all reading the same `payroll_items.breakdown` snapshot the
+  UI already reads — no second calculation), then the permanent test suite, then a full
+  `run_all_gates.sh` pass, then the remaining browser QA (approve/pay/undo/publish click-through,
+  cross-tenant/cross-role negative tests, mobile 375px, retention boundary cases) once the shared
+  environment isn't contended, then update this section with real final status before pushing.
