@@ -304,4 +304,64 @@ end $$;
 
 do $$ begin perform pg_temp.act_as('0f200000-0000-4000-8000-0000000000c1', '0f200000-0000-4000-8000-000000000001'); end $$;
 
+-- =======================================================================
+-- ASSERTIONS: retention deposit -- not-yet-eligible, eligible payout, exact
+-- amount, idempotent retry (unique index), and a second groomer's maturity
+-- boundary is independent of the first. Tenure is computed from real
+-- wall-clock "today" (app.org_today), not the fixture payroll period, so
+-- hired_at is set relative to current_date to stay deterministic regardless
+-- of when this suite runs.
+-- =======================================================================
+insert into auth.users (id) values
+  ('0f200000-0000-4000-8000-0000000000c4'), ('0f200000-0000-4000-8000-0000000000c5')
+  on conflict (id) do nothing;
+insert into public.users (id, full_name, email, status) values
+  ('0f200000-0000-4000-8000-0000000000c4', 'Groomer C', 'groomer-c@payroll-test.local', 'active'),
+  ('0f200000-0000-4000-8000-0000000000c5', 'Groomer D', 'groomer-d@payroll-test.local', 'active')
+  on conflict (id) do update set full_name = excluded.full_name, email = excluded.email, status = excluded.status;
+insert into public.memberships (id, organization_id, user_id, role_id, status) values
+  ('0f200000-0000-4000-8000-0000000000d4', '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000c4', '0f200000-0000-4000-8000-0000000000e2', 'active'),
+  ('0f200000-0000-4000-8000-0000000000d5', '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000c5', '0f200000-0000-4000-8000-0000000000e2', 'active');
+insert into public.membership_branch_access (organization_id, membership_id, branch_id) values
+  ('0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000d4', '0f200000-0000-4000-8000-0000000000a1'),
+  ('0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000d5', '0f200000-0000-4000-8000-0000000000a1');
+-- Groomer C: hired 3 months ago, term=2 months -> ELIGIBLE (tenure 3 >= term 2).
+-- Groomer D: hired 1 month ago, term=2 months -> NOT YET ELIGIBLE (tenure 1 < term 2).
+insert into public.resources (id, organization_id, branch_id, kind, name, capacity, status, membership_id, hired_at) values
+  ('0f200000-0000-4000-8000-00000000e503', '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000a1', 'staff', 'Groomer C', 1, 'active', '0f200000-0000-4000-8000-0000000000d4', (current_date - interval '3 months')::date),
+  ('0f200000-0000-4000-8000-00000000e504', '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000a1', 'staff', 'Groomer D', 1, 'active', '0f200000-0000-4000-8000-0000000000d5', (current_date - interval '1 month')::date);
+insert into public.staff_payroll_settings (organization_id, membership_id, retention_enabled, retention_amount_per_month, retention_term_months) values
+  ('0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000d4', true, 200000, 2),
+  ('0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000d5', true, 200000, 2);
+
+do $$
+declare v_event public.payroll_retention_events%rowtype; v_count int;
+begin
+  -- D: not yet eligible (tenure 1 < term 2) -> rejected, no event written.
+  begin
+    perform app.pay_retention_deposit('0f200000-0000-4000-8000-0000000000d5');
+    perform pg_temp.ok(false, 'D retention payout before maturity must be rejected');
+  exception when check_violation then
+    perform pg_temp.ok(sqlerrm like '%retention_not_yet_payable%', 'D retention payout rejected: retention_not_yet_payable');
+  end;
+  select count(*) into v_count from public.payroll_retention_events where membership_id = '0f200000-0000-4000-8000-0000000000d5';
+  perform pg_temp.ok(v_count = 0, 'D has no retention event recorded after the rejected attempt');
+
+  -- C: eligible (tenure 3 >= term 2) -> min(term=2, tenure=3) * 200000 = 400000.
+  v_event := app.pay_retention_deposit('0f200000-0000-4000-8000-0000000000d4');
+  perform pg_temp.ok(v_event.amount = 400000, 'C retention payout = min(term_months=2, tenure=3) * 200000/month = 400000');
+  perform pg_temp.ok(v_event.kind = 'payout', 'C retention event kind is payout');
+
+  -- Idempotent retry: the unique index (one payout per member) is caught and the
+  -- SAME event is returned, not a raw constraint error and not a second row.
+  v_event := app.pay_retention_deposit('0f200000-0000-4000-8000-0000000000d4');
+  perform pg_temp.ok(v_event.amount = 400000, 'C retention retry returns the SAME already-recorded amount (idempotent)');
+  select count(*) into v_count from public.payroll_retention_events where membership_id = '0f200000-0000-4000-8000-0000000000d4' and kind = 'payout';
+  perform pg_temp.ok(v_count = 1, 'C has exactly one payout event despite two calls -- unique index enforced, not a duplicate lump sum');
+
+  -- D remains unaffected by C's payout (independent per-membership eligibility).
+  select count(*) into v_count from public.payroll_retention_events where membership_id = '0f200000-0000-4000-8000-0000000000d5';
+  perform pg_temp.ok(v_count = 0, 'D still has zero retention events -- C''s payout did not leak across memberships');
+end $$;
+
 rollback;
