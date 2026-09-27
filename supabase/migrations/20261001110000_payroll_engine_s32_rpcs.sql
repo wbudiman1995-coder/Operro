@@ -419,6 +419,7 @@ declare
   v_org uuid := app.fn_active_organization();
   v_run_id uuid;
   v_status text;
+  v_currency text;
   m record;
   v_breakdown jsonb;
   v_override record;
@@ -433,15 +434,30 @@ begin
   insert into public.payroll_cycle_settings (organization_id)
   values (v_org) on conflict (organization_id) do nothing;
 
-  select id, status into v_run_id, v_status from public.payroll_runs
+  select id, status, currency into v_run_id, v_status, v_currency from public.payroll_runs
   where organization_id = v_org and coalesce(branch_id, '00000000-0000-0000-0000-000000000000'::uuid)
       = coalesce(p_branch, '00000000-0000-0000-0000-000000000000'::uuid)
     and period_start = p_period_start and period_end = p_period_end
   for update;
 
   if v_run_id is null then
-    insert into public.payroll_runs (organization_id, branch_id, period_start, period_end, status)
-    values (v_org, p_branch, p_period_start, p_period_end, 'draft')
+    -- payroll_runs.currency defaults to 'USD' (0009's original default, written
+    -- before this engine existed); a run must instead carry the ORG's real
+    -- currency, not that placeholder, since it flows straight into the
+    -- financial_ledger entry tg_payroll_ledger writes on pay. Prefer the org's
+    -- own declared currency (organizations.settings->>'currency'); fall back to
+    -- whatever currency its active staff_compensation rows actually use (the
+    -- most common one) when the org never set one; fall back to the table
+    -- default only if neither source exists.
+    select coalesce(
+      (select o.settings ->> 'currency' from public.organizations o where o.id = v_org),
+      (select sc.currency from public.staff_compensation sc
+       where sc.organization_id = v_org and sc.is_active and sc.deleted_at is null
+       group by sc.currency order by count(*) desc limit 1),
+      'USD'
+    ) into v_currency;
+    insert into public.payroll_runs (organization_id, branch_id, period_start, period_end, status, currency)
+    values (v_org, p_branch, p_period_start, p_period_end, 'draft', v_currency)
     returning id, status into v_run_id, v_status;
   elsif v_status <> 'draft' then
     raise exception 'run_not_editable:%', v_status using errcode = 'check_violation';
@@ -450,12 +466,19 @@ begin
   delete from public.payroll_items where organization_id = v_org and payroll_run_id = v_run_id;
 
   for m in
-    select sc.membership_id
+    select sc.membership_id, sc.currency
     from public.staff_compensation sc
     where sc.organization_id = v_org and sc.is_active and sc.deleted_at is null
       and sc.effective_from <= (p_period_end - 1)
-    group by sc.membership_id
+    group by sc.membership_id, sc.currency
   loop
+    -- Brief requirement: never sum unlike currencies into an unlabeled total.
+    -- A membership paid in a currency other than the run's is a real
+    -- configuration problem, not something to silently add together.
+    if m.currency <> v_currency then
+      raise exception 'currency_mismatch:membership=% run_currency=% staff_currency=%', m.membership_id, v_currency, m.currency
+        using errcode = 'check_violation';
+    end if;
     v_breakdown := app.compute_payroll_item(v_org, m.membership_id, p_period_start, p_period_end);
 
     for v_override in
