@@ -766,16 +766,125 @@ export async function adjustInventoryAction(_previous: PilotActionState, formDat
 
 const paymentProofMimeExtensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
+// Errors record_payment raises deliberately (the request definitely did not
+// commit) — safe to report as a plain rejection and, if we freshly uploaded
+// a proof this call, safe to clean it up. Anything NOT in this list is
+// treated as ambiguous/transport-shaped: we do not know whether the RPC
+// committed before the response was lost, so we check for real instead of
+// guessing either way.
+const PAYMENT_RPC_KNOWN_REJECTIONS = [
+  /proof_required_for_bank_transfer/, /invoice_already_paid/, /invoice_void/, /invoice_zero_due/,
+  /invalid_method/, /invalid_amount/, /invoice_not_found/, /not_authorized/,
+  /proof_attachment_not_linked_to_invoice/, /request_key_reused_with_different_inputs/,
+];
+
+function mapPaymentRpcError(message: string): string {
+  if (/proof_required_for_bank_transfer/.test(message)) return "transfer bank wajib menyertakan bukti screenshot";
+  if (/invoice_already_paid/.test(message)) return "invoice ini sudah lunas";
+  if (/invoice_void/.test(message)) return "invoice ini sudah dibatalkan";
+  if (/invoice_zero_due/.test(message)) return "invoice ini tidak memiliki tagihan";
+  if (/not_authorized/.test(message)) return "Anda tidak memiliki akses ke cabang invoice ini";
+  if (/request_key_reused_with_different_inputs/.test(message)) return "permintaan ini sudah pernah dikirim dengan data berbeda — muat ulang halaman";
+  return "server tidak dapat mencatat pembayaran. Coba lagi.";
+}
+
+type ProofResult = { id: string; storagePath: string; freshlyUploaded: boolean } | { error: string } | null;
+
+/**
+ * Uploads (or reuses) the proof for ONE logical payment submission. The
+ * storage path is DETERMINISTIC from requestKey — `${org}/payments/${requestKey}.ext`
+ * — so a genuine retry of the same submission always resolves to the SAME
+ * object and the SAME attachments/attachment_links rows instead of
+ * uploading a fresh, orphaned copy every attempt (which is what made
+ * app.record_payment's changed-input detection reject legitimate retries:
+ * a new random attachment id every submission looks like a changed input).
+ * If a prior attempt already got the attachment row (or even just the
+ * upload) done, this reuses it and never re-uploads or re-links.
+ */
+async function ensurePaymentProof(
+  context: { supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never; organizationId: string; userId: string },
+  invoiceId: string, requestKey: string, proofFile: FormDataEntryValue | null,
+): Promise<ProofResult> {
+  if (!(proofFile instanceof File) || proofFile.size === 0) return null;
+  const extension = paymentProofMimeExtensions[proofFile.type];
+  if (!extension) return { error: "format harus JPG, PNG, atau WebP" };
+  if (proofFile.size > 4 * 1024 * 1024) return { error: "ukuran maksimum 4 MB" };
+  const storagePath = `${context.organizationId}/payments/${requestKey}.${extension}`;
+
+  const existing = await context.supabase.from("attachments").select("id").eq("organization_id", context.organizationId).eq("storage_path", storagePath).is("deleted_at", null).maybeSingle();
+  let attachmentId: string;
+  let freshlyUploaded = false;
+  if (existing.data) {
+    attachmentId = existing.data.id;
+  } else {
+    const upload = await context.supabase.storage.from("attachments").upload(storagePath, proofFile, { contentType: proofFile.type, upsert: true });
+    if (upload.error) return { error: `gagal diunggah: ${upload.error.message}` };
+    const attachment = await context.supabase.from("attachments").insert({
+      organization_id: context.organizationId, storage_bucket: "attachments", storage_path: storagePath,
+      filename: proofFile.name.slice(0, 200) || `bukti.${extension}`, mime_type: proofFile.type, size_bytes: proofFile.size,
+      uploaded_by: context.userId, metadata: { category: "payment_proof" },
+    }).select("id").single();
+    if (attachment.error || !attachment.data) {
+      await context.supabase.storage.from("attachments").remove([storagePath]);
+      return { error: "metadata gagal disimpan" };
+    }
+    attachmentId = attachment.data.id;
+    freshlyUploaded = true;
+  }
+  // Idempotent regardless of whether the attachment row is new or reused —
+  // covers the partial-failure case where a prior attempt created the
+  // attachment but died before linking it.
+  const link = await context.supabase.from("attachment_links").upsert(
+    { organization_id: context.organizationId, attachment_id: attachmentId, subject_type: "invoice", subject_id: invoiceId },
+    { onConflict: "attachment_id,subject_type,subject_id", ignoreDuplicates: true },
+  );
+  if (link.error) return { error: `gagal ditautkan ke invoice: ${link.error.message}` };
+  return { id: attachmentId, storagePath, freshlyUploaded };
+}
+
+/**
+ * Calls app.record_payment and, on an error record_payment did NOT raise
+ * deliberately, checks whether the payment actually committed before
+ * reporting failure — a lost response must never be treated as "definitely
+ * did not happen" when it might have, because the caller (recordPaymentAction)
+ * uses "definitely did not happen" as the ONLY condition under which it is
+ * safe to delete a freshly-uploaded proof.
+ */
+async function callRecordPayment(
+  context: { supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never; organizationId: string },
+  args: { invoiceId: string; method: string; amount: number; proofAttachmentId: string | null; requestKey: string },
+): Promise<{ payment: Record<string, unknown>; recovered: boolean } | { error: string; ambiguous: boolean }> {
+  const result = await context.supabase.schema("app").rpc("record_payment", {
+    p_invoice: args.invoiceId, p_method: args.method, p_amount: args.amount,
+    p_external_ref: `MANUAL-${args.requestKey}`, // deterministic: stable across retries of the same requestKey
+    p_proof_attachment: args.proofAttachmentId, p_request_key: args.requestKey,
+  });
+  if (!result.error) return { payment: result.data as Record<string, unknown>, recovered: false };
+
+  const message = result.error.message;
+  if (PAYMENT_RPC_KNOWN_REJECTIONS.some((re) => re.test(message))) return { error: message, ambiguous: false };
+
+  const recovered = await context.supabase.from("payments").select("*").eq("organization_id", context.organizationId).eq("request_key", args.requestKey).maybeSingle();
+  if (recovered.data) return { payment: recovered.data, recovered: true };
+  return { error: message, ambiguous: true };
+}
+
+async function cleanupRejectedProof(context: { supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never; organizationId: string }, proof: ProofResult) {
+  if (!proof || "error" in proof || !proof.freshlyUploaded) return;
+  await context.supabase.from("attachment_links").delete().eq("organization_id", context.organizationId).eq("attachment_id", proof.id);
+  await context.supabase.from("attachments").delete().eq("organization_id", context.organizationId).eq("id", proof.id);
+  await context.supabase.storage.from("attachments").remove([proof.storagePath]);
+}
+
 /**
  * Records a payment through app.record_payment (section 29). Direct inserts into
  * `payments` are revoked at the privilege layer (20260928100000_payment_control_workflow.sql)
- * so this RPC is now the only way to record one. bank_transfer requires a proof
- * screenshot: it is uploaded to the private `attachments` bucket and linked to
- * THIS invoice (subject_type='invoice') before the RPC call, because the RPC
- * verifies that specific linkage rather than trusting a bare attachment ID.
- * `requestKey` is generated once per form mount (PaymentForm) and resubmitted
- * unchanged on retry, which is what makes app.record_payment's idempotency work
- * — a fresh key would defeat it on every retry.
+ * so this RPC is now the only way to record one. `requestKey` is generated once
+ * per logical submission (PaymentForm regenerates it only after an ACKNOWLEDGED
+ * success — see pilot-forms.tsx) and resubmitted unchanged on retry; every value
+ * derived from it (external_ref, the proof's storage path) is deterministic for
+ * the SAME reason: a retry must look identical to the RPC, not like a new,
+ * conflicting request.
  */
 export async function recordPaymentAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
@@ -785,51 +894,16 @@ export async function recordPaymentAction(_previous: PilotActionState, formData:
     return databaseError("Pembayaran", "data tidak valid");
   }
 
-  let proofAttachmentId: string | null = null;
-  let storagePath: string | null = null;
-  const proofFile = formData.get("proof");
-  if (proofFile instanceof File && proofFile.size > 0) {
-    const extension = paymentProofMimeExtensions[proofFile.type];
-    if (!extension) return databaseError("Bukti transfer", "format harus JPG, PNG, atau WebP");
-    if (proofFile.size > 4 * 1024 * 1024) return databaseError("Bukti transfer", "ukuran maksimum 4 MB");
-    storagePath = `${context.organizationId}/payments/${invoiceId}/${crypto.randomUUID()}.${extension}`;
-    const upload = await context.supabase.storage.from("attachments").upload(storagePath, proofFile, { contentType: proofFile.type, upsert: false });
-    if (upload.error) return databaseError("Bukti transfer gagal diunggah", upload.error.message);
-    const attachment = await context.supabase.from("attachments").insert({
-      organization_id: context.organizationId, storage_bucket: "attachments", storage_path: storagePath,
-      filename: proofFile.name.slice(0, 200) || `bukti.${extension}`, mime_type: proofFile.type, size_bytes: proofFile.size,
-      uploaded_by: context.userId, metadata: { category: "payment_proof" },
-    }).select("id").single();
-    if (attachment.error || !attachment.data) {
-      await context.supabase.storage.from("attachments").remove([storagePath]);
-      return databaseError("Bukti transfer", "metadata gagal disimpan");
-    }
-    const link = await context.supabase.from("attachment_links").insert({ organization_id: context.organizationId, attachment_id: attachment.data.id, subject_type: "invoice", subject_id: invoiceId });
-    if (link.error) {
-      await context.supabase.from("attachments").delete().eq("organization_id", context.organizationId).eq("id", attachment.data.id);
-      await context.supabase.storage.from("attachments").remove([storagePath]);
-      return databaseError("Bukti transfer", "gagal ditautkan ke invoice");
-    }
-    proofAttachmentId = attachment.data.id;
-  }
+  const proof = await ensurePaymentProof(context, invoiceId, requestKey, formData.get("proof"));
+  if (proof && "error" in proof) return databaseError("Bukti transfer", proof.error);
 
-  const result = await context.supabase.schema("app").rpc("record_payment", {
-    p_invoice: invoiceId, p_method: method, p_amount: amount, p_external_ref: `MANUAL-${Date.now()}`,
-    p_proof_attachment: proofAttachmentId, p_request_key: requestKey,
-  });
-  if (result.error) {
-    if (storagePath) await context.supabase.storage.from("attachments").remove([storagePath]);
-    const message = result.error.message;
-    if (/proof_required_for_bank_transfer/.test(message)) return databaseError("Pembayaran", "transfer bank wajib menyertakan bukti screenshot");
-    if (/invoice_already_paid/.test(message)) return databaseError("Pembayaran", "invoice ini sudah lunas");
-    if (/invoice_void/.test(message)) return databaseError("Pembayaran", "invoice ini sudah dibatalkan");
-    if (/invoice_zero_due/.test(message)) return databaseError("Pembayaran", "invoice ini tidak memiliki tagihan");
-    if (/not_authorized/.test(message)) return databaseError("Pembayaran", "Anda tidak memiliki akses ke cabang invoice ini");
-    console.error("record_payment RPC failed", { code: result.error.code, message });
-    return databaseError("Pembayaran gagal", "server tidak dapat mencatat pembayaran. Coba lagi.");
+  const outcome = await callRecordPayment(context, { invoiceId, method, amount, proofAttachmentId: proof?.id ?? null, requestKey });
+  if ("error" in outcome) {
+    if (!outcome.ambiguous) await cleanupRejectedProof(context, proof);
+    return databaseError("Pembayaran", mapPaymentRpcError(outcome.error));
   }
   revalidatePath("/finance"); revalidatePath("/dashboard"); revalidatePath("/reports");
-  return { error: null, success: "Pembayaran berhasil dicatat." };
+  return { error: null, success: outcome.recovered ? "Pembayaran ini sebelumnya sudah berhasil dicatat (dipulihkan setelah koneksi sempat terputus)." : "Pembayaran berhasil dicatat." };
 }
 
 export async function recordExpenseAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
@@ -842,32 +916,48 @@ export async function recordExpenseAction(_previous: PilotActionState, formData:
 }
 
 /**
- * Sells a catalog package to a customer: creates the customer_packages entry and records
- * the payment through app.record_package_purchase_payment (payments.invoice_id is
- * nullable — an invoice is not required). Packages have no service/product catalog row,
- * so they cannot become an order_item (item_type only allows service|product) and cannot
- * flow through invoices the way a booking does — this is a genuine schema gap, not an
- * oversight.
+ * Sells a catalog package through app.create_package_invoice (pre-existing,
+ * 20260924120000_invoice_workflow.sql) instead of a raw customer_packages
+ * insert + the now-retired app.record_package_purchase_payment RPC (P3
+ * closeout finding: that path wrote entitlements outside any transaction
+ * shared with the payment, so a failed/retried sale could duplicate sessions,
+ * had no ledger row, and labelled every transfer legacy_unreviewed with no
+ * proof path). create_package_invoice atomically creates the order/invoice/
+ * invoice_line/customer_packages/ledger rows and is itself request_key-
+ * idempotent, so calling it twice with the same key returns the SAME invoice
+ * rather than a second one. The payment against that invoice then goes
+ * through the identical record_payment + proof pipeline as recordPaymentAction
+ * — same idempotency, same proof review workflow, no second billing engine.
  */
 export async function sellPackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   const customerId = idValue(formData, "customerId"); const packageId = idValue(formData, "packageId"); const branchId = idValue(formData, "branchId");
   const method = textValue(formData, "method", 30); const requestKey = idValue(formData, "requestKey");
   if (!customerId || !packageId || !branchId || !["cash", "card", "wallet", "bank_transfer", "other"].includes(method) || !requestKey) return databaseError("Paket", "data tidak valid");
-  const { data: pkg } = await context.supabase.from("packages").select("id,name,total_sessions,price,currency,validity_days").eq("organization_id", context.organizationId).eq("id", packageId).eq("is_active", true).maybeSingle();
+  const { data: pkg } = await context.supabase.from("packages").select("id,name,price").eq("organization_id", context.organizationId).eq("id", packageId).eq("is_active", true).maybeSingle();
   if (!pkg) return databaseError("Paket", "paket tidak ditemukan");
-  const purchasedAt = new Date();
-  const expiresAt = pkg.validity_days != null ? new Date(purchasedAt.getTime() + pkg.validity_days * 86_400_000).toISOString() : null;
-  const { error: purchaseError } = await context.supabase.from("customer_packages").insert({ organization_id: context.organizationId, customer_id: customerId, package_id: pkg.id, sessions_remaining: pkg.total_sessions, purchased_at: purchasedAt.toISOString(), expires_at: expiresAt, status: "active", metadata: { created_from: "homepaw_pilot" } });
-  if (purchaseError) return databaseError("Paket gagal dijual", purchaseError.message);
+
+  const invoiceResult = await context.supabase.schema("app").rpc("create_package_invoice", {
+    p_branch: branchId, p_customer: customerId, p_package: pkg.id,
+    p_issued_at: new Date().toISOString(), p_due_at: null, p_admin_notes: null, p_request_key: requestKey,
+  });
+  if (invoiceResult.error) {
+    const message = invoiceResult.error.message;
+    if (/not_authorized/.test(message)) return databaseError("Paket", "Anda tidak memiliki akses ke cabang ini");
+    if (/customer_not_found/.test(message)) return databaseError("Paket", "pelanggan tidak ditemukan");
+    if (/package_not_found/.test(message)) return databaseError("Paket", "paket tidak ditemukan atau nonaktif");
+    return databaseError("Paket gagal dijual", message);
+  }
+  const invoice = invoiceResult.data as { id: string; total: number };
+
   if (Number(pkg.price) > 0) {
-    // app.record_package_purchase_payment: payments no longer accepts a direct
-    // insert (revoked in 20260928100000_payment_control_workflow.sql).
-    const result = await context.supabase.schema("app").rpc("record_package_purchase_payment", {
-      p_branch: branchId, p_customer: customerId, p_package: pkg.id, p_method: method,
-      p_amount: pkg.price, p_currency: pkg.currency, p_request_key: requestKey,
-    });
-    if (result.error) return databaseError("Paket tersimpan, tapi pembayaran gagal dicatat", result.error.message);
+    const proof = await ensurePaymentProof(context, invoice.id, requestKey, formData.get("proof"));
+    if (proof && "error" in proof) return databaseError("Bukti transfer", proof.error);
+    const outcome = await callRecordPayment(context, { invoiceId: invoice.id, method, amount: invoice.total, proofAttachmentId: proof?.id ?? null, requestKey });
+    if ("error" in outcome) {
+      if (!outcome.ambiguous) await cleanupRejectedProof(context, proof);
+      return databaseError("Paket tersimpan, tapi pembayaran gagal dicatat", mapPaymentRpcError(outcome.error));
+    }
   }
   revalidatePath("/programs"); revalidatePath(`/customers/${customerId}`); revalidatePath("/finance");
   return { error: null, success: `${pkg.name} berhasil dijual.` };
