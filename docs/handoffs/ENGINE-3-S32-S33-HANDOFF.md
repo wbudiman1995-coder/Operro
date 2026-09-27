@@ -302,6 +302,15 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
 
 ## 6. Checkpoints
 
+- [x] Checkpoint 1 (frontend half): `/payroll` page + `payroll-actions.ts` + `payroll-data.ts` +
+      client components (`payroll-action-form.tsx`, `payroll-staff-card.tsx`,
+      `payroll-settings-form.tsx`) — cycle nav, stat cards, settings panel, missing-invoice queue,
+      per-component override editor, custom-pay-row editor, staff on/off toggles. Typechecks and
+      lints clean across the whole workspace. Old `PayrollWorkspace`/`loadPayrollWorkspace` (in
+      `pilot-data.ts`) and the 3 old payroll actions (in `pilot-actions.ts`) removed and replaced
+      by the dedicated new modules — see Section 7 for the exact shared-file edits. Added
+      `payroll.approve` to `CAPABILITY_KEYS` in `authorization.ts` (was missing; the DB permission
+      already existed but nothing in the frontend checked it).
 - [x] Checkpoint 1 (backend half): calculation engine — `supabase/migrations/20261001100000_payroll_engine_s32.sql`
       (schema) + `20261001110000_payroll_engine_s32_rpcs.sql` (cycle bounds, working-day stats,
       eligible-pets/transport-shares, `compute_payroll_item`, `recompute_payroll_run`,
@@ -322,11 +331,70 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
 
 ## 7. Dependencies / shared-file edit log
 
-_List any edits to shared pilot-actions/pilot-data/navigation/report files here as they happen, with overlap risk vs Engine 1/2._
+- `apps/web/src/app/pilot-actions.ts`: removed the 3 old payroll actions
+  (`recomputePayrollRunAction`/`approvePayrollRunAction`/`markPayrollRunPaidAction`, ~55 lines)
+  and their line in the top function-index comment. Replaced by
+  `apps/web/src/app/payroll/payroll-actions.ts` (new file, payroll-only). **Overlap risk with
+  Engine 1/2: low** — this is a pure deletion of payroll-specific code neither engine's scope
+  touches (sections 23-26 / 27-30), and every other export in the file is untouched.
+- `apps/web/src/lib/pilot-data.ts`: removed the old `PayrollWorkspace` interface and
+  `loadPayrollWorkspace` function (~20 lines) and the now-dead `embeddedStaffName` helper it was
+  the sole caller of, plus the function-index comment line. Replaced by
+  `apps/web/src/lib/payroll-data.ts`. **Overlap risk: low**, same reasoning as above.
+- `apps/web/src/lib/authorization.ts`: added `"payroll.approve"` to `CAPABILITY_KEYS` (1 line,
+  additive — the permission already existed in the DB catalog from migration 0011, nothing in
+  the frontend read it). **Overlap risk: very low**, additive to a fixed-shape const array.
+- `apps/web/src/app/payroll/page.tsx`: full rewrite (was the section-32-free MVP version).
+  **Overlap risk: none** — this route is exclusively payroll's.
+- `run_all_gates.sh`: appended both new migration files to `EXPECTED_MIGRATIONS` (additive, gate
+  requires an exact match). **Overlap risk: real but expected** — Engine 1/2 will each need to
+  do the same for their own migrations; whoever merges last resolves a trivial array-append
+  conflict, not a logic conflict.
+- `supabase/seed.sql`: fixed a stale/wrong comment (said `owner@homepaw.local`, actual code
+  creates `wbudiman1995@gmail.com`) discovered while debugging a real login failure during QA.
+  **Overlap risk: none** — comment-only, corrects a pre-existing bug affecting all three engines'
+  local QA equally.
+- No edits to any other engine's migration files, and no edits to `apps/web/src/app/pilot-actions.ts`
+  or `pilot-data.ts` beyond the payroll-specific removals above.
 
 ## 8. Known gaps / blockers
 
-_None yet — reconnaissance not started._
+- **Local environment is under severe resource contention from concurrent engine stacks.**
+  `free -h` inside WSL2 showed `973Mi` free of `7.7Gi` total while FOUR full local Supabase
+  stacks were running simultaneously: mine (`operro-payroll-s3233-local`), `operro-m13-local`
+  (main repo), `operro-s2730-local` (Engine 2), and a fourth, previously-unseen
+  `operro-retention-s35-local` stack (not one of the three engines named in this task's brief —
+  presumably another concurrent session's work; not investigated further since it isn't mine to
+  touch). `supabase_analytics_operro-s2730-local` was observed pegged at ~296% CPU (thrashing).
+  Symptom: the Next.js dev server's `fetch` calls to its own Supabase Kong gateway intermittently
+  hang ~7s then fail with `TypeError: fetch failed` / `net::ERR_CONNECTION_RESET` /
+  `net::ERR_EMPTY_RESPONSE`, even though a bare `curl` to the same endpoint succeeds seconds
+  before or after — consistent with WSL2/Docker Desktop port-proxy connections being dropped
+  under memory/CPU pressure, not an application bug. Reproduced across a stopped+restarted
+  Supabase stack AND a fully restarted Next.js dev server, ruling out stale-process/stale-pool
+  explanations. This matches `run_all_gates.sh`'s own pre-existing comment anticipating "known
+  WSL host-TCP issues."
+  - **What IS verified working through this instability**, via direct `docker exec psql` against
+    the real local Postgres (bypassing the flaky Next<->Kong HTTP hop entirely): the full
+    `recompute -> approve -> pay -> idempotent pay retry (no duplicate ledger row) -> undo
+    (compensating ledger entry, run back to draft) -> publish -> groomer reads their own
+    snapshot -> unauthorized recompute denied by RLS` lifecycle (Section 6 checkpoint note).
+  - **What IS verified working through the real browser** before the environment degraded: sign-in
+    as the QA owner (`wbudiman1995@gmail.com` / `operro-local-qa`), the full `/payroll` page
+    rendering real cycle/stat/settings/missing-queue/staff-card data matching the psql-level
+    state exactly, and a live component override save (`Basic Grooming per dog` -> Rp 50.000)
+    that correctly triggered a server-side recompute and updated the total in the UI
+    (Rp 3.600.000 -> Rp 3.650.000) — direct evidence the App Router server actions -> RPC chain
+    works end-to-end, not just the RPCs in isolation.
+  - **Not yet re-confirmed through the browser** because of this instability: custom-row add (the
+    one in-flight attempt hit the network fault mid-submit and needs a clean retry), and
+    approve/pay/undo/publish/unpublish through their actual UI buttons (all proven at the RPC
+    layer above, just not re-clicked in a live browser session yet). Revisit once the shared
+    environment has less concurrent load, or when other engines' stacks are stopped.
+  - Fixed a genuine, pre-existing, unrelated bug found while diagnosing this: `supabase/seed.sql`'s
+    QA-login comment said `owner@homepaw.local`, but the actual `insert into auth.users` uses
+    `wbudiman1995@gmail.com` — the comment was simply wrong and caused a real failed-login
+    red herring during this session. Corrected the comment (small, low-risk, shared-file fix).
 
 ## 9. Environment identity
 

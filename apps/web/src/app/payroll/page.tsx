@@ -1,74 +1,111 @@
 /**
- * Payroll route for the HomePaw pilot.
- *
- * Attendance exceptions are shown beside compensation so payroll review can resolve
- * late and missing-photo records before approval.
+ * Payroll route (sections 32-33). Configurable cycle (org-wide, business-timezone-safe
+ * bounds from app.payroll_cycle_bounds), per-groomer component breakdown with draft
+ * overrides/custom rows, approve/pay/undo lifecycle, retention deposits, and
+ * publish/hide to the staff's own page. Attendance exceptions stay visible alongside
+ * compensation so payroll review can resolve late/missing-photo records before approval.
  */
 import Link from "next/link";
-import { approvePayrollRunAction, markPayrollRunPaidAction, recomputePayrollRunAction } from "@/app/pilot-actions";
-import { ActionSubmitButton } from "@/components/action-submit-button";
+
+import { PayrollActionForm } from "@/components/payroll-action-form";
+import { PayrollCycleSettingsForm, StaffPayrollSettingsForm } from "@/components/payroll-settings-form";
+import { PayrollStaffCard } from "@/components/payroll-staff-card";
 import { EmptyState, PageHeader, StatCard } from "@/components/pilot-ui";
+import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
-import { formatRupiah, loadPayrollWorkspace } from "@/lib/pilot-data";
+import { formatRupiah } from "@/lib/pilot-data";
+import { loadPayrollWorkspace } from "@/lib/payroll-data";
+import { recomputePayrollAction, approvePayrollAction, payPayrollAction, undoPayrollPaymentAction } from "@/app/payroll/payroll-actions";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 
 export const metadata = { title: "Payroll" };
 
 const RUN_STATUS_LABEL: Record<string, string> = { draft: "Draft", approved: "Disetujui", paid: "Lunas" };
 
-function currentMonthBounds() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), label: start.toLocaleDateString("id-ID", { month: "long", year: "numeric" }) };
-}
-
-export default async function PayrollPage() {
+export default async function PayrollPage({ searchParams }: { searchParams: Promise<{ anchor?: string }> }) {
   const workspace = await requireActiveWorkspace();
-  const period = currentMonthBounds();
-  const data = await loadPayrollWorkspace(workspace.supabase, workspace.activeOrganization.id, period.start, period.end);
-  const totalGross = data.staff.reduce((sum, s) => sum + s.grossPay, 0);
+  const header = <PageHeader eyebrow="Payroll" title="Payroll" description="Konfigurasi cycle, komponen gaji per groomer, dan siklus persetujuan/pembayaran." />;
+  if (!workspace.capabilities["payroll.read"]) {
+    return <WorkspaceShell {...workspace} activePath="/payroll">{header}<div className="mt-7"><RestrictedNotice title="Tidak ada izin payroll" description="Peran ini memerlukan payroll.read." /></div></WorkspaceShell>;
+  }
+  const params = await searchParams;
+  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(params.anchor ?? "") ? params.anchor! : null;
+  const data = await loadPayrollWorkspace(workspace.supabase, workspace.activeOrganization.id, anchor);
+  const canManage = workspace.capabilities["payroll.manage"];
+  const canApprove = workspace.capabilities["payroll.approve"];
+  const run = data.run;
+  const runId = run?.id ?? null;
 
-  return <WorkspaceShell {...workspace} activePath="/payroll"><PageHeader eyebrow={period.label} title="Payroll" description="Gaji pokok dari staff compensation, ditambah komisi yang sudah terakru dari booking selesai." />
-    <div className="mt-7 grid gap-4 sm:grid-cols-3">
+  return <WorkspaceShell {...workspace} activePath="/payroll">{header}
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <Link href={`/payroll?anchor=${data.previousAnchor}`} className="rounded-lg border px-3 py-2 text-xs font-bold">← Cycle sebelumnya</Link>
+        <span className="px-2 text-sm font-bold">{data.label}</span>
+        <Link href={`/payroll?anchor=${data.nextAnchor}`} className="rounded-lg border px-3 py-2 text-xs font-bold">Cycle berikutnya →</Link>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/attendance?month=${data.periodStart.slice(0, 7)}`} className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-800">Periksa kehadiran</Link>
+        {canManage && (!run || run.status === "draft") ? (
+          <PayrollActionForm action={recomputePayrollAction} hidden={{ periodStart: data.periodStart, periodEnd: data.periodEnd }} buttonLabel={run ? "Hitung ulang" : "Hitung payroll"} pendingLabel="Menghitung…" buttonClassName="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60" />
+        ) : null}
+        {canApprove && run?.status === "draft" ? (
+          <PayrollActionForm action={approvePayrollAction} hidden={{ runId: run.id }} buttonLabel="Setujui" pendingLabel="Menyetujui…" buttonClassName="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60" />
+        ) : null}
+        {canApprove && run?.status === "approved" ? (
+          <PayrollActionForm action={payPayrollAction} hidden={{ runId: run.id }} buttonLabel="Tandai sudah dibayar" pendingLabel="Menyimpan…" buttonClassName="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60" />
+        ) : null}
+      </div>
+    </div>
+
+    <div className="mt-5 grid gap-4 sm:grid-cols-3">
       <StatCard label="Staf aktif" value={String(data.staff.length)} helper="Dengan konfigurasi gaji." />
-      <StatCard label="Total payroll" value={formatRupiah(totalGross)} helper="Estimasi bulan berjalan." tone="success" />
-      <StatCard label="Status cycle" value={data.run ? RUN_STATUS_LABEL[data.run.status] ?? data.run.status : "Belum dihitung"} helper={data.run?.status === "paid" || data.run?.status === "approved" ? `Total tersimpan: ${formatRupiah(data.run.totalGross)}` : "Klik hitung untuk membuat draft."} />
+      <StatCard label="Total payroll" value={formatRupiah(run?.totalGross ?? data.staff.reduce((sum, s) => sum + s.grossPay, 0))} helper="Cycle berjalan." tone="success" />
+      <StatCard label="Status cycle" value={run ? RUN_STATUS_LABEL[run.status] ?? run.status : "Belum dihitung"} helper={run?.status === "paid" || run?.status === "approved" ? `Total tersimpan: ${formatRupiah(run.totalGross)}` : "Klik hitung untuk membuat draft."} />
     </div>
 
-    <div className="mt-7 flex flex-wrap gap-2">
-      <Link href={`/attendance?month=${period.start.slice(0, 7)}`} className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-800">Periksa kehadiran</Link>
-      {!data.run || data.run.status === "draft" ? (
-        <form action={recomputePayrollRunAction}>
-          <input type="hidden" name="periodStart" value={period.start} />
-          <input type="hidden" name="periodEnd" value={period.end} />
-          <ActionSubmitButton pendingLabel="Menghitung…" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60" disabled={data.staff.length === 0}>{data.run ? "Hitung ulang" : "Hitung payroll"}</ActionSubmitButton>
-        </form>
-      ) : null}
-      {data.run?.status === "draft" ? (
-        <form action={approvePayrollRunAction}>
-          <input type="hidden" name="runId" value={data.run.id} />
-          <ActionSubmitButton pendingLabel="Menyetujui…" className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">Setujui</ActionSubmitButton>
-        </form>
-      ) : null}
-      {data.run?.status === "approved" ? (
-        <form action={markPayrollRunPaidAction}>
-          <input type="hidden" name="runId" value={data.run.id} />
-          <ActionSubmitButton pendingLabel="Menyimpan…" className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">Tandai sudah dibayar</ActionSubmitButton>
-        </form>
-      ) : null}
-    </div>
+    {run?.status === "paid" && canApprove ? (
+      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <PayrollActionForm
+          action={undoPayrollPaymentAction} hidden={{ runId: run.id }}
+          buttonLabel="Undo pembayaran (koreksi)" pendingLabel="Membatalkan…"
+          buttonClassName="rounded-lg bg-amber-700 px-4 py-2 text-xs font-bold text-white disabled:cursor-wait disabled:opacity-60"
+          confirmMessage="Undo pembayaran cycle ini? Ini akan tercatat sebagai koreksi beraudit (bukan penghapusan), dan cycle kembali ke draft untuk diperbaiki."
+        >
+          <textarea name="reason" required minLength={3} placeholder="Alasan koreksi (wajib)" className="mb-2 block h-16 w-full max-w-md rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-xs" />
+        </PayrollActionForm>
+        {run.correctionCount > 0 ? <p className="mt-2 text-[11px] font-semibold text-amber-800">{run.correctionCount}x dikoreksi sebelumnya.</p> : null}
+      </div>
+    ) : null}
 
-    <section className="mt-7 rounded-3xl border border-slate-200 bg-white shadow-sm">
+    {canManage ? <div className="mt-5"><PayrollCycleSettingsForm settings={data.settings} /></div> : null}
+
+    {data.missing.length > 0 ? (
+      <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-amber-800">Selesai tapi belum ada invoice ({data.missing.length})</h2>
+        <p className="mt-1 text-[11px] text-amber-700">Pekerjaan ini tidak masuk hitungan payroll sampai invoice dibuat.</p>
+        <div className="mt-2 space-y-1">
+          {data.missing.map((m) => (
+            <div key={m.groomingJobPetId} className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 text-xs">
+              <span>{m.staffName} · {new Date(m.startsAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</span>
+              <Link href={`/bookings?id=${m.bookingId}`} className="font-bold text-sky-700">Buka booking</Link>
+            </div>
+          ))}
+        </div>
+      </section>
+    ) : null}
+
+    <section className="mt-6">
       {data.staff.length === 0 ? (
-        <div className="p-6"><EmptyState title="Belum ada staf" description="Tambahkan konfigurasi gaji (staff_compensation) untuk groomer terlebih dahulu." /></div>
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><EmptyState title="Belum ada staf" description="Tambahkan konfigurasi gaji (staff_compensation) untuk groomer terlebih dahulu." /></div>
       ) : (
-        <div className="divide-y">{data.staff.map((s) => (
-          <div key={s.membershipId} className="flex items-center justify-between gap-4 p-5">
-            <div><p className="font-bold">{s.name}</p><p className="mt-1 text-xs text-slate-500">Pokok {formatRupiah(s.basePay)} · Komisi {formatRupiah(s.commissionTotal)}</p><p className={`mt-1 text-xs font-semibold ${s.lateCount || s.missingPhotoCount ? "text-amber-700" : "text-emerald-700"}`}>{s.attendanceTotal} kehadiran · {s.lateCount} terlambat ({s.lateMinutes} menit) · {s.missingPhotoCount} tanpa foto · {s.waivedCount} waiver</p></div>
-            <p className="text-lg font-bold text-emerald-700">{formatRupiah(s.grossPay)}</p>
-          </div>
-        ))}</div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {data.staff.map((staff) => (
+            <div key={staff.membershipId}>
+              <PayrollStaffCard staff={staff} runId={runId} runStatus={run?.status ?? null} canManage={Boolean(canManage)} canApprove={Boolean(canApprove)} />
+              {canManage ? <StaffPayrollSettingsForm staff={staff} /> : null}
+            </div>
+          ))}
+        </div>
       )}
     </section>
   </WorkspaceShell>;

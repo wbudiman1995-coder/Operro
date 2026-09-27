@@ -14,7 +14,7 @@
  * - recordPaymentAction / recordExpenseAction: records manual financial activity.
  * - sellPackageAction: sells a catalog package to a customer and records the payment.
  * - setCustomerNextDiscountAction / revokeCustomerNextDiscountAction: manages a customer's one-use next-booking offer.
- * - recomputePayrollRunAction / approvePayrollRunAction / markPayrollRunPaidAction: payroll lifecycle.
+ * - Payroll lifecycle (sections 32-33) lives in @/app/payroll/payroll-actions, not here.
  */
 import "server-only";
 
@@ -786,59 +786,8 @@ export async function sellPackageAction(_previous: PilotActionState, formData: F
   return { error: null, success: `${pkg.name} berhasil dijual.` };
 }
 
-/**
- * Payroll lifecycle. payroll_items are insert-only once written (DB trigger blocks direct
- * update), so "recompute" deletes and reinserts while the run is still draft. Base pay
- * comes from staff_compensation as-is. Attendance exceptions are reviewed separately;
- * #32 will add explicit hours and adjustment rules before they affect net pay.
- */
-export async function recomputePayrollRunAction(formData: FormData) {
-  const context = await workspace(); if (!context) return;
-  const periodStart = textValue(formData, "periodStart", 10); const periodEnd = textValue(formData, "periodEnd", 10);
-  if (!periodStart || !periodEnd) return;
-
-  const { data: existingRun } = await context.supabase.from("payroll_runs").select("id,status").eq("organization_id", context.organizationId).eq("period_start", periodStart).eq("period_end", periodEnd).maybeSingle();
-  if (existingRun && existingRun.status !== "draft") return;
-
-  let runId = existingRun?.id ?? null;
-  if (!runId) {
-    const { data: run, error: runError } = await context.supabase.from("payroll_runs").insert({ organization_id: context.organizationId, period_start: periodStart, period_end: periodEnd, status: "draft" }).select("id").single();
-    if (runError || !run) return;
-    runId = run.id;
-  } else {
-    await context.supabase.from("payroll_items").delete().eq("organization_id", context.organizationId).eq("payroll_run_id", runId);
-  }
-
-  const [staffResult, commissionResult] = await Promise.all([
-    context.supabase.from("staff_compensation").select("membership_id,base_amount").eq("organization_id", context.organizationId).eq("is_active", true).is("deleted_at", null),
-    context.supabase.from("commission_entries").select("membership_id,commission_amount").eq("organization_id", context.organizationId).eq("status", "accrued").gte("occurred_at", periodStart).lt("occurred_at", periodEnd),
-  ]);
-  const commissionByMembership = new Map<string, number>();
-  for (const row of commissionResult.data ?? []) commissionByMembership.set(row.membership_id, (commissionByMembership.get(row.membership_id) ?? 0) + Number(row.commission_amount));
-
-  const staff = staffResult.data ?? [];
-  if (staff.length > 0) {
-    await context.supabase.from("payroll_items").insert(staff.map((s) => {
-      const basePay = Number(s.base_amount); const commissionTotal = commissionByMembership.get(s.membership_id) ?? 0; const grossPay = Math.round((basePay + commissionTotal) * 100) / 100;
-      return { organization_id: context.organizationId, payroll_run_id: runId, membership_id: s.membership_id, base_pay: basePay, commission_total: commissionTotal, gross_pay: grossPay, net_pay: grossPay, breakdown: { base_pay: basePay, commission_total: commissionTotal } };
-    }));
-  }
-  revalidatePath("/payroll");
-}
-
-export async function approvePayrollRunAction(formData: FormData) {
-  const context = await workspace(); if (!context) return;
-  const runId = idValue(formData, "runId"); if (!runId) return;
-  const { data: items } = await context.supabase.from("payroll_items").select("gross_pay,net_pay").eq("organization_id", context.organizationId).eq("payroll_run_id", runId);
-  const totalGross = (items ?? []).reduce((sum, i) => sum + Number(i.gross_pay), 0);
-  const totalNet = (items ?? []).reduce((sum, i) => sum + Number(i.net_pay), 0);
-  await context.supabase.from("payroll_runs").update({ status: "approved", approved_at: new Date().toISOString(), total_gross: totalGross, total_net: totalNet }).eq("organization_id", context.organizationId).eq("id", runId).eq("status", "draft");
-  revalidatePath("/payroll");
-}
-
-export async function markPayrollRunPaidAction(formData: FormData) {
-  const context = await workspace(); if (!context) return;
-  const runId = idValue(formData, "runId"); if (!runId) return;
-  await context.supabase.from("payroll_runs").update({ status: "paid", paid_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("id", runId).eq("status", "approved");
-  revalidatePath("/payroll");
-}
+// Payroll lifecycle (sections 32-33) moved to @/app/payroll/payroll-actions --
+// it now goes through server-side RPCs (app.recompute_payroll_run and friends)
+// instead of the client delete+insert+direct-update pattern that used to live
+// here, which was not atomic and had no approval/revision guard against a
+// concurrent double-submit.
