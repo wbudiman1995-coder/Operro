@@ -358,7 +358,11 @@ begin
       group by pt.size
     loop
       if r.size is not null and (v_matrix ? r.size) then
-        v_basic_amount := v_basic_amount + (v_matrix ->> r.size)::numeric * r.n;
+        -- coalesce guards a malformed/null matrix entry (e.g. {"small": null})
+        -- from NULL-poisoning v_basic_amount for every subsequent size group
+        -- in this loop -- falls back to the flat rate for that group only,
+        -- instead of silently zeroing every other pet's per-pet pay too.
+        v_basic_amount := v_basic_amount + coalesce((v_matrix ->> r.size)::numeric, v_per_pet_rate) * r.n;
       else
         v_basic_amount := v_basic_amount + v_per_pet_rate * r.n;
       end if;
