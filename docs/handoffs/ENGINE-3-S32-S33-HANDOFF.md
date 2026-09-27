@@ -325,9 +325,23 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
       override UI, and the deterministic fixture-based automated test suite** (brief section 10 —
       independently-computed expected values, not the function checking itself) — the manual psql
       checks above are a smoke test, not the required permanent test suite.
-- [ ] Checkpoint 2: Controls & snapshots UI (draft edit forms, approve/pay/undo buttons, security/transaction automated tests)
-- [ ] Checkpoint 3: Publication & exports (groomer-facing page, publish/hide UI, XLSX/CSV/PDF)
-- [ ] Checkpoint 4: Final acceptance (upgrade test, gates, browser E2E, consolidated evidence)
+- [x] Checkpoint 2: Controls & snapshots (draft overrides/custom rows, approve/pay/undo/retention RPCs
+      wired into the UI, `docs/handoffs/logs/ENGINE-3-S32-S33/` not yet populated with screenshots).
+      Security/transaction proof: `run_all_gates.sh` GATE 6b (21 deterministic assertions, including
+      the full recompute/approve/pay/idempotent-retry/undo lifecycle and an RLS negative test) +
+      GATE 7 (real password-authenticated non-superuser role under actual RLS). See Section 9.
+- [x] Checkpoint 3: Publication & exports — groomer `/my-schedule` "Gaji saya" card (reads
+      `app.get_my_payroll_snapshot()` live), publish/unpublish buttons on the admin side, real
+      `.xlsx` (ExcelJS)/CSV (with formula-injection escaping)/payslip PDF (PDFKit) via
+      `GET /payroll/export`.
+- [ ] Checkpoint 4: Final acceptance — NOT DONE. Needs: a populated-upgrade replay test (existing
+      paid history survives a fresh migration + a populated-DB migration, per brief section 10),
+      full browser click-through of approve/pay/undo/publish (proven at the RPC/gate level, not yet
+      re-clicked live after the environment instability in Section 8), mobile 375px check, retention
+      boundary tests (no-term-yet/maturity/already-paid/undo), cross-tenant/cross-role negative tests
+      beyond the one RLS check GATE 6b has, and the two self-reviews the brief asks for (requirement
+      trace UI->action->RPC->permission->database->export; then a money/security/concurrency/
+      upgrade/historical-behavior challenge pass).
 
 ## 7. Dependencies / shared-file edit log
 
@@ -398,11 +412,15 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
 
 ## 9. Environment identity
 
-- Node/Next: TBD (read `apps/web/AGENTS.md` and package.json)
-- Local Supabase Postgres version used for tests: TBD
-- Dev port: TBD (must not collide with 54321-54324, 54341-54344 or other engines' dev ports)
+- Next.js 16.2.12, React 19.2.4, TypeScript per `apps/web/package.json` / `tsconfig.typecheck.json`. Node v24.19.0.
+- Own local Supabase stack: `operro-payroll-s3233-local`, ports 54351 (api) / 54352 (db, Postgres 17.6.1 -- the Supabase-managed local stack) / 54353 (studio) / 54354 (inbucket).
+- Dev server: `npm run dev --workspace=apps/web` on port 3010 (NOT the project's default 3000 -- that collided with an unrelated pre-existing `.claude/launch.json` at the repo-root-level `E:\Claude\.claude\launch.json`, shared across worktrees and pointing at a totally different, unrelated local project called "marketforge" -- do not edit that shared file; just run the dev server directly with an explicit `PORT=3010`, or via a different port, rather than relying on `preview_start`'s launch.json lookup for this worktree).
+- **`run_all_gates.sh` actually run this session** (not merely written) against a **disposable `postgres:16` Docker container** (`operro-gate-pg16`, verified `PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2)`), per the brief's PG16 requirement -- NOT against port 54322 (that's the main repo's own live Supabase Postgres 17 stack; reusing it would have commingled gate churn with another engine's real dev database). Because this WSL2 environment has no `psql`/`createdb`/`dropdb` client installed and no passwordless sudo to install one, gate commands were proxied through small shell shims (`~/gate-shims/{psql,createdb,dropdb}`, not committed to the repo, purely local tooling) that run the same commands via `docker exec` into that disposable container, with the repo bind-mounted at `/workspace` so relative `-f path.sql` arguments resolve identically to a native client. This is exactly the "container invocation of unchanged harnesses... for known WSL host-TCP issues" the script's own header comment anticipates -- `run_all_gates.sh` itself was never edited to make this work, only *how it was invoked* changed.
+  - **GATE 1 (typecheck): PASS.** **GATE 2 (build): PASS** (`next build` + all 3 package `tsc -b`, including the new `/payroll` and `/payroll/export` routes compiling). **GATE 3 (in-memory + preset tests): PASS**, 25/25 assertions. **GATE 4 (fresh PG16 migrate, all 44 migrations incl. this engine's 3): PASS**, zero errors, `assembly%` function count = 8 as asserted. **GATE 5 (assembly RPC tests): PASS**, 16/16. **GATE 6 (reservation tests): PASS**, 18/18. **GATE 6b (this engine's own payroll test suite, newly added to the script): PASS**, 21/21. **GATE 7 (real authenticated-role integration under actual RLS, password-authenticated non-superuser client role): PASS**, 11/11.
+  - **GATE 8 (completion-vs-assembly/reservation concurrency harness) was NOT run.** It shells out to a bash script (`run_concurrency_assembly.sh`) that itself spawns multiple concurrent `psql` processes against a `DATABASE_URL`; wrapping that whole harness through the docker-exec shim approach was judged not worth the added fragility for a harness that doesn't touch payroll code at all (it predates this engine and tests booking-assembly concurrency, not payroll). Not a payroll-specific gap, but honestly unverified this session.
+  - The disposable `operro-gate-pg16` container (and its `~/gate-shims/*` wrapper scripts) are local-only, throwaway, not part of any commit, and safe to `docker rm -f` -- they exist purely so gates could run without installing anything system-wide or touching another engine's environment.
 
-## 10. Status as of this session's usage limit (NOT final — resume here)
+## 10. Status as of latest work (superseded by Section 6/9/11 above where they disagree — this section predates the gate run and the export/test-suite work; kept for the historical record of the earlier pause)
 
 - Branch: `claude/sections-32-33-payroll-exports` (not pushed yet — local commits only)
 - SHA at pause: `4e62d832d1eca8d19bfac443e52310e214da583b`
