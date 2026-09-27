@@ -78,8 +78,8 @@ function CustomRows({ runId, membershipId, rows, editable }: { runId: string; me
   );
 }
 
-export function PayrollStaffCard({ staff, runId, runStatus, canManage, canApprove }: {
-  staff: PayrollStaffCardData; runId: string | null; runStatus: string | null; canManage: boolean; canApprove: boolean;
+export function PayrollStaffCard({ staff, runId, runStatus, periodStart, canManage, canApprove }: {
+  staff: PayrollStaffCardData; runId: string | null; runStatus: string | null; periodStart: string; canManage: boolean; canApprove: boolean;
 }) {
   const overrideByComponent = new Map(staff.overrides.map((o) => [o.componentKey, o]));
   const editable = canManage && runStatus === "draft" && Boolean(runId);
@@ -115,6 +115,12 @@ export function PayrollStaffCard({ staff, runId, runStatus, canManage, canApprov
           {canApprove && staff.retentionEligible && !staff.retentionAlreadyPaid ? (
             <PayrollActionForm action={payRetentionDepositAction} hidden={{ membershipId: staff.membershipId }} buttonLabel="Bayar deposit retensi" buttonClassName="mt-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50" confirmMessage={`Bayar deposit retensi untuk ${staff.name}? Ini adalah pembayaran lump-sum sekali seumur hidup staf.`} />
           ) : null}
+        </div>
+      ) : null}
+
+      {runId && staff.breakdown ? (
+        <div className="mt-2">
+          <a href={`/payroll/export?format=pdf&membershipId=${staff.membershipId}&anchor=${periodStart}`} className="text-[11px] font-bold text-sky-700">Unduh payslip PDF</a>
         </div>
       ) : null}
 

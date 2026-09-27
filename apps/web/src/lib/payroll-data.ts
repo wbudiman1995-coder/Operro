@@ -206,6 +206,25 @@ export async function loadPayrollWorkspace(
   };
 }
 
+export interface PayrollExportDetailRow {
+  bookingId: string; membershipId: string; staffName: string; startsAt: string;
+  customerName: string; petName: string; petSize: string | null; services: string;
+  serviceRevenue: number; invoiceNumber: string | null; invoiceStatus: string | null;
+}
+
+export async function loadPayrollExportDetail(
+  supabase: SupabaseClient, organizationId: string, periodStart: string, periodEnd: string, staffByMembership: Map<string, string>,
+): Promise<PayrollExportDetailRow[]> {
+  const result = await supabase.schema("app").rpc("payroll_export_detail_rows", { p_org: organizationId, p_period_start: periodStart, p_period_end: periodEnd });
+  assertResult("payroll_export_detail", result.error);
+  type Row = { booking_id: string; membership_id: string; starts_at: string; customer_name: string; pet_name: string; pet_size: string | null; services: string; service_revenue: number; invoice_number: string | null; invoice_id: string | null; invoice_status: string | null };
+  return ((result.data ?? []) as Row[]).map((r) => ({
+    bookingId: r.booking_id, membershipId: r.membership_id, staffName: staffByMembership.get(r.membership_id) ?? "Staf",
+    startsAt: r.starts_at, customerName: r.customer_name, petName: r.pet_name, petSize: r.pet_size,
+    services: r.services, serviceRevenue: Number(r.service_revenue), invoiceNumber: r.invoice_number, invoiceStatus: r.invoice_status,
+  }));
+}
+
 export interface MyPayrollSnapshot {
   status: string; periodStart: string; periodEnd: string; publishedAt: string; total: number;
   breakdown: PayrollBreakdown; customRows: Array<{ label: string; amount: number }>;

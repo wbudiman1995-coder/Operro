@@ -45,6 +45,12 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       </div>
       <div className="flex flex-wrap gap-2">
         <Link href={`/attendance?month=${data.periodStart.slice(0, 7)}`} className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-800">Periksa kehadiran</Link>
+        {workspace.capabilities["payroll.read"] ? (
+          <>
+            <a href={`/payroll/export?format=xlsx&anchor=${data.periodStart}`} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">Export Excel</a>
+            <a href={`/payroll/export?format=csv&anchor=${data.periodStart}`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Export CSV</a>
+          </>
+        ) : null}
         {canManage && (!run || run.status === "draft") ? (
           <PayrollActionForm action={recomputePayrollAction} hidden={{ periodStart: data.periodStart, periodEnd: data.periodEnd }} buttonLabel={run ? "Hitung ulang" : "Hitung payroll"} pendingLabel="Menghitung…" buttonClassName="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60" />
         ) : null}
@@ -101,7 +107,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         <div className="grid gap-4 lg:grid-cols-2">
           {data.staff.map((staff) => (
             <div key={staff.membershipId}>
-              <PayrollStaffCard staff={staff} runId={runId} runStatus={run?.status ?? null} canManage={Boolean(canManage)} canApprove={Boolean(canApprove)} />
+              <PayrollStaffCard staff={staff} runId={runId} runStatus={run?.status ?? null} periodStart={data.periodStart} canManage={Boolean(canManage)} canApprove={Boolean(canApprove)} />
               {canManage ? <StaffPayrollSettingsForm staff={staff} /> : null}
             </div>
           ))}

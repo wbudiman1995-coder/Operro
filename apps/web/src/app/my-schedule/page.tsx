@@ -9,9 +9,11 @@ import { ActionSubmitButton } from "@/components/action-submit-button";
 import { AttendanceCheckinForm } from "@/components/attendance-checkin-form";
 import { buildWhatsAppUrl } from "@/components/customer-360";
 import { GroomingEvidenceForm, GroomingEvidenceGallery } from "@/components/grooming-evidence-form";
+import { PayrollMySnapshotCard } from "@/components/payroll-my-snapshot-card";
 import { StylingReferenceGallery } from "@/components/styling-references";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
+import { loadMyPayrollSnapshot } from "@/lib/payroll-data";
 import { loadMyScheduleWorkspace } from "@/lib/pilot-data";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 
@@ -25,9 +27,13 @@ const nextDispatchStage: Record<string, { value: string; label: string; pendingL
 
 export default async function MySchedulePage() {
   const workspace = await requireActiveWorkspace();
-  const jobs = await loadMyScheduleWorkspace(workspace.supabase, workspace.activeOrganization.id, workspace.userId);
+  const [jobs, paySnapshot] = await Promise.all([
+    loadMyScheduleWorkspace(workspace.supabase, workspace.activeOrganization.id, workspace.userId),
+    loadMyPayrollSnapshot(workspace.supabase),
+  ]);
   return <WorkspaceShell {...workspace} activePath="/my-schedule"><PageHeader eyebrow="Groomer" title="Jadwal saya" description="Hewan yang ditugaskan ke Anda, belum selesai, 8 hari ke depan." />
-    <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="mt-7"><PayrollMySnapshotCard snapshot={paySnapshot} membershipId={workspace.activeOrganization.membershipId} /></div>
+    <section className="mt-2 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {jobs.length === 0 ? <EmptyState title="Tidak ada pekerjaan tertunda" description="Semua hewan yang ditugaskan ke Anda sudah selesai, atau belum ada yang ditugaskan." /> : jobs.map((job) => (
         <article key={job.groomingJobPetId} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between gap-3">
