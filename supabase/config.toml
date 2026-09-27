@@ -38,7 +38,7 @@ sql_paths = ["./seed.sql", "./seeds/homepaw_demo.sql", "./seeds/homepaw_home_ser
 enabled = true
 port = 54353
 
-[inbucket]
+[local_smtp]
 enabled = true
 port = 54354
 
@@ -56,8 +56,11 @@ enable_confirmations = false
 enabled = true
 uri = "pg-functions://postgres/public/custom_access_token_hook"
 
+[analytics]
+enabled = false
+
 [realtime]
 enabled = false
 
 [storage]
-enabled = false
+enabled = true
