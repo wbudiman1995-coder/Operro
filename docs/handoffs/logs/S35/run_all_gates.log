@@ -1,0 +1,6 @@
+=== 2026-09-27T15:54:12+07:00 starting operro_pg16_gate ===
+operro_pg16_gate
+d16f2795c0760247a427adf3522b14a13370c8685ee0fa6730e1423c13f0be3c
+/var/run/postgresql:5432 - accepting connections
+=== 2026-09-27T15:54:26+07:00 running run_all_gates.sh (CRLF-stripped copy) ===
+
