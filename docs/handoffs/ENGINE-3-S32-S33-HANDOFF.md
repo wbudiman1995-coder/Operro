@@ -327,21 +327,45 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
       checks above are a smoke test, not the required permanent test suite.
 - [x] Checkpoint 2: Controls & snapshots (draft overrides/custom rows, approve/pay/undo/retention RPCs
       wired into the UI, `docs/handoffs/logs/ENGINE-3-S32-S33/` not yet populated with screenshots).
-      Security/transaction proof: `run_all_gates.sh` GATE 6b (21 deterministic assertions, including
+      Security/transaction proof: `run_all_gates.sh` GATE 6b (23 deterministic assertions, including
       the full recompute/approve/pay/idempotent-retry/undo lifecycle and an RLS negative test) +
       GATE 7 (real password-authenticated non-superuser role under actual RLS). See Section 9.
 - [x] Checkpoint 3: Publication & exports — groomer `/my-schedule` "Gaji saya" card (reads
       `app.get_my_payroll_snapshot()` live), publish/unpublish buttons on the admin side, real
       `.xlsx` (ExcelJS)/CSV (with formula-injection escaping)/payslip PDF (PDFKit) via
       `GET /payroll/export`.
-- [ ] Checkpoint 4: Final acceptance — NOT DONE. Needs: a populated-upgrade replay test (existing
-      paid history survives a fresh migration + a populated-DB migration, per brief section 10),
-      full browser click-through of approve/pay/undo/publish (proven at the RPC/gate level, not yet
-      re-clicked live after the environment instability in Section 8), mobile 375px check, retention
-      boundary tests (no-term-yet/maturity/already-paid/undo), cross-tenant/cross-role negative tests
-      beyond the one RLS check GATE 6b has, and the two self-reviews the brief asks for (requirement
-      trace UI->action->RPC->permission->database->export; then a money/security/concurrency/
-      upgrade/historical-behavior challenge pass).
+- [~] Checkpoint 4: Final acceptance — PARTIALLY DONE this pass. Completed once the environment
+      stabilized (Section 8's instability was intermittent, not permanent):
+      - **Full live browser click-through** as the real owner QA login: Hitung payroll -> Setujui
+        -> Tandai sudah dibayar -> Publish ke staf, all via actual button clicks (not RPC calls),
+        each transition confirmed on-screen.
+      - **Groomer's own view verified live**: logged in as `groomer@homepaw.local`, `/my-schedule`
+        showed the "Gaji saya" card with the exact published breakdown (status DIBAYAR, correct
+        rupiah amounts matching the admin side and the earlier psql/GATE 6b numbers exactly).
+      - **All three export formats verified live** via `fetch()` in the real browser session
+        (not just unit-level `buildX` calls): XLSX (200, magic bytes `50 4b 03 04` = a real ZIP/
+        OOXML file, correct content-type, 8911 bytes), CSV (200, correct content-type, header row
+        + one data row matching the UI exactly), payslip PDF (200, magic bytes `%PDF-1.3`, correct
+        `Content-Disposition` filename).
+      - **Found and fixed a real bug via this testing** (see the `fix(payroll): self-service
+        payslip...` commit): the export route's self-download path reused the admin-only,
+        `payroll.read`-gated data loader for a groomer downloading their OWN payslip, so RLS
+        silently zeroed the result and every legitimate self-download 404'd. Fixed by routing
+        self-downloads through `app.get_my_payroll_snapshot()` (the same RPC the "Gaji saya" card
+        already uses) instead. This is exactly the class of bug real browser QA exists to catch —
+        it would never have surfaced from RPC-level or gate-level testing alone, since those never
+        exercised the export route AS a genuinely permission-restricted groomer. Re-verified fixed
+        after the change; also re-ran gates 4-7 fresh (Section 9) to confirm no regression.
+      - Full gate suite (1-7) run fresh end-to-end on the FINAL code, all green (Section 9).
+      **Still NOT done**: a populated-upgrade replay test (existing paid history surviving a
+      migration applied to an already-populated DB, distinct from the fresh-migrate GATE 4 already
+      proven), mobile 375px layout check, retention boundary tests beyond the one-payout-per-member
+      unique-index guarantee (no-term-yet/maturity-exact-boundary/already-paid/undo scenarios with
+      real fixture dates), cross-tenant negative tests (a second org's membership attempting to
+      read/act on this org's payroll — GATE 6b only tested cross-ROLE within one org), and the two
+      brief-mandated self-review passes (a written requirement trace UI->action->RPC->permission->
+      database->export; then a dedicated money/security/concurrency/upgrade/historical-behavior
+      challenge pass, distinct from the ordinary implementation work already done).
 
 ## 7. Dependencies / shared-file edit log
 
@@ -416,7 +440,7 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
 - Own local Supabase stack: `operro-payroll-s3233-local`, ports 54351 (api) / 54352 (db, Postgres 17.6.1 -- the Supabase-managed local stack) / 54353 (studio) / 54354 (inbucket).
 - Dev server: `npm run dev --workspace=apps/web` on port 3010 (NOT the project's default 3000 -- that collided with an unrelated pre-existing `.claude/launch.json` at the repo-root-level `E:\Claude\.claude\launch.json`, shared across worktrees and pointing at a totally different, unrelated local project called "marketforge" -- do not edit that shared file; just run the dev server directly with an explicit `PORT=3010`, or via a different port, rather than relying on `preview_start`'s launch.json lookup for this worktree).
 - **`run_all_gates.sh` actually run this session** (not merely written) against a **disposable `postgres:16` Docker container** (`operro-gate-pg16`, verified `PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2)`), per the brief's PG16 requirement -- NOT against port 54322 (that's the main repo's own live Supabase Postgres 17 stack; reusing it would have commingled gate churn with another engine's real dev database). Because this WSL2 environment has no `psql`/`createdb`/`dropdb` client installed and no passwordless sudo to install one, gate commands were proxied through small shell shims (`~/gate-shims/{psql,createdb,dropdb}`, not committed to the repo, purely local tooling) that run the same commands via `docker exec` into that disposable container, with the repo bind-mounted at `/workspace` so relative `-f path.sql` arguments resolve identically to a native client. This is exactly the "container invocation of unchanged harnesses... for known WSL host-TCP issues" the script's own header comment anticipates -- `run_all_gates.sh` itself was never edited to make this work, only *how it was invoked* changed.
-  - **GATE 1 (typecheck): PASS.** **GATE 2 (build): PASS** (`next build` + all 3 package `tsc -b`, including the new `/payroll` and `/payroll/export` routes compiling). **GATE 3 (in-memory + preset tests): PASS**, 25/25 assertions. **GATE 4 (fresh PG16 migrate, all 44 migrations incl. this engine's 3): PASS**, zero errors, `assembly%` function count = 8 as asserted. **GATE 5 (assembly RPC tests): PASS**, 16/16. **GATE 6 (reservation tests): PASS**, 18/18. **GATE 6b (this engine's own payroll test suite, newly added to the script): PASS**, 21/21. **GATE 7 (real authenticated-role integration under actual RLS, password-authenticated non-superuser client role): PASS**, 11/11.
+  - **GATE 1 (typecheck): PASS.** **GATE 2 (build): PASS** (`next build` + all 3 package `tsc -b`, including the new `/payroll` and `/payroll/export` routes compiling). **GATE 3 (in-memory + preset tests): PASS**, 25/25 assertions. **GATE 4 (fresh PG16 migrate, all 44 migrations incl. this engine's 3): PASS**, zero errors, `assembly%` function count = 8 as asserted. **GATE 5 (assembly RPC tests): PASS**, 16/16. **GATE 6 (reservation tests): PASS**, 18/18. **GATE 6b (this engine's own payroll test suite, newly added to the script): PASS**, 23/23. **GATE 7 (real authenticated-role integration under actual RLS, password-authenticated non-superuser client role): PASS**, 11/11. Re-run fresh (clean drop/recreate/migrate) after the self-payslip bugfix below -- same result, no regression.
   - **GATE 8 (completion-vs-assembly/reservation concurrency harness) was NOT run.** It shells out to a bash script (`run_concurrency_assembly.sh`) that itself spawns multiple concurrent `psql` processes against a `DATABASE_URL`; wrapping that whole harness through the docker-exec shim approach was judged not worth the added fragility for a harness that doesn't touch payroll code at all (it predates this engine and tests booking-assembly concurrency, not payroll). Not a payroll-specific gap, but honestly unverified this session.
   - The disposable `operro-gate-pg16` container (and its `~/gate-shims/*` wrapper scripts) are local-only, throwaway, not part of any commit, and safe to `docker rm -f` -- they exist purely so gates could run without installing anything system-wide or touching another engine's environment.
 
