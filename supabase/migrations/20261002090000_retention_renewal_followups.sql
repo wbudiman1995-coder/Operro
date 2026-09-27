@@ -50,19 +50,23 @@ update public.grooming_job_pets
 
 
 -- =====================================================================
--- SECTION 2 -- organizations: audit trigger + followup_retention settings
+-- SECTION 2 -- organizations: followup_retention settings backfill
 -- ---------------------------------------------------------------------
--- `organizations` never carried the generic `trg_write_audit` trigger
--- (deliberately -- see its own original comment: "no organization_id").
--- `app.tg_write_audit` already falls back to `app.fn_active_organization()`
--- when the changed row has no `organization_id` column of its own, so
--- attaching it here is reuse of existing machinery, not new machinery,
--- and is what "audit successful configuration writes through the existing
--- audit machinery" (S35 brief) actually resolves to for this table.
--- =====================================================================
-create trigger trg_organizations_audit after insert or update or delete on public.organizations
-  for each row execute function app.tg_write_audit();
-
+-- `organizations` deliberately never carries the generic `trg_write_audit`
+-- trigger (see its own original comment: "no organization_id"). Tried
+-- attaching it here first; it broke the seed script, because seeding
+-- inserts organization rows outside any authenticated session, so
+-- `app.tg_write_audit`'s own fallback -- `app.fn_active_organization()`,
+-- which resolves from JWT claims -- returns NULL there, violating
+-- `audit_log.organization_id`'s NOT NULL constraint. A blanket trigger on
+-- every future write to this root tenant table (seeds, migrations,
+-- platform tooling, not just this module's own RPC) is the wrong blast
+-- radius for one settings write. `app.update_followup_retention_settings`
+-- below instead writes its own explicit audit_log row, inside the one RPC
+-- that actually has a real authenticated actor and active org -- audit
+-- reuse scoped to what this module actually touches, not a table-wide
+-- change with a real failure mode already caught by running it for real.
+--
 -- Preserve current behavior for every organization that exists as of this
 -- migration: explicit 30-day threshold, merged into `settings` without
 -- touching any other key (branding, bank accounts, payroll, etc. all live
@@ -192,6 +196,14 @@ begin
            'followup_template', p_followup_template,
            'renewal_template', p_renewal_template))
    where id = v_org;
+
+  insert into app.audit_log (organization_id, actor_id, action, entity_table, entity_id, diff)
+  values (v_org, app.fn_current_user_id(), 'UPDATE', 'organizations', v_org,
+          jsonb_build_object(
+            'old', jsonb_build_object('followup_retention', v_row.settings -> 'followup_retention'),
+            'new', jsonb_build_object('followup_retention', jsonb_build_object(
+                     'inactivity_threshold_days', p_inactivity_threshold_days,
+                     'followup_template', p_followup_template, 'renewal_template', p_renewal_template))));
 
   return app.fn_followup_retention_settings(v_org);
 end; $$;
