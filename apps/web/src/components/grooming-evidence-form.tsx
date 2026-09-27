@@ -16,22 +16,34 @@ import { compressPhoto } from "@/lib/image-compression";
 
 const initialState: PilotActionState = { error: null, success: null };
 
-const categories: Array<{ value: string; label: string }> = [
-  { value: "before", label: "Sebelum" }, { value: "after", label: "Sesudah" },
+const otherCategories: Array<{ value: string; label: string }> = [
   { value: "attendance", label: "Kehadiran" }, { value: "ear", label: "Telinga" },
   { value: "hygiene", label: "Area higienis" }, { value: "dematting", label: "Dematting" },
   { value: "fungal", label: "Kondisi jamur" }, { value: "injury", label: "Cedera" }, { value: "other", label: "Lainnya" },
 ];
+const categoryLabels: Record<string, string> = { before: "Sebelum", after: "Sesudah", ...Object.fromEntries(otherCategories.map((c) => [c.value, c.label])) };
 
-export function GroomingEvidenceForm({ bookingId, petJobId }: { bookingId: string; petJobId: string }) {
+/**
+ * One upload zone: browse (multi-select), drag-and-drop, and clipboard
+ * paste all feed the same client-side queue, compressed and uploaded ONE
+ * FILE PER CALL through the existing, unchanged uploadGroomingEvidenceAction
+ * (server-side validation/assignment check untouched). `category` is either
+ * a fixed string (the Before/After zones, always visible and always that
+ * category) or a `{ options, value, onChange }` selector (the "other
+ * categories" zone) — same upload mechanics either way.
+ */
+function EvidenceUploadZone({ bookingId, petJobId, label, category }: {
+  bookingId: string; petJobId: string; label: string;
+  category: { kind: "fixed"; value: string } | { kind: "selectable"; options: Array<{ value: string; label: string }>; value: string; onChange: (value: string) => void };
+}) {
   const router = useRouter();
-  const [category, setCategory] = useState("before");
   const [queue, setQueue] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [message, setMessage] = useState<PilotActionState>(initialState);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeCategory = category.kind === "fixed" ? category.value : category.value;
 
   function addFiles(files: FileList | File[] | null) {
     if (!files) return;
@@ -50,7 +62,7 @@ export function GroomingEvidenceForm({ bookingId, petJobId }: { bookingId: strin
       setProgress({ done: i, total: files.length });
       const compressed = await compressPhoto(files[i]);
       const data = new FormData();
-      data.set("bookingId", bookingId); data.set("petJobId", petJobId); data.set("category", category); data.set("photo", compressed);
+      data.set("bookingId", bookingId); data.set("petJobId", petJobId); data.set("category", activeCategory); data.set("photo", compressed);
       lastResult = await uploadGroomingEvidenceAction(initialState, data);
       if (lastResult.error) failures += 1;
     }
@@ -62,11 +74,13 @@ export function GroomingEvidenceForm({ bookingId, petJobId }: { bookingId: strin
     router.refresh();
   }
 
-  return <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-    <p className="text-xs font-bold text-slate-800">Dokumentasi layanan</p>
-    <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold sm:w-40">
-      {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-    </select>
+  return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+    <p className="text-xs font-bold text-slate-800">{label}</p>
+    {category.kind === "selectable" ? (
+      <select value={category.value} onChange={(e) => category.onChange(e.target.value)} className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold sm:w-40">
+        {category.options.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+      </select>
+    ) : null}
 
     <div
       role="button" tabIndex={0}
@@ -83,7 +97,7 @@ export function GroomingEvidenceForm({ bookingId, petJobId }: { bookingId: strin
     </div>
 
     {queue.length > 0 ? <div className="mt-2 flex flex-wrap items-center gap-2">
-      <p className="text-[11px] font-semibold text-slate-600">{queue.length} foto siap diunggah untuk kategori &ldquo;{categories.find((c) => c.value === category)?.label}&rdquo;</p>
+      <p className="text-[11px] font-semibold text-slate-600">{queue.length} foto siap diunggah untuk kategori &ldquo;{categoryLabels[activeCategory] ?? activeCategory}&rdquo;</p>
       <button type="button" onClick={() => setQueue([])} className="text-[11px] font-bold text-rose-600">Kosongkan</button>
     </div> : null}
 
@@ -95,6 +109,23 @@ export function GroomingEvidenceForm({ bookingId, petJobId }: { bookingId: strin
         {uploading ? "Mengunggah…" : `Unggah ${queue.length || ""} foto`}
       </button>
     </div>
+  </div>;
+}
+
+/**
+ * Two always-visible, independently-queued zones for Before/After (the
+ * catalog's explicit requirement — previously one zone + a dropdown that
+ * defaulted to "before"), plus a third zone for every other category via
+ * the same selectable-dropdown mechanism the old single zone used.
+ */
+export function GroomingEvidenceForm({ bookingId, petJobId }: { bookingId: string; petJobId: string }) {
+  const [otherCategory, setOtherCategory] = useState(otherCategories[0].value);
+  return <div className="mt-3 space-y-3">
+    <div className="grid gap-3 sm:grid-cols-2">
+      <EvidenceUploadZone bookingId={bookingId} petJobId={petJobId} label="Sebelum" category={{ kind: "fixed", value: "before" }} />
+      <EvidenceUploadZone bookingId={bookingId} petJobId={petJobId} label="Sesudah" category={{ kind: "fixed", value: "after" }} />
+    </div>
+    <EvidenceUploadZone bookingId={bookingId} petJobId={petJobId} label="Dokumentasi lainnya" category={{ kind: "selectable", options: otherCategories, value: otherCategory, onChange: setOtherCategory }} />
   </div>;
 }
 

@@ -34,12 +34,12 @@ export function PrintDownloadButton({ invoiceNumber, customerName }: { invoiceNu
   </button>;
 }
 
-export function WhatsAppHandoffButton({ phone, template, invoiceNumber, customerName, total, currency, label }: {
-  phone: string | null; template: string; invoiceNumber: string; customerName: string; total: number; currency: string; label: string;
+export function WhatsAppHandoffButton({ phone, template, invoiceNumber, customerName, total, currency, notes, label }: {
+  phone: string | null; template: string; invoiceNumber: string; customerName: string; total: number; currency: string; notes: string; label: string;
 }) {
   const [copied, setCopied] = useState(false);
   const totalFormatted = new Intl.NumberFormat("id-ID", { style: "currency", currency: currency || "IDR", maximumFractionDigits: 0 }).format(total);
-  const message = interpolate(template, { customer: customerName, number: invoiceNumber, total: totalFormatted });
+  const message = interpolate(template, { customer: customerName, number: invoiceNumber, total: totalFormatted, notes });
   const url = buildWhatsAppUrl(phone, message);
 
   if (!phone) return <div className="print:hidden">

@@ -526,7 +526,7 @@ export async function loadLeaderboardWorkspace(supabase: SupabaseClient, organiz
 
 export interface GroomerPerformanceDetail {
   summary: LeaderboardRow;
-  visits: Array<{ bookingId: string; startsAt: string; customerName: string; petNames: string[]; actualDurationMinutes: number | null; documented: boolean; evidenceCount: number }>;
+  visits: Array<{ bookingId: string; startsAt: string; customerName: string; petNames: string[]; actualDurationMinutes: number | null; documented: boolean; evidenceCount: number; photos: Array<{ id: string; category: string; url: string }> }>;
 }
 
 export async function loadGroomerPerformanceDetail(supabase: SupabaseClient, organizationId: string, resourceId: string, periodStart: string, periodEnd: string): Promise<GroomerPerformanceDetail | null> {
@@ -544,14 +544,31 @@ export async function loadGroomerPerformanceDetail(supabase: SupabaseClient, org
     supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", ownBookingIds),
   ]);
   assertResult("groomer_detail_pets", pets.error); assertResult("groomer_detail_customers", customers.error); assertResult("groomer_detail_events", events.error); assertResult("groomer_detail_links", links.error);
-  const attachmentIds = (links.data ?? []).map((link) => link.attachment_id); const attachments = attachmentIds.length ? await supabase.from("attachments").select("id,metadata").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null) : { data: [], error: null };
-  assertResult("groomer_detail_attachments", attachments.error); const categories = new Map((attachments.data ?? []).map((row) => [row.id, row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) && typeof row.metadata.category === "string" ? row.metadata.category : "other"]));
+  const attachmentIds = (links.data ?? []).map((link) => link.attachment_id); const attachments = attachmentIds.length ? await supabase.from("attachments").select("id,storage_path,metadata").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null) : { data: [] as { id: string; storage_path: string; metadata: unknown }[], error: null };
+  assertResult("groomer_detail_attachments", attachments.error); const categories = new Map((attachments.data ?? []).map((row) => [row.id, row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) && typeof (row.metadata as Record<string, unknown>).category === "string" ? (row.metadata as Record<string, string>).category : "other"]));
+  // Cross-job/date evidence for this workflow (C3): reuse the SAME
+  // attachments/attachment_links records the per-job gallery already reads,
+  // batched into one signed-URL call — no duplicate photo store.
+  const nonAttendance = (attachments.data ?? []).filter((row) => categories.get(row.id) !== "attendance");
+  let signedUrlByPath = new Map<string, string>();
+  if (nonAttendance.length) {
+    const signed = await supabase.storage.from("attachments").createSignedUrls(nonAttendance.map((a) => a.storage_path), 3600);
+    if (!signed.error) signedUrlByPath = new Map((signed.data ?? []).flatMap((s) => (s.signedUrl ? [[s.path ?? "", s.signedUrl]] : [])));
+  }
+  const pathByAttachment = new Map((attachments.data ?? []).map((row) => [row.id, row.storage_path]));
   const petNames = new Map((pets.data ?? []).map((pet) => [pet.id, pet.name])); const customerNames = new Map((customers.data ?? []).map((customer) => [customer.id, customer.display_name]));
   const visits = ownBookings.map((booking) => {
     const ownEvents = (events.data ?? []).filter((event) => event.subject_id === booking.id); const started = ownEvents.find((event) => event.event_type === "booking.status_changed" && event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).to === "in_progress"); const completed = ownEvents.find((event) => event.event_type === "booking.completed");
     const rawMinutes = started && completed ? Math.round((new Date(completed.occurred_at).getTime() - new Date(started.occurred_at).getTime()) / 60000) : null; const actualDurationMinutes = rawMinutes !== null && rawMinutes >= 0 && rawMinutes <= 1440 ? rawMinutes : null;
     const ownLinks = (links.data ?? []).filter((link) => link.subject_id === booking.id); const ownCategories = new Set(ownLinks.map((link) => categories.get(link.attachment_id)));
-    return { bookingId: booking.id, startsAt: booking.starts_at, customerName: customerNames.get(booking.customer_id) ?? "Pelanggan", petNames: (petJobs.data ?? []).filter((petJob) => petJob.grooming_job_id === booking.id).map((petJob) => petNames.get(petJob.pet_id) ?? "Hewan"), actualDurationMinutes, documented: ownCategories.has("before") && ownCategories.has("after"), evidenceCount: ownLinks.length };
+    const photos = ownLinks.flatMap((link) => {
+      const category = categories.get(link.attachment_id) ?? "other";
+      if (category === "attendance") return [];
+      const path = pathByAttachment.get(link.attachment_id);
+      const url = path ? signedUrlByPath.get(path) : undefined;
+      return url ? [{ id: link.attachment_id, category, url }] : [];
+    });
+    return { bookingId: booking.id, startsAt: booking.starts_at, customerName: customerNames.get(booking.customer_id) ?? "Pelanggan", petNames: (petJobs.data ?? []).filter((petJob) => petJob.grooming_job_id === booking.id).map((petJob) => petNames.get(petJob.pet_id) ?? "Hewan"), actualDurationMinutes, documented: ownCategories.has("before") && ownCategories.has("after"), evidenceCount: ownLinks.length, photos };
   });
   return { summary, visits };
 }

@@ -23,6 +23,7 @@ export interface InvoiceDocument {
   paidTotal: number;
   balanceDue: number;
   customerNotes: string | null;
+  internalGroomerNotes: string | null;
   revision: number;
   groomerName: string | null;
   organization: { name: string; tagline: string; logoUrl: string | null; membershipTerms: string; waTemplates: { paidCompletion: string; outstanding: string; subscriptionBilling: string } };
@@ -30,12 +31,87 @@ export interface InvoiceDocument {
   customer: { id: string; name: string; phone: string | null; address: string | null };
   pets: string[];
   lines: Array<{ id: string; itemType: string; name: string; quantity: number; unitPrice: number; discountAmount: number; taxAmount: number; lineTotal: number }>;
-  packageBalance: { name: string; sessionsRemaining: number; expiresAt: string | null } | null;
+  packageBalance: PackageCoverage | null;
   photos: Array<{ id: string; category: string; url: string }>;
 }
 
 function assertResult(scope: string, error: { message: string } | null) {
   if (error) throw new Error(`invoice_document_${scope}_failed:${error.message}`);
+}
+
+/**
+ * C8: canonical, ledger-backed package coverage — not a metadata match plus
+ * a cached balance. `sessionsAvailable` is summed directly from
+ * customer_package_ledger (the append-only source of truth; `sessions_remaining`
+ * on customer_packages is documented as just a derived cache of it), always
+ * labeled as the CURRENT balance, never portrayed as this invoice's
+ * historical state. "purchase" = this invoice IS the package sale;
+ * "consumption" = this invoice is a service report for a visit that drew
+ * down an EXISTING package via package_reservations — the two cases have
+ * different, real links and must not be conflated. "unavailable" means real
+ * usage was found but the linkage is ambiguous/inconsistent — an honest
+ * review state, never an invented zero.
+ */
+export interface PackageCoverage {
+  status: "purchase" | "consumption" | "unavailable";
+  packageName: string;
+  sessionsAvailable: number;
+  sessionsUsedThisVisit: number | null;
+  packageStatus: string | null;
+  expiresAt: string | null;
+  reviewNote: string | null;
+}
+
+async function sumPackageLedger(supabase: SupabaseClient, organizationId: string, customerPackageId: string): Promise<number> {
+  const ledger = await supabase.from("customer_package_ledger").select("delta").eq("organization_id", organizationId).eq("customer_package_id", customerPackageId);
+  assertResult("package_ledger", ledger.error);
+  return (ledger.data ?? []).reduce((sum, row) => sum + Number(row.delta), 0);
+}
+
+function packageNameFromJoin(row: { packages: unknown }): string {
+  const pkg = (Array.isArray(row.packages) ? row.packages[0] : row.packages) as { name?: string } | null;
+  return pkg?.name ?? "Paket";
+}
+
+async function resolvePackageCoverage(
+  supabase: SupabaseClient, organizationId: string, invoiceId: string, customerId: string, billingMode: string, bookingId: string | null,
+): Promise<PackageCoverage | null> {
+  if (billingMode === "package_sale") {
+    const cp = await supabase.from("customer_packages").select("id,status,expires_at,packages(name)").eq("organization_id", organizationId).eq("customer_id", customerId).contains("metadata", { source_invoice_id: invoiceId }).maybeSingle();
+    assertResult("customer_packages", cp.error);
+    if (!cp.data) return null;
+    const sessionsAvailable = await sumPackageLedger(supabase, organizationId, cp.data.id);
+    return { status: "purchase", packageName: packageNameFromJoin(cp.data), sessionsAvailable, sessionsUsedThisVisit: null, packageStatus: cp.data.status, expiresAt: cp.data.expires_at, reviewNote: null };
+  }
+
+  if (!bookingId) return null;
+  const gjp = await supabase.from("grooming_job_pets").select("id").eq("organization_id", organizationId).eq("grooming_job_id", bookingId).is("deleted_at", null);
+  assertResult("package_coverage_gjp", gjp.error);
+  const gjpIds = (gjp.data ?? []).map((r) => r.id);
+  if (!gjpIds.length) return null;
+
+  const lines = await supabase.from("grooming_job_pet_services").select("id").eq("organization_id", organizationId).in("grooming_job_pet_id", gjpIds).is("deleted_at", null);
+  assertResult("package_coverage_lines", lines.error);
+  const lineIds = (lines.data ?? []).map((r) => r.id);
+  if (!lineIds.length) return null;
+
+  const reservations = await supabase.from("package_reservations").select("id,customer_package_id,status").eq("organization_id", organizationId).in("grooming_job_pet_service_id", lineIds).in("status", ["reserved", "consumed"]);
+  assertResult("package_reservations", reservations.error);
+  const rows = reservations.data ?? [];
+  if (!rows.length) return null; // this visit was genuinely not paid via a package — not an error
+
+  const distinctPackageIds = Array.from(new Set(rows.map((r) => r.customer_package_id)));
+  if (distinctPackageIds.length > 1) {
+    return { status: "unavailable", packageName: "Beberapa paket", sessionsAvailable: 0, sessionsUsedThisVisit: rows.length, packageStatus: null, expiresAt: null, reviewNote: "Kunjungan ini menggunakan lebih dari satu paket — perlu ditinjau manual, saldo tidak ditampilkan otomatis." };
+  }
+
+  const cp = await supabase.from("customer_packages").select("id,status,expires_at,packages(name)").eq("organization_id", organizationId).eq("id", distinctPackageIds[0]).maybeSingle();
+  assertResult("customer_packages", cp.error);
+  if (!cp.data) {
+    return { status: "unavailable", packageName: "Paket", sessionsAvailable: 0, sessionsUsedThisVisit: rows.length, packageStatus: null, expiresAt: null, reviewNote: "Riwayat paket untuk kunjungan ini tidak ditemukan atau tidak konsisten — perlu ditinjau manual." };
+  }
+  const sessionsAvailable = await sumPackageLedger(supabase, organizationId, cp.data.id);
+  return { status: "consumption", packageName: packageNameFromJoin(cp.data), sessionsAvailable, sessionsUsedThisVisit: rows.length, packageStatus: cp.data.status, expiresAt: cp.data.expires_at, reviewNote: null };
 }
 
 const DEFAULT_WA = {
@@ -80,10 +156,21 @@ export async function loadInvoiceDocument(supabase: SupabaseClient, organization
   const paidTotal = (payments.data ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
 
   let bookingId: string | null = null;
+  let internalGroomerNotes: string | null = null;
   if (row.order_id) {
     const order = await supabase.from("orders").select("booking_id").eq("organization_id", organizationId).eq("id", row.order_id).maybeSingle();
     assertResult("order", order.error);
     bookingId = order.data?.booking_id ?? null;
+    if (bookingId) {
+      // Internal operational instructions (grooming_jobs.groomer_notes) —
+      // never rendered on the document itself. Surfaced only so the invoice
+      // page can offer an EXPLICIT review/copy step into the separate,
+      // already-customer-facing invoices.customer_notes field (C4: these
+      // must stay distinct, with a human deciding what becomes visible).
+      const job = await supabase.from("grooming_jobs").select("groomer_notes").eq("organization_id", organizationId).eq("booking_id", bookingId).maybeSingle();
+      assertResult("grooming_job", job.error);
+      internalGroomerNotes = job.data?.groomer_notes ?? null;
+    }
   }
 
   let pets: string[] = [];
@@ -124,21 +211,13 @@ export async function loadInvoiceDocument(supabase: SupabaseClient, organization
     }
   }
 
-  let packageBalance: InvoiceDocument["packageBalance"] = null;
-  if (row.billing_mode === "package_sale") {
-    const cp = await supabase.from("customer_packages").select("sessions_remaining,expires_at,packages(name)").eq("organization_id", organizationId).eq("customer_id", row.customer_id).contains("metadata", { source_invoice_id: invoiceId }).maybeSingle();
-    assertResult("customer_packages", cp.error);
-    if (cp.data) {
-      const pkgName = (Array.isArray(cp.data.packages) ? cp.data.packages[0] : cp.data.packages) as { name?: string } | null;
-      packageBalance = { name: pkgName?.name ?? "Paket", sessionsRemaining: cp.data.sessions_remaining, expiresAt: cp.data.expires_at };
-    }
-  }
+  const packageBalance = await resolvePackageCoverage(supabase, organizationId, invoiceId, row.customer_id, row.billing_mode, bookingId);
 
   return {
     id: row.id, invoiceNumber: row.invoice_number, status: row.status, billingMode: row.billing_mode, documentType: row.document_type,
     issuedAt: row.issued_at, dueAt: row.due_at, currency: row.currency, subtotal: Number(row.subtotal), discountTotal: Number(row.discount_total),
     taxTotal: Number(row.tax_total), total: Number(row.total), paidTotal, balanceDue: Math.max(0, Number(row.total) - paidTotal),
-    customerNotes: row.customer_notes, revision: row.revision, groomerName: row.groomer_name_snapshot,
+    customerNotes: row.customer_notes, internalGroomerNotes, revision: row.revision, groomerName: row.groomer_name_snapshot,
     organization: {
       name: org.data?.name ?? "Operro", tagline: documents.tagline ?? "", logoUrl, membershipTerms: documents.membership_terms ?? "",
       waTemplates: { paidCompletion: wa.paid_completion || DEFAULT_WA.paidCompletion, outstanding: wa.outstanding || DEFAULT_WA.outstanding, subscriptionBilling: wa.subscription_billing || DEFAULT_WA.subscriptionBilling },

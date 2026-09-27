@@ -31,7 +31,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
       <Link href="/finance" className="text-sm font-semibold text-slate-500">&larr; Kembali ke Keuangan</Link>
       <div className="flex flex-wrap items-center gap-2">
-        <WhatsAppHandoffButton phone={doc.customer.phone} template={waTemplate} invoiceNumber={doc.invoiceNumber} customerName={doc.customer.name} total={doc.balanceDue <= 0 ? doc.total : doc.balanceDue} currency={doc.currency} label={waLabel} />
+        <WhatsAppHandoffButton phone={doc.customer.phone} template={waTemplate} invoiceNumber={doc.invoiceNumber} customerName={doc.customer.name} total={doc.balanceDue <= 0 ? doc.total : doc.balanceDue} currency={doc.currency} notes={doc.customerNotes ?? ""} label={waLabel} />
         <PrintDownloadButton invoiceNumber={doc.invoiceNumber} customerName={doc.customer.name} />
       </div>
     </div>
@@ -81,10 +81,17 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
         </div>
       </section>
 
-      {doc.packageBalance ? <section className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm">
-        <p className="font-bold text-emerald-800">Saldo paket: {doc.packageBalance.name}</p>
-        <p className="text-emerald-700">Sisa sesi: {doc.packageBalance.sessionsRemaining}{doc.packageBalance.expiresAt ? ` · Berlaku hingga ${new Date(doc.packageBalance.expiresAt).toLocaleDateString("id-ID")}` : ""}</p>
-      </section> : null}
+      {doc.packageBalance ? (
+        doc.packageBalance.status === "unavailable" ? <section className="mt-6 rounded-xl bg-amber-50 p-4 text-sm">
+          <p className="font-bold text-amber-800">Saldo paket: perlu ditinjau</p>
+          <p className="text-amber-700">{doc.packageBalance.reviewNote}</p>
+        </section> : <section className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm">
+          <p className="font-bold text-emerald-800">{doc.packageBalance.status === "purchase" ? `Pembelian paket: ${doc.packageBalance.packageName}` : `Menggunakan paket: ${doc.packageBalance.packageName}`}</p>
+          {doc.packageBalance.status === "consumption" ? <p className="text-emerald-700">Sesi terpakai pada kunjungan ini: {doc.packageBalance.sessionsUsedThisVisit}</p> : null}
+          <p className="text-emerald-700">Saldo saat ini: {doc.packageBalance.sessionsAvailable} sesi{doc.packageBalance.expiresAt ? ` · Berlaku hingga ${new Date(doc.packageBalance.expiresAt).toLocaleDateString("id-ID")}` : ""}{doc.packageBalance.packageStatus && doc.packageBalance.packageStatus !== "active" ? ` · Status: ${doc.packageBalance.packageStatus}` : ""}</p>
+          <p className="mt-1 text-[10px] text-emerald-600">Saldo ini mencerminkan kondisi paket saat dokumen dibuka, bukan kondisi historis saat invoice ini pertama diterbitkan.</p>
+        </section>
+      ) : null}
 
       {showPaymentInstructions ? <section className="mt-6">
         <p className="text-xs font-bold uppercase text-slate-400">Instruksi pembayaran</p>
@@ -101,7 +108,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">{doc.photos.map((p) => <div key={p.id} className="overflow-hidden rounded-lg border border-slate-200"><img src={p.url} alt={p.category} className="aspect-square w-full object-cover" /><p className="p-1 text-center text-[10px] font-semibold capitalize text-slate-500">{p.category}</p></div>)}</div>
       </section> : null}
 
-      {doc.status === "issued" ? <InvoiceCustomerNotesEditor invoiceId={doc.id} revision={doc.revision} initialNotes={doc.customerNotes ?? ""} /> : null}
+      {doc.status === "issued" ? <InvoiceCustomerNotesEditor invoiceId={doc.id} revision={doc.revision} initialNotes={doc.customerNotes ?? ""} internalNote={doc.internalGroomerNotes} /> : null}
     </div>
   </div>;
 }

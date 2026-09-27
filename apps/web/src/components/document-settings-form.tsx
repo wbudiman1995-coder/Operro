@@ -64,7 +64,7 @@ export function DocumentSettingsForm({ settings }: { settings: DocumentSettings 
     <label className="block text-xs font-bold text-slate-600">Template WhatsApp — tagihan langganan/paket</label>
     <textarea className={textareaClass} name="waSubscriptionTemplate" defaultValue={settings.waSubscriptionTemplate} rows={2} placeholder="Halo {customer}, tagihan langganan {number} sebesar {total}." />
 
-    <p className="text-[11px] text-slate-500">Placeholder yang tersedia: {"{customer}"}, {"{number}"}, {"{total}"}.</p>
+    <p className="text-[11px] text-slate-500">Placeholder yang tersedia: {"{customer}"}, {"{number}"}, {"{total}"}, {"{notes}"} (catatan yang sudah disetujui untuk pelanggan pada invoice ini, kosong jika belum diisi).</p>
     <div className="flex items-center justify-between gap-3">
       {state.error ? <p className="text-xs font-semibold text-rose-600">{state.error}</p> : state.success ? <p className="text-xs font-semibold text-emerald-700">{state.success}</p> : <span />}
       <button className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-60" disabled={pending}>{pending ? "Menyimpan..." : "Simpan pengaturan dokumen"}</button>
