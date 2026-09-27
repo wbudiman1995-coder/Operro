@@ -27,8 +27,11 @@ export interface PaymentRegisterRow {
   status: string;
   stage: PaymentStage;
   proofAttachmentId: string | null;
+  proofUrl: string | null; // signed URL, 1h TTL; null when no proof or unreadable
   screenshotConfirmedAt: string | null;
+  screenshotConfirmedBy: string | null; // display name/email of the confirming actor
   bankValidatedAt: string | null;
+  bankValidatedBy: string | null;
   paidAt: string;
   serviceMonth: string; // "YYYY-MM" in the branch's own timezone
 }
@@ -46,10 +49,20 @@ function monthKey(iso: string, timeZone: string): string {
   return `${year}-${month}`;
 }
 
+// All filtering (stage/month/search) happens client-side in PaymentRegister
+// over this ENTIRE loaded set, so the cap below must never be low enough to
+// silently hide a match from a filtered view (P4 finding: the previous
+// limit(200) discarded rows BEFORE the client ever got to filter them).
+// ponytail: flat cap, not real pagination — raise it (or switch to a keyset
+// query) if a single organization's payment history outgrows this.
+const PAYMENT_REGISTER_ROW_CAP = 5000;
+
 export async function loadPaymentRegister(supabase: SupabaseClient, organizationId: string, filters: PaymentRegisterFilters = {}): Promise<PaymentRegisterRow[]> {
-  const payments = await supabase.from("payments")
-    .select("id,branch_id,invoice_id,customer_id,method,amount,status,payment_stage,proof_attachment_id,screenshot_confirmed_at,bank_validated_at,paid_at")
-    .eq("organization_id", organizationId).order("paid_at", { ascending: false }).limit(200);
+  let paymentsQuery = supabase.from("payments")
+    .select("id,branch_id,invoice_id,customer_id,method,amount,status,payment_stage,proof_attachment_id,screenshot_confirmed_at,screenshot_confirmed_by,bank_validated_at,bank_validated_by,paid_at")
+    .eq("organization_id", organizationId);
+  if (filters.stage) paymentsQuery = paymentsQuery.eq("payment_stage", filters.stage);
+  const payments = await paymentsQuery.order("paid_at", { ascending: false }).limit(PAYMENT_REGISTER_ROW_CAP);
   if (payments.error) throw new Error(`payment_register_failed:${payments.error.message}`);
   const rows = payments.data ?? [];
 
@@ -81,6 +94,28 @@ export async function loadPaymentRegister(supabase: SupabaseClient, organization
   if (bookings.error) throw new Error(`payment_register_failed:${bookings.error.message}`);
   const bookingStartMap = new Map((bookings.data ?? []).map((b) => [b.id, b.starts_at]));
 
+  // Actor names for the review-stage timestamps, and a signed preview URL for
+  // whatever proof is attached — a reviewer must be able to inspect the proof
+  // before confirming/validating, not just see that "something" was uploaded.
+  const actorIds = Array.from(new Set(rows.flatMap((r) => [r.screenshot_confirmed_by, r.bank_validated_by]).filter((v): v is string => Boolean(v))));
+  const proofAttachmentIds = Array.from(new Set(rows.map((r) => r.proof_attachment_id).filter((v): v is string => Boolean(v))));
+  const [actors, proofAttachments] = await Promise.all([
+    actorIds.length ? supabase.from("users").select("id,full_name,email").in("id", actorIds) : { data: [] as { id: string; full_name: string | null; email: string | null }[], error: null },
+    proofAttachmentIds.length ? supabase.from("attachments").select("id,storage_path").eq("organization_id", organizationId).in("id", proofAttachmentIds) : { data: [] as { id: string; storage_path: string }[], error: null },
+  ]);
+  if (actors.error) throw new Error(`payment_register_failed:${actors.error.message}`);
+  if (proofAttachments.error) throw new Error(`payment_register_failed:${proofAttachments.error.message}`);
+  const actorName = new Map((actors.data ?? []).map((u) => [u.id, u.full_name || u.email || "Pengguna"]));
+  const proofPathById = new Map((proofAttachments.data ?? []).map((a) => [a.id, a.storage_path]));
+  let proofUrlById = new Map<string, string>();
+  if (proofAttachments.data?.length) {
+    // Deleted/unreadable proofs are handled honestly: createSignedUrls
+    // reports a per-path error instead of throwing, and a missing entry
+    // here just means proofUrl stays null for that row.
+    const signed = await supabase.storage.from("attachments").createSignedUrls(proofAttachments.data.map((a) => a.storage_path), 3600);
+    if (!signed.error) proofUrlById = new Map((signed.data ?? []).flatMap((s) => (s.signedUrl ? [[s.path ?? "", s.signedUrl]] : [])));
+  }
+
   let result: PaymentRegisterRow[] = rows.map((row) => {
     const invoice = row.invoice_id ? invoiceMap.get(row.invoice_id) : undefined;
     const customer = row.customer_id ? customerMap.get(row.customer_id) : undefined;
@@ -100,8 +135,11 @@ export async function loadPaymentRegister(supabase: SupabaseClient, organization
       status: row.status,
       stage: row.payment_stage as PaymentStage,
       proofAttachmentId: row.proof_attachment_id,
+      proofUrl: row.proof_attachment_id ? (proofUrlById.get(proofPathById.get(row.proof_attachment_id) ?? "") ?? null) : null,
       screenshotConfirmedAt: row.screenshot_confirmed_at,
+      screenshotConfirmedBy: row.screenshot_confirmed_by ? (actorName.get(row.screenshot_confirmed_by) ?? null) : null,
       bankValidatedAt: row.bank_validated_at,
+      bankValidatedBy: row.bank_validated_by ? (actorName.get(row.bank_validated_by) ?? null) : null,
       paidAt: row.paid_at,
       serviceMonth: monthKey(serviceDate, tz),
     };

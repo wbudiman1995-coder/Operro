@@ -38,9 +38,15 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
 
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm print:rounded-none print:border-none print:shadow-none sm:p-10">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6">
-        <div>
-          <h1 className="text-xl font-bold">{doc.organization.name}</h1>
-          {doc.organization.tagline ? <p className="mt-1 text-sm text-slate-500">{doc.organization.tagline}</p> : null}
+        <div className="flex items-start gap-3">
+          {doc.organization.logoUrl ?
+            // eslint-disable-next-line @next/next/no-img-element -- print layout needs a plain <img>, not next/image's runtime optimization
+            <img src={doc.organization.logoUrl} alt={doc.organization.name} className="h-12 w-12 shrink-0 rounded-lg object-contain" />
+          : null}
+          <div>
+            <h1 className="text-xl font-bold">{doc.organization.name}</h1>
+            {doc.organization.tagline ? <p className="mt-1 text-sm text-slate-500">{doc.organization.tagline}</p> : null}
+          </div>
         </div>
         <div className="text-right">
           <p className="text-lg font-bold">{isServiceReport ? "Laporan Layanan" : "Invoice"} {doc.invoiceNumber}</p>

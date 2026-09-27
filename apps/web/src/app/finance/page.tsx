@@ -27,7 +27,7 @@ export default async function FinancePage() {
 
     <section className="mt-7">
       <h2 className="mb-4 font-bold">Kontrol pembayaran</h2>
-      <PaymentRegister rows={paymentRegister} />
+      <PaymentRegister rows={paymentRegister} canManage={workspace.capabilities["payment.manage"]} canValidate={workspace.capabilities["payment.validate"]} />
     </section>
   </WorkspaceShell>;
 }

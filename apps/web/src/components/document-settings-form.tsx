@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import {
   deleteBankAccountAction,
   updateInvoiceDocumentSettingsAction,
+  updateInvoiceLogoAction,
   upsertBankAccountAction,
   type DocumentSettingsActionState,
 } from "@/app/document-settings-actions";
@@ -16,6 +17,34 @@ export interface DocumentSettings { tagline: string; membershipTerms: string; wa
 
 const textareaClass = "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm";
 const inputClass = "h-10 w-full rounded-xl border border-slate-200 px-3 text-sm";
+
+export function LogoSection({ logoUrl }: { logoUrl: string | null }) {
+  const [state, action, pending] = useActionState(updateInvoiceLogoAction, initialState);
+  return <div className="space-y-3">
+    <div className="flex items-center gap-4">
+      {logoUrl
+        // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL, not a static asset next/image can optimize
+        ? <img src={logoUrl} alt="Logo bisnis" className="h-16 w-16 rounded-xl border border-slate-200 object-contain bg-white" />
+        : <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-slate-300 text-[10px] font-semibold text-slate-400">Belum ada</div>}
+      <form action={action} className="flex flex-1 items-center gap-2">
+        <input type="hidden" name="intent" value="upload" />
+        <input className="flex-1 text-xs" type="file" name="logo" accept="image/jpeg,image/png,image/webp" required />
+        <button className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60" disabled={pending}>{pending ? "..." : logoUrl ? "Ganti" : "Unggah"}</button>
+      </form>
+      {logoUrl ? <RemoveLogoButton /> : null}
+    </div>
+    {state.error ? <p className="text-xs font-semibold text-rose-600">{state.error}</p> : state.success ? <p className="text-xs font-semibold text-emerald-700">{state.success}</p> : null}
+  </div>;
+}
+
+function RemoveLogoButton() {
+  const [state, action, pending] = useActionState(updateInvoiceLogoAction, initialState);
+  return <form action={action}>
+    <input type="hidden" name="intent" value="remove" />
+    <button className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-bold text-rose-700 disabled:opacity-60" disabled={pending}>{pending ? "..." : "Hapus"}</button>
+    {state.error ? <p className="mt-1 text-[10px] font-semibold text-rose-600">{state.error}</p> : null}
+  </form>;
+}
 
 export function DocumentSettingsForm({ settings }: { settings: DocumentSettings }) {
   const [state, action, pending] = useActionState(updateInvoiceDocumentSettingsAction, initialState);

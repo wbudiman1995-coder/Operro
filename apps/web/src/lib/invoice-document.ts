@@ -25,7 +25,7 @@ export interface InvoiceDocument {
   customerNotes: string | null;
   revision: number;
   groomerName: string | null;
-  organization: { name: string; tagline: string; membershipTerms: string; waTemplates: { paidCompletion: string; outstanding: string; subscriptionBilling: string } };
+  organization: { name: string; tagline: string; logoUrl: string | null; membershipTerms: string; waTemplates: { paidCompletion: string; outstanding: string; subscriptionBilling: string } };
   bankAccounts: Array<{ bankName: string; accountNumber: string; accountHolder: string; isPrimary: boolean }>;
   customer: { id: string; name: string; phone: string | null; address: string | null };
   pets: string[];
@@ -64,9 +64,18 @@ export async function loadInvoiceDocument(supabase: SupabaseClient, organization
   assertResult("lines", lines.error); assertResult("payments", payments.error);
   if (!customer.data) throw new Error("invoice_document_customer_mismatch");
 
-  const settings = (org.data?.settings as { documents?: { tagline?: string; membership_terms?: string; whatsapp_templates?: Record<string, string> } } | null) ?? {};
+  const settings = (org.data?.settings as { documents?: { tagline?: string; logo_attachment_id?: string; membership_terms?: string; whatsapp_templates?: Record<string, string> } } | null) ?? {};
   const documents = settings.documents ?? {};
   const wa = documents.whatsapp_templates ?? {};
+
+  let logoUrl: string | null = null;
+  if (documents.logo_attachment_id) {
+    const logo = await supabase.from("attachments").select("storage_path").eq("organization_id", organizationId).eq("id", documents.logo_attachment_id).is("deleted_at", null).maybeSingle();
+    if (logo.data) {
+      const signed = await supabase.storage.from("attachments").createSignedUrl(logo.data.storage_path, 3600);
+      logoUrl = signed.data?.signedUrl ?? null;
+    }
+  }
 
   const paidTotal = (payments.data ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
 
@@ -131,7 +140,7 @@ export async function loadInvoiceDocument(supabase: SupabaseClient, organization
     taxTotal: Number(row.tax_total), total: Number(row.total), paidTotal, balanceDue: Math.max(0, Number(row.total) - paidTotal),
     customerNotes: row.customer_notes, revision: row.revision, groomerName: row.groomer_name_snapshot,
     organization: {
-      name: org.data?.name ?? "Operro", tagline: documents.tagline ?? "", membershipTerms: documents.membership_terms ?? "",
+      name: org.data?.name ?? "Operro", tagline: documents.tagline ?? "", logoUrl, membershipTerms: documents.membership_terms ?? "",
       waTemplates: { paidCompletion: wa.paid_completion || DEFAULT_WA.paidCompletion, outstanding: wa.outstanding || DEFAULT_WA.outstanding, subscriptionBilling: wa.subscription_billing || DEFAULT_WA.subscriptionBilling },
     },
     bankAccounts: (bankAccounts.data ?? []).map((a) => ({ bankName: a.bank_name, accountNumber: a.account_number, accountHolder: a.account_holder, isPrimary: a.is_primary })),
