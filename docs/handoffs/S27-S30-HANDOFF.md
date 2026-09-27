@@ -1,6 +1,8 @@
 # Sections 27–30 handoff — HomePaw parity: invoice documents, grooming photos, payment control, visit management
 
-**Status as of this revision: IN CLOSEOUT.** An external review (Codex, at `acf5268`) reproduced a real gate failure (`run_all_gates.sh`'s `EXPECTED_MIGRATIONS` never listed the four sections-27-30 migrations — fixed) and found genuine correctness/authorization defects in the payment-idempotency, payment-review-UI, package-payment, register-filtering, and storage-authorization code, plus several catalog items this handoff had marked done while a real gap remained. **Do not treat any milestone as complete while §11 (closeout findings) has open rows.** This file is the single entry point; §11 tracks the closeout pass, §1–§10 are the prior state (left intact for history, superseded where §11 says so).
+**Status as of this revision: IN CLOSEOUT — most findings fixed, some genuinely open.** An external review (Codex, at `acf5268`) reproduced a real gate failure (`run_all_gates.sh`'s `EXPECTED_MIGRATIONS` never listed the four sections-27-30 migrations — fixed) and found genuine correctness/authorization defects in the payment-idempotency, payment-review-UI, package-payment, register-filtering, and storage-authorization code, plus several catalog items this handoff had marked done while a real gap remained. **Do not treat any milestone as complete while §11 (closeout findings) has open rows.** This file is the single entry point; §11 tracks the closeout pass, §1–§10 are the prior state (left intact for history, superseded where §11 says so).
+
+**This closeout pass fixed and verified: Gate, P1, P2, P3, P4, C1, C6, C7.** S1's schema/RLS fix is written and applies cleanly in the full migration replay, but live Storage-HTTP authorization testing (forged path/link, cross-branch denial, evidence-delete-rejects-payment-proof) was **not** performed — treat S1 as "implemented, not independently verified" rather than closed. **C2, C3, C4, C5, C8 are genuinely not done** in this pass — see §11 for what each actually needs. Full evidence: `docs/handoffs/logs/S27-S30/closeout/run_all_gates_full.log` (typecheck, build, GATE 1-8 including the PG16 concurrency gate, lint, test:batch1a, test:batch1b all exit 0; test:booking has exactly one pre-existing baseline failure, documented below, left in place per instruction). Tested-implementation SHA: `3431ec3`.
 
 ## 1. Identity, paths, branch
 
@@ -44,7 +46,7 @@ Status key: **Done** = implemented + backend-tested; **Done, browser-verified** 
 | Catalog bullet | Status | Evidence |
 |---|---|---|
 | Live invoice preview | Done, browser-verified | `/invoices/[invoiceId]`; live-rendered DEMO-INV-003 |
-| Branded business name, logo, tagline | Partial, browser-verified | Name/tagline done and verified live; logo upload not built (text/terms/templates only) |
+| Branded business name, logo, tagline | Done | Real upload/replace/remove (`updateInvoiceLogoAction`, JPG/PNG/WebP <=1MB, replace never leaves the org logo-less on failure) + rendered on the invoice document header; typecheck/lint clean, not yet browser-clicked this pass (see §11 C1) |
 | Customer contact and address | Done, browser-verified | Full address incl. kecamatan/kabupaten rendered live for a real customer |
 | Pet details / Groomer name | Done | `lib/invoice-document.ts` (pets via grooming_job_pets; groomer via existing `groomer_name_snapshot`) |
 | Service / discount / additional-charge itemization | Done | Reuses `invoice_lines` snapshot as-is; no seeded invoice with lines to browser-verify visually (seed data limitation, confirmed via SQL, not a bug) |
@@ -93,11 +95,11 @@ Status key: **Done** = implemented + backend-tested; **Done, browser-verified** 
 | Catalog bullet | Status | Evidence |
 |---|---|---|
 | Automatic visit history from past appointments | Done, browser-verified | Read projection over completed bookings, no new state |
-| Optional automatic logging setting | Partial | Setting persists and toggles in the UI; nothing reads it yet — open product question recorded in M1 |
+| Optional automatic logging setting | Done | Now actually enforced: off suppresses the booking-derived projection (manual visits unaffected). `loadVisitRegister({ autoLogEnabled })`; not browser-clicked this pass |
 | Manually add visits | Done, browser-verified | Live-created, appeared immediately |
-| Filter by search/customer/pet/invoiced-status, sort newest/oldest | Done, browser-verified (search/customer/status/sort); pet filter implemented, not live-clicked | |
+| Filter by search/customer/pet/invoiced-status, sort newest/oldest | Done | Pet filter now compares pet IDs, not names (name collision was a real bug), and has a reachable dropdown in the UI (previously the type supported it but no control existed); not live-clicked this pass |
 | Link visits to invoices | Done | `app.link_manual_visit_invoice`, SQL-tested |
-| Create an invoice from a visit | Partial | RPC + button built and SQL-tested (idempotency case); not live-clicked in the browser this session |
+| Create an invoice from a visit | Partial | RPC + button built and SQL-tested (idempotency case); booking-row `invoiceId`/`invoicedStatus` now resolve a real non-void invoice instead of order-existence (was always null/wrong — see §11 C7); not live-clicked in the browser this session |
 | Mark manually billed (amount + note) | Done, browser-verified | |
 | Undo manual billing | Done, browser-verified | |
 | Delete orphaned/incorrect visits | Done, browser-verified | Soft-delete with linked-invoice/active-billing guard |
@@ -194,6 +196,11 @@ Everything below is genuinely open — nothing here is done and mislabeled.
 | `09133e4` | M4: invoice document (branding/bank/WhatsApp/PDF), verified live |
 | `7acdf25` | Fix: add settings.manage to the pre-resolved capability list |
 | `c7e5270` | Fix 2 real bugs found by the mandated PostgreSQL 16 gate harness |
+| `acf5268` | Finalize S27-S30 handoff: full requirements matrix, QC checklist (external review point) |
+| `18ea1e0` | Closeout: fix gate lineage, mark handoff in-closeout |
+| `34da306` | Closeout P1/P3: fix payment idempotency at the app boundary, retire obsolete package-sale engine |
+| `01a4d89` | Closeout: fix gate lineage (the 5th migration), payment-register P2/P4, add brand-logo upload (C1) |
+| `3431ec3` | Closeout C6/C7: enforce the auto-visit setting, fix visit invoicing correctness |
 
 ## 9. Overlap / dependency notes with sections 23–26
 
@@ -220,17 +227,38 @@ Status per finding. Evidence lands under `docs/handoffs/logs/S27-S30/closeout/`.
 
 | # | Finding | Files | Status |
 |---|---|---|---|
-| Gate | `run_all_gates.sh` `EXPECTED_MIGRATIONS` never listed the 4 sections-27-30 migrations — hard `Migration lineage mismatch` before Gate 1 | `run_all_gates.sh` | **Fixed** |
-| P1 | Payment idempotency breaks at the app boundary: fresh `external_ref`/proof attachment on every submit defeats `record_payment`'s changed-input check; `PaymentForm`'s request key never advances after success | `apps/web/src/app/pilot-actions.ts`, `apps/web/src/components/pilot-forms.tsx`, migration | *(in progress)* |
-| P2 | Payment register never shows the proof being confirmed, no actor/time, confirm/validate buttons not capability-gated | `apps/web/src/components/payment-register.tsx`, `apps/web/src/lib/payment-register.ts` | *(in progress)* |
-| P3 | New package payments mislabeled `legacy_unreviewed`; obsolete package-sale-outside-invoice path duplicated the already-existing `app.create_package_invoice` | `apps/web/src/app/pilot-actions.ts`, `apps/web/src/components/pilot-forms.tsx`, migration | *(in progress)* |
-| P4 | Register hard-limits 200 rows before filtering; totals don't match the search/month scope | `apps/web/src/lib/payment-register.ts`, `apps/web/src/components/payment-register.tsx` | *(in progress)* |
-| S1 | Storage UPDATE/DELETE for grooming evidence still open to any `booking.update` holder org-wide; evidence-delete RPC doesn't verify the attachment is actually grooming evidence before deleting; payment-proof isolation not guaranteed | migration | *(in progress)* |
-| C1 | Brand logo: text-only, no real upload | `settings/documents`, migration | *(in progress)* |
-| C2 | Before/after: one zone + dropdown, not two labeled zones | `grooming-evidence-form.tsx` | *(in progress)* |
-| C3 | Evidence history: no cross-job page | — | *(in progress)* |
-| C4 | Notes: customer_notes is a fresh free-text field, not sourced from `grooming_jobs.groomer_notes` with an explicit review/copy step | `invoice-customer-notes-editor.tsx`, migration | *(in progress)* |
-| C5 | Document pages: never verified against a real invoice with lines/photos/terms | fixtures + PDF inspection | *(in progress)* |
-| C6 | Auto-visit setting: persists, nothing reads it | `visit-register.ts` | *(in progress)* |
-| C7 | Visit invoicing: `invoicedStatus`/`invoiceId` derived from order existence, not a real non-void invoice; pet filter compares names not IDs; 300-row cap | `lib/visit-register.ts` | *(in progress)* |
-| C8 | Package balance: metadata match only, not canonical ledger linkage | `lib/invoice-document.ts` | *(in progress)* |
+| Gate | `run_all_gates.sh` `EXPECTED_MIGRATIONS` never listed the 4 sections-27-30 migrations, then never listed the 5th (this closeout's own migration) either — hard `Migration lineage mismatch` before Gate 1, twice | `run_all_gates.sh` | **Fixed, verified** — full `run_all_gates.sh` (GATE 1-8, incl. PG16 concurrency) passes end to end |
+| P1 | Payment idempotency breaks at the app boundary: fresh `external_ref`/proof attachment on every submit defeats `record_payment`'s changed-input check; `PaymentForm`'s request key never advances after success; amount `step=1000` rejected valid amounts | `apps/web/src/app/pilot-actions.ts`, `apps/web/src/components/pilot-forms.tsx`, `20261001100000_payment_workflow_closeout.sql` | **Fixed, gate-verified** — deterministic `ensurePaymentProof`/`callRecordPayment` helpers (see commit `34da306`). **Not verified**: the acceptance suite's real two-connection concurrency cases (simultaneous same-key sessions, competing payments, lost-response recovery) — designed for but not exercised live this pass |
+| P2 | Payment register never shows the proof being confirmed, no actor/time, confirm/validate buttons not capability-gated | `apps/web/src/components/payment-register.tsx`, `apps/web/src/lib/payment-register.ts` | **Fixed, typecheck/lint-verified** — signed proof preview, actor/time, `payment.manage`/`payment.validate`-gated buttons (added to `authorization.ts`'s `CAPABILITY_KEYS`). Not browser-clicked this pass |
+| P3 | New package payments mislabeled `legacy_unreviewed`; obsolete package-sale-outside-invoice path duplicated the already-existing `app.create_package_invoice` | `apps/web/src/app/pilot-actions.ts`, migration | **Fixed, gate-verified** — `sellPackageAction` now calls `app.create_package_invoice` + the same P1 proof/payment pipeline; `app.record_package_purchase_payment` dropped in the migration and its RPC call site removed. Not browser-clicked this pass |
+| P4 | Register hard-limits 200 rows before filtering; totals don't match the search/month scope | `apps/web/src/lib/payment-register.ts`, `apps/web/src/components/payment-register.tsx` | **Fixed, typecheck/lint-verified** — stage pushed into the query, cap raised to a documented 5000-row ceiling, totals now scoped to month/search (deliberately still ignoring the selected stage — documented convention). Not tested over a real >200-row/two-month dataset this pass |
+| S1 | Storage UPDATE/DELETE for grooming evidence still open to any `booking.update` holder org-wide; evidence-delete RPC doesn't verify the attachment is actually grooming evidence before deleting; payment-proof isolation not guaranteed | `20261001100000_payment_workflow_closeout.sql` | **Implemented, migration-verified only** — applies cleanly on fresh PG16 replay (part of the passing gate run) with no SQL errors. **Not verified**: real authenticated Storage HTTP tests (assigned/unassigned/cross-branch read-write-delete, forged path, evidence-delete-rejects-payment-proof, signed-URL TTL). Treat as implemented-but-unverified, not closed |
+| C1 | Brand logo: text-only, no real upload | `document-settings-actions.ts`, `document-settings-form.tsx`, `settings/documents/page.tsx`, `invoice-document.ts`, invoice document page | **Fixed, typecheck/lint-verified** — real upload/replace/remove (`updateInvoiceLogoAction`; replace uploads-then-switches-then-cleans-up so a failure never leaves the org logo-less or with two live copies), rendered on both the settings page and the invoice document header. Also fixed a real latent bug found while building this: `updateInvoiceDocumentSettingsAction` hardcoded `p_logo_attachment: null` on every tagline/template save, which would have silently wiped any logo the moment it existed. Not browser-clicked this pass |
+| C2 | Before/after: one zone + dropdown, not two labeled zones | `grooming-evidence-form.tsx` | **Not done this pass** — no code change. Scope: split the single drop zone into two always-visible zones (Before/After), each keeping the existing multi-file browse/drag-drop/paste/compress/partial-failure-summary behavior; verify deletion still works per zone |
+| C3 | Evidence history: no cross-job page | — | **Not done this pass** — no code change. Scope: surface prior grooming-evidence photos across jobs inside the EXISTING groomer performance/report workflow (do not create a new standalone page/store per the brief) |
+| C4 | Notes: customer_notes is a fresh free-text field, not sourced from `grooming_jobs.groomer_notes` with an explicit review/copy step | `invoice-customer-notes-editor.tsx`, migration | **Not done this pass** — no code change. Scope: distinguish internal (`grooming_jobs.groomer_notes`) from customer-facing (`invoices.customer_notes`) explicitly, add a review/copy step from the former to the latter, render on both the document and WhatsApp templates, and test the final-invoice-locks/stale-revision paths |
+| C5 | Document pages: never verified against a real invoice with lines/photos/terms | fixtures + PDF inspection | **Not done this pass** — no code change. Scope: seed or construct a real fixture invoice with lines, a package/prepaid balance, notes, and photos; print/save an actual PDF and inspect page breaks — empty seed invoices are not proof |
+| C6 | Auto-visit setting: persists, nothing reads it | `lib/visit-register.ts`, `app/visits/page.tsx` | **Fixed, typecheck/lint-verified** — defined as "automatically include completed bookings in the visit register"; `loadVisitRegister` now takes `autoLogEnabled` and skips the booking-derived projection entirely when off, leaving manual visits and everything else unchanged. Not browser-clicked this pass |
+| C7 | Visit invoicing: `invoicedStatus`/`invoiceId` derived from order existence, not a real non-void invoice; pet filter compares names not IDs; 300-row cap | `lib/visit-register.ts`, `components/visit-register.tsx` | **Fixed, typecheck/lint-verified** — booking rows now resolve their order's real invoice and exclude void ones; `VisitRow` carries `petIds` and filtering (plus a newly-added, previously-nonexistent pet filter dropdown in the UI) matches by id, not name; customerId is pushed into the query and a pet filter resolves to exact ids first, so neither is truncated behind the (now 3000-row, documented) cap. Not browser-clicked this pass |
+| C8 | Package balance: metadata match only, not canonical ledger linkage | `lib/invoice-document.ts` | **Not done this pass** — no code change. Note: `customer_packages` has no `invoice_id`/`order_id` column in the frozen baseline schema, so `metadata->>'source_invoice_id'` (written atomically by `app.create_package_invoice` in the same transaction as the invoice) is the only linkage available without a new migration; the real gap is likely that the document shows a point-in-time `sessions_remaining` snapshot instead of real usage/renewal history from `customer_package_ledger` — investigate whether a ledger-history section is what's actually wanted before implementing |
+
+### Gate-harness notes (for whoever runs this next)
+
+The mandated PG16 gate suite needed two infrastructure fixes beyond the lineage array, both now folded into the harness script (not yet a permanent repo file — see "next commands" below):
+1. **Docker must bind-mount `/tmp:/tmp` in addition to the scratch copy directory.** GATE 8's concurrency case does `mktemp -d /tmp/operro-concurrency.XXXXXX` — a path OUTSIDE the scratch copy — and the wrapped `psql`/`createdb`/`dropdb` run via `docker exec`, which can only see paths actually mounted into the container. Without `-v /tmp:/tmp`, GATE 8 fails with `No such file or directory` for every session script, independent of the actual concurrency logic. Attribution: Engine 1's `engine1-checks.sh` already mounted `/tmp:/tmp` for this exact reason; this was missed when adapting it and cost real debugging time before the log evidence made it obvious.
+2. **Lint/test:batch1a/test:batch1b/test:booking must run inside the same WSL/Linux environment as the gate DB**, not from the Windows-side `node_modules` — this branch's Windows-side `node_modules` has a `@esbuild/linux-x64` binary installed (a prior cross-platform install artifact, not something this pass introduced) and fails immediately with a native-binary platform-mismatch error under Windows-side `node`/`tsx`. Running them from the WSL scratch copy (where `npm ci` installs the correct `linux-x64` binaries fresh) avoids this entirely and is what the evidence log actually reflects.
+
+**Exact next commands** to reproduce or extend this evidence (run from `E:\Claude\operro-sections-27-30` in Windows Git Bash; requires Docker available inside the machine's WSL Ubuntu distro). The harness script is saved at `docs/handoffs/logs/S27-S30/closeout/run_gates_harness.sh`:
+```bash
+MSYS2_ARG_CONV_EXCL="*" wsl.exe -- bash /mnt/e/Claude/operro-sections-27-30/docs/handoffs/logs/S27-S30/closeout/run_gates_harness.sh
+```
+It re-syncs a fresh scratch copy, runs the full gate+lint+test suite, and overwrites `run_all_gates_full.log` in place — safe to rerun after any further source change.
+
+### Genuinely unfinished after this pass
+
+- **C2, C3, C4, C5, C8**: no code changes this pass — see the table above for exact scope.
+- **S1**: schema/RLS written and migration-verified; live Storage HTTP authorization testing not performed.
+- **Real two-connection financial concurrency tests** for P1's acceptance criteria (simultaneous same-key sessions, competing payments as overpayment, lost-response recovery) — designed for, not executed.
+- **All live browser/Auth/Storage verification** for this closeout pass's changes (P1-P4, C1, C6, C7) — every change is typecheck/lint/gate-verified but not click-tested against the real isolated Supabase stack this pass, unlike the more thorough M0-M4 verification recorded in §6 for the original build.
+- **Second/empty-organization and invalid/foreign-invoice-ID testing** on the new/changed surfaces.
+- **Real transfer-upload→screenshot→confirm→validate→locked workflow**, live PDF content inspection, live visit-invoice action click, and small-screen usability — none exercised this pass.

@@ -1,0 +1,3820 @@
+=== Sun Sep 27 21:14:44 +07 2026 start ===
+--- syncing scratch copy ---
+--- normalizing CRLF in shell scripts ---
+--- checking npm registry reachability ---
+registry reachable, npm ci will run fresh inside run_all_gates.sh
+--- starting disposable postgres 16 container ---
+c8bd3cc338b4dc0435dc6590a2c98017dd08edf6e76a2c60f3335f236891d76b
+--- running run_all_gates.sh ---
+
+########## GATE 1 — strict TypeScript typecheck ##########
+
+added 385 packages, and audited 390 packages in 20s
+
+150 packages are looking for funding
+  run `npm fund` for details
+
+6 vulnerabilities (5 high, 1 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues, run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+Version 5.9.3
+typecheck exit=0
+
+########## GATE 2 — workspace build ##########
+
+> web@0.1.0 build
+> next build
+
+▲ Next.js 16.2.12 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  · serverActions
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.7s
+  Running TypeScript ...
+  Finished TypeScript in 14.3s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/32) ...
+  Generating static pages using 11 workers (8/32) 
+  Generating static pages using 11 workers (16/32) 
+  Generating static pages using 11 workers (24/32) 
+✓ Generating static pages using 11 workers (32/32) in 675ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/availability/slots
+├ ƒ /api/complaints/export
+├ ƒ /api/health/supabase
+├ ƒ /api/maps/expand
+├ ƒ /api/onboarding/[token]
+├ ƒ /api/search
+├ ƒ /attendance
+├ ƒ /bookings
+├ ƒ /catalog
+├ ƒ /complaints
+├ ƒ /customers
+├ ƒ /customers/[customerId]
+├ ƒ /customers/onboarding
+├ ƒ /dashboard
+├ ƒ /finance
+├ ƒ /followups
+├ ƒ /inventory
+├ ƒ /invoices/[invoiceId]
+├ ƒ /invoices/new
+├ ƒ /join/[token]
+├ ƒ /leaderboard
+├ ƒ /leaderboard/[resourceId]
+├ ƒ /login
+├ ƒ /my-schedule
+├ ƒ /operations
+├ ƒ /organizations
+├ ƒ /payroll
+├ ƒ /programs
+├ ƒ /reports
+├ ƒ /schedule
+├ ƒ /settings/documents
+├ ƒ /tasks
+└ ƒ /visits
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+> @operro/sdk@0.1.0 build
+> tsc -b --force
+
+
+> @operro/preset-grooming@0.1.0 build
+> tsc -b --force
+
+
+> @operro/backend@0.1.0 build
+> tsc -b --force
+
+-rwxr-xr-x 1 dw_winston dw_winston 403 Sep 27 21:15 packages/backend/dist/index.d.ts
+-rwxr-xr-x 1 dw_winston dw_winston 368 Sep 27 21:15 packages/backend/dist/index.js
+-rwxr-xr-x 1 dw_winston dw_winston 329 Sep 27 21:15 packages/preset-grooming/dist/index.d.ts
+-rwxr-xr-x 1 dw_winston dw_winston 294 Sep 27 21:15 packages/preset-grooming/dist/index.js
+-rwxr-xr-x 1 dw_winston dw_winston 222 Sep 27 21:15 packages/sdk/dist/index.d.ts
+-rwxr-xr-x 1 dw_winston dw_winston 187 Sep 27 21:15 packages/sdk/dist/index.js
+
+########## GATE 3 — in-memory + preset-contract tests ##########
+PASS: 1 authorized addPet delegates to repo/RPC
+PASS: 2 addLine defaults quantity to 1
+PASS: 3 missing module denied
+PASS: 4 wrong-branch denied
+PASS: 5 missing permission denied
+PASS: 6 voidLine without reason -> BUSINESS_RULE, no RPC
+PASS: 7 setLineQuantity(0) -> BUSINESS_RULE
+PASS: 8 repo 42501 -> AUTHORIZATION
+PASS: 9 repo 23505 -> CONFLICT
+PASS: 10 repo pet_customer_mismatch -> BUSINESS_RULE
+PASS: 11 assignPetResource delegates to repo/RPC
+PASS: 12 getJob returns empty job with real branchId (item 5)
+
+12 assertions passed.
+PASS: 1 42501/wrong_branch -> AUTHORIZATION
+PASS: 2 pet_already_on_booking -> CONFLICT
+PASS: 3 line_not_found -> NOT_FOUND
+PASS: 4 pet_customer_mismatch -> BUSINESS_RULE
+PASS: 5 resource_not_active_or_not_in_branch classified
+PASS: 6 package_requires_unit_quantity -> BUSINESS_RULE
+PASS: 7 unknown -> INTERNAL
+PASS: 8 prefix match returns stable code
+PASS: 9 contract includes resource_not_active_or_not_in_branch
+PASS: 10 obsolete resource_not_active_or_not_in_org removed
+PASS: 11 RPC name from preset
+PASS: 12 gate from preset
+PASS: 13 repository methods accept preset Repo* input types (compile-time)
+
+13 assertions passed.
+
+########## GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150) ##########
+NOTICE:  database "operro_gate" does not exist, skipping
+psql:supabase/migrations/20260721000100_extensions_and_helpers.sql:47: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721000150_fix_uuidv7_supabase.sql:22: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql:488: NOTICE:  BACKFILL OK: all legacy grooming pet/service values mapped; no non-grooming booking carries pet_id/service_id.
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "membership_plans_org_isolation" for relation "public.membership_plans" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_memberships_org_isolation" for relation "public.customer_memberships" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "packages_org_isolation" for relation "public.packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_packages_org_isolation" for relation "public.customer_packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_package_ledger_org_isolation" for relation "public.customer_package_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_accounts_org_isolation" for relation "public.loyalty_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_ledger_org_isolation" for relation "public.loyalty_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_accounts_org_isolation" for relation "public.wallet_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_ledger_org_isolation" for relation "public.wallet_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "referrals_org_isolation" for relation "public.referrals" does not exist, skipping
+assembly fns: 8
+
+########## GATE 5 — assembly RPC tests ##########
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 4
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 3
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:84: NOTICE:  PASS: C1 add_pet accepts pet owned by booking customer
+psql:supabase/tests/20260721001350_test_assembly.sql:92: NOTICE:  PASS: C2 cross-customer pet rejected pet_customer_mismatch
+DO
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:100: NOTICE:  PASS: C3 add_line snapshots catalog duration 90 (not default 60)
+psql:supabase/tests/20260721001350_test_assembly.sql:109: NOTICE:  PASS: C4 inactive service rejected
+psql:supabase/tests/20260721001350_test_assembly.sql:109: NOTICE:  PASS: C5 soft-deleted service rejected
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C6 assign_pet_resource sets the groomer
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C7 reassignment writes a reassigned audit event
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C8 retired/inactive resource rejected
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C8b cross-branch resource rejected (not_active_or_not_in_branch)
+psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C9 reserve rejects qty<>1 line (package_requires_unit_quantity)
+psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C10 qty=1 line reserves a package session
+psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C11 set_qty rejects line with package reservation (any status)
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C12 availability is 2 (1 reserved of 3) before removal
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C13 remove_pet released the reservation; availability back to 3
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C14 reservation row preserved with status released
+DO
+psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C15 repeated removal cannot double-release (pet_not_found)
+psql:supabase/tests/20260721001350_test_assembly.sql:174: NOTICE:  PASS: C16 re-adding a removed pet raises stable pet_removal_is_permanent
+DO
+ROLLBACK
+
+########## GATE 6 — package-reservation regression tests ##########
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 4
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 5
+INSERT 0 5
+DO
+CREATE SEQUENCE
+CREATE FUNCTION
+psql:supabase/tests/20260721001350_test_reservation.sql:86: NOTICE:  PASS: R1 qty<>1 rejected (package_requires_unit_quantity)
+DO
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:93: NOTICE:  PASS: R2 qty=1 accepted
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:101: NOTICE:  PASS: R3 expired package rejected (package_expired)
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:109: NOTICE:  PASS: R4 service mismatch rejected
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:117: NOTICE:  PASS: R5 customer mismatch rejected
+psql:supabase/tests/20260721001350_test_reservation.sql:125: NOTICE:  PASS: R6 missing package rejected (package_not_found)
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7a exactly three reserved lifecycle rows exist
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7b availability is 0 before expiration processing (three stale-but-reserved holds)
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7c new reservation succeeds after stale holds expired
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7d the three stale rows changed to expired
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7e the new reservation is reserved
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7f final availability is correct (3 total - 1 active = 2)
+psql:supabase/tests/20260721001350_test_reservation.sql:189: NOTICE:  PASS: R8a set_qty rejected while RESERVED
+psql:supabase/tests/20260721001350_test_reservation.sql:189: NOTICE:  PASS: R8b set_qty rejected while CONSUMED
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:189: NOTICE:  PASS: R8c set_qty rejected while REVERSED/RELEASED
+psql:supabase/tests/20260721001350_test_reservation.sql:196: NOTICE:  PASS: R8d set_qty rejected while RELEASED
+DO
+DO
+psql:supabase/tests/20260721001350_test_reservation.sql:203: NOTICE:  PASS: R8e set_qty rejected while EXPIRED
+psql:supabase/tests/20260721001350_test_reservation.sql:213: NOTICE:  PASS: R9 reserve rejected on completed booking (booking_not_open_for_assembly)
+DO
+ROLLBACK
+
+########## GATE 7 — real authenticated-role integration (incl reserve_package_session) ##########
+CREATE FUNCTION
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+ ok 
+----
+ 
+(1 row)
+
+psql:integration/0100_integration_client.sql:16: NOTICE:  PASS: I1 authenticated can assembly_add_pet via RPC
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/0100_integration_client.sql:35: NOTICE:  PASS: I2 authenticated can assembly_add_line via RPC
+psql:integration/0100_integration_client.sql:35: NOTICE:  PASS: I3 line visible via RLS with quantity 2
+DO
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/0100_integration_client.sql:61: NOTICE:  PASS: I4 direct quantity UPDATE still blocked under real authenticated role
+psql:integration/0100_integration_client.sql:61: NOTICE:  PASS: I5 assembly_set_line_quantity via RPC works under real role
+DO
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+DO
+psql:integration/0100_integration_client.sql:76: NOTICE:  PASS: I6 cross-customer pet rejected (pet_customer_mismatch) under real role
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+DO
+psql:integration/0100_integration_client.sql:92: NOTICE:  PASS: I7 assembly_assign_pet_resource works under real authenticated role
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/0100_integration_client.sql:134: NOTICE:  PASS: I8 authenticated can reserve_package_session via RPC (EXECUTE grant works)
+psql:integration/0100_integration_client.sql:134: NOTICE:  PASS: I9 reservation visible through RLS as authenticated
+psql:integration/0100_integration_client.sql:134: NOTICE:  PASS: I10 reservation org/line/package/status are correct
+DO
+psql:integration/0100_integration_client.sql:134: NOTICE:  PASS: I11 availability decremented to 2 after reservation (authenticated read RPC)
+COMMIT
+
+########## GATE 8 — completion vs assembly/reservation concurrency ##########
+NOTICE:  database "operro_cc" does not exist, skipping
+psql:supabase/migrations/20260721000100_extensions_and_helpers.sql:47: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721000150_fix_uuidv7_supabase.sql:22: NOTICE:  extension "pgcrypto" already exists, skipping
+psql:supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql:488: NOTICE:  BACKFILL OK: all legacy grooming pet/service values mapped; no non-grooming booking carries pet_id/service_id.
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "membership_plans_org_isolation" for relation "public.membership_plans" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_memberships_org_isolation" for relation "public.customer_memberships" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "packages_org_isolation" for relation "public.packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_packages_org_isolation" for relation "public.customer_packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_package_ledger_org_isolation" for relation "public.customer_package_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_accounts_org_isolation" for relation "public.loyalty_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_ledger_org_isolation" for relation "public.loyalty_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_accounts_org_isolation" for relation "public.wallet_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_ledger_org_isolation" for relation "public.wallet_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "referrals_org_isolation" for relation "public.referrals" does not exist, skipping
+                                                 set_config                                                 
+------------------------------------------------------------------------------------------------------------
+ {"sub" : "0c100000-0000-4000-8000-0000000000c1", "active_org_id" : "0c100000-0000-4000-8000-000000000001"}
+(1 row)
+
+== case: complete_booking vs set_line_quantity ==
+  A_RC=0 B_RC=0
+  blocking OK (causal): B saw frozen booking; A~1790518602.46 B~1790518602.47
+  OK: complete_booking vs set_line_quantity — no deadlock, A committed, B blocked then rejected, booking=completed
+== case: complete_booking vs void_line ==
+  A_RC=0 B_RC=0
+  blocking OK (causal): B saw frozen booking; A~1790518606.23 B~1790518606.24
+  OK: complete_booking vs void_line — no deadlock, A committed, B blocked then rejected, booking=completed
+== case: complete_booking vs reserve_package_session ==
+  A_RC=0 B_RC=0
+  blocking OK (causal): B saw frozen booking; A~1790518610.40 B~1790518610.40
+  OK: complete_booking vs reserve_package_session — no deadlock, A committed, B blocked then rejected, booking=completed
+CONC PASS: all three cases serialized; no deadlock; A committed; B blocked then rejected; final state correct.
+
+ALL GATES PASSED
+run_all_gates.sh exit=0
+--- lint (apps/web) ---
+
+> web@0.1.0 lint
+> eslint
+
+
+/tmp/operro-s2730-gate-run/apps/web/test/invoice-workflow-contract.test.ts
+  10:7  warning  'pilotActions' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
+lint exit=0
+--- test:batch1a (apps/web) ---
+
+> web@0.1.0 test:batch1a
+> tsx --test test/timezone.test.ts test/schedule-layout.test.ts test/schedule-segments.test.ts test/schedule-assignments.test.ts test/search-and-profile.test.ts test/zoned-formatting.test.ts test/authorization.test.ts test/booking-week.test.ts test/maps.test.ts test/slot-recommendations.test.ts test/booking-chat-parser.test.ts
+
+TAP version 13
+# Subtest: a membership with explicit grants sees only those branches
+ok 1 - a membership with explicit grants sees only those branches
+  ---
+  duration_ms: 8.615448
+  type: 'test'
+  ...
+# Subtest: branches.all sees every organization branch
+ok 2 - branches.all sees every organization branch
+  ---
+  duration_ms: 0.842531
+  type: 'test'
+  ...
+# Subtest: an inaccessible branch cannot be selected through a query parameter
+ok 3 - an inaccessible branch cannot be selected through a query parameter
+  ---
+  duration_ms: 0.690546
+  type: 'test'
+  ...
+# Subtest: a membership with no branch grants sees nothing
+ok 4 - a membership with no branch grants sees nothing
+  ---
+  duration_ms: 0.386177
+  type: 'test'
+  ...
+# Subtest: each permission-bearing tab declares its required capability
+ok 5 - each permission-bearing tab declares its required capability
+  ---
+  duration_ms: 0.390316
+  type: 'test'
+  ...
+# Subtest: unauthorized tabs are not offered
+ok 6 - unauthorized tabs are not offered
+  ---
+  duration_ms: 0.765473
+  type: 'test'
+  ...
+# Subtest: granting a capability reveals exactly its tab
+ok 7 - granting a capability reveals exactly its tab
+  ---
+  duration_ms: 0.985065
+  type: 'test'
+  ...
+# Subtest: a tab reached by editing the query string is still denied
+ok 8 - a tab reached by editing the query string is still denied
+  ---
+  duration_ms: 0.625358
+  type: 'test'
+  ...
+# Subtest: all capabilities default to denied
+ok 9 - all capabilities default to denied
+  ---
+  duration_ms: 0.925287
+  type: 'test'
+  ...
+# Subtest: totals are grouped per currency and never added across currencies
+ok 10 - totals are grouped per currency and never added across currencies
+  ---
+  duration_ms: 1.758579
+  type: 'test'
+  ...
+# Subtest: numeric strings from the database are coerced
+ok 11 - numeric strings from the database are coerced
+  ---
+  duration_ms: 0.314049
+  type: 'test'
+  ...
+# Subtest: a missing currency is labelled rather than merged into another
+ok 12 - a missing currency is labelled rather than merged into another
+  ---
+  duration_ms: 0.363317
+  type: 'test'
+  ...
+# Subtest: no payments yields no currency rows, which is distinct from restricted
+ok 13 - no payments yields no currency rows, which is distinct from restricted
+  ---
+  duration_ms: 0.175374
+  type: 'test'
+  ...
+# Subtest: currency rows are ordered by amount descending
+ok 14 - currency rows are ordered by amount descending
+  ---
+  duration_ms: 0.199563
+  type: 'test'
+  ...
+# Subtest: parses a HomePaw booking chat into one customer and multiple pets
+ok 15 - parses a HomePaw booking chat into one customer and multiple pets
+  ---
+  duration_ms: 8.449205
+  type: 'test'
+  ...
+# Subtest: shares a single pet field value across every parsed pet
+ok 16 - shares a single pet field value across every parsed pet
+  ---
+  duration_ms: 4.307449
+  type: 'test'
+  ...
+# Subtest: caps imports at ten pets and tolerates unrelated chat lines
+ok 17 - caps imports at ten pets and tolerates unrelated chat lines
+  ---
+  duration_ms: 1.831263
+  type: 'test'
+  ...
+# Subtest: expands a Monday anchor into its seven calendar dates
+ok 18 - expands a Monday anchor into its seven calendar dates
+  ---
+  duration_ms: 6.396604
+  type: 'test'
+  ...
+# Subtest: crosses a month boundary without drift
+ok 19 - crosses a month boundary without drift
+  ---
+  duration_ms: 0.742064
+  type: 'test'
+  ...
+# Subtest: a booking is bucketed by its OWN branch's zone, not a shared org zone
+ok 20 - a booking is bucketed by its OWN branch's zone, not a shared org zone
+  ---
+  duration_ms: 77.137132
+  type: 'test'
+  ...
+# Subtest: two branches in different zones disagree on the day for a near-midnight instant
+ok 21 - two branches in different zones disagree on the day for a near-midnight instant
+  ---
+  duration_ms: 2.040499
+  type: 'test'
+  ...
+# Subtest: falls back to the supplied default zone when the branch is not in the map
+ok 22 - falls back to the supplied default zone when the branch is not in the map
+  ---
+  duration_ms: 0.557021
+  type: 'test'
+  ...
+# Subtest: groups a week of bookings onto all seven day buckets, including empty ones
+ok 23 - groups a week of bookings onto all seven day buckets, including empty ones
+  ---
+  duration_ms: 1.71239
+  type: 'test'
+  ...
+# Subtest: a booking whose branch zone pushes it outside the requested week is dropped, not misfiled
+ok 24 - a booking whose branch zone pushes it outside the requested week is dropped, not misfiled
+  ---
+  duration_ms: 0.969986
+  type: 'test'
+  ...
+# Subtest: parses common Google Maps coordinate formats
+ok 25 - parses common Google Maps coordinate formats
+  ---
+  duration_ms: 8.824171
+  type: 'test'
+  ...
+# Subtest: only recognizes allow-listed Google short-link hosts
+ok 26 - only recognizes allow-listed Google short-link hosts
+  ---
+  duration_ms: 0.860811
+  type: 'test'
+  ...
+# Subtest: an inactive assignment does not make a booking match a selected groomer
+ok 27 - an inactive assignment does not make a booking match a selected groomer
+  ---
+  duration_ms: 7.509827
+  type: 'test'
+  ...
+# Subtest: an inactive assignment does not match even when another groomer is active on the booking
+ok 28 - an inactive assignment does not match even when another groomer is active on the booking
+  ---
+  duration_ms: 0.58575
+  type: 'test'
+  ...
+# Subtest: an inactive assignment is absent from resourceIds in an unfiltered read
+ok 29 - an inactive assignment is absent from resourceIds in an unfiltered read
+  ---
+  duration_ms: 0.567621
+  type: 'test'
+  ...
+# Subtest: a missing, null, or non-boolean active flag is treated as released
+ok 30 - a missing, null, or non-boolean active flag is treated as released
+  ---
+  duration_ms: 0.28575
+  type: 'test'
+  ...
+# Subtest: malformed assignment rows are ignored rather than throwing
+ok 31 - malformed assignment rows are ignored rather than throwing
+  ---
+  duration_ms: 0.343418
+  type: 'test'
+  ...
+# Subtest: active assignments still place a booking under their groomer
+ok 32 - active assignments still place a booking under their groomer
+  ---
+  duration_ms: 0.56936
+  type: 'test'
+  ...
+# Subtest: an active assignment for two groomers yields both columns
+ok 33 - an active assignment for two groomers yields both columns
+  ---
+  duration_ms: 0.531031
+  type: 'test'
+  ...
+# Subtest: a selection narrows active assignments to the selected groomers only
+ok 34 - a selection narrows active assignments to the selected groomers only
+  ---
+  duration_ms: 0.324999
+  type: 'test'
+  ...
+# Subtest: an unassigned booking yields no columns but is not discarded
+ok 35 - an unassigned booking yields no columns but is not discarded
+  ---
+  duration_ms: 0.667007
+  type: 'test'
+  ...
+# Subtest: the unfiltered select omits !inner so unassigned bookings survive the join
+ok 36 - the unfiltered select omits !inner so unassigned bookings survive the join
+  ---
+  duration_ms: 1.022224
+  type: 'test'
+  ...
+# Subtest: the filtered select uses !inner so the groomer restriction reaches the parent rows
+ok 37 - the filtered select uses !inner so the groomer restriction reaches the parent rows
+  ---
+  duration_ms: 0.341008
+  type: 'test'
+  ...
+# Subtest: both selects request is_active, since the derivation depends on it
+ok 38 - both selects request is_active, since the derivation depends on it
+  ---
+  duration_ms: 0.28246
+  type: 'test'
+  ...
+# Subtest: per-pet assigned resources still contribute columns
+ok 39 - per-pet assigned resources still contribute columns
+  ---
+  duration_ms: 0.58196
+  type: 'test'
+  ...
+# Subtest: a per-pet assignment survives alongside a released booking-level assignment
+ok 40 - a per-pet assignment survives alongside a released booking-level assignment
+  ---
+  duration_ms: 0.2882
+  type: 'test'
+  ...
+# Subtest: null per-pet assignments are skipped without collapsing the rest
+ok 41 - null per-pet assignments are skipped without collapsing the rest
+  ---
+  duration_ms: 0.255471
+  type: 'test'
+  ...
+# Subtest: a resource appearing as both an active assignment and a pet assignment is not duplicated
+ok 42 - a resource appearing as both an active assignment and a pet assignment is not duplicated
+  ---
+  duration_ms: 0.262191
+  type: 'test'
+  ...
+# Subtest: a resource outside the active branch is excluded even when actively assigned
+ok 43 - a resource outside the active branch is excluded even when actively assigned
+  ---
+  duration_ms: 0.261071
+  type: 'test'
+  ...
+# Subtest: guards the view parameter against arbitrary input
+ok 44 - guards the view parameter against arbitrary input
+  ---
+  duration_ms: 3.665193
+  type: 'test'
+  ...
+# Subtest: expands each view into the right number of day columns
+ok 45 - expands each view into the right number of day columns
+  ---
+  duration_ms: 3.766588
+  type: 'test'
+  ...
+# Subtest: week view snaps to a Monday start regardless of the requested day
+ok 46 - week view snaps to a Monday start regardless of the requested day
+  ---
+  duration_ms: 0.939178
+  type: 'test'
+  ...
+# Subtest: uses configured business hours when nothing falls outside them
+ok 47 - uses configured business hours when nothing falls outside them
+  ---
+  duration_ms: 0.531122
+  type: 'test'
+  ...
+# Subtest: widens the window so an early or late booking is never hidden
+ok 48 - widens the window so an early or late booking is never hidden
+  ---
+  duration_ms: 0.426945
+  type: 'test'
+  ...
+# Subtest: ignores zero-length and inverted spans when widening
+ok 49 - ignores zero-length and inverted spans when widening
+  ---
+  duration_ms: 0.29325
+  type: 'test'
+  ...
+# Subtest: never produces an empty window
+ok 50 - never produces an empty window
+  ---
+  duration_ms: 0.622848
+  type: 'test'
+  ...
+# Subtest: positions a span proportionally inside the window
+ok 51 - positions a span proportionally inside the window
+  ---
+  duration_ms: 0.565791
+  type: 'test'
+  ...
+# Subtest: drops spans that fall entirely outside the window
+ok 52 - drops spans that fall entirely outside the window
+  ---
+  duration_ms: 0.997345
+  type: 'test'
+  ...
+# Subtest: clamps a span that straddles the window edge
+ok 53 - clamps a span that straddles the window edge
+  ---
+  duration_ms: 2.082227
+  type: 'test'
+  ...
+# Subtest: keeps a very short booking clickable rather than zero-height
+ok 54 - keeps a very short booking clickable rather than zero-height
+  ---
+  duration_ms: 0.350668
+  type: 'test'
+  ...
+# Subtest: emits inclusive time-axis markers
+ok 55 - emits inclusive time-axis markers
+  ---
+  duration_ms: 0.459834
+  type: 'test'
+  ...
+# Subtest: formats minute offsets as a zero-padded clock
+ok 56 - formats minute offsets as a zero-padded clock
+  ---
+  duration_ms: 0.316879
+  type: 'test'
+  ...
+# Subtest: places a same-day booking on exactly one day
+ok 57 - places a same-day booking on exactly one day
+  ---
+  duration_ms: 38.045876
+  type: 'test'
+  ...
+# Subtest: a booking starting before the window is still placed inside it
+ok 58 - a booking starting before the window is still placed inside it
+  ---
+  duration_ms: 1.726649
+  type: 'test'
+  ...
+# Subtest: a booking crossing local midnight appears on both days
+ok 59 - a booking crossing local midnight appears on both days
+  ---
+  duration_ms: 3.337508
+  type: 'test'
+  ...
+# Subtest: a multi-day occupancy fills every intermediate day
+ok 60 - a multi-day occupancy fills every intermediate day
+  ---
+  duration_ms: 3.259037
+  type: 'test'
+  ...
+# Subtest: returns no segments when the range misses every requested day
+ok 61 - returns no segments when the range misses every requested day
+  ---
+  duration_ms: 1.062273
+  type: 'test'
+  ...
+# Subtest: rejects a zero-length or inverted range
+ok 62 - rejects a zero-length or inverted range
+  ---
+  duration_ms: 0.391627
+  type: 'test'
+  ...
+# Subtest: segment minutes are branch-local, not UTC
+ok 63 - segment minutes are branch-local, not UTC
+  ---
+  duration_ms: 1.340594
+  type: 'test'
+  ...
+# Subtest: bounds derive from segments, so a filtered-out groomer cannot stretch the axis
+ok 64 - bounds derive from segments, so a filtered-out groomer cannot stretch the axis
+  ---
+  duration_ms: 3.008295
+  type: 'test'
+  ...
+# Subtest: requires a minimum term length
+ok 65 - requires a minimum term length
+  ---
+  duration_ms: 4.387797
+  type: 'test'
+  ...
+# Subtest: trims surrounding whitespace and caps length
+ok 66 - trims surrounding whitespace and caps length
+  ---
+  duration_ms: 0.426825
+  type: 'test'
+  ...
+# Subtest: rejects non-string input
+ok 67 - rejects non-string input
+  ---
+  duration_ms: 10.625328
+  type: 'test'
+  ...
+# Subtest: escapes LIKE metacharacters so a query cannot widen its own match
+ok 68 - escapes LIKE metacharacters so a query cannot widen its own match
+  ---
+  duration_ms: 0.639958
+  type: 'test'
+  ...
+# Subtest: hostile terms survive normalization without being rejected outright
+ok 69 - hostile terms survive normalization without being rejected outright
+  ---
+  duration_ms: 0.319359
+  type: 'test'
+  ...
+# Subtest: LIKE metacharacters are escaped and no others are introduced
+ok 70 - LIKE metacharacters are escaped and no others are introduced
+  ---
+  duration_ms: 0.29029
+  type: 'test'
+  ...
+# Subtest: PostgREST structural characters pass through as ordinary text
+ok 71 - PostgREST structural characters pass through as ordinary text
+  ---
+  duration_ms: 0.28926
+  type: 'test'
+  ...
+# Subtest: an injected filter fragment stays a literal search term
+ok 72 - an injected filter fragment stays a literal search term
+  ---
+  duration_ms: 0.314179
+  type: 'test'
+  ...
+# Subtest: a single character is rejected before any query is built
+ok 73 - a single character is rejected before any query is built
+  ---
+  duration_ms: 0.654127
+  type: 'test'
+  ...
+# Subtest: deduplicates customers matched by both name and phone
+ok 74 - deduplicates customers matched by both name and phone
+  ---
+  duration_ms: 3.959061
+  type: 'test'
+  ...
+# Subtest: merge preserves first-seen ordering and tolerates empty inputs
+ok 75 - merge preserves first-seen ordering and tolerates empty inputs
+  ---
+  duration_ms: 0.532311
+  type: 'test'
+  ...
+# Subtest: derives grooming size bands from weight
+ok 76 - derives grooming size bands from weight
+  ---
+  duration_ms: 0.384497
+  type: 'test'
+  ...
+# Subtest: returns no size band for missing or invalid weight
+ok 77 - returns no size band for missing or invalid weight
+  ---
+  duration_ms: 0.208803
+  type: 'test'
+  ...
+# Subtest: renders age from a birthdate
+ok 78 - renders age from a birthdate
+  ---
+  duration_ms: 0.774723
+  type: 'test'
+  ...
+# Subtest: rejects unusable birthdates including future dates
+ok 79 - rejects unusable birthdates including future dates
+  ---
+  duration_ms: 0.86536
+  type: 'test'
+  ...
+# Subtest: surfaces only scalar metadata as custom fields
+ok 80 - surfaces only scalar metadata as custom fields
+  ---
+  duration_ms: 0.960886
+  type: 'test'
+  ...
+# Subtest: tolerates non-object metadata
+ok 81 - tolerates non-object metadata
+  ---
+  duration_ms: 0.334188
+  type: 'test'
+  ...
+# Subtest: reads medical flags from both object and array shapes
+ok 82 - reads medical flags from both object and array shapes
+  ---
+  duration_ms: 1.232677
+  type: 'test'
+  ...
+# Subtest: haversine returns a plausible Jakarta distance
+ok 83 - haversine returns a plausible Jakarta distance
+  ---
+  duration_ms: 5.224857
+  type: 'test'
+  ...
+# Subtest: traffic factor is higher in morning and evening peaks
+ok 84 - traffic factor is higher in morning and evening peaks
+  ---
+  duration_ms: 0.566291
+  type: 'test'
+  ...
+# Subtest: recommends only common free windows for every selected groomer
+ok 85 - recommends only common free windows for every selected groomer
+  ---
+  duration_ms: 56.174629
+  type: 'test'
+  ...
+# Subtest: uses the previous stop before branch base for route scoring
+ok 86 - uses the previous stop before branch base for route scoring
+  ---
+  duration_ms: 26.057611
+  type: 'test'
+  ...
+# Subtest: an explicitly selected customer anchor overrides the previous stop
+ok 87 - an explicitly selected customer anchor overrides the previous stop
+  ---
+  duration_ms: 3.109052
+  type: 'test'
+  ...
+# Subtest: same-city days rank above a groomer day already committed to another city
+ok 88 - same-city days rank above a groomer day already committed to another city
+  ---
+  duration_ms: 14.508544
+  type: 'test'
+  ...
+# Subtest: resolves a fixed positive offset
+ok 89 - resolves a fixed positive offset
+  ---
+  duration_ms: 57.906878
+  type: 'test'
+  ...
+# Subtest: resolves a negative offset
+ok 90 - resolves a negative offset
+  ---
+  duration_ms: 5.975187
+  type: 'test'
+  ...
+# Subtest: maps an instant to its branch-local calendar day
+ok 91 - maps an instant to its branch-local calendar day
+  ---
+  duration_ms: 1.314764
+  type: 'test'
+  ...
+# Subtest: reads local minutes from midnight, not UTC minutes
+ok 92 - reads local minutes from midnight, not UTC minutes
+  ---
+  duration_ms: 0.872449
+  type: 'test'
+  ...
+# Subtest: round-trips a local date and minute offset through UTC
+ok 93 - round-trips a local date and minute offset through UTC
+  ---
+  duration_ms: 1.760218
+  type: 'test'
+  ...
+# Subtest: local midnight is not UTC midnight
+ok 94 - local midnight is not UTC midnight
+  ---
+  duration_ms: 0.669916
+  type: 'test'
+  ...
+# Subtest: survives a DST transition zone without shifting the local wall clock
+ok 95 - survives a DST transition zone without shifting the local wall clock
+  ---
+  duration_ms: 2.080988
+  type: 'test'
+  ...
+# Subtest: counts whole local days across a UTC day boundary
+ok 96 - counts whole local days across a UTC day boundary
+  ---
+  duration_ms: 2.667128
+  type: 'test'
+  ...
+# Subtest: shifts ISO dates across month and year ends
+ok 97 - shifts ISO dates across month and year ends
+  ---
+  duration_ms: 2.598945
+  type: 'test'
+  ...
+# Subtest: guards malformed date input
+ok 98 - guards malformed date input
+  ---
+  duration_ms: 2.367016
+  type: 'test'
+  ...
+# Subtest: the fixture really does straddle the UTC/Jakarta date boundary
+ok 99 - the fixture really does straddle the UTC/Jakarta date boundary
+  ---
+  duration_ms: 24.151689
+  type: 'test'
+  ...
+# Subtest: formatZonedDate reports the branch calendar date, not the UTC one
+ok 100 - formatZonedDate reports the branch calendar date, not the UTC one
+  ---
+  duration_ms: 1.362092
+  type: 'test'
+  ...
+# Subtest: formatZonedDateTime reports the branch wall clock
+ok 101 - formatZonedDateTime reports the branch wall clock
+  ---
+  duration_ms: 0.688566
+  type: 'test'
+  ...
+# Subtest: formatZonedDayLong reports the branch weekday
+ok 102 - formatZonedDayLong reports the branch weekday
+  ---
+  duration_ms: 0.527321
+  type: 'test'
+  ...
+# Subtest: formatters accept both Date and ISO string inputs identically
+ok 103 - formatters accept both Date and ISO string inputs identically
+  ---
+  duration_ms: 0.642667
+  type: 'test'
+  ...
+# Subtest: a branch in a negative offset zone also shifts the reported date
+ok 104 - a branch in a negative offset zone also shifts the reported date
+  ---
+  duration_ms: 0.412236
+  type: 'test'
+  ...
+# Subtest: default branch timezone prefers the explicit default branch
+ok 105 - default branch timezone prefers the explicit default branch
+  ---
+  duration_ms: 0.408046
+  type: 'test'
+  ...
+# Subtest: default branch timezone falls back to the first branch when none is flagged
+ok 106 - default branch timezone falls back to the first branch when none is flagged
+  ---
+  duration_ms: 0.170144
+  type: 'test'
+  ...
+# Subtest: timezone resolution reports an explicit fallback when no branch is readable
+ok 107 - timezone resolution reports an explicit fallback when no branch is readable
+  ---
+  duration_ms: 0.462033
+  type: 'test'
+  ...
+1..107
+# tests 107
+# suites 0
+# pass 107
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1474.864395
+test:batch1a exit=0
+--- test:batch1b (apps/web) ---
+
+> web@0.1.0 test:batch1b
+> tsx --test test/booking-reschedule.test.ts test/booking-series-contract.test.ts test/availability-blocks.test.ts test/branch-availability-contract.test.ts test/safe-archive-contract.test.ts test/groomer-management-contract.test.ts test/attendance-contract.test.ts test/groomer-performance-contract.test.ts test/complaint-lifecycle-contract.test.ts test/invoice-workflow-contract.test.ts test/mutation-safety.test.ts test/reschedule-steps.test.ts test/use-server-exports.test.ts test/onboarding-contract.test.ts test/styling-references-contract.test.ts test/complimentary-discount-contract.test.ts test/calendar-bulk-contract.test.ts test/service-size-pricing-contract.test.ts test/invoice-discounts-contract.test.ts
+
+TAP version 13
+# Subtest: attendance is tenant isolated and RPC writes stay authenticated
+ok 1 - attendance is tenant isolated and RPC writes stay authenticated
+  ---
+  duration_ms: 6.103987
+  type: 'test'
+  ...
+# Subtest: check-in requires the assigned groomer, linked photo and valid GPS
+ok 2 - check-in requires the assigned groomer, linked photo and valid GPS
+  ---
+  duration_ms: 8.824352
+  type: 'test'
+  ...
+# Subtest: server classifies lateness and payroll can audit exceptions
+ok 3 - server classifies lateness and payroll can audit exceptions
+  ---
+  duration_ms: 0.547701
+  type: 'test'
+  ...
+# Subtest: a valid one-off blackout parses into branch-local instants
+ok 4 - a valid one-off blackout parses into branch-local instants
+  ---
+  duration_ms: 37.615652
+  type: 'test'
+  ...
+# Subtest: a late-evening blackout crosses the UTC date boundary correctly
+ok 5 - a late-evening blackout crosses the UTC date boundary correctly
+  ---
+  duration_ms: 1.820606
+  type: 'test'
+  ...
+# Subtest: zero-length and inverted windows are rejected
+ok 6 - zero-length and inverted windows are rejected
+  ---
+  duration_ms: 0.458014
+  type: 'test'
+  ...
+# Subtest: a resource outside the selected branch is rejected
+ok 7 - a resource outside the selected branch is rejected
+  ---
+  duration_ms: 0.378887
+  type: 'test'
+  ...
+# Subtest: a missing or non-string resource id is rejected
+ok 8 - a missing or non-string resource id is rejected
+  ---
+  duration_ms: 0.376337
+  type: 'test'
+  ...
+# Subtest: an empty accessible-resource set blocks all blackout creation
+ok 9 - an empty accessible-resource set blocks all blackout creation
+  ---
+  duration_ms: 0.266781
+  type: 'test'
+  ...
+# Subtest: malformed dates and times are rejected
+ok 10 - malformed dates and times are rejected
+  ---
+  duration_ms: 0.655097
+  type: 'test'
+  ...
+# Subtest: a blank reason normalizes to null and an over-long one is rejected
+ok 11 - a blank reason normalizes to null and an over-long one is rejected
+  ---
+  duration_ms: 1.489298
+  type: 'test'
+  ...
+# Subtest: the maximum span guard is enforced
+ok 12 - the maximum span guard is enforced
+  ---
+  duration_ms: 1.944372
+  type: 'test'
+  ...
+# Subtest: ranges are half-open, matching tstzrange [start, end)
+ok 13 - ranges are half-open, matching tstzrange [start, end)
+  ---
+  duration_ms: 1.229427
+  type: 'test'
+  ...
+# Subtest: a blackout over an active assigned booking is rejected
+ok 14 - a blackout over an active assigned booking is rejected
+  ---
+  duration_ms: 0.721725
+  type: 'test'
+  ...
+# Subtest: an INACTIVE assignment does not block a blackout
+ok 15 - an INACTIVE assignment does not block a blackout
+  ---
+  duration_ms: 0.2856
+  type: 'test'
+  ...
+# Subtest: another groomer's booking does not block
+ok 16 - another groomer's booking does not block
+  ---
+  duration_ms: 0.269331
+  type: 'test'
+  ...
+# Subtest: an adjacent booking does not block
+ok 17 - an adjacent booking does not block
+  ---
+  duration_ms: 0.249152
+  type: 'test'
+  ...
+# Subtest: no assignments means no conflict
+ok 18 - no assignments means no conflict
+  ---
+  duration_ms: 0.229062
+  type: 'test'
+  ...
+# Subtest: parseTstzRange reads a Postgres tstzrange literal's bounds
+ok 19 - parseTstzRange reads a Postgres tstzrange literal's bounds
+  ---
+  duration_ms: 0.627209
+  type: 'test'
+  ...
+# Subtest: parseTstzRange rejects malformed or unparseable literals rather than guessing
+ok 20 - parseTstzRange rejects malformed or unparseable literals rather than guessing
+  ---
+  duration_ms: 3.381948
+  type: 'test'
+  ...
+# Subtest: deriveActiveAssignmentWindows sources bounds from `during`, and excludes a soft-deleted booking's row
+ok 21 - deriveActiveAssignmentWindows sources bounds from `during`, and excludes a soft-deleted booking's row
+  ---
+  duration_ms: 0.760923
+  type: 'test'
+  ...
+# Subtest: deriveActiveAssignmentWindows drops a row with a malformed `during` or a non-string identifier rather than guessing
+ok 22 - deriveActiveAssignmentWindows drops a row with a malformed `during` or a non-string identifier rather than guessing
+  ---
+  duration_ms: 0.346548
+  type: 'test'
+  ...
+# Subtest: v3 correction 4 regression: conflict detection follows booking_resources.during, not the parent booking's own starts_at/ends_at, when the two differ
+ok 23 - v3 correction 4 regression: conflict detection follows booking_resources.during, not the parent booking's own starts_at/ends_at, when the two differ
+  ---
+  duration_ms: 0.435095
+  type: 'test'
+  ...
+# Subtest: rescheduling into a blackout is detected for the targeted groomer
+ok 24 - rescheduling into a blackout is detected for the targeted groomer
+  ---
+  duration_ms: 0.638568
+  type: 'test'
+  ...
+# Subtest: only the targeted groomers' blackouts are considered
+ok 25 - only the targeted groomers' blackouts are considered
+  ---
+  duration_ms: 0.26281
+  type: 'test'
+  ...
+# Subtest: a multi-pet reschedule checks every targeted groomer
+ok 26 - a multi-pet reschedule checks every targeted groomer
+  ---
+  duration_ms: 0.482583
+  type: 'test'
+  ...
+# Subtest: a soft-removed blackout is excluded by the schedule read contract
+ok 27 - a soft-removed blackout is excluded by the schedule read contract
+  ---
+  duration_ms: 1.931833
+  type: 'test'
+  ...
+# Subtest: a WhatsApp URL is built from a local number with the country prefix
+ok 28 - a WhatsApp URL is built from a local number with the country prefix
+  ---
+  duration_ms: 0.592049
+  type: 'test'
+  ...
+# Subtest: separators and spacing in stored numbers are normalized
+ok 29 - separators and spacing in stored numbers are normalized
+  ---
+  duration_ms: 0.509022
+  type: 'test'
+  ...
+# Subtest: prefilled text is percent-encoded so it cannot corrupt the query string
+ok 30 - prefilled text is percent-encoded so it cannot corrupt the query string
+  ---
+  duration_ms: 0.365867
+  type: 'test'
+  ...
+# Subtest: an unusable phone number yields no link rather than a broken one
+ok 31 - an unusable phone number yields no link rather than a broken one
+  ---
+  duration_ms: 0.28435
+  type: 'test'
+  ...
+# Subtest: an already-international number is left intact
+ok 32 - an already-international number is left intact
+  ---
+  duration_ms: 0.29504
+  type: 'test'
+  ...
+# Subtest: no message means no query string at all
+ok 33 - no message means no query string at all
+  ---
+  duration_ms: 0.308879
+  type: 'test'
+  ...
+# Subtest: reschedulable statuses exclude in_progress and every terminal status
+ok 34 - reschedulable statuses exclude in_progress and every terminal status
+  ---
+  duration_ms: 6.830031
+  type: 'test'
+  ...
+# Subtest: cancellable statuses include in_progress but no terminal status
+ok 35 - cancellable statuses include in_progress but no terminal status
+  ---
+  duration_ms: 0.618308
+  type: 'test'
+  ...
+# Subtest: rescheduling a terminal or in-progress booking is rejected by the parser
+ok 36 - rescheduling a terminal or in-progress booking is rejected by the parser
+  ---
+  duration_ms: 1.115461
+  type: 'test'
+  ...
+# Subtest: an unknown status is rejected rather than allowed through
+ok 37 - an unknown status is rejected rather than allowed through
+  ---
+  duration_ms: 0.303789
+  type: 'test'
+  ...
+# Subtest: wall-clock input is interpreted in the branch timezone
+ok 38 - wall-clock input is interpreted in the branch timezone
+  ---
+  duration_ms: 35.485982
+  type: 'test'
+  ...
+# Subtest: a late branch-local time lands on the previous UTC calendar day
+ok 39 - a late branch-local time lands on the previous UTC calendar day
+  ---
+  duration_ms: 1.845966
+  type: 'test'
+  ...
+# Subtest: the same wall clock in a negative-offset branch resolves to a different instant
+ok 40 - the same wall clock in a negative-offset branch resolves to a different instant
+  ---
+  duration_ms: 3.470929
+  type: 'test'
+  ...
+# Subtest: requires ends_at strictly after starts_at
+ok 41 - requires ends_at strictly after starts_at
+  ---
+  duration_ms: 0.648957
+  type: 'test'
+  ...
+# Subtest: rejects malformed dates and times
+ok 42 - rejects malformed dates and times
+  ---
+  duration_ms: 1.338753
+  type: 'test'
+  ...
+# Subtest: parseClockMinutes accepts only zero-padded 24-hour values
+ok 43 - parseClockMinutes accepts only zero-padded 24-hour values
+  ---
+  duration_ms: 1.387541
+  type: 'test'
+  ...
+# Subtest: fulfillment mode is restricted to the schema's enum
+ok 44 - fulfillment mode is restricted to the schema's enum
+  ---
+  duration_ms: 0.919638
+  type: 'test'
+  ...
+# Subtest: over-long notes are rejected
+ok 45 - over-long notes are rejected
+  ---
+  duration_ms: 0.870391
+  type: 'test'
+  ...
+# Subtest: blank notes normalize to null rather than an empty string
+ok 46 - blank notes normalize to null rather than an empty string
+  ---
+  duration_ms: 1.608664
+  type: 'test'
+  ...
+# Subtest: a pet id not on this booking is rejected
+ok 47 - a pet id not on this booking is rejected
+  ---
+  duration_ms: 0.505792
+  type: 'test'
+  ...
+# Subtest: a resource outside the booking's branch is rejected
+ok 48 - a resource outside the booking's branch is rejected
+  ---
+  duration_ms: 0.392036
+  type: 'test'
+  ...
+# Subtest: an empty accessible-resource set rejects every assignment
+ok 49 - an empty accessible-resource set rejects every assignment
+  ---
+  duration_ms: 0.365177
+  type: 'test'
+  ...
+# Subtest: multi-pet bookings keep independent groomers
+ok 50 - multi-pet bookings keep independent groomers
+  ---
+  duration_ms: 1.380971
+  type: 'test'
+  ...
+# Subtest: two pets may share one groomer
+ok 51 - two pets may share one groomer
+  ---
+  duration_ms: 1.600284
+  type: 'test'
+  ...
+# Subtest: a pet entirely absent from the submitted map is rejected, not silently kept as-is
+ok 52 - a pet entirely absent from the submitted map is rejected, not silently kept as-is
+  ---
+  duration_ms: 0.487533
+  type: 'test'
+  ...
+# Subtest: a pet present with an empty string selection is rejected, not treated as no-op
+ok 53 - a pet present with an empty string selection is rejected, not treated as no-op
+  ---
+  duration_ms: 0.609499
+  type: 'test'
+  ...
+# Subtest: a pet present with a non-string selection is rejected
+ok 54 - a pet present with a non-string selection is rejected
+  ---
+  duration_ms: 0.468564
+  type: 'test'
+  ...
+# Subtest: a booking with a single pet still requires that pet's assignment
+ok 55 - a booking with a single pet still requires that pet's assignment
+  ---
+  duration_ms: 1.382832
+  type: 'test'
+  ...
+# Subtest: a booking with no pets requires no assignment and succeeds with an empty map
+ok 56 - a booking with no pets requires no assignment and succeeds with an empty map
+  ---
+  duration_ms: 1.374332
+  type: 'test'
+  ...
+# Subtest: an unchanged assignment set only refreshes the occupied window
+ok 57 - an unchanged assignment set only refreshes the occupied window
+  ---
+  duration_ms: 0.779123
+  type: 'test'
+  ...
+# Subtest: reassigning deactivates the old resource and activates the new one
+ok 58 - reassigning deactivates the old resource and activates the new one
+  ---
+  duration_ms: 0.765464
+  type: 'test'
+  ...
+# Subtest: a previously released row is reactivated rather than inserted again
+ok 59 - a previously released row is reactivated rather than inserted again
+  ---
+  duration_ms: 0.405116
+  type: 'test'
+  ...
+# Subtest: an inactive row not in the desired set is never activated accidentally
+ok 60 - an inactive row not in the desired set is never activated accidentally
+  ---
+  duration_ms: 0.411325
+  type: 'test'
+  ...
+# Subtest: dropping every assignment deactivates all active rows and activates none
+ok 61 - dropping every assignment deactivates all active rows and activates none
+  ---
+  duration_ms: 0.310019
+  type: 'test'
+  ...
+# Subtest: the exclusion violation is recognised as a slot conflict
+ok 62 - the exclusion violation is recognised as a slot conflict
+  ---
+  duration_ms: 0.611089
+  type: 'test'
+  ...
+# Subtest: authorization, transition, and not-found failures are distinguished
+ok 63 - authorization, transition, and not-found failures are distinguished
+  ---
+  duration_ms: 1.221807
+  type: 'test'
+  ...
+# Subtest: anything unrecognised is unexpected, never optimistically allowed
+ok 64 - anything unrecognised is unexpected, never optimistically allowed
+  ---
+  duration_ms: 0.498292
+  type: 'test'
+  ...
+# Subtest: the happy path runs every step in order with no compensation
+ok 65 - the happy path runs every step in order with no compensation
+  ---
+  duration_ms: 1.551086
+  type: 'test'
+  ...
+# Subtest: a blocking blackout stops before any step runs
+ok 66 - a blocking blackout stops before any step runs
+  ---
+  duration_ms: 0.605139
+  type: 'test'
+  ...
+# Subtest: a blackout probe failure is unexpected and writes nothing
+ok 67 - a blackout probe failure is unexpected and writes nothing
+  ---
+  duration_ms: 0.607259
+  type: 'test'
+  ...
+# Subtest: a failure on a later step compensates every already-applied step in reverse order
+ok 68 - a failure on a later step compensates every already-applied step in reverse order
+  ---
+  duration_ms: 0.909878
+  type: 'test'
+  ...
+# Subtest: a step failing with stale:true is reported as not_found, and still triggers compensation
+ok 69 - a step failing with stale:true is reported as not_found, and still triggers compensation
+  ---
+  duration_ms: 0.538502
+  type: 'test'
+  ...
+# Subtest: a step whose zero-row write matched is never treated as success (Correction 2)
+ok 70 - a step whose zero-row write matched is never treated as success (Correction 2)
+  ---
+  duration_ms: 0.626898
+  type: 'test'
+  ...
+# Subtest: when compensation itself fails, the outcome is partially_applied, never a false success
+ok 71 - when compensation itself fails, the outcome is partially_applied, never a false success
+  ---
+  duration_ms: 1.115891
+  type: 'test'
+  ...
+# Subtest: an uncompensatable step (null original assignment) forces partially_applied even though every other step reverses cleanly
+ok 72 - an uncompensatable step (null original assignment) forces partially_applied even though every other step reverses cleanly
+  ---
+  duration_ms: 3.874024
+  type: 'test'
+  ...
+# Subtest: compensation continues through every applied step even after one compensation fails
+ok 73 - compensation continues through every applied step even after one compensation fails
+  ---
+  duration_ms: 2.047018
+  type: 'test'
+  ...
+# Subtest: a failed first-step write (the booking row itself) needs no compensation, since nothing else applied
+ok 74 - a failed first-step write (the booking row itself) needs no compensation, since nothing else applied
+  ---
+  duration_ms: 1.539675
+  type: 'test'
+  ...
+# Subtest: a single-step reschedule (no resource or pet changes) never calls recheckStatus's result against a later step
+ok 75 - a single-step reschedule (no resource or pet changes) never calls recheckStatus's result against a later step
+  ---
+  duration_ms: 0.367337
+  type: 'test'
+  ...
+# Subtest: a status recheck that reveals a concurrent invalid transition compensates and reports invalid_transition
+ok 76 - a status recheck that reveals a concurrent invalid transition compensates and reports invalid_transition
+  ---
+  duration_ms: 0.500362
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: a status recheck error stops the sequence, compensates the booking row, and reports unexpected once compensation is verified
+ok 77 - v4 correction 2: a status recheck error stops the sequence, compensates the booking row, and reports unexpected once compensation is verified
+  ---
+  duration_ms: 0.513692
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: a missing row on recheck (status and error both null) is treated the same as a recheck error
+ok 78 - v4 correction 2: a missing row on recheck (status and error both null) is treated the same as a recheck error
+  ---
+  duration_ms: 0.638337
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: when the booking-row compensation after a failed recheck cannot itself be verified, the outcome is partially_applied, never unexpected
+ok 79 - v4 correction 2: when the booking-row compensation after a failed recheck cannot itself be verified, the outcome is partially_applied, never unexpected
+  ---
+  duration_ms: 0.721484
+  type: 'test'
+  ...
+# Subtest: a recheck reporting a still-reschedulable status lets the sequence continue
+ok 80 - a recheck reporting a still-reschedulable status lets the sequence continue
+  ---
+  duration_ms: 0.504392
+  type: 'test'
+  ...
+# Subtest: a compensation failure during the recheck's rollback is also reported as partially_applied
+ok 81 - a compensation failure during the recheck's rollback is also reported as partially_applied
+  ---
+  duration_ms: 0.691286
+  type: 'test'
+  ...
+# Subtest: pet reassignment steps are simply absent from the sequence when nothing changed, rather than run as no-ops
+ok 82 - pet reassignment steps are simply absent from the sequence when nothing changed, rather than run as no-ops
+  ---
+  duration_ms: 0.764283
+  type: 'test'
+  ...
+# Subtest: a second pet's RPC throwing after the first pet changed compensates the first pet, the resource, and the booking row
+ok 83 - a second pet's RPC throwing after the first pet changed compensates the first pet, the resource, and the booking row
+  ---
+  duration_ms: 1.232477
+  type: 'test'
+  ...
+# Subtest: a resource mutation that throws with an uncertain commit state is reported as partially_applied even when it did not apply
+ok 84 - a resource mutation that throws with an uncertain commit state is reported as partially_applied even when it did not apply
+  ---
+  duration_ms: 0.703556
+  type: 'test'
+  ...
+# Subtest: a compensation that throws still lets the remaining compensations execute
+ok 85 - a compensation that throws still lets the remaining compensations execute
+  ---
+  duration_ms: 0.725105
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: a status recheck that throws after the booking-row mutation stops the sequence and compensates it, rather than letting the sequence continue
+ok 86 - v4 correction 2: a status recheck that throws after the booking-row mutation stops the sequence and compensates it, rather than letting the sequence continue
+  ---
+  duration_ms: 0.693996
+  type: 'test'
+  ...
+# Subtest: an ambiguous currently-failing step whose own recovery also throws is reported as partially_applied, not guessed
+ok 87 - an ambiguous currently-failing step whose own recovery also throws is reported as partially_applied, not guessed
+  ---
+  duration_ms: 0.997645
+  type: 'test'
+  ...
+# Subtest: full, verified restoration of every earlier step still reports the original classified error, not ok or unexpected
+ok 88 - full, verified restoration of every earlier step still reports the original classified error, not ok or unexpected
+  ---
+  duration_ms: 0.667877
+  type: 'test'
+  ...
+# Subtest: series creation is tenant and permission scoped
+ok 89 - series creation is tenant and permission scoped
+  ---
+  duration_ms: 2.751324
+  type: 'test'
+  ...
+# Subtest: series children preserve immutable service and location snapshots
+ok 90 - series children preserve immutable service and location snapshots
+  ---
+  duration_ms: 0.808902
+  type: 'test'
+  ...
+# Subtest: resource collisions are explicit and support skip or atomic stop
+ok 91 - resource collisions are explicit and support skip or atomic stop
+  ---
+  duration_ms: 0.245201
+  type: 'test'
+  ...
+# Subtest: series materializes independent pet, service, and resource rows
+ok 92 - series materializes independent pet, service, and resource rows
+  ---
+  duration_ms: 0.240812
+  type: 'test'
+  ...
+# Subtest: collisions can use a bounded nearby alternative time
+ok 93 - collisions can use a bounded nearby alternative time
+  ---
+  duration_ms: 0.253251
+  type: 'test'
+  ...
+# Subtest: series cancellation has explicit current, future, and all scopes
+ok 94 - series cancellation has explicit current, future, and all scopes
+  ---
+  duration_ms: 0.29673
+  type: 'test'
+  ...
+# Subtest: the occurrence materializer cannot be called by browser roles
+ok 95 - the occurrence materializer cannot be called by browser roles
+  ---
+  duration_ms: 0.244042
+  type: 'test'
+  ...
+# Subtest: branch closure races are rejected from both mutation directions
+ok 96 - branch closure races are rejected from both mutation directions
+  ---
+  duration_ms: 2.056788
+  type: 'test'
+  ...
+# Subtest: availability tables are tenant, branch and capability scoped
+ok 97 - availability tables are tenant, branch and capability scoped
+  ---
+  duration_ms: 0.341098
+  type: 'test'
+  ...
+# Subtest: slot recommendations consume closures and dated served-city plans
+ok 98 - slot recommendations consume closures and dated served-city plans
+  ---
+  duration_ms: 0.323309
+  type: 'test'
+  ...
+# Subtest: management UI exposes both branch closures and served-city dates
+ok 99 - management UI exposes both branch closures and served-city dates
+  ---
+  duration_ms: 0.216982
+  type: 'test'
+  ...
+# Subtest: calendar move is one locked transaction with collision and blackout enforcement
+ok 100 - calendar move is one locked transaction with collision and blackout enforcement
+  ---
+  duration_ms: 3.084283
+  type: 'test'
+  ...
+# Subtest: mass cancellation delegates every row to the canonical state machine
+ok 101 - mass cancellation delegates every row to the canonical state machine
+  ---
+  duration_ms: 0.993145
+  type: 'test'
+  ...
+# Subtest: server actions call only app-schema bulk RPCs and keep a confirmation token
+ok 102 - server actions call only app-schema bulk RPCs and keep a confirmation token
+  ---
+  duration_ms: 0.643438
+  type: 'test'
+  ...
+# Subtest: calendar exposes drag, shift-selection, grouped controls and source badges
+ok 103 - calendar exposes drag, shift-selection, grouped controls and source badges
+  ---
+  duration_ms: 0.658087
+  type: 'test'
+  ...
+# Subtest: source badges prefer membership, then complimentary, then package coverage
+ok 104 - source badges prefer membership, then complimentary, then package coverage
+  ---
+  duration_ms: 1.649322
+  type: 'test'
+  ...
+# Subtest: complaints are tenant and branch isolated with no browser table writes
+ok 105 - complaints are tenant and branch isolated with no browser table writes
+  ---
+  duration_ms: 3.041704
+  type: 'test'
+  ...
+# Subtest: creation validates every linked tenant entity
+ok 106 - creation validates every linked tenant entity
+  ---
+  duration_ms: 0.458664
+  type: 'test'
+  ...
+# Subtest: lifecycle requires resolution notes and writes immutable history
+ok 107 - lifecycle requires resolution notes and writes immutable history
+  ---
+  duration_ms: 0.489743
+  type: 'test'
+  ...
+# Subtest: application exposes recovery, audit, filters and authorized CSV export
+ok 108 - application exposes recovery, audit, filters and authorized CSV export
+  ---
+  duration_ms: 0.310459
+  type: 'test'
+  ...
+# Subtest: only one active next-booking offer can exist per customer
+ok 109 - only one active next-booking offer can exist per customer
+  ---
+  duration_ms: 3.907135
+  type: 'test'
+  ...
+# Subtest: offer assignment validates the three HomePaw service scopes
+ok 110 - offer assignment validates the three HomePaw service scopes
+  ---
+  duration_ms: 0.477704
+  type: 'test'
+  ...
+# Subtest: consumption locks the booking and offer and writes an immutable line snapshot
+ok 111 - consumption locks the booking and offer and writes an immutable line snapshot
+  ---
+  duration_ms: 0.744843
+  type: 'test'
+  ...
+# Subtest: booking consumes only after confirmation and recurring copies lose the offer snapshot
+ok 112 - booking consumes only after confirmation and recurring copies lose the offer snapshot
+  ---
+  duration_ms: 0.711795
+  type: 'test'
+  ...
+# Subtest: invoice order and frozen invoice lines receive the snapshotted amount
+ok 113 - invoice order and frozen invoice lines receive the snapshotted amount
+  ---
+  duration_ms: 0.545481
+  type: 'test'
+  ...
+# Subtest: groomer profiles carry phone, calendar color and route base coordinates
+ok 114 - groomer profiles carry phone, calendar color and route base coordinates
+  ---
+  duration_ms: 4.085728
+  type: 'test'
+  ...
+# Subtest: groomers can link to memberships, compensation and their filtered schedule
+ok 115 - groomers can link to memberships, compensation and their filtered schedule
+  ---
+  duration_ms: 0.55665
+  type: 'test'
+  ...
+# Subtest: archiving is a soft delete and refuses future assigned bookings
+ok 116 - archiving is a soft delete and refuses future assigned bookings
+  ---
+  duration_ms: 0.852327
+  type: 'test'
+  ...
+# Subtest: performance keeps invoice revenue unsplit and uses attributable activity
+ok 117 - performance keeps invoice revenue unsplit and uses attributable activity
+  ---
+  duration_ms: 3.855316
+  type: 'test'
+  ...
+# Subtest: retention and duration come from bounded booking history and timeline actuals
+ok 118 - retention and duration come from bounded booking history and timeline actuals
+  ---
+  duration_ms: 2.504153
+  type: 'test'
+  ...
+# Subtest: documentation and complaint metrics use real evidence and complaint records
+ok 119 - documentation and complaint metrics use real evidence and complaint records
+  ---
+  duration_ms: 0.85403
+  type: 'test'
+  ...
+# Subtest: performance cycles can move backward and forward by month
+ok 120 - performance cycles can move backward and forward by month
+  ---
+  duration_ms: 0.362647
+  type: 'test'
+  ...
+# Subtest: leaderboard links each groomer to a visit-level evidence drill-down
+ok 121 - leaderboard links each groomer to a visit-level evidence drill-down
+  ---
+  duration_ms: 0.355427
+  type: 'test'
+  ...
+# Subtest: invoice-level percentage discount is validated (0-100) and applied to whatever remains after prior layers
+ok 122 - invoice-level percentage discount is validated (0-100) and applied to whatever remains after prior layers
+  ---
+  duration_ms: 4.177564
+  type: 'test'
+  ...
+# Subtest: invoice-level fixed discount is a single pool consumed deterministically across eligible lines
+ok 123 - invoice-level fixed discount is a single pool consumed deterministically across eligible lines
+  ---
+  duration_ms: 0.468393
+  type: 'test'
+  ...
+# Subtest: an invoice discount can be restricted to Basic Grooming lines only
+ok 124 - an invoice discount can be restricted to Basic Grooming lines only
+  ---
+  duration_ms: 0.486073
+  type: 'test'
+  ...
+# Subtest: per-pet discounts are validated and applied before per-service/category/invoice layers, keyed by grooming_job_pet_id
+ok 125 - per-pet discounts are validated and applied before per-service/category/invoice layers, keyed by grooming_job_pet_id
+  ---
+  duration_ms: 0.483994
+  type: 'test'
+  ...
+# Subtest: per-service discounts are keyed by service_id, not by the grooming line id, so they apply across every pet with that service
+ok 126 - per-service discounts are keyed by service_id, not by the grooming line id, so they apply across every pet with that service
+  ---
+  duration_ms: 0.621308
+  type: 'test'
+  ...
+# Subtest: per-category discounts are restricted to the four HomePaw categories and default unclassified services to Other Fees
+ok 127 - per-category discounts are restricted to the four HomePaw categories and default unclassified services to Other Fees
+  ---
+  duration_ms: 0.29249
+  type: 'test'
+  ...
+# Subtest: a home-service transport fee is carried onto the invoice as its own line, untouched by any discount layer
+ok 128 - a home-service transport fee is carried onto the invoice as its own line, untouched by any discount layer
+  ---
+  duration_ms: 0.342468
+  type: 'test'
+  ...
+# Subtest: a discount preview shares the exact same calculator as issuance and performs no writes
+ok 129 - a discount preview shares the exact same calculator as issuance and performs no writes
+  ---
+  duration_ms: 0.760803
+  type: 'test'
+  ...
+# Subtest: every discount input is a rule (type/value/target), never a browser-supplied total, subtotal or discount amount
+ok 130 - every discount input is a rule (type/value/target), never a browser-supplied total, subtotal or discount amount
+  ---
+  duration_ms: 1.224537
+  type: 'test'
+  ...
+# Subtest: package-covered lines are fully zeroed and skip every new discount layer without touching any fixed pool
+ok 131 - package-covered lines are fully zeroed and skip every new discount layer without touching any fixed pool
+  ---
+  duration_ms: 1.127401
+  type: 'test'
+  ...
+# Subtest: no line total or invoice total can go negative: every discount layer is clamped with least()/greatest()
+ok 132 - no line total or invoice total can go negative: every discount layer is clamped with least()/greatest()
+  ---
+  duration_ms: 0.27472
+  type: 'test'
+  ...
+# Subtest: multiple pets and services are tracked independently via per-key maps, not a single shared running total
+ok 133 - multiple pets and services are tracked independently via per-key maps, not a single shared running total
+  ---
+  duration_ms: 0.180584
+  type: 'test'
+  ...
+# Subtest: organization isolation: both RPCs re-derive the booking's own organization_id and re-check it, never trusting a caller-supplied org
+ok 134 - organization isolation: both RPCs re-derive the booking's own organization_id and re-check it, never trusting a caller-supplied org
+  ---
+  duration_ms: 0.27098
+  type: 'test'
+  ...
+# Subtest: unauthorized callers cannot preview or issue: no direct grant to anon, and revoke precedes the authenticated grant
+ok 135 - unauthorized callers cannot preview or issue: no direct grant to anon, and revoke precedes the authenticated grant
+  ---
+  duration_ms: 0.323509
+  type: 'test'
+  ...
+# Subtest: re-issuing for the same booking is refused once an order already exists (duplicate-submit safe)
+ok 136 - re-issuing for the same booking is refused once an order already exists (duplicate-submit safe)
+  ---
+  duration_ms: 0.332698
+  type: 'test'
+  ...
+# Subtest: issuance is one atomic PL\\/pgSQL function, not sequential app-code inserts: order, order_items, invoice and invoice_lines are all written before returning
+ok 137 - issuance is one atomic PL\\/pgSQL function, not sequential app-code inserts: order, order_items, invoice and invoice_lines are all written before returning
+  ---
+  duration_ms: 0.27872
+  type: 'test'
+  ...
+# Subtest: issued and paid invoices stay immutable: this migration does not touch the pre-existing freeze/append-only triggers
+ok 138 - issued and paid invoices stay immutable: this migration does not touch the pre-existing freeze/append-only triggers
+  ---
+  duration_ms: 0.354947
+  type: 'test'
+  ...
+# Subtest: widening order_items/invoice_lines to fee preserves the package invoice type
+ok 139 - widening order_items/invoice_lines to fee preserves the package invoice type
+  ---
+  duration_ms: 0.227072
+  type: 'test'
+  ...
+# Subtest: client server actions only ever pass discount RULES to the RPC, and the client-side discount panel never submits a computed total
+ok 140 - client server actions only ever pass discount RULES to the RPC, and the client-side discount panel never submits a computed total
+  ---
+  duration_ms: 0.392536
+  type: 'test'
+  ...
+# Subtest: pilot-actions.ts stays a valid "use server" module: only async functions and types are exported, never a const object/array (Next.js build error)
+ok 141 - pilot-actions.ts stays a valid "use server" module: only async functions and types are exported, never a const object/array (Next.js build error)
+  ---
+  duration_ms: 0.446714
+  type: 'test'
+  ...
+# Subtest: the catalog category select feeds the section-22 per-category discount vocabulary exactly
+ok 142 - the catalog category select feeds the section-22 per-category discount vocabulary exactly
+  ---
+  duration_ms: 0.376507
+  type: 'test'
+  ...
+# Subtest: run_all_gates.sh records this migration's lineage
+ok 143 - run_all_gates.sh records this migration's lineage
+  ---
+  duration_ms: 0.210373
+  type: 'test'
+  ...
+# Subtest: invoice workflow separates visit and package billing with immutable identity
+ok 144 - invoice workflow separates visit and package billing with immutable identity
+  ---
+  duration_ms: 3.244816
+  type: 'test'
+  ...
+# Subtest: package issuance is atomic, idempotency-keyed, and ledger backed
+ok 145 - package issuance is atomic, idempotency-keyed, and ledger backed
+  ---
+  duration_ms: 0.710375
+  type: 'test'
+  ...
+# Subtest: duplicate visit invoices and double-click saves are protected
+ok 146 - duplicate visit invoices and double-click saves are protected
+  ---
+  duration_ms: 0.28843
+  type: 'test'
+  ...
+# Subtest: studio provides HomePaw invoice selection and due-date workflow
+ok 147 - studio provides HomePaw invoice selection and due-date workflow
+  ---
+  duration_ms: 0.331529
+  type: 'test'
+  ...
+# Subtest: unpaid detail edits are optimistic and paid invoices are locked
+ok 148 - unpaid detail edits are optimistic and paid invoices are locked
+  ---
+  duration_ms: 0.30263
+  type: 'test'
+  ...
+# Subtest: cancellation goes through the controlled status RPC
+ok 149 - cancellation goes through the controlled status RPC
+  ---
+  duration_ms: 4.041029
+  type: 'test'
+  ...
+# Subtest: no mutation hard-deletes a row
+ok 150 - no mutation hard-deletes a row
+  ---
+  duration_ms: 0.733484
+  type: 'test'
+  ...
+# Subtest: a rejected pet reassignment is never silently deleted, only deactivated or restored
+ok 151 - a rejected pet reassignment is never silently deleted, only deactivated or restored
+  ---
+  duration_ms: 0.524082
+  type: 'test'
+  ...
+# Subtest: blackout removal is a soft delete
+ok 152 - blackout removal is a soft delete
+  ---
+  duration_ms: 0.294409
+  type: 'test'
+  ...
+# Subtest: package and resource release is not reimplemented in application code
+ok 153 - package and resource release is not reimplemented in application code
+  ---
+  duration_ms: 0.403856
+  type: 'test'
+  ...
+# Subtest: reschedule requires both the semantic and the RLS-required capability
+ok 154 - reschedule requires both the semantic and the RLS-required capability
+  ---
+  duration_ms: 0.233902
+  type: 'test'
+  ...
+# Subtest: cancel requires booking.cancel and the RPC's booking.update
+ok 155 - cancel requires booking.cancel and the RPC's booking.update
+  ---
+  duration_ms: 0.472693
+  type: 'test'
+  ...
+# Subtest: blackout mutations require resource.manage
+ok 156 - blackout mutations require resource.manage
+  ---
+  duration_ms: 0.324049
+  type: 'test'
+  ...
+# Subtest: every mutation reads capabilities rather than trusting the client
+ok 157 - every mutation reads capabilities rather than trusting the client
+  ---
+  duration_ms: 0.833771
+  type: 'test'
+  ...
+# Subtest: no mutation trusts an organization id from the browser
+ok 158 - no mutation trusts an organization id from the browser
+  ---
+  duration_ms: 1.038353
+  type: 'test'
+  ...
+# Subtest: branch access is re-resolved server-side for every mutation
+ok 159 - branch access is re-resolved server-side for every mutation
+  ---
+  duration_ms: 0.268961
+  type: 'test'
+  ...
+# Subtest: every write is scoped by organization_id
+ok 160 - every write is scoped by organization_id
+  ---
+  duration_ms: 0.626118
+  type: 'test'
+  ...
+# Subtest: booking writes are additionally scoped by branch
+ok 161 - booking writes are additionally scoped by branch
+  ---
+  duration_ms: 0.508142
+  type: 'test'
+  ...
+# Subtest: no service-role credential is referenced anywhere in the mutations
+ok 162 - no service-role credential is referenced anywhere in the mutations
+  ---
+  duration_ms: 0.435915
+  type: 'test'
+  ...
+# Subtest: identifiers arriving from the form are shape-validated
+ok 163 - identifiers arriving from the form are shape-validated
+  ---
+  duration_ms: 0.195553
+  type: 'test'
+  ...
+# Subtest: all cancellation and availability-removal actions require an explicit confirmation token
+ok 164 - all cancellation and availability-removal actions require an explicit confirmation token
+  ---
+  duration_ms: 0.54917
+  type: 'test'
+  ...
+# Subtest: unexpected database detail is logged server-side, not returned to the browser
+ok 165 - unexpected database detail is logged server-side, not returned to the browser
+  ---
+  duration_ms: 0.322508
+  type: 'test'
+  ...
+# Subtest: every exported mutation action wraps its entire body in try/catch
+ok 166 - every exported mutation action wraps its entire body in try/catch
+  ---
+  duration_ms: 0.878059
+  type: 'test'
+  ...
+# Subtest: booking mutations revalidate every affected surface
+ok 167 - booking mutations revalidate every affected surface
+  ---
+  duration_ms: 0.26884
+  type: 'test'
+  ...
+# Subtest: the reschedule engine snapshots and compensates an arbitrary number of steps, not a fixed two
+ok 168 - the reschedule engine snapshots and compensates an arbitrary number of steps, not a fixed two
+  ---
+  duration_ms: 0.534781
+  type: 'test'
+  ...
+# Subtest: a step failure that cannot be fully compensated is reported as partially_applied, never success
+ok 169 - a step failure that cannot be fully compensated is reported as partially_applied, never success
+  ---
+  duration_ms: 0.247801
+  type: 'test'
+  ...
+# Subtest: the booking row write is guarded by both status and the optimistic concurrency token
+ok 170 - the booking row write is guarded by both status and the optimistic concurrency token
+  ---
+  duration_ms: 0.246471
+  type: 'test'
+  ...
+# Subtest: every step verifies its own affected-row count rather than trusting an absent error
+ok 171 - every step verifies its own affected-row count rather than trusting an absent error
+  ---
+  duration_ms: 0.291549
+  type: 'test'
+  ...
+# Subtest: a pet whose original groomer was null cannot be falsely reported as fully restored
+ok 172 - a pet whose original groomer was null cannot be falsely reported as fully restored
+  ---
+  duration_ms: 0.224202
+  type: 'test'
+  ...
+# Subtest: a newly-activated booking_resources row is deactivated on compensation, never deleted
+ok 173 - a newly-activated booking_resources row is deactivated on compensation, never deleted
+  ---
+  duration_ms: 0.393136
+  type: 'test'
+  ...
+# Subtest: a mid-sequence status recheck exists and re-validates reschedulability
+ok 174 - a mid-sequence status recheck exists and re-validates reschedulability
+  ---
+  duration_ms: 0.209423
+  type: 'test'
+  ...
+# Subtest: the parser requires a complete, non-empty assignment for every pet on the booking
+ok 175 - the parser requires a complete, non-empty assignment for every pet on the booking
+  ---
+  duration_ms: 0.191334
+  type: 'test'
+  ...
+# Subtest: the server action reads every pet's form field, including an absent or empty one, rather than skipping it
+ok 176 - the server action reads every pet's form field, including an absent or empty one, rather than skipping it
+  ---
+  duration_ms: 0.240082
+  type: 'test'
+  ...
+# Subtest: blackout update and removal verify the affected row count before reporting success
+ok 177 - blackout update and removal verify the affected row count before reporting success
+  ---
+  duration_ms: 0.378927
+  type: 'test'
+  ...
+# Subtest: the preselected customer is re-read server-side within the active organization
+ok 178 - the preselected customer is re-read server-side within the active organization
+  ---
+  duration_ms: 0.211893
+  type: 'test'
+  ...
+# Subtest: an inaccessible preselection opens the wizard normally, exposing no authorization difference
+ok 179 - an inaccessible preselection opens the wizard normally, exposing no authorization difference
+  ---
+  duration_ms: 0.26975
+  type: 'test'
+  ...
+# Subtest: a thrown step.run() is never treated as an ordinary generic error — it always routes through handleUncertainStep
+ok 180 - a thrown step.run() is never treated as an ordinary generic error — it always routes through handleUncertainStep
+  ---
+  duration_ms: 0.363387
+  type: 'test'
+  ...
+# Subtest: handleUncertainStep never guesses: no recovery method, a thrown recovery, or an unverified restore all resolve to partially_applied
+ok 181 - handleUncertainStep never guesses: no recovery method, a thrown recovery, or an unverified restore all resolve to partially_applied
+  ---
+  duration_ms: 0.30119
+  type: 'test'
+  ...
+# Subtest: compensateApplied catches a throwing compensate() and keeps compensating the remaining applied steps
+ok 182 - compensateApplied catches a throwing compensate() and keeps compensating the remaining applied steps
+  ---
+  duration_ms: 0.324349
+  type: 'test'
+  ...
+# Subtest: a thrown status recheck after the booking-row mutation falls back to a neutral result rather than returning early from inside the catch
+ok 183 - a thrown status recheck after the booking-row mutation falls back to a neutral result rather than returning early from inside the catch
+  ---
+  duration_ms: 0.345238
+  type: 'test'
+  ...
+# Subtest: v4 correction 2: a thrown recheck, a resolved recheck error, and a missing row all stop the sequence and compensate before returning, never falling through to run a later step
+ok 184 - v4 correction 2: a thrown recheck, a resolved recheck error, and a missing row all stop the sequence and compensate before returning, never falling through to run a later step
+  ---
+  duration_ms: 0.489073
+  type: 'test'
+  ...
+# Subtest: every concrete resource and pet step builder implements recoverFromUncertainRun for the thrown-run case
+ok 185 - every concrete resource and pet step builder implements recoverFromUncertainRun for the thrown-run case
+  ---
+  duration_ms: 0.255391
+  type: 'test'
+  ...
+# Subtest: the concrete step builders are extracted into a dedicated, dependency-injectable module rather than inlined in the server action
+ok 186 - the concrete step builders are extracted into a dedicated, dependency-injectable module rather than inlined in the server action
+  ---
+  duration_ms: 0.189614
+  type: 'test'
+  ...
+# Subtest: BookingResourceSnapshot captures updated_at alongside resource_id, during, and is_active
+ok 187 - BookingResourceSnapshot captures updated_at alongside resource_id, during, and is_active
+  ---
+  duration_ms: 0.358128
+  type: 'test'
+  ...
+# Subtest: every resource step guards its own write on the snapshot's updated_at, and remembers what it wrote so compensation guards on that value, not the stale snapshot
+ok 188 - every resource step guards its own write on the snapshot's updated_at, and remembers what it wrote so compensation guards on that value, not the stale snapshot
+  ---
+  duration_ms: 0.528622
+  type: 'test'
+  ...
+# Subtest: v4 correction 1: recoverFromUncertainRun never writes — booking-row, resource, and pet recovery are all pure reads, so an unprovable ownership case can never mutate the row
+ok 189 - v4 correction 1: recoverFromUncertainRun never writes — booking-row, resource, and pet recovery are all pure reads, so an unprovable ownership case can never mutate the row
+  ---
+  duration_ms: 0.484373
+  type: 'test'
+  ...
+# Subtest: buildActivateStep distinguishes a guarded reactivation from a new-row insert, and never upserts over an existing row
+ok 190 - buildActivateStep distinguishes a guarded reactivation from a new-row insert, and never upserts over an existing row
+  ---
+  duration_ms: 0.386726
+  type: 'test'
+  ...
+# Subtest: zero or unexpected affected rows are reported as stale, never as a silent success, throughout the resource step builders
+ok 191 - zero or unexpected affected rows are reported as stale, never as a silent success, throughout the resource step builders
+  ---
+  duration_ms: 0.351667
+  type: 'test'
+  ...
+# Subtest: findConflictingBooking derives the active-assignment window from booking_resources.during, never from bookings.starts_at/ends_at
+ok 192 - findConflictingBooking derives the active-assignment window from booking_resources.during, never from bookings.starts_at/ends_at
+  ---
+  duration_ms: 0.419635
+  type: 'test'
+  ...
+# Subtest: both blackout-mutation call sites route their conflict check through findConflictingBooking
+ok 193 - both blackout-mutation call sites route their conflict check through findConflictingBooking
+  ---
+  duration_ms: 0.198183
+  type: 'test'
+  ...
+# Subtest: onboarding stores only a token hash and grants no anonymous table access
+ok 194 - onboarding stores only a token hash and grants no anonymous table access
+  ---
+  duration_ms: 2.2915
+  type: 'test'
+  ...
+# Subtest: public RPCs are narrow while review stays authenticated
+ok 195 - public RPCs are narrow while review stays authenticated
+  ---
+  duration_ms: 0.400896
+  type: 'test'
+  ...
+# Subtest: one link can create only one pending submission and is consumed
+ok 196 - one link can create only one pending submission and is consumed
+  ---
+  duration_ms: 0.57787
+  type: 'test'
+  ...
+# Subtest: approval is tenant and permission scoped and rejection never creates CRM rows
+ok 197 - approval is tenant and permission scoped and rejection never creates CRM rows
+  ---
+  duration_ms: 0.382477
+  type: 'test'
+  ...
+# Subtest: onboarding styling uploads are token scoped and never expose raw tokens in paths
+ok 198 - onboarding styling uploads are token scoped and never expose raw tokens in paths
+  ---
+  duration_ms: 0.491553
+  type: 'test'
+  ...
+# Subtest: approval validates uploaded object ownership before linking it to the created pet
+ok 199 - approval validates uploaded object ownership before linking it to the created pet
+  ---
+  duration_ms: 0.360008
+  type: 'test'
+  ...
+# Subtest: onboarding settings are tenant and customer-manage scoped
+ok 200 - onboarding settings are tenant and customer-manage scoped
+  ---
+  duration_ms: 0.264731
+  type: 'test'
+  ...
+# Subtest: onboarding approval applies organization retention before attachment insert
+ok 201 - onboarding approval applies organization retention before attachment insert
+  ---
+  duration_ms: 0.273461
+  type: 'test'
+  ...
+# Subtest: storage cleanup is bounded and removes objects before soft deleting metadata
+ok 202 - storage cleanup is bounded and removes objects before soft deleting metadata
+  ---
+  duration_ms: 1.083933
+  type: 'test'
+  ...
+# Subtest: buildDeactivateStep.run() deactivates the row and compensate() restores it, wired to a fake db through the same RescheduleDbClient interface production code uses
+ok 203 - buildDeactivateStep.run() deactivates the row and compensate() restores it, wired to a fake db through the same RescheduleDbClient interface production code uses
+  ---
+  duration_ms: 7.560378
+  type: 'test'
+  ...
+# Subtest: concurrent cancellation deactivates a resource before uncertain deactivate recovery; recovery must not reactivate it
+ok 204 - concurrent cancellation deactivates a resource before uncertain deactivate recovery; recovery must not reactivate it
+  ---
+  duration_ms: 0.84562
+  type: 'test'
+  ...
+# Subtest: a concurrent modification of a resource's window before uncertain keep recovery is not overwritten
+ok 205 - a concurrent modification of a resource's window before uncertain keep recovery is not overwritten
+  ---
+  duration_ms: 0.638218
+  type: 'test'
+  ...
+# Subtest: a concurrent reactivation of a resource before uncertain activate recovery is not overwritten
+ok 206 - a concurrent reactivation of a resource before uncertain activate recovery is not overwritten
+  ---
+  duration_ms: 0.730135
+  type: 'test'
+  ...
+# Subtest: an uncertain insert followed by an existing row does not deactivate that row
+ok 207 - an uncertain insert followed by an existing row does not deactivate that row
+  ---
+  duration_ms: 0.397026
+  type: 'test'
+  ...
+# Subtest: an uncertain insert with no row at all is correctly reported as not applied
+ok 208 - an uncertain insert with no row at all is correctly reported as not applied
+  ---
+  duration_ms: 0.378787
+  type: 'test'
+  ...
+# Subtest: a terminal booking status reached before uncertain booking-row recovery is not updated
+ok 209 - a terminal booking status reached before uncertain booking-row recovery is not updated
+  ---
+  duration_ms: 1.040413
+  type: 'test'
+  ...
+# Subtest: booking-row recovery reports not applied only when the complete current state still matches the original snapshot exactly
+ok 210 - booking-row recovery reports not applied only when the complete current state still matches the original snapshot exactly
+  ---
+  duration_ms: 0.741804
+  type: 'test'
+  ...
+# Subtest: a pet reassigned by a concurrent request before uncertain pet recovery is not reverted, and the RPC is never re-invoked by recovery
+ok 211 - a pet reassigned by a concurrent request before uncertain pet recovery is not reverted, and the RPC is never re-invoked by recovery
+  ---
+  duration_ms: 1.197188
+  type: 'test'
+  ...
+# Subtest: archive supports explicit current, future and whole-series scopes
+ok 212 - archive supports explicit current, future and whole-series scopes
+  ---
+  duration_ms: 3.245757
+  type: 'test'
+  ...
+# Subtest: archive refuses financial records and cleans linked visit rows
+ok 213 - archive refuses financial records and cleans linked visit rows
+  ---
+  duration_ms: 0.524721
+  type: 'test'
+  ...
+# Subtest: archive reconciles both reserved and consumed package effects
+ok 214 - archive reconciles both reserved and consumed package effects
+  ---
+  duration_ms: 0.340658
+  type: 'test'
+  ...
+# Subtest: service_catalog gains a nullable size price matrix that preserves base_price
+ok 215 - service_catalog gains a nullable size price matrix that preserves base_price
+  ---
+  duration_ms: 3.865164
+  type: 'test'
+  ...
+# Subtest: size and price columns are constrained non-negative / to a fixed enum
+ok 216 - size and price columns are constrained non-negative / to a fixed enum
+  ---
+  duration_ms: 0.56986
+  type: 'test'
+  ...
+# Subtest: every supported size resolves to its own catalog column in assembly_add_line
+ok 217 - every supported size resolves to its own catalog column in assembly_add_line
+  ---
+  duration_ms: 0.386586
+  type: 'test'
+  ...
+# Subtest: a missing size or a missing size price falls back to base_price, never null/negative
+ok 218 - a missing size or a missing size price falls back to base_price, never null/negative
+  ---
+  duration_ms: 0.55997
+  type: 'test'
+  ...
+# Subtest: additional duration only ever adds time for units beyond the first, defaulting to zero impact
+ok 219 - additional duration only ever adds time for units beyond the first, defaulting to zero impact
+  ---
+  duration_ms: 2.132076
+  type: 'test'
+  ...
+# Subtest: the resolved size, price source and duration are snapshotted onto the line, never recomputed later
+ok 220 - the resolved size, price source and duration are snapshotted onto the line, never recomputed later
+  ---
+  duration_ms: 0.477913
+  type: 'test'
+  ...
+# Subtest: assembly_add_line keeps its exact signature so run_all_gates.sh GATE 4's assembly-function count is unaffected
+ok 221 - assembly_add_line keeps its exact signature so run_all_gates.sh GATE 4's assembly-function count is unaffected
+  ---
+  duration_ms: 2.541472
+  type: 'test'
+  ...
+# Subtest: manual override is a dedicated RPC outside the assembly-count gate, and requires org auth, a reason, and a non-negative price
+ok 222 - manual override is a dedicated RPC outside the assembly-count gate, and requires org auth, a reason, and a non-negative price
+  ---
+  duration_ms: 0.432225
+  type: 'test'
+  ...
+# Subtest: override is refused once an invoice already exists for the booking (issued invoice immutability boundary)
+ok 223 - override is refused once an invoice already exists for the booking (issued invoice immutability boundary)
+  ---
+  duration_ms: 0.546151
+  type: 'test'
+  ...
+# Subtest: override writes an auditable trail and revokes public/anon execute
+ok 224 - override writes an auditable trail and revokes public/anon execute
+  ---
+  duration_ms: 0.706386
+  type: 'test'
+  ...
+# Subtest: financial_sales invoice/invoice_lines immutability triggers are untouched by this migration
+ok 225 - financial_sales invoice/invoice_lines immutability triggers are untouched by this migration
+  ---
+  duration_ms: 0.2572
+  type: 'test'
+  ...
+# Subtest: run_all_gates.sh records this migration's lineage
+ok 226 - run_all_gates.sh records this migration's lineage
+  ---
+  duration_ms: 0.29031
+  type: 'test'
+  ...
+# Subtest: client server actions gate service-catalog writes and the price override behind service.manage, never trusting a client-supplied booking price
+ok 227 - client server actions gate service-catalog writes and the price override behind service.manage, never trusting a client-supplied booking price
+  ---
+  duration_ms: 0.773603
+  type: 'test'
+  ...
+# Subtest: service create/update stay organization-scoped and validate every size price is a non-negative number or blank
+ok 228 - service create/update stay organization-scoped and validate every size price is a non-negative number or blank
+  ---
+  duration_ms: 0.376417
+  type: 'test'
+  ...
+# Subtest: pet size selection is optional and constrained to the four supported bands
+ok 229 - pet size selection is optional and constrained to the four supported bands
+  ---
+  duration_ms: 0.149295
+  type: 'test'
+  ...
+# Subtest: catalog admin UI exposes size prices, additional duration and fulfillment-mode checkboxes for editing
+ok 230 - catalog admin UI exposes size prices, additional duration and fulfillment-mode checkboxes for editing
+  ---
+  duration_ms: 0.195884
+  type: 'test'
+  ...
+# Subtest: operations pricing data snapshots price_source per line so overridden lines are distinguishable
+ok 231 - operations pricing data snapshots price_source per line so overridden lines are distinguishable
+  ---
+  duration_ms: 0.162414
+  type: 'test'
+  ...
+# Subtest: multiple services per pet remain supported: assembly_add_line is called once per selected service, unbounded by size logic
+ok 232 - multiple services per pet remain supported: assembly_add_line is called once per selected service, unbounded by size logic
+  ---
+  duration_ms: 0.293399
+  type: 'test'
+  ...
+# Subtest: styling reference bucket is private and tenant partitioned
+ok 233 - styling reference bucket is private and tenant partitioned
+  ---
+  duration_ms: 2.449305
+  type: 'test'
+  ...
+# Subtest: upload validates tenant pet ownership and stores bounded expiry metadata
+ok 234 - upload validates tenant pet ownership and stores bounded expiry metadata
+  ---
+  duration_ms: 0.385987
+  type: 'test'
+  ...
+# Subtest: loaders hide expired references and issue short lived signed urls
+ok 235 - loaders hide expired references and issue short lived signed urls
+  ---
+  duration_ms: 0.470684
+  type: 'test'
+  ...
+# Subtest: actions.ts starts with the "use server" directive
+ok 236 - actions.ts starts with the "use server" directive
+  ---
+  duration_ms: 77.94718
+  type: 'test'
+  ...
+# Subtest: every export from actions.ts is an async function declaration
+ok 237 - every export from actions.ts is an async function declaration
+  ---
+  duration_ms: 30.370849
+  type: 'test'
+  ...
+# Subtest: actions.ts does not declare or export MutationState/IDLE_STATE itself
+ok 238 - actions.ts does not declare or export MutationState/IDLE_STATE itself
+  ---
+  duration_ms: 22.762195
+  type: 'test'
+  ...
+# Subtest: actions.ts imports MutationState as a type-only import from lib/schedule/idle_state
+ok 239 - actions.ts imports MutationState as a type-only import from lib/schedule/idle_state
+  ---
+  duration_ms: 14.90107
+  type: 'test'
+  ...
+# Subtest: lib/schedule/idle_state.ts owns MutationState and IDLE_STATE, and carries no directive
+ok 240 - lib/schedule/idle_state.ts owns MutationState and IDLE_STATE, and carries no directive
+  ---
+  duration_ms: 1.70318
+  type: 'test'
+  ...
+# Subtest: blackout-manager and booking-edit-form import IDLE_STATE from idle_state.ts, not from actions.ts
+ok 241 - blackout-manager and booking-edit-form import IDLE_STATE from idle_state.ts, not from actions.ts
+  ---
+  duration_ms: 44.789427
+  type: 'test'
+  ...
+1..241
+# tests 241
+# suites 0
+# pass 241
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2590.653602
+test:batch1b exit=0
+--- test:booking (apps/web) — pre-existing baseline failure expected ---
+
+> web@0.1.0 test:booking
+> tsx --test test/booking-validation.test.ts test/booking-wizard-contract.test.ts
+
+TAP version 13
+# Subtest: accepts and normalizes a valid multi-entity draft
+ok 1 - accepts and normalizes a valid multi-entity draft
+  ---
+  duration_ms: 3.252267
+  type: 'test'
+  ...
+# Subtest: requires a pet
+ok 2 - requires a pet
+  ---
+  duration_ms: 0.983366
+  type: 'test'
+  ...
+# Subtest: requires an end after the start
+ok 3 - requires an end after the start
+  ---
+  duration_ms: 0.339248
+  type: 'test'
+  ...
+# Subtest: rejects duplicate pets
+ok 4 - rejects duplicate pets
+  ---
+  duration_ms: 0.364357
+  type: 'test'
+  ...
+# Subtest: requires service per pet
+ok 5 - requires service per pet
+  ---
+  duration_ms: 0.701135
+  type: 'test'
+  ...
+# Subtest: rejects malformed ids
+ok 6 - rejects malformed ids
+  ---
+  duration_ms: 1.913013
+  type: 'test'
+  ...
+# Subtest: keeps only package allocations attached to selected services
+ok 7 - keeps only package allocations attached to selected services
+  ---
+  duration_ms: 0.658747
+  type: 'test'
+  ...
+# Subtest: validates bounded, unique category discounts
+ok 8 - validates bounded, unique category discounts
+  ---
+  duration_ms: 0.410746
+  type: 'test'
+  ...
+# Subtest: wizard exposes separate note audiences and category discounts
+ok 9 - wizard exposes separate note audiences and category discounts
+  ---
+  duration_ms: 1.903913
+  type: 'test'
+  ...
+# Subtest: package allocation is validated then reserved against the exact service line
+ok 10 - package allocation is validated then reserved against the exact service line
+  ---
+  duration_ms: 0.464983
+  type: 'test'
+  ...
+# Subtest: invoice pricing honors package coverage and snapshotted category discounts
+not ok 11 - invoice pricing honors package coverage and snapshotted category discounts
+  ---
+  duration_ms: 7.173739
+  type: 'test'
+  location: '/tmp/operro-s2730-gate-run/apps/web/test/booking-wizard-contract.test.ts:2:2507'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /rpc\("list_booking_package_coverage"/. Input:
+    
+    '"use server";\r\n' +
+      '\r\n' +
+      '/**\r\n' +
+      ' * Function index:\r\n' +
+      ' * - createCustomerAction: creates a customer and optional first pet and address.\r\n' +
+      ' * - createCustomerAddressAction / updateCustomerAddressAction / deleteCustomerAddressAction / setDefaultCustomerAddressAction: manages saved addresses.\r\n' +
+      ' * - createTaskAction / updateTaskStatusAction: manages operational tasks.\r\n' +
+      ' * - transitionBookingAction / updatePetJobStatusAction: advances grooming work.\r\n' +
+      " * - setDispatchStageAction: advances a home-service booking's dispatch stage (scheduled/en_route/arrived/in_service), independent of bookings.status.\r\n" +
+      ' * - uploadGroomingEvidenceAction / deleteGroomingEvidenceAction: stores/retracts private, booking-linked grooming evidence for an assigned groomer.\r\n' +
+      ' * - updateGroomingChecklistAction / issueInvoiceForBookingAction / previewInvoiceDiscountsAction: closes the service-to-cash loop, including section-22 invoice/pet/service/category discounts, transport fee, and a pre-issuance preview.\r\n' +
+      ' * - createServiceAction / updateServiceAction / overrideGroomingLinePriceAction / createResourceAction / updateResourceAction / archiveResourceAction: configures the operating catalog.\r\n' +
+      ' * - adjustInventoryAction: appends an inventory adjustment movement.\r\n' +
+      ' * - recordPaymentAction / recordExpenseAction: records manual financial activity.\r\n' +
+      ' * - sellPackageAction: sells a catalog package to a customer and records the payment.\r\n' +
+      " * - setCustomerNextDiscountAction / revokeCustomerNextDiscountAction: manages a customer's one-use next-booking offer.\r\n" +
+      ' * - recomputePayrollRunAction / approvePayrollRunAction / markPayrollRunPaidAction: payroll lifecycle.\r\n' +
+      ' */\r\n' +
+      'import "server-only";\r\n' +
+      '\r\n' +
+      'import { revalidatePath } from "next/cache";\r\n' +
+      '\r\n' +
+      'import { loadAuthContext } from "@/lib/auth-context";\r\n' +
+      'import { loadCapabilities } from "@/lib/authorization";\r\n' +
+      'import { INVOICE_DISCOUNT_CATEGORIES } from "@/lib/invoice-discount-categories";\r\n' +
+      'import { createClient } from "@/lib/supabase/server";\r\n' +
+      '\r\n' +
+      'export interface PilotActionState { error: string | null; success: string | null }\r\n' +
+      '\r\n' +
+      'const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\r\n' +
+      'const allowedTaskStatuses = new Set(["todo", "in_progress", "done", "canceled"]);\r\n' +
+      'const allowedBookingStatuses = new Set(["in_progress", "completed", "canceled", "no_show"]);\r\n' +
+      'const allowedPetStatuses = new Set(["pending", "in_progress", "complete", "skipped"]);\r\n' +
+      '\r\n' +
+      'function textValue(formData: FormData, key: string, max = 200) {\r\n' +
+      '  return String(formData.get(key) ?? "").trim().slice(0, max);\r\n' +
+      '}\r\n' +
+      '\r\n' +
+      'function idValue(formData: FormData, key: string) {\r\n' +
+      '  const value = textValue(formData, key, 36);\r\n' +
+      '  return UUID.test(value) ? value : null;\r\n' +
+      '}\r\n' +
+      '\r\n' +
+      'function numberValue(formData: FormData, key: string) {\r\n' +
+      '  const value = Number(formData.get(key));\r\n' +
+      '  return Number.isFinite(value) ? value : null;\r\n' +
+      '}\r\n' +
+      '\r\n' +
+      'async function workspace() {\r\n' +
+      '  const supabase = await createClient();\r\n' +
+      '  const context = await loadAuthContext(supabase);\r\n' +
+      '  if (!context?.activeOrganization) return null;\r\n' +
+      '  return { supabase, organizationId: context.activeOrganization.id, userId: context.user.id };\r\n' +
+      '}\r\n' +
+      '\r\n' +
+      'function databaseError(scope: string, message: string) {\r\n' +
+      '  return { error: `${scope}: ${message}`, success: null };\r\n' +
+      '}\r\n' +
+      '\r\n' +
+      'export async function setCustomerNextDiscountAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {\r\n' +
+      '  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");\r\n' +
+      '  const customerId = idValue(formData, "customerId");\r\n' +
+      '  if (!customerId) return databaseError("Diskon", "pelanggan tidak valid");\r\n' +
+      '  const rules: Record<string, { type: string; value: number }> = {};\r\n' +
+      '  for (const [scope, prefix] of [["basic_grooming", "basic"], ["styling", "styling"], ["other", "other"]] as const) {\r\n' +
+      '    const type = textValue(formData, `${prefix}Type`, 10);\r\n' +
+      '    const value = numberValue(formData, `${prefix}Value`);\r\n' +
+      '    if (value !== null && value > 0) rules[scope] = { type: type === "fixed" ? "fixed" : "percent", value };\r\n' +
+      '  }\r\n' +
+      '  if (Object.keys(rules).length === 0) return databaseError("Diskon", "isi minimal satu aturan diskon");\r\n' +
+      '  const expiresDate = textValue(formData, "expiresAt", 10);\r\n' +
+      '  const expiresAt = expiresDate ? new Date(`${expiresDate}T23:59:59+07:00`).toISOString() : null;\r\n' +
+      '  const result = await context.supabase.schema("app").rpc("set_customer_next_discount", {\r\n' +
+      '    p_customer: customerId,\r\n' +
+      '    p_rules: rules,\r\n' +
+      '    p_expires_at: expiresAt,\r\n' +
+      '    p_note: textValue(formData, "note", 500) || null,\r\n' +
+      '    p_label: textValue(formData, "label", 120) || "Complimentary next appointment",\r\n' +
+      '  });\r\n' +
+      '  if (result.error) return databaseError("Diskon gagal disimpan", result.error.message);\r\n' +
+      '  revalidatePath("/customers"); revalidatePath(`/customers/${customerId}`); revalidatePath("/bookings");\r\n' +
+      '  return { error: null, success: "Diskon satu kali siap dipakai otomatis pada booking berikutnya." };\r\n' +
+      '}\r\n' +
+      '\r\n' +
+      'export async function revokeCustomerNextDiscountAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {\r\n' +
+      '  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");\r\n' +
+      '  const customerId = idValue(formData, "customerId"); const offerId = idValue(formData, "offerId");\r\n' +
+      '  if (!customerId || !offerId) return databaseError("Diskon", "penawaran tidak valid");\r\n' +
+      '  const result = await context.supabase.schema("app").rpc("revoke_customer_next_discount", { p_offer: offerId });\r\n' +
+      '  if (result.error) return databaseError("Diskon gagal dicabut", result.error.message);\r\n' +
+      '  revalidatePath("/customers"); revalidatePath(`/customers/${customerId}`); revalidatePath("/bookings");\r\n' +
+      '  return { error: null, success: "Diskon booking berikutnya dicabut." };\r\n' +
+      '}\r\n' +
+      '\r\n' +
+      'const PHONE_PATTERN = /^\\+?[0-9][0-9 .\\-()]{6,19}$/;\r\n' +
+      'const POSTAL_PATTERN = /^[0-9]{4,10}$/;\r\n' +
+      '\r\n' +
+      'interface AddressFieldValues {\r\n' +
+      '  label: string;\r\n' +
+      '  recipient_name: string | null;\r\n' +
+      '  recipient_phone: string | null;\r\n' +
+      '  line1: string;\r\n' +
+      '  line2: string | null;\r\n' +
+      '  rt: string | null;\r\n' +
+      '  rw: string | null;\r\n' +
+      '  kelurahan: string | null;\r\n' +
+      '  kecamatan: string | null;\r\n' +
+      '  kabupaten_kota: string | null;\r\n' +
+      '  province: string | null;\r\n' +
+      '  postal_code: string | null;\r\n' +
+      '  landmark: string | null;\r\n' +
+      '  access_notes: string | null;\r\n' +
+      '  latitude: number | null;\r\n' +
+      '  longitude: number | null;\r\n' +
+      '}\r\n' +
+      'interface AddressFieldsInvalid { invalid: string }\r\n' +
+      '\r\n' +
+      '/** Reads the optional full-address fields shared by customer creation and address CRUD. */\r\n' +
+      'function addressFields(formData: FormData): AddressFieldValues | AddressFieldsInvalid | null {\r\n' +
+      '  const line1 = textValue(formData, "line1", 200);\r\n' +
+      '  if (!line1) return null;\r\n' +
+      '  const recipientPhone = textValue(formData, "recipientPhone", 40);\r\n' +
+      '  const postalCode = textValue(formData, "postalCode", 10);\r\n' +
+      '  if (recipientPhone && !PHONE_PATTERN.test(recipientPhone)) return { invalid: "Nomor telepon penerima tidak valid" };\r\n' +
+      '  if (postalCode && !POSTAL_PATTERN.test(postalCode)) return { invalid: "Kode pos tidak valid" };\r\n' +
+      '  // A local, stricter numeric reader: numberValue() treats a missing/empty field as 0\r\n' +
+      '  // (Number("") === 0), which would silently place every address-less submission at\r\n' +
+      '  // the Gulf of Guinea. Coordinates are optional, so blank must stay null, not 0.\r\n' +
+      '  const coordinate = (key: string) => {\r\n' +
+      '    const raw = String(formData.get(key) ?? "").trim();\r\n' +
+      '    if (!raw) return null;\r\n' +
+      '    const parsed = Number(raw);\r\n' +
+      '    return Number.isFinite(parsed) ? parsed : null;\r\n' +
+      '  };\r\n' +
+      '  const latitude = coordinate("latitude");\r\n' +
+      '  const longitude = coordinate("longitude");\r\n' +
+      '  return {\r\n' +
+      '    label: textValue(formData, "label", 60) || "Rumah",\r\n' +
+      '    recipient_name: textValue(formData, "recipientName", 120) || null,\r\n' +
+      '    recipient_phone: recipientPhone || null,\r\n' +
+      '    line1,\r\n' +
+      '    line2: textValue(formData, "line2", 200) || null,\r\n' +
+      '    rt: textValue(formData, "rt", 10) || null,\r\n' +
+      '    rw: textValue(formData, "rw", 10) || null,\r\n' +
+      '    kelurahan: textValue(formData, "kelurahan", 100) || null,\r\n' +
+      '    kecamatan: textValue(formData, "kecamatan", 100) || null,\r\n' +
+      '    kabupaten_kota: textValue(formData, "kabupatenKota", 100) || null,\r\n' +
+      '    province: textValue(formData, "province", 100) || null,\r\n' +
+      '    postal_code: postalCode || null,\r\n' +
+      '    landmark: textValue(formData, "landmark", 200) || null,\r\n' +
+      '    access_notes: textValue(formData, "accessNotes", 500) || null,\r\n' +
+      '    latitude,\r\n' +
+      '    longitude,\r\n' +
+      '  };\r\n' +
+      '}\r\n' +
+      '\r\n' +
+      'export async function createCustomerAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {\r\n' +
+      '  const context = await workspace();\r\n' +
+      '  if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");\r\n' +
+      '  const name = textValue(formData, "name", 120);\r\n' +
+      '  const phone = textValue(formData, "phone", 40);\r\n' +
+      '  const petName = textValue(formData, "petName", 80);\r\n' +
+      '  const breed = textValue(formData, "breed", 100);\r\n' +
+      '  const species = textValue(formData, "species", 30) || "dog";\r\n' +
+      '  const sizeRaw = textValue(formData, "size", 20);\r\n' +
+      '  const size = ["small", "medium", "large", "extra_large"].includes(sizeRaw) ? sizeRaw : null;\r\n' +
+      '  if (name.length < 2) return databaseError("Pelanggan", "nama wajib diisi");\r\n' +
+      '\r\n' +
+      '  const address = addressFields(formData);\r\n' +
+      '  if (address && "invalid" in address) return databaseError("Alamat", address.invalid);\r\n' +
+      '\r\n' +
+      '  const { data: customer, error } = await context.supabase.from("customers").insert({ organization_id: context.organizationId, display_name: name, phone: phone || null, status: "active", source: "Operro", metadata: { created_from: "homepaw_pilot" } }).select("id").single();\r\n' +
+      '  if (error || !customer) return databaseError("Pelanggan gagal dibuat", error?.message ?? "unknown");\r\n' +
+      '  if (petName) {\r\n' +
+      '    const { error: petError } = await context.supabase.from("pets").insert({ organization_id: context.organizationId, customer_id: customer.id, name: petName, species, breed: breed || null, size, status: "active", metadata: { created_from: "homepaw_pilot" } });\r\n' +
+      '    if (petError) {\r\n' +
+      '      await context.supabase.from("customers").up'... 67558 more characters
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    "use server";
+    
+    /**
+     * Function index:
+     * - createCustomerAction: creates a customer and optional first pet and address.
+     * - createCustomerAddressAction / updateCustomerAddressAction / deleteCustomerAddressAction / setDefaultCustomerAddressAction: manages saved addresses.
+     * - createTaskAction / updateTaskStatusAction: manages operational tasks.
+     * - transitionBookingAction / updatePetJobStatusAction: advances grooming work.
+     * - setDispatchStageAction: advances a home-service booking's dispatch stage (scheduled/en_route/arrived/in_service), independent of bookings.status.
+     * - uploadGroomingEvidenceAction / deleteGroomingEvidenceAction: stores/retracts private, booking-linked grooming evidence for an assigned groomer.
+     * - updateGroomingChecklistAction / issueInvoiceForBookingAction / previewInvoiceDiscountsAction: closes the service-to-cash loop, including section-22 invoice/pet/service/category discounts, transport fee, and a pre-issuance preview.
+     * - createServiceAction / updateServiceAction / overrideGroomingLinePriceAction / createResourceAction / updateResourceAction / archiveResourceAction: configures the operating catalog.
+     * - adjustInventoryAction: appends an inventory adjustment movement.
+     * - recordPaymentAction / recordExpenseAction: records manual financial activity.
+     * - sellPackageAction: sells a catalog package to a customer and records the payment.
+     * - setCustomerNextDiscountAction / revokeCustomerNextDiscountAction: manages a customer's one-use next-booking offer.
+     * - recomputePayrollRunAction / approvePayrollRunAction / markPayrollRunPaidAction: payroll lifecycle.
+     */
+    import "server-only";
+    
+    import { revalidatePath } from "next/cache";
+    
+    import { loadAuthContext } from "@/lib/auth-context";
+    import { loadCapabilities } from "@/lib/authorization";
+    import { INVOICE_DISCOUNT_CATEGORIES } from "@/lib/invoice-discount-categories";
+    import { createClient } from "@/lib/supabase/server";
+    
+    export interface PilotActionState { error: string | null; success: string | null }
+    
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const allowedTaskStatuses = new Set(["todo", "in_progress", "done", "canceled"]);
+    const allowedBookingStatuses = new Set(["in_progress", "completed", "canceled", "no_show"]);
+    const allowedPetStatuses = new Set(["pending", "in_progress", "complete", "skipped"]);
+    
+    function textValue(formData: FormData, key: string, max = 200) {
+      return String(formData.get(key) ?? "").trim().slice(0, max);
+    }
+    
+    function idValue(formData: FormData, key: string) {
+      const value = textValue(formData, key, 36);
+      return UUID.test(value) ? value : null;
+    }
+    
+    function numberValue(formData: FormData, key: string) {
+      const value = Number(formData.get(key));
+      return Number.isFinite(value) ? value : null;
+    }
+    
+    async function workspace() {
+      const supabase = await createClient();
+      const context = await loadAuthContext(supabase);
+      if (!context?.activeOrganization) return null;
+      return { supabase, organizationId: context.activeOrganization.id, userId: context.user.id };
+    }
+    
+    function databaseError(scope: string, message: string) {
+      return { error: `${scope}: ${message}`, success: null };
+    }
+    
+    export async function setCustomerNextDiscountAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const customerId = idValue(formData, "customerId");
+      if (!customerId) return databaseError("Diskon", "pelanggan tidak valid");
+      const rules: Record<string, { type: string; value: number }> = {};
+      for (const [scope, prefix] of [["basic_grooming", "basic"], ["styling", "styling"], ["other", "other"]] as const) {
+        const type = textValue(formData, `${prefix}Type`, 10);
+        const value = numberValue(formData, `${prefix}Value`);
+        if (value !== null && value > 0) rules[scope] = { type: type === "fixed" ? "fixed" : "percent", value };
+      }
+      if (Object.keys(rules).length === 0) return databaseError("Diskon", "isi minimal satu aturan diskon");
+      const expiresDate = textValue(formData, "expiresAt", 10);
+      const expiresAt = expiresDate ? new Date(`${expiresDate}T23:59:59+07:00`).toISOString() : null;
+      const result = await context.supabase.schema("app").rpc("set_customer_next_discount", {
+        p_customer: customerId,
+        p_rules: rules,
+        p_expires_at: expiresAt,
+        p_note: textValue(formData, "note", 500) || null,
+        p_label: textValue(formData, "label", 120) || "Complimentary next appointment",
+      });
+      if (result.error) return databaseError("Diskon gagal disimpan", result.error.message);
+      revalidatePath("/customers"); revalidatePath(`/customers/${customerId}`); revalidatePath("/bookings");
+      return { error: null, success: "Diskon satu kali siap dipakai otomatis pada booking berikutnya." };
+    }
+    
+    export async function revokeCustomerNextDiscountAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const customerId = idValue(formData, "customerId"); const offerId = idValue(formData, "offerId");
+      if (!customerId || !offerId) return databaseError("Diskon", "penawaran tidak valid");
+      const result = await context.supabase.schema("app").rpc("revoke_customer_next_discount", { p_offer: offerId });
+      if (result.error) return databaseError("Diskon gagal dicabut", result.error.message);
+      revalidatePath("/customers"); revalidatePath(`/customers/${customerId}`); revalidatePath("/bookings");
+      return { error: null, success: "Diskon booking berikutnya dicabut." };
+    }
+    
+    const PHONE_PATTERN = /^\+?[0-9][0-9 .\-()]{6,19}$/;
+    const POSTAL_PATTERN = /^[0-9]{4,10}$/;
+    
+    interface AddressFieldValues {
+      label: string;
+      recipient_name: string | null;
+      recipient_phone: string | null;
+      line1: string;
+      line2: string | null;
+      rt: string | null;
+      rw: string | null;
+      kelurahan: string | null;
+      kecamatan: string | null;
+      kabupaten_kota: string | null;
+      province: string | null;
+      postal_code: string | null;
+      landmark: string | null;
+      access_notes: string | null;
+      latitude: number | null;
+      longitude: number | null;
+    }
+    interface AddressFieldsInvalid { invalid: string }
+    
+    /** Reads the optional full-address fields shared by customer creation and address CRUD. */
+    function addressFields(formData: FormData): AddressFieldValues | AddressFieldsInvalid | null {
+      const line1 = textValue(formData, "line1", 200);
+      if (!line1) return null;
+      const recipientPhone = textValue(formData, "recipientPhone", 40);
+      const postalCode = textValue(formData, "postalCode", 10);
+      if (recipientPhone && !PHONE_PATTERN.test(recipientPhone)) return { invalid: "Nomor telepon penerima tidak valid" };
+      if (postalCode && !POSTAL_PATTERN.test(postalCode)) return { invalid: "Kode pos tidak valid" };
+      // A local, stricter numeric reader: numberValue() treats a missing/empty field as 0
+      // (Number("") === 0), which would silently place every address-less submission at
+      // the Gulf of Guinea. Coordinates are optional, so blank must stay null, not 0.
+      const coordinate = (key: string) => {
+        const raw = String(formData.get(key) ?? "").trim();
+        if (!raw) return null;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : null;
+      };
+      const latitude = coordinate("latitude");
+      const longitude = coordinate("longitude");
+      return {
+        label: textValue(formData, "label", 60) || "Rumah",
+        recipient_name: textValue(formData, "recipientName", 120) || null,
+        recipient_phone: recipientPhone || null,
+        line1,
+        line2: textValue(formData, "line2", 200) || null,
+        rt: textValue(formData, "rt", 10) || null,
+        rw: textValue(formData, "rw", 10) || null,
+        kelurahan: textValue(formData, "kelurahan", 100) || null,
+        kecamatan: textValue(formData, "kecamatan", 100) || null,
+        kabupaten_kota: textValue(formData, "kabupatenKota", 100) || null,
+        province: textValue(formData, "province", 100) || null,
+        postal_code: postalCode || null,
+        landmark: textValue(formData, "landmark", 200) || null,
+        access_notes: textValue(formData, "accessNotes", 500) || null,
+        latitude,
+        longitude,
+      };
+    }
+    
+    export async function createCustomerAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace();
+      if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const name = textValue(formData, "name", 120);
+      const phone = textValue(formData, "phone", 40);
+      const petName = textValue(formData, "petName", 80);
+      const breed = textValue(formData, "breed", 100);
+      const species = textValue(formData, "species", 30) || "dog";
+      const sizeRaw = textValue(formData, "size", 20);
+      const size = ["small", "medium", "large", "extra_large"].includes(sizeRaw) ? sizeRaw : null;
+      if (name.length < 2) return databaseError("Pelanggan", "nama wajib diisi");
+    
+      const address = addressFields(formData);
+      if (address && "invalid" in address) return databaseError("Alamat", address.invalid);
+    
+      const { data: customer, error } = await context.supabase.from("customers").insert({ organization_id: context.organizationId, display_name: name, phone: phone || null, status: "active", source: "Operro", metadata: { created_from: "homepaw_pilot" } }).select("id").single();
+      if (error || !customer) return databaseError("Pelanggan gagal dibuat", error?.message ?? "unknown");
+      if (petName) {
+        const { error: petError } = await context.supabase.from("pets").insert({ organization_id: context.organizationId, customer_id: customer.id, name: petName, species, breed: breed || null, size, status: "active", metadata: { created_from: "homepaw_pilot" } });
+        if (petError) {
+          await context.supabase.from("customers").update({ deleted_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("id", customer.id);
+          return databaseError("Hewan gagal dibuat", petError.message);
+        }
+      }
+      if (address && !("invalid" in address)) {
+        const { error: addressError } = await context.supabase.from("customer_addresses").insert({ organization_id: context.organizationId, customer_id: customer.id, is_default: true, ...address });
+        // A bad address must not silently discard an otherwise-valid new customer — report it,
+        // but the customer record (and pet, if any) already committed successfully above.
+        if (addressError) return { error: null, success: `${name} berhasil ditambahkan, tetapi alamat gagal disimpan: ${addressError.message}` };
+      }
+      revalidatePath("/customers"); revalidatePath("/bookings"); revalidatePath("/dashboard");
+      return { error: null, success: `${name} berhasil ditambahkan.` };
+    }
+    
+    export async function importCustomerHouseholdAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace();
+      if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const capabilities = await loadCapabilities(context.supabase);
+      if (!capabilities["customer.manage"]) return databaseError("Impor", "Anda tidak memiliki izin mengelola pelanggan");
+      const raw = textValue(formData, "household", 20_000);
+      let payload: Record<string, unknown>;
+      try { payload = JSON.parse(raw) as Record<string, unknown>; } catch { return databaseError("Impor", "hasil parsing tidak valid"); }
+      const name = typeof payload.customerName === "string" ? payload.customerName.trim().slice(0, 120) : "";
+      const phone = typeof payload.phone === "string" ? payload.phone.trim().slice(0, 40) : "";
+      const source = typeof payload.source === "string" ? payload.source.trim().slice(0, 80) : "Fast booking import";
+      const pets = Array.isArray(payload.pets) ? payload.pets.slice(0, 10) : [];
+      if (name.length < 2 || pets.length === 0) return databaseError("Impor", "nama pelanggan dan minimal satu hewan wajib ada");
+      if (phone && !PHONE_PATTERN.test(phone)) return databaseError("Impor", "nomor WhatsApp tidak valid");
+      const petRows = pets.flatMap((value) => {
+        if (!value || typeof value !== "object") return [];
+        const pet = value as Record<string, unknown>;
+        const petName = typeof pet.name === "string" ? pet.name.trim().slice(0, 80) : "";
+        if (!petName) return [];
+        const weight = pet.weightKg === null || pet.weightKg === "" ? null : Number(pet.weightKg);
+        return [{ name: petName, species: pet.species === "cat" ? "cat" : "dog", breed: typeof pet.breed === "string" ? pet.breed.trim().slice(0, 100) || null : null, weight_kg: Number.isFinite(weight) && Number(weight) > 0 ? Number(weight) : null, color: typeof pet.color === "string" ? pet.color.trim().slice(0, 80) || null : null, notes: typeof pet.notes === "string" ? pet.notes.trim().slice(0, 1000) || null : null, metadata: { created_from: "booking_chat_import", stated_age: typeof pet.age === "string" ? pet.age.trim().slice(0, 80) : "" } }];
+      });
+      if (petRows.length !== pets.length) return databaseError("Impor", "setiap hewan harus memiliki nama");
+    
+      if (phone) {
+        const localPhone = phone.startsWith("+62") ? `0${phone.slice(3)}` : phone;
+        const duplicate = await context.supabase.from("customers").select("id").eq("organization_id", context.organizationId).is("deleted_at", null).in("phone", [...new Set([phone, localPhone])]).limit(1);
+        if (duplicate.error) return databaseError("Impor", "pemeriksaan duplikat gagal");
+        if ((duplicate.data ?? []).length > 0) return databaseError("Impor", "nomor WhatsApp sudah digunakan pelanggan lain. Buka pelanggan yang ada agar tidak membuat duplikat");
+      }
+    
+      const { data: customer, error: customerError } = await context.supabase.from("customers").insert({ organization_id: context.organizationId, display_name: name, phone: phone || null, status: "active", source: source || "Fast booking import", metadata: { created_from: "booking_chat_import", original_maps_input: typeof payload.mapsInput === "string" ? payload.mapsInput.slice(0, 1000) : null } }).select("id").single();
+      if (customerError || !customer) return databaseError("Impor pelanggan gagal", customerError?.message ?? "unknown");
+      const { error: petsError } = await context.supabase.from("pets").insert(petRows.map((pet) => ({ ...pet, organization_id: context.organizationId, customer_id: customer.id, status: "active" })));
+      if (petsError) {
+        await context.supabase.from("customers").update({ deleted_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("id", customer.id);
+        return databaseError("Impor hewan gagal", petsError.message);
+      }
+      const line1 = typeof payload.addressLine === "string" ? payload.addressLine.trim().slice(0, 200) : "";
+      if (line1) {
+        const latitude = payload.latitude === null ? null : Number(payload.latitude);
+        const longitude = payload.longitude === null ? null : Number(payload.longitude);
+        const validCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(Number(latitude)) <= 90 && Math.abs(Number(longitude)) <= 180;
+        const { error: addressError } = await context.supabase.from("customer_addresses").insert({ organization_id: context.organizationId, customer_id: customer.id, label: "Rumah", recipient_name: name, recipient_phone: phone || null, line1, kecamatan: typeof payload.kecamatan === "string" ? payload.kecamatan.trim().slice(0, 100) || null : null, kabupaten_kota: typeof payload.kabupatenKota === "string" ? payload.kabupatenKota.trim().slice(0, 100) || null : null, latitude: validCoordinates ? latitude : null, longitude: validCoordinates ? longitude : null, is_default: true });
+        if (addressError) return { error: null, success: `${name} dan ${petRows.length} hewan dibuat, tetapi alamat perlu diperiksa: ${addressError.message}` };
+      }
+      revalidatePath("/customers"); revalidatePath("/bookings"); revalidatePath("/dashboard");
+      return { error: null, success: `${name} dan ${petRows.length} hewan berhasil diimpor.` };
+    }
+    
+    export async function createCustomerAddressAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace();
+      if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const customerId = idValue(formData, "customerId");
+      if (!customerId) return databaseError("Alamat", "pelanggan tidak valid");
+      const address = addressFields(formData);
+      if (!address) return databaseError("Alamat", "alamat baris pertama wajib diisi");
+      if ("invalid" in address) return databaseError("Alamat", address.invalid);
+      const { count } = await context.supabase.from("customer_addresses").select("id", { count: "exact", head: true }).eq("organization_id", context.organizationId).eq("customer_id", customerId).is("deleted_at", null);
+      const { error } = await context.supabase.from("customer_addresses").insert({ organization_id: context.organizationId, customer_id: customerId, is_default: (count ?? 0) === 0, ...address });
+      if (error) return databaseError("Alamat gagal disimpan", error.message);
+      revalidatePath(`/customers/${customerId}`);
+      return { error: null, success: "Alamat berhasil ditambahkan." };
+    }
+    
+    export async function updateCustomerAddressAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace();
+      if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const addressId = idValue(formData, "addressId");
+      const customerId = idValue(formData, "customerId");
+      if (!addressId || !customerId) return databaseError("Alamat", "alamat tidak valid");
+      const address = addressFields(formData);
+      if (!address) return databaseError("Alamat", "alamat baris pertama wajib diisi");
+      if ("invalid" in address) return databaseError("Alamat", address.invalid);
+      const { error } = await context.supabase.from("customer_addresses").update(address).eq("organization_id", context.organizationId).eq("customer_id", customerId).eq("id", addressId);
+      if (error) return databaseError("Alamat gagal diperbarui", error.message);
+      revalidatePath(`/customers/${customerId}`);
+      return { error: null, success: "Alamat berhasil diperbarui." };
+    }
+    
+    export async function deleteCustomerAddressAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const addressId = idValue(formData, "addressId");
+      const customerId = idValue(formData, "customerId");
+      if (!addressId || !customerId) return;
+      await context.supabase.from("customer_addresses").update({ deleted_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("customer_id", customerId).eq("id", addressId);
+      revalidatePath(`/customers/${customerId}`);
+    }
+    
+    export async function setDefaultCustomerAddressAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const addressId = idValue(formData, "addressId");
+      const customerId = idValue(formData, "customerId");
+      if (!addressId || !customerId) return;
+      await context.supabase.schema("app").rpc("fn_set_default_customer_address", { p_address_id: addressId });
+      revalidatePath(`/customers/${customerId}`);
+    }
+    
+    export async function createTaskAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const branchId = idValue(formData, "branchId"); const title = textValue(formData, "title", 160); const priority = textValue(formData, "priority", 20); const due = textValue(formData, "dueAt", 40);
+      if (!branchId || title.length < 3 || !["low", "normal", "high", "urgent"].includes(priority)) return databaseError("Tugas", "data belum lengkap");
+      const { data: branch } = await context.supabase.from("branches").select("id").eq("organization_id", context.organizationId).eq("id", branchId).eq("status", "active").maybeSingle();
+      if (!branch) return databaseError("Tugas", "cabang tidak dapat diakses");
+      const { error } = await context.supabase.from("tasks").insert({ organization_id: context.organizationId, branch_id: branchId, title, priority, due_at: due ? new Date(due).toISOString() : null, metadata: { created_from: "homepaw_pilot" } });
+      if (error) return databaseError("Tugas gagal dibuat", error.message);
+      revalidatePath("/tasks"); revalidatePath("/dashboard"); return { error: null, success: "Tugas berhasil dibuat." };
+    }
+    
+    export async function updateTaskStatusAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const taskId = idValue(formData, "taskId"); const status = textValue(formData, "status", 30);
+      if (!taskId || !allowedTaskStatuses.has(status)) return;
+      await context.supabase.from("tasks").update({ status }).eq("organization_id", context.organizationId).eq("id", taskId);
+      revalidatePath("/tasks"); revalidatePath("/dashboard");
+    }
+    
+    export async function transitionBookingAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const bookingId = idValue(formData, "bookingId"); const status = textValue(formData, "status", 30);
+      if (!bookingId || !allowedBookingStatuses.has(status)) return;
+      const app = context.supabase.schema("app");
+      const result = status === "completed"
+        ? await app.rpc("complete_booking", { p_booking: bookingId, p_override: false, p_reason: null })
+        : await app.rpc("transition_booking_status", { p_booking: bookingId, p_to: status });
+      if (result.error) throw new Error(`Status booking gagal diperbarui: ${result.error.message}`);
+      revalidatePath("/operations"); revalidatePath("/bookings"); revalidatePath("/dashboard"); revalidatePath("/reports");
+    }
+    
+    export async function updatePetJobStatusAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const petJobId = idValue(formData, "petJobId"); const status = textValue(formData, "status", 30);
+      if (!petJobId || !allowedPetStatuses.has(status)) return;
+      await context.supabase.from("grooming_job_pets").update({ status }).eq("organization_id", context.organizationId).eq("id", petJobId);
+      revalidatePath("/operations"); revalidatePath("/my-schedule");
+    }
+    
+    const allowedDispatchStages = new Set(["scheduled", "en_route", "arrived", "in_service"]);
+    
+    /**
+     * Advances a home-service booking's dispatch stage. This never touches `bookings.status` —
+     * it calls `app.fn_set_dispatch_stage`, which is deliberately separate from and subordinate
+     * to `app.transition_booking_status`/`app.complete_booking`. A dispatcher marking "arrived"
+     * cannot accidentally (or otherwise) move a booking through the real, frozen state machine.
+     */
+    export async function setDispatchStageAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const bookingId = idValue(formData, "bookingId");
+      const stage = textValue(formData, "stage", 20);
+      if (!bookingId || !allowedDispatchStages.has(stage)) return;
+      await context.supabase.schema("app").rpc("fn_set_dispatch_stage", { p_booking: bookingId, p_stage: stage });
+      revalidatePath("/operations"); revalidatePath("/my-schedule");
+    }
+    
+    const allowedEvidenceCategories = new Set(["before", "after", "ear", "hygiene", "dematting", "fungal", "injury", "other", "attendance"]);
+    const evidenceMimeExtensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+    
+    export async function uploadGroomingEvidenceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace();
+      if (!context) return databaseError("Foto", "sesi atau workspace aktif tidak tersedia");
+      const petJobId = idValue(formData, "petJobId");
+      const bookingId = idValue(formData, "bookingId");
+      const category = textValue(formData, "category", 30);
+      const file = formData.get("photo");
+      if (!petJobId || !bookingId || !allowedEvidenceCategories.has(category)) return databaseError("Foto", "data pekerjaan tidak valid");
+      if (!(file instanceof File) || file.size === 0) return databaseError("Foto", "pilih foto terlebih dahulu");
+      const extension = evidenceMimeExtensions[file.type];
+      if (!extension) return databaseError("Foto", "format harus JPG, PNG, atau WebP");
+      if (file.size > 4 * 1024 * 1024) return databaseError("Foto", "ukuran maksimum 4 MB setelah kompresi");
+    
+      const membership = await context.supabase.from("memberships").select("id").eq("organization_id", context.organizationId).eq("user_id", context.userId).eq("status", "active").is("deleted_at", null).maybeSingle();
+      if (membership.error || !membership.data) return databaseError("Foto", "membership groomer tidak ditemukan");
+      const resources = await context.supabase.from("resources").select("id").eq("organization_id", context.organizationId).eq("membership_id", membership.data.id).eq("status", "active").is("deleted_at", null);
+      if (resources.error) return databaseError("Foto", resources.error.message);
+      const resourceIds = (resources.data ?? []).map((resource) => resource.id);
+      if (resourceIds.length === 0) return databaseError("Foto", "akun ini belum terhubung ke profil groomer");
+      const assignment = await context.supabase.from("grooming_job_pets").select("id,grooming_job_id").eq("organization_id", context.organizationId).eq("id", petJobId).eq("grooming_job_id", bookingId).in("assigned_resource_id", resourceIds).is("deleted_at", null).maybeSingle();
+      if (assignment.error || !assignment.data) return databaseError("Foto", "pekerjaan ini tidak ditugaskan ke akun Anda");
+    
+      const storagePath = `${context.organizationId}/${bookingId}/${petJobId}/${crypto.randomUUID()}.${extension}`;
+      const upload = await context.supabase.storage.from("attachments").upload(storagePath, file, { contentType: file.type, upsert: false });
+      if (upload.error) return databaseError("Foto gagal diunggah", upload.error.message);
+    
+      const attachment = await context.supabase.from("attachments").insert({
+        organization_id: context.organizationId,
+        storage_bucket: "attachments",
+        storage_path: storagePath,
+        filename: file.name.slice(0, 200) || `${category}.${extension}`,
+        mime_type: file.type,
+        size_bytes: file.size,
+        uploaded_by: context.userId,
+        metadata: { category, grooming_job_pet_id: petJobId },
+      }).select("id").single();
+      if (attachment.error || !attachment.data) {
+        await context.supabase.storage.from("attachments").remove([storagePath]);
+        return databaseError("Metadata foto gagal disimpan", attachment.error?.message ?? "unknown");
+      }
+      const link = await context.supabase.from("attachment_links").insert({ organization_id: context.organizationId, attachment_id: attachment.data.id, subject_type: "booking", subject_id: bookingId });
+      if (link.error) {
+        await context.supabase.from("attachments").delete().eq("organization_id", context.organizationId).eq("id", attachment.data.id);
+        await context.supabase.storage.from("attachments").remove([storagePath]);
+        return databaseError("Foto gagal ditautkan", link.error.message);
+      }
+      revalidatePath("/my-schedule"); revalidatePath("/operations");
+      return { error: null, success: "Foto berhasil disimpan." };
+    }
+    
+    /**
+     * Retracts a grooming evidence photo through app.delete_grooming_evidence
+     * (section 28), which re-checks the same job-assignment rule as upload (or
+     * evidence.read_all/booking.delete for a manager). The DB row is soft-deleted
+     * FIRST, then the storage object is removed - never the reverse, which would
+     * leave a live signed URL pointing at nothing.
+     */
+    export async function deleteGroomingEvidenceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace();
+      if (!context) return databaseError("Foto", "sesi atau workspace aktif tidak tersedia");
+      const attachmentId = idValue(formData, "attachmentId");
+      if (!attachmentId) return databaseError("Foto", "ID foto tidak valid");
+      const result = await context.supabase.schema("app").rpc("delete_grooming_evidence", { p_attachment: attachmentId });
+      if (result.error) {
+        if (/not_authorized/.test(result.error.message)) return databaseError("Foto", "Anda tidak memiliki akses untuk menghapus foto ini");
+        if (/attachment_not_found/.test(result.error.message)) return databaseError("Foto", "foto tidak ditemukan");
+        console.error("delete_grooming_evidence RPC failed", { code: result.error.code, message: result.error.message });
+        return databaseError("Foto", "server tidak dapat menghapus foto. Coba lagi.");
+      }
+      const row = Array.isArray(result.data) ? result.data[0] : result.data;
+      if (row?.storage_bucket && row?.storage_path) {
+        await context.supabase.storage.from(row.storage_bucket).remove([row.storage_path]);
+      }
+      revalidatePath("/my-schedule"); revalidatePath("/operations");
+      return { error: null, success: "Foto berhasil dihapus." };
+    }
+    
+    export async function recordAttendanceCheckinAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace();
+      if (!context) return databaseError("Kehadiran", "sesi atau workspace aktif tidak tersedia");
+      const bookingId = idValue(formData, "bookingId"); const resourceId = idValue(formData, "resourceId");
+      const latitudeRaw = String(formData.get("latitude") ?? "").trim(); const longitudeRaw = String(formData.get("longitude") ?? "").trim(); const accuracyRaw = String(formData.get("accuracy") ?? "").trim();
+      const latitude = Number(latitudeRaw); const longitude = Number(longitudeRaw); const accuracy = accuracyRaw ? Number(accuracyRaw) : Number.NaN;
+      const lateReason = textValue(formData, "lateReason", 500); const file = formData.get("photo");
+      if (!bookingId || !resourceId || !latitudeRaw || !longitudeRaw || !Number.isFinite(latitude) || Math.abs(latitude) > 90 || !Number.isFinite(longitude) || Math.abs(longitude) > 180) return databaseError("Kehadiran", "GPS wajib diaktifkan sebelum check-in");
+      if (!(file instanceof File) || file.size === 0) return databaseError("Kehadiran", "foto check-in wajib diambil");
+      const extension = evidenceMimeExtensions[file.type];
+      if (!extension || file.size > 4 * 1024 * 1024) return databaseError("Kehadiran", "foto harus JPG, PNG, atau WebP maksimum 4 MB");
+      const membership = await context.supabase.from("memberships").select("id").eq("organization_id", context.organizationId).eq("user_id", context.userId).eq("status", "active").is("deleted_at", null).maybeSingle();
+      if (!membership.data) return databaseError("Kehadiran", "membership aktif tidak ditemukan");
+      const resource = await context.supabase.from("resources").select("id").eq("organization_id", context.organizationId).eq("id", resourceId).eq("membership_id", membership.data.id).eq("status", "active").is("deleted_at", null).maybeSingle();
+      if (!resource.data) return databaseError("Kehadiran", "profil groomer tidak terhubung ke akun ini");
+      const assigned = await context.supabase.from("grooming_job_pets").select("id").eq("organization_id", context.organizationId).eq("grooming_job_id", bookingId).eq("assigned_resource_id", resourceId).is("deleted_at", null).limit(1);
+      if (!(assigned.data ?? []).length) return databaseError("Kehadiran", "booking tidak ditugaskan kepada groomer ini");
+    
+      const storagePath = `${context.organizationId}/${bookingId}/attendance/${crypto.randomUUID()}.${extension}`;
+      const upload = await context.supabase.storage.from("attachments").upload(storagePath, file, { contentType: file.type, upsert: false });
+      if (upload.error) return databaseError("Foto check-in gagal diunggah", upload.error.message);
+      const attachment = await context.supabase.from("attachments").insert({ organization_id: context.organizationId, storage_bucket: "attachments", storage_path: storagePath, filename: file.name.slice(0, 200) || `attendance.${extension}`, mime_type: file.type, size_bytes: file.size, uploaded_by: context.userId, metadata: { category: "attendance", resource_id: resourceId, latitude, longitude, accuracy_meters: Number.isFinite(accuracy) ? accuracy : null } }).select("id").single();
+      if (!attachment.data) { await context.supabase.storage.from("attachments").remove([storagePath]); return databaseError("Metadata check-in gagal", attachment.error?.message ?? "unknown"); }
+      const link = await context.supabase.from("attachment_links").insert({ organization_id: context.organizationId, attachment_id: attachment.data.id, subject_type: "booking", subject_id: bookingId });
+      if (link.error) { await context.supabase.storage.from("attachments").remove([storagePath]); return databaseError("Foto check-in gagal ditautkan", link.error.message); }
+      const result = await context.supabase.schema("app").rpc("record_attendance_checkin", { p_booking: bookingId, p_resource: resourceId, p_attachment: attachment.data.id, p_latitude: latitude, p_longitude: longitude, p_accuracy: Number.isFinite(accuracy) ? accuracy : null, p_late_reason: lateReason || null });
+      if (result.error) {
+        await context.supabase.storage.from("attachments").remove([storagePath]);
+        if (/already_recorded|23505/i.test(result.error.message)) return databaseError("Kehadiran", "check-in untuk booking ini sudah tercatat");
+        if (/photo_required|location_required|not_assigned|not_owned|membership_not_found/i.test(result.error.message)) return databaseError("Check-in gagal", "data foto, GPS, atau penugasan tidak valid");
+        console.error("attendance check-in RPC failed", { code: result.error.code, message: result.error.message });
+        return databaseError("Check-in gagal", "server tidak dapat mencatat kehadiran. Coba lagi.");
+      }
+      revalidatePath("/my-schedule"); revalidatePath("/attendance"); revalidatePath("/payroll"); revalidatePath("/catalog");
+      return { error: null, success: "Check-in GPS dan foto berhasil dicatat." };
+    }
+    
+    export async function waiveAttendanceLatenessAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Kehadiran", "workspace aktif tidak tersedia");
+      const attendanceId = idValue(formData, "attendanceId"); const reason = textValue(formData, "reason", 500);
+      if (!attendanceId || reason.length < 3) return databaseError("Kehadiran", "alasan waiver wajib diisi");
+      const result = await context.supabase.schema("app").rpc("waive_attendance_lateness", { p_attendance: attendanceId, p_reason: reason });
+      if (result.error) return databaseError("Waiver gagal", /not_authorized|42501/i.test(result.error.message) ? "izin payroll.manage diperlukan" : result.error.message);
+      revalidatePath("/attendance"); revalidatePath("/payroll"); revalidatePath("/catalog");
+      return { error: null, success: "Keterlambatan di-waive dan audit tersimpan." };
+    }
+    
+    export async function syncMissingAttendanceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Kehadiran", "workspace aktif tidak tersedia");
+      const from = textValue(formData, "from", 10); const to = textValue(formData, "to", 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return databaseError("Kehadiran", "rentang cycle tidak valid");
+      const result = await context.supabase.schema("app").rpc("materialize_missing_attendance", { p_from: `${from}T00:00:00+07:00`, p_to: `${to}T00:00:00+07:00` });
+      if (result.error) return databaseError("Sinkronisasi gagal", /not_authorized|42501/i.test(result.error.message) ? "izin payroll.manage diperlukan" : result.error.message);
+      revalidatePath("/attendance"); revalidatePath("/payroll"); revalidatePath("/catalog");
+      return { error: null, success: `${Number(result.data ?? 0)} ketidakhadiran tanpa foto ditambahkan.` };
+    }
+    
+    export async function updateGroomingChecklistAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const bookingId = idValue(formData, "bookingId"); if (!bookingId) return;
+      const checklist = { before_photo: formData.get("beforePhoto") === "on", bath: formData.get("bath") === "on", dry: formData.get("dry") === "on", finishing: formData.get("finishing") === "on", after_photo: formData.get("afterPhoto") === "on" };
+      const notes = textValue(formData, "notes", 500);
+      await context.supabase.from("grooming_jobs").update({ checklist, groomer_notes: notes || null }).eq("organization_id", context.organizationId).eq("booking_id", bookingId);
+      revalidatePath("/operations");
+    }
+    
+    function invoiceLevelDiscount(formData: FormData): { type: string; value: number; basicGroomingOnly: boolean } | null {
+      const type = textValue(formData, "invoiceDiscountType", 10);
+      if (type !== "percent" && type !== "fixed") return null;
+      const value = numberValue(formData, "invoiceDiscountValue");
+      if (value === null || value <= 0) return null;
+      return { type, value, basicGroomingOnly: formData.get("invoiceDiscountBasicOnly") === "on" };
+    }
+    
+    function categoryDiscounts(formData: FormData): Array<{ category: string; type: string; value: number }> {
+      const rules: Array<{ category: string; type: string; value: number }> = [];
+      for (const [slug, label] of INVOICE_DISCOUNT_CATEGORIES) {
+        const type = textValue(formData, `categoryDiscountType_${slug}`, 10);
+        if (type !== "percent" && type !== "fixed") continue;
+        const value = numberValue(formData, `categoryDiscountValue_${slug}`);
+        if (value === null || value <= 0) continue;
+        rules.push({ category: label, type, value });
+      }
+      return rules;
+    }
+    
+    /** Reads parallel getAll() arrays (one row per pet/service the staff set a discount on) into typed rule objects. */
+    function keyedDiscounts(formData: FormData, idKey: string, typeKey: string, valueKey: string, idField: string): Array<Record<string, string | number>> {
+      const ids = formData.getAll(idKey).map(String);
+      const types = formData.getAll(typeKey).map(String);
+      const values = formData.getAll(valueKey).map(String);
+      const rules: Array<Record<string, string | number>> = [];
+      for (let i = 0; i < ids.length; i += 1) {
+        const type = types[i]; const value = Number(values[i]);
+        if (!ids[i] || (type !== "percent" && type !== "fixed") || !Number.isFinite(value) || value <= 0) continue;
+        rules.push({ [idField]: ids[i], type, value });
+      }
+      return rules;
+    }
+    
+    function invoiceDiscountInputs(formData: FormData) {
+      return {
+        invoice: invoiceLevelDiscount(formData),
+        pets: keyedDiscounts(formData, "petDiscountId", "petDiscountType", "petDiscountValue", "grooming_job_pet_id"),
+        services: keyedDiscounts(formData, "serviceDiscountId", "serviceDiscountType", "serviceDiscountValue", "service_id"),
+        categories: categoryDiscounts(formData),
+      };
+    }
+    
+    /**
+     * Issues an invoice for a completed booking. All pricing -- package coverage, the
+     * complimentary next-appointment offer, the booking-time category rules, and the new
+     * section-22 invoice/pet/service/category discounts and transport fee -- is resolved
+     * and written atomically by app.issue_invoice_for_booking; nothing here trusts a
+     * client-supplied amount, only discount RULES (type/value/target), each range-checked
+     * again inside the RPC.
+     */
+    export async function issueInvoiceForBookingAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      if (!(await loadCapabilities(context.supabase))["invoice.issue"]) return;
+      const bookingId = idValue(formData, "bookingId"); if (!bookingId) return;
+      const invoiceDate = textValue(formData, "invoiceDate", 10);
+      const dueDate = textValue(formData, "dueDate", 10);
+      if ((invoiceDate && !/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) || (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate))) return;
+      const issuedAt = invoiceDate ? new Date(`${invoiceDate}T09:00:00+07:00`) : null;
+      const dueAt = dueDate ? new Date(`${dueDate}T23:59:59+07:00`) : null;
+      if ((issuedAt && Number.isNaN(issuedAt.getTime())) || (dueAt && Number.isNaN(dueAt.getTime()))) return;
+      const documentType = textValue(formData, "documentType", 30);
+      if (documentType && !["auto", "invoice", "service_report"].includes(documentType)) return;
+      const discounts = invoiceDiscountInputs(formData);
+      const result = await context.supabase.schema("app").rpc("issue_invoice_for_booking", {
+        p_booking: bookingId, p_invoice_discount: discounts.invoice, p_pet_discounts: discounts.pets,
+        p_service_discounts: discounts.services, p_category_discounts: discounts.categories,
+        p_issued_at: issuedAt?.toISOString() ?? null, p_due_at: dueAt?.toISOString() ?? null,
+        p_document_type: documentType === "auto" ? null : documentType || null,
+        p_groomer: idValue(formData, "groomerId"), p_manual_groomer: textValue(formData, "manualGroomer", 160) || null,
+        p_admin_notes: textValue(formData, "adminNotes", 2000) || null,
+      });
+      if (result.error) { console.error("issue_invoice_failed", result.error); return; }
+      revalidatePath("/operations"); revalidatePath("/finance"); revalidatePath("/reports");
+    }
+    
+    export interface InvoicePreviewLine {
+      lineId: string | null; name: string; quantity: number; unitPrice: number; gross: number;
+      discountAmount: number; lineTotal: number; category: string; pricingBreakdown: Record<string, unknown>;
+    }
+    export interface InvoicePreview { lines: InvoicePreviewLine[]; transportFee: number; subtotal: number; discountTotal: number; total: number }
+    export interface InvoicePreviewResult { error: string | null; preview: InvoicePreview | null }
+    
+    /** Read-only: lets staff see exactly what issuing would produce before committing (section 22, item 8). */
+    export async function previewInvoiceDiscountsAction(formData: FormData): Promise<InvoicePreviewResult> {
+      const context = await workspace(); if (!context) return { error: "workspace aktif tidak tersedia", preview: null };
+      const bookingId = idValue(formData, "bookingId"); if (!bookingId) return { error: "booking tidak valid", preview: null };
+      const discounts = invoiceDiscountInputs(formData);
+      const result = await context.supabase.schema("app").rpc("preview_invoice_pricing", {
+        p_booking: bookingId, p_invoice_discount: discounts.invoice, p_pet_discounts: discounts.pets,
+        p_service_discounts: discounts.services, p_category_discounts: discounts.categories,
+      });
+      if (result.error) return { error: result.error.message, preview: null };
+      const data = result.data as { lines: Array<Record<string, unknown>>; transport_fee: number; subtotal: number; discount_total: number; total: number };
+      return {
+        error: null,
+        preview: {
+          lines: data.lines.map((line) => ({
+            lineId: (line.line_id as string | null) ?? null, name: String(line.name), quantity: Number(line.quantity), unitPrice: Number(line.unit_price),
+            gross: Number(line.gross), discountAmount: Number(line.discount_amount), lineTotal: Number(line.line_total), category: String(line.category),
+            pricingBreakdown: (line.pricing_breakdown as Record<string, unknown>) ?? {},
+          })),
+          transportFee: Number(data.transport_fee), subtotal: Number(data.subtotal), discountTotal: Number(data.discount_total), total: Number(data.total),
+        },
+      };
+    }
+    
+    const SERVICE_SIZE_KEYS = ["small", "medium", "large", "extraLarge"] as const;
+    const SERVICE_SIZE_COLUMNS: Record<(typeof SERVICE_SIZE_KEYS)[number], string> = {
+      small: "price_small", medium: "price_medium", large: "price_large", extraLarge: "price_extra_large",
+    };
+    const FULFILLMENT_MODES = new Set(["home", "in_store"]);
+    
+    /** Blank means "no override for this size" (falls back to base_price); numberValue() would coerce blank to 0. */
+    function optionalPriceValue(formData: FormData, key: string): number | null | "invalid" {
+      const raw = String(formData.get(key) ?? "").trim();
+      if (!raw) return null;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : "invalid";
+    }
+    
+    interface ServicePriceMatrix { price_small: number | null; price_medium: number | null; price_large: number | null; price_extra_large: number | null }
+    
+    function servicePriceMatrix(formData: FormData): ServicePriceMatrix | { invalid: string } {
+      const matrix: Record<string, number | null> = {};
+      for (const key of SERVICE_SIZE_KEYS) {
+        const value = optionalPriceValue(formData, `price_${key}`);
+        if (value === "invalid") return { invalid: `harga untuk ukuran ${key} tidak valid` };
+        matrix[SERVICE_SIZE_COLUMNS[key]] = value;
+      }
+      return matrix as unknown as ServicePriceMatrix;
+    }
+    
+    function serviceFulfillmentModes(formData: FormData): string[] {
+      const modes = formData.getAll("fulfillmentModes").map((value) => String(value)).filter((value) => FULFILLMENT_MODES.has(value));
+      return modes.length ? [...new Set(modes)] : ["home", "in_store"];
+    }
+    
+    const SERVICE_CATEGORIES = new Set(["Basic Grooming", "Styling", "Special Charges", "Other Fees"]);
+    
+    /** Drives the section-22 per-category invoice discount; blank/unset falls back to "Other Fees" at discount time. */
+    function serviceCategory(formData: FormData): string | null {
+      const value = textValue(formData, "category", 40);
+      return SERVICE_CATEGORIES.has(value) ? value : null;
+    }
+    
+    export async function createServiceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Layanan", "izin service.manage diperlukan");
+      const name = textValue(formData, "name", 100); const duration = numberValue(formData, "duration"); const price = numberValue(formData, "price");
+      const additionalDuration = numberValue(formData, "additionalDuration") ?? 0;
+      if (name.length < 2 || !duration || duration < 15 || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
+      const priceMatrix = servicePriceMatrix(formData);
+      if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
+      const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), metadata: { created_from: "homepaw_pilot" }, ...priceMatrix });
+      if (error) return databaseError("Layanan gagal dibuat", error.message);
+      revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil ditambahkan." };
+    }
+    
+    export async function updateServiceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Layanan", "izin service.manage diperlukan");
+      const serviceId = idValue(formData, "serviceId"); if (!serviceId) return databaseError("Layanan", "layanan tidak valid");
+      const name = textValue(formData, "name", 100); const duration = numberValue(formData, "duration"); const price = numberValue(formData, "price");
+      const additionalDuration = numberValue(formData, "additionalDuration") ?? 0;
+      if (name.length < 2 || !duration || duration < 15 || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
+      const priceMatrix = servicePriceMatrix(formData);
+      if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
+      const isActive = formData.get("isActive") === "on";
+      const { error } = await context.supabase.from("service_catalog").update({ name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), is_active: isActive, ...priceMatrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
+      if (error) return databaseError("Layanan gagal diperbarui", error.message);
+      revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil diperbarui." };
+    }
+    
+    export async function overrideGroomingLinePriceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const lineId = idValue(formData, "lineId"); const price = numberValue(formData, "price");
+      const reason = textValue(formData, "reason", 300);
+      if (!lineId || price === null || price < 0) return databaseError("Harga layanan", "harga tidak valid");
+      if (reason.length < 3) return databaseError("Harga layanan", "alasan override wajib diisi");
+      const result = await context.supabase.schema("app").rpc("override_grooming_line_price", { p_line: lineId, p_price: price, p_reason: reason });
+      if (result.error) return databaseError("Harga tidak dapat diubah", /insufficient_privilege|42501/i.test(result.error.message) ? "izin service.manage diperlukan" : result.error.message);
+      revalidatePath("/operations"); revalidatePath("/finance");
+      return { error: null, success: "Harga layanan berhasil diperbarui." };
+    }
+    
+    function resourceSettings(formData: FormData) {
+      const latitudeText = textValue(formData, "latitude", 30);
+      const longitudeText = textValue(formData, "longitude", 30);
+      const latitude = latitudeText ? Number(latitudeText) : null;
+      const longitude = longitudeText ? Number(longitudeText) : null;
+      const color = textValue(formData, "color", 7);
+      return {
+        phone: textValue(formData, "phone", 30) || null,
+        calendar_color: /^#[0-9a-f]{6}$/i.test(color) ? color : "#0f766e",
+        base_location: {
+          label: textValue(formData, "baseLabel", 160) || null,
+          latitude: latitude !== null && Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 ? latitude : null,
+          longitude: longitude !== null && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 ? longitude : null,
+        },
+      };
+    }
+    
+    async function validateResourceBranchAndMembership(context: NonNullable<Awaited<ReturnType<typeof workspace>>>, branchId: string, membershipId: string | null) {
+      const [branch, membership] = await Promise.all([
+        context.supabase.from("branches").select("id").eq("organization_id", context.organizationId).eq("id", branchId).eq("status", "active").is("deleted_at", null).maybeSingle(),
+        membershipId ? context.supabase.from("memberships").select("id").eq("organization_id", context.organizationId).eq("id", membershipId).eq("status", "active").is("deleted_at", null).maybeSingle() : Promise.resolve({ data: { id: null }, error: null }),
+      ]);
+      return Boolean(branch.data && membership.data);
+    }
+    
+    export async function createResourceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      if (!(await loadCapabilities(context.supabase))["resource.manage"]) return databaseError("Groomer", "izin resource.manage diperlukan");
+      const branchId = idValue(formData, "branchId"); const membershipId = idValue(formData, "membershipId"); const name = textValue(formData, "name", 100);
+      if (!branchId || name.length < 2) return databaseError("Groomer", "nama dan cabang wajib diisi");
+      if (!(await validateResourceBranchAndMembership(context, branchId, membershipId))) return databaseError("Groomer", "cabang atau akun staf tidak dapat diakses");
+      const { error } = await context.supabase.from("resources").insert({ organization_id: context.organizationId, branch_id: branchId, membership_id: membershipId, kind: "staff", name, capacity: 1, skills: ["grooming"], status: "active", settings: resourceSettings(formData), metadata: { created_from: "homepaw_pilot" } });
+      if (error) return databaseError("Groomer gagal dibuat", error.message);
+      revalidatePath("/catalog"); revalidatePath("/bookings"); revalidatePath("/schedule"); return { error: null, success: "Groomer berhasil ditambahkan." };
+    }
+    
+    export async function updateResourceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      if (!(await loadCapabilities(context.supabase))["resource.manage"]) return databaseError("Groomer", "izin resource.manage diperlukan");
+      const resourceId = idValue(formData, "resourceId"); const branchId = idValue(formData, "branchId"); const membershipId = idValue(formData, "membershipId");
+      const name = textValue(formData, "name", 100); const status = textValue(formData, "status", 20);
+      if (!resourceId || !branchId || name.length < 2 || !["active", "maintenance", "retired"].includes(status)) return databaseError("Groomer", "data perubahan tidak valid");
+      if (!(await validateResourceBranchAndMembership(context, branchId, membershipId))) return databaseError("Groomer", "cabang atau akun staf tidak dapat diakses");
+      const current = await context.supabase.from("resources").select("settings").eq("organization_id", context.organizationId).eq("id", resourceId).eq("kind", "staff").is("deleted_at", null).maybeSingle();
+      if (!current.data) return databaseError("Groomer", "profil tidak ditemukan");
+      const existingSettings = current.data.settings && typeof current.data.settings === "object" && !Array.isArray(current.data.settings) ? current.data.settings as Record<string, unknown> : {};
+      const { error } = await context.supabase.from("resources").update({ branch_id: branchId, membership_id: membershipId, name, status, settings: { ...existingSettings, ...resourceSettings(formData) } }).eq("organization_id", context.organizationId).eq("id", resourceId).eq("kind", "staff").is("deleted_at", null);
+      if (error) return databaseError("Groomer gagal diperbarui", error.message);
+      revalidatePath("/catalog"); revalidatePath("/bookings"); revalidatePath("/schedule"); return { error: null, success: "Profil groomer diperbarui." };
+    }
+    
+    export async function archiveResourceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      if (!(await loadCapabilities(context.supabase))["resource.manage"]) return databaseError("Groomer", "izin resource.manage diperlukan");
+      const resourceId = idValue(formData, "resourceId");
+      if (!resourceId || textValue(formData, "confirm", 10) !== "yes") return databaseError("Groomer", "konfirmasi arsip tidak valid");
+      const now = new Date().toISOString();
+      const { data: future } = await context.supabase.from("booking_resources").select("booking_id,bookings!inner(starts_at,status,deleted_at)").eq("organization_id", context.organizationId).eq("resource_id", resourceId).eq("is_active", true).gt("bookings.starts_at", now).is("bookings.deleted_at", null).not("bookings.status", "in", "(canceled,no_show,completed)").limit(1);
+      if (future?.length) return databaseError("Groomer", "masih memiliki booking aktif mendatang; pindahkan booking sebelum mengarsipkan");
+      const { error } = await context.supabase.from("resources").update({ status: "retired", deleted_at: now }).eq("organization_id", context.organizationId).eq("id", resourceId).eq("kind", "staff").is("deleted_at", null);
+      if (error) return databaseError("Groomer gagal diarsipkan", error.message);
+      revalidatePath("/catalog"); revalidatePath("/bookings"); revalidatePath("/schedule"); return { error: null, success: "Groomer diarsipkan dengan aman." };
+    }
+    
+    export async function updateResourceCompensationAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const resourceId = idValue(formData, "resourceId"); const membershipId = idValue(formData, "membershipId");
+      const payType = textValue(formData, "payType", 20); const baseAmount = numberValue(formData, "baseAmount");
+      if (!resourceId || !membershipId || !["salary", "hourly"].includes(payType) || baseAmount === null || baseAmount < 0) return databaseError("Kompensasi", "data gaji tidak valid");
+      const capabilities = await loadCapabilities(context.supabase);
+      if (!capabilities["payroll.manage"]) return databaseError("Kompensasi", "izin payroll.manage diperlukan");
+      const { data: resource } = await context.supabase.from("resources").select("id").eq("organization_id", context.organizationId).eq("id", resourceId).eq("membership_id", membershipId).eq("kind", "staff").is("deleted_at", null).maybeSingle();
+      if (!resource) return databaseError("Kompensasi", "groomer belum terhubung ke akun staf aktif");
+      const current = await context.supabase.from("staff_compensation").select("id").eq("organization_id", context.organizationId).eq("membership_id", membershipId).eq("is_active", true).is("deleted_at", null).order("effective_from", { ascending: false }).limit(1).maybeSingle();
+      const write = current.data
+        ? await context.supabase.from("staff_compensation").update({ pay_type: payType, base_amount: baseAmount, currency: "IDR" }).eq("organization_id", context.organizationId).eq("id", current.data.id)
+        : await context.supabase.from("staff_compensation").insert({ organization_id: context.organizationId, membership_id: membershipId, pay_type: payType, base_amount: baseAmount, currency: "IDR", is_active: true, metadata: { created_from: "groomer_management" } });
+      if (write.error) return databaseError("Kompensasi gagal disimpan", write.error.message);
+      revalidatePath("/catalog"); revalidatePath("/payroll"); return { error: null, success: "Kompensasi groomer disimpan." };
+    }
+    
+    export async function adjustInventoryAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const branchId = idValue(formData, "branchId"); const productId = idValue(formData, "productId"); const quantity = numberValue(formData, "quantity"); const notes = textValue(formData, "notes", 200);
+      if (!branchId || !productId || !quantity || quantity === 0) return databaseError("Inventaris", "produk, cabang, dan jumlah wajib diisi");
+      const { error } = await context.supabase.from("inventory_movements").insert({ organization_id: context.organizationId, branch_id: branchId, product_id: productId, movement_type: "adjustment", quantity, notes: notes || "Penyesuaian dari Operro", metadata: { created_from: "homepaw_pilot" } });
+      if (error) return databaseError("Penyesuaian gagal", error.message);
+      revalidatePath("/inventory"); revalidatePath("/catalog"); return { error: null, success: "Stok berhasil disesuaikan." };
+    }
+    
+    const paymentProofMimeExtensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+    
+    // Errors record_payment raises deliberately (the request definitely did not
+    // commit) — safe to report as a plain rejection and, if we freshly uploaded
+    // a proof this call, safe to clean it up. Anything NOT in this list is
+    // treated as ambiguous/transport-shaped: we do not know whether the RPC
+    // committed before the response was lost, so we check for real instead of
+    // guessing either way.
+    const PAYMENT_RPC_KNOWN_REJECTIONS = [
+      /proof_required_for_bank_transfer/, /invoice_already_paid/, /invoice_void/, /invoice_zero_due/,
+      /invalid_method/, /invalid_amount/, /invoice_not_found/, /not_authorized/,
+      /proof_attachment_not_linked_to_invoice/, /request_key_reused_with_different_inputs/,
+    ];
+    
+    function mapPaymentRpcError(message: string): string {
+      if (/proof_required_for_bank_transfer/.test(message)) return "transfer bank wajib menyertakan bukti screenshot";
+      if (/invoice_already_paid/.test(message)) return "invoice ini sudah lunas";
+      if (/invoice_void/.test(message)) return "invoice ini sudah dibatalkan";
+      if (/invoice_zero_due/.test(message)) return "invoice ini tidak memiliki tagihan";
+      if (/not_authorized/.test(message)) return "Anda tidak memiliki akses ke cabang invoice ini";
+      if (/request_key_reused_with_different_inputs/.test(message)) return "permintaan ini sudah pernah dikirim dengan data berbeda — muat ulang halaman";
+      return "server tidak dapat mencatat pembayaran. Coba lagi.";
+    }
+    
+    type ProofResult = { id: string; storagePath: string; freshlyUploaded: boolean } | { error: string } | null;
+    
+    /**
+     * Uploads (or reuses) the proof for ONE logical payment submission. The
+     * storage path is DETERMINISTIC from requestKey — `${org}/payments/${requestKey}.ext`
+     * — so a genuine retry of the same submission always resolves to the SAME
+     * object and the SAME attachments/attachment_links rows instead of
+     * uploading a fresh, orphaned copy every attempt (which is what made
+     * app.record_payment's changed-input detection reject legitimate retries:
+     * a new random attachment id every submission looks like a changed input).
+     * If a prior attempt already got the attachment row (or even just the
+     * upload) done, this reuses it and never re-uploads or re-links.
+     */
+    async function ensurePaymentProof(
+      context: { supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never; organizationId: string; userId: string },
+      invoiceId: string, requestKey: string, proofFile: FormDataEntryValue | null,
+    ): Promise<ProofResult> {
+      if (!(proofFile instanceof File) || proofFile.size === 0) return null;
+      const extension = paymentProofMimeExtensions[proofFile.type];
+      if (!extension) return { error: "format harus JPG, PNG, atau WebP" };
+      if (proofFile.size > 4 * 1024 * 1024) return { error: "ukuran maksimum 4 MB" };
+      const storagePath = `${context.organizationId}/payments/${requestKey}.${extension}`;
+    
+      const existing = await context.supabase.from("attachments").select("id").eq("organization_id", context.organizationId).eq("storage_path", storagePath).is("deleted_at", null).maybeSingle();
+      let attachmentId: string;
+      let freshlyUploaded = false;
+      if (existing.data) {
+        attachmentId = existing.data.id;
+      } else {
+        const upload = await context.supabase.storage.from("attachments").upload(storagePath, proofFile, { contentType: proofFile.type, upsert: true });
+        if (upload.error) return { error: `gagal diunggah: ${upload.error.message}` };
+        const attachment = await context.supabase.from("attachments").insert({
+          organization_id: context.organizationId, storage_bucket: "attachments", storage_path: storagePath,
+          filename: proofFile.name.slice(0, 200) || `bukti.${extension}`, mime_type: proofFile.type, size_bytes: proofFile.size,
+          uploaded_by: context.userId, metadata: { category: "payment_proof" },
+        }).select("id").single();
+        if (attachment.error || !attachment.data) {
+          await context.supabase.storage.from("attachments").remove([storagePath]);
+          return { error: "metadata gagal disimpan" };
+        }
+        attachmentId = attachment.data.id;
+        freshlyUploaded = true;
+      }
+      // Idempotent regardless of whether the attachment row is new or reused —
+      // covers the partial-failure case where a prior attempt created the
+      // attachment but died before linking it.
+      const link = await context.supabase.from("attachment_links").upsert(
+        { organization_id: context.organizationId, attachment_id: attachmentId, subject_type: "invoice", subject_id: invoiceId },
+        { onConflict: "attachment_id,subject_type,subject_id", ignoreDuplicates: true },
+      );
+      if (link.error) return { error: `gagal ditautkan ke invoice: ${link.error.message}` };
+      return { id: attachmentId, storagePath, freshlyUploaded };
+    }
+    
+    /**
+     * Calls app.record_payment and, on an error record_payment did NOT raise
+     * deliberately, checks whether the payment actually committed before
+     * reporting failure — a lost response must never be treated as "definitely
+     * did not happen" when it might have, because the caller (recordPaymentAction)
+     * uses "definitely did not happen" as the ONLY condition under which it is
+     * safe to delete a freshly-uploaded proof.
+     */
+    async function callRecordPayment(
+      context: { supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never; organizationId: string },
+      args: { invoiceId: string; method: string; amount: number; proofAttachmentId: string | null; requestKey: string },
+    ): Promise<{ payment: Record<string, unknown>; recovered: boolean } | { error: string; ambiguous: boolean }> {
+      const result = await context.supabase.schema("app").rpc("record_payment", {
+        p_invoice: args.invoiceId, p_method: args.method, p_amount: args.amount,
+        p_external_ref: `MANUAL-${args.requestKey}`, // deterministic: stable across retries of the same requestKey
+        p_proof_attachment: args.proofAttachmentId, p_request_key: args.requestKey,
+      });
+      if (!result.error) return { payment: result.data as Record<string, unknown>, recovered: false };
+    
+      const message = result.error.message;
+      if (PAYMENT_RPC_KNOWN_REJECTIONS.some((re) => re.test(message))) return { error: message, ambiguous: false };
+    
+      const recovered = await context.supabase.from("payments").select("*").eq("organization_id", context.organizationId).eq("request_key", args.requestKey).maybeSingle();
+      if (recovered.data) return { payment: recovered.data, recovered: true };
+      return { error: message, ambiguous: true };
+    }
+    
+    async function cleanupRejectedProof(context: { supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never; organizationId: string }, proof: ProofResult) {
+      if (!proof || "error" in proof || !proof.freshlyUploaded) return;
+      await context.supabase.from("attachment_links").delete().eq("organization_id", context.organizationId).eq("attachment_id", proof.id);
+      await context.supabase.from("attachments").delete().eq("organization_id", context.organizationId).eq("id", proof.id);
+      await context.supabase.storage.from("attachments").remove([proof.storagePath]);
+    }
+    
+    /**
+     * Records a payment through app.record_payment (section 29). Direct inserts into
+     * `payments` are revoked at the privilege layer (20260928100000_payment_control_workflow.sql)
+     * so this RPC is now the only way to record one. `requestKey` is generated once
+     * per logical submission (PaymentForm regenerates it only after an ACKNOWLEDGED
+     * success — see pilot-forms.tsx) and resubmitted unchanged on retry; every value
+     * derived from it (external_ref, the proof's storage path) is deterministic for
+     * the SAME reason: a retry must look identical to the RPC, not like a new,
+     * conflicting request.
+     */
+    export async function recordPaymentAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const invoiceId = idValue(formData, "invoiceId"); const amount = numberValue(formData, "amount"); const method = textValue(formData, "method", 30);
+      const requestKey = idValue(formData, "requestKey");
+      if (!invoiceId || !amount || amount <= 0 || !["cash", "card", "wallet", "bank_transfer", "other"].includes(method) || !requestKey) {
+        return databaseError("Pembayaran", "data tidak valid");
+      }
+    
+      const proof = await ensurePaymentProof(context, invoiceId, requestKey, formData.get("proof"));
+      if (proof && "error" in proof) return databaseError("Bukti transfer", proof.error);
+    
+      const outcome = await callRecordPayment(context, { invoiceId, method, amount, proofAttachmentId: proof?.id ?? null, requestKey });
+      if ("error" in outcome) {
+        if (!outcome.ambiguous) await cleanupRejectedProof(context, proof);
+        return databaseError("Pembayaran", mapPaymentRpcError(outcome.error));
+      }
+      revalidatePath("/finance"); revalidatePath("/dashboard"); revalidatePath("/reports");
+      return { error: null, success: outcome.recovered ? "Pembayaran ini sebelumnya sudah berhasil dicatat (dipulihkan setelah koneksi sempat terputus)." : "Pembayaran berhasil dicatat." };
+    }
+    
+    export async function recordExpenseAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const branchId = idValue(formData, "branchId"); const description = textValue(formData, "description", 160); const category = textValue(formData, "category", 80); const amount = numberValue(formData, "amount");
+      if (!branchId || description.length < 3 || !amount || amount <= 0) return databaseError("Pengeluaran", "data tidak valid");
+      const { error } = await context.supabase.from("expenses").insert({ organization_id: context.organizationId, branch_id: branchId, description, category: category || "Operasional", amount, currency: "IDR", status: "recorded", metadata: { created_from: "homepaw_pilot" } });
+      if (error) return databaseError("Pengeluaran gagal", error.message);
+      revalidatePath("/finance"); revalidatePath("/reports"); return { error: null, success: "Pengeluaran berhasil dicatat." };
+    }
+    
+    /**
+     * Sells a catalog package through app.create_package_invoice (pre-existing,
+     * 20260924120000_invoice_workflow.sql) instead of a raw customer_packages
+     * insert + the now-retired app.record_package_purchase_payment RPC (P3
+     * closeout finding: that path wrote entitlements outside any transaction
+     * shared with the payment, so a failed/retried sale could duplicate sessions,
+     * had no ledger row, and labelled every transfer legacy_unreviewed with no
+     * proof path). create_package_invoice atomically creates the order/invoice/
+     * invoice_line/customer_packages/ledger rows and is itself request_key-
+     * idempotent, so calling it twice with the same key returns the SAME invoice
+     * rather than a second one. The payment against that invoice then goes
+     * through the identical record_payment + proof pipeline as recordPaymentAction
+     * — same idempotency, same proof review workflow, no second billing engine.
+     */
+    export async function sellPackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+      const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+      const customerId = idValue(formData, "customerId"); const packageId = idValue(formData, "packageId"); const branchId = idValue(formData, "branchId");
+      const method = textValue(formData, "method", 30); const requestKey = idValue(formData, "requestKey");
+      if (!customerId || !packageId || !branchId || !["cash", "card", "wallet", "bank_transfer", "other"].includes(method) || !requestKey) return databaseError("Paket", "data tidak valid");
+      const { data: pkg } = await context.supabase.from("packages").select("id,name,price").eq("organization_id", context.organizationId).eq("id", packageId).eq("is_active", true).maybeSingle();
+      if (!pkg) return databaseError("Paket", "paket tidak ditemukan");
+    
+      const invoiceResult = await context.supabase.schema("app").rpc("create_package_invoice", {
+        p_branch: branchId, p_customer: customerId, p_package: pkg.id,
+        p_issued_at: new Date().toISOString(), p_due_at: null, p_admin_notes: null, p_request_key: requestKey,
+      });
+      if (invoiceResult.error) {
+        const message = invoiceResult.error.message;
+        if (/not_authorized/.test(message)) return databaseError("Paket", "Anda tidak memiliki akses ke cabang ini");
+        if (/customer_not_found/.test(message)) return databaseError("Paket", "pelanggan tidak ditemukan");
+        if (/package_not_found/.test(message)) return databaseError("Paket", "paket tidak ditemukan atau nonaktif");
+        return databaseError("Paket gagal dijual", message);
+      }
+      const invoice = invoiceResult.data as { id: string; total: number };
+    
+      if (Number(pkg.price) > 0) {
+        const proof = await ensurePaymentProof(context, invoice.id, requestKey, formData.get("proof"));
+        if (proof && "error" in proof) return databaseError("Bukti transfer", proof.error);
+        const outcome = await callRecordPayment(context, { invoiceId: invoice.id, method, amount: invoice.total, proofAttachmentId: proof?.id ?? null, requestKey });
+        if ("error" in outcome) {
+          if (!outcome.ambiguous) await cleanupRejectedProof(context, proof);
+          return databaseError("Paket tersimpan, tapi pembayaran gagal dicatat", mapPaymentRpcError(outcome.error));
+        }
+      }
+      revalidatePath("/programs"); revalidatePath(`/customers/${customerId}`); revalidatePath("/finance");
+      return { error: null, success: `${pkg.name} berhasil dijual.` };
+    }
+    
+    /**
+     * Payroll lifecycle. payroll_items are insert-only once written (DB trigger blocks direct
+     * update), so "recompute" deletes and reinserts while the run is still draft. Base pay
+     * comes from staff_compensation as-is. Attendance exceptions are reviewed separately;
+     * #32 will add explicit hours and adjustment rules before they affect net pay.
+     */
+    export async function recomputePayrollRunAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const periodStart = textValue(formData, "periodStart", 10); const periodEnd = textValue(formData, "periodEnd", 10);
+      if (!periodStart || !periodEnd) return;
+    
+      const { data: existingRun } = await context.supabase.from("payroll_runs").select("id,status").eq("organization_id", context.organizationId).eq("period_start", periodStart).eq("period_end", periodEnd).maybeSingle();
+      if (existingRun && existingRun.status !== "draft") return;
+    
+      let runId = existingRun?.id ?? null;
+      if (!runId) {
+        const { data: run, error: runError } = await context.supabase.from("payroll_runs").insert({ organization_id: context.organizationId, period_start: periodStart, period_end: periodEnd, status: "draft" }).select("id").single();
+        if (runError || !run) return;
+        runId = run.id;
+      } else {
+        await context.supabase.from("payroll_items").delete().eq("organization_id", context.organizationId).eq("payroll_run_id", runId);
+      }
+    
+      const [staffResult, commissionResult] = await Promise.all([
+        context.supabase.from("staff_compensation").select("membership_id,base_amount").eq("organization_id", context.organizationId).eq("is_active", true).is("deleted_at", null),
+        context.supabase.from("commission_entries").select("membership_id,commission_amount").eq("organization_id", context.organizationId).eq("status", "accrued").gte("occurred_at", periodStart).lt("occurred_at", periodEnd),
+      ]);
+      const commissionByMembership = new Map<string, number>();
+      for (const row of commissionResult.data ?? []) commissionByMembership.set(row.membership_id, (commissionByMembership.get(row.membership_id) ?? 0) + Number(row.commission_amount));
+    
+      const staff = staffResult.data ?? [];
+      if (staff.length > 0) {
+        await context.supabase.from("payroll_items").insert(staff.map((s) => {
+          const basePay = Number(s.base_amount); const commissionTotal = commissionByMembership.get(s.membership_id) ?? 0; const grossPay = Math.round((basePay + commissionTotal) * 100) / 100;
+          return { organization_id: context.organizationId, payroll_run_id: runId, membership_id: s.membership_id, base_pay: basePay, commission_total: commissionTotal, gross_pay: grossPay, net_pay: grossPay, breakdown: { base_pay: basePay, commission_total: commissionTotal } };
+        }));
+      }
+      revalidatePath("/payroll");
+    }
+    
+    export async function approvePayrollRunAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const runId = idValue(formData, "runId"); if (!runId) return;
+      const { data: items } = await context.supabase.from("payroll_items").select("gross_pay,net_pay").eq("organization_id", context.organizationId).eq("payroll_run_id", runId);
+      const totalGross = (items ?? []).reduce((sum, i) => sum + Number(i.gross_pay), 0);
+      const totalNet = (items ?? []).reduce((sum, i) => sum + Number(i.net_pay), 0);
+      await context.supabase.from("payroll_runs").update({ status: "approved", approved_at: new Date().toISOString(), total_gross: totalGross, total_net: totalNet }).eq("organization_id", context.organizationId).eq("id", runId).eq("status", "draft");
+      revalidatePath("/payroll");
+    }
+    
+    export async function markPayrollRunPaidAction(formData: FormData) {
+      const context = await workspace(); if (!context) return;
+      const runId = idValue(formData, "runId"); if (!runId) return;
+      await context.supabase.from("payroll_runs").update({ status: "paid", paid_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("id", runId).eq("status", "approved");
+      revalidatePath("/payroll");
+    }
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (/tmp/operro-s2730-gate-run/apps/web/test/booking-wizard-contract.test.ts:27:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: package coverage read is a narrow invoice-issuer RPC
+ok 12 - package coverage read is a narrow invoice-issuer RPC
+  ---
+  duration_ms: 0.220353
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 11
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 578.665802
+npm ERR! Lifecycle script `test:booking` failed with error: 
+npm ERR! Error: command failed 
+npm ERR!   in workspace: web@0.1.0 
+npm ERR!   at location: /tmp/operro-s2730-gate-run/apps/web 
+test:booking exit=1 (non-blocking, see handoff for the known baseline failure)
+=== Sun Sep 27 21:17:12 +07 2026 done, rc=0 (gate=0 lint=0 batch1a=0 batch1b=0 booking=1) ===
