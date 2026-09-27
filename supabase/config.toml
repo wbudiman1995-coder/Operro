@@ -10,17 +10,21 @@
 #   2. the custom_access_token_hook wiring (production also relies on it for active_org_id
 #      and is_platform_admin JWT claims — see supabase/migrations/20260721001400_*.sql)
 
-project_id = "operro-m13-local"
+project_id = "operro-payroll-s3233-local"
+
+# Port block reserved for Engine 3 (sections 32-33). Do not reuse: 54321-54324/54327
+# (operro-m13-local / main repo) and 54341-54344 (operro-s2730-local / Engine 2) are
+# other engines' live local stacks, verified running via `docker ps` on 2026-09-27.
 
 [api]
 enabled = true
-port = 54321
+port = 54351
 schemas = ["public", "app", "graphql_public"]
 extra_search_path = ["public", "app"]
 max_rows = 1000
 
 [db]
-port = 54322
+port = 54352
 # Supabase CLI 2.117.0 supports PostgreSQL 17 for its managed local stack.
 # run_all_gates.sh uses a separate PostgreSQL 16 container for lineage gates.
 major_version = 17
@@ -32,7 +36,11 @@ sql_paths = ["./seed.sql", "./seeds/homepaw_demo.sql", "./seeds/homepaw_home_ser
 
 [studio]
 enabled = true
-port = 54323
+port = 54353
+
+[inbucket]
+enabled = true
+port = 54354
 
 [auth]
 enabled = true
