@@ -364,4 +364,58 @@ begin
   perform pg_temp.ok(v_count = 0, 'D still has zero retention events -- C''s payout did not leak across memberships');
 end $$;
 
+-- =======================================================================
+-- ASSERTIONS: cross-tenant isolation -- a second organization's owner
+-- cannot act on this org's payroll run even by ID (RPCs scope every query
+-- on `organization_id = v_org` derived from the caller's OWN active-org
+-- JWT claim, not a client-supplied value, so a guessed/leaked run id from
+-- another tenant resolves to "not found", never a cross-tenant read/write).
+-- =======================================================================
+insert into public.organizations (id, name, slug, status) values
+  ('0f200000-0000-4000-8000-000000000002', 'Payroll Test Org 2', 'payroll-test-org-2', 'active');
+insert into public.branches (id, organization_id, name, is_default, status, timezone) values
+  ('0f200000-0000-4000-8000-0000000000a2', '0f200000-0000-4000-8000-000000000002', 'Main', true, 'active', 'Asia/Jakarta');
+insert into auth.users (id) values ('0f200000-0000-4000-8000-0000000000c8') on conflict (id) do nothing;
+insert into public.users (id, full_name, email, status) values
+  ('0f200000-0000-4000-8000-0000000000c8', 'Owner Org2', 'owner2@payroll-test.local', 'active')
+  on conflict (id) do update set full_name = excluded.full_name, email = excluded.email, status = excluded.status;
+insert into public.roles (id, organization_id, name, is_system) values
+  ('0f200000-0000-4000-8000-0000000000e8', '0f200000-0000-4000-8000-000000000002', 'Owner', true);
+insert into public.memberships (id, organization_id, user_id, role_id, status) values
+  ('0f200000-0000-4000-8000-0000000000d8', '0f200000-0000-4000-8000-000000000002', '0f200000-0000-4000-8000-0000000000c8', '0f200000-0000-4000-8000-0000000000e8', 'active');
+insert into public.role_permissions (organization_id, role_id, permission_id)
+  select '0f200000-0000-4000-8000-000000000002', '0f200000-0000-4000-8000-0000000000e8', p.id
+  from public.permissions p where p.key in ('payroll.read', 'payroll.manage', 'payroll.approve');
+insert into public.organization_modules (organization_id, module_id, enabled)
+  select '0f200000-0000-4000-8000-000000000002', m.id, true from public.modules m
+  where m.key = 'payroll' on conflict (organization_id, module_id) do update set enabled = true;
+insert into public.subscriptions (organization_id, status) values ('0f200000-0000-4000-8000-000000000002', 'active') on conflict do nothing;
+
+do $$
+declare v_org1_run uuid;
+begin
+  select id into v_org1_run from public.payroll_runs
+  where organization_id = '0f200000-0000-4000-8000-000000000001' and period_start = '2026-01-26' and period_end = '2026-02-26';
+  perform pg_temp.ok(v_org1_run is not null, 'org1''s run id resolved for the cross-tenant probe below');
+
+  perform pg_temp.act_as('0f200000-0000-4000-8000-0000000000c8', '0f200000-0000-4000-8000-000000000002');
+  begin
+    perform app.approve_payroll_run(v_org1_run);
+    perform pg_temp.ok(false, 'org2''s owner approving org1''s run id must be rejected');
+  exception when no_data_found then
+    perform pg_temp.ok(true, 'org2''s owner cannot approve org1''s run by id (run_not_found, not a cross-tenant read)');
+  end;
+  begin
+    -- org1's Groomer C membership id, requested while org2 is active: the resource
+    -- lookup is scoped to (organization_id = v_org=org2, membership_id), so it finds
+    -- nothing for an org1 membership and fails closed -- org1's actual hired_at/
+    -- retention config is never read while impersonating org2.
+    perform app.pay_retention_deposit('0f200000-0000-4000-8000-0000000000d4');
+    perform pg_temp.ok(false, 'org2''s owner paying org1''s groomer''s retention must be rejected');
+  exception when check_violation then
+    perform pg_temp.ok(sqlerrm like '%no_hire_date_on_record%', 'org2''s owner cannot pay retention for an org1 membership id (no_hire_date_on_record -- org1''s data never read)');
+  end;
+  perform pg_temp.act_as('0f200000-0000-4000-8000-0000000000c1', '0f200000-0000-4000-8000-000000000001');
+end $$;
+
 rollback;
