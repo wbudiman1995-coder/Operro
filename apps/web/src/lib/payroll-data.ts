@@ -226,7 +226,7 @@ export async function loadPayrollExportDetail(
 }
 
 export interface MyPayrollSnapshot {
-  status: string; periodStart: string; periodEnd: string; publishedAt: string; total: number;
+  staffName: string; status: string; periodStart: string; periodEnd: string; publishedAt: string; total: number;
   breakdown: PayrollBreakdown; customRows: Array<{ label: string; amount: number }>;
 }
 
@@ -236,6 +236,7 @@ export async function loadMyPayrollSnapshot(supabase: SupabaseClient): Promise<M
   if (!result.data) return null;
   const d = result.data as Record<string, unknown>;
   return {
+    staffName: (d.staffName as string) ?? "Staf",
     status: d.status as string, periodStart: d.periodStart as string, periodEnd: d.periodEnd as string,
     publishedAt: d.publishedAt as string, total: Number(d.total), breakdown: d.breakdown as PayrollBreakdown,
     customRows: (d.customRows as Array<{ label: string; amount: number }>) ?? [],

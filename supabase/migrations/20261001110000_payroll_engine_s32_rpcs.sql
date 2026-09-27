@@ -819,11 +819,13 @@ language plpgsql stable as $$
 declare
   v_org uuid := app.fn_active_organization();
   v_membership uuid;
+  v_name text;
   v_pub public.payroll_publications%rowtype;
   v_run public.payroll_runs%rowtype;
   v_item public.payroll_items%rowtype;
 begin
-  select m.id into v_membership from public.memberships m
+  select m.id, coalesce(u.full_name, u.email, 'Staf') into v_membership, v_name
+  from public.memberships m join public.users u on u.id = m.user_id
   where m.organization_id = v_org and m.user_id = auth.uid() and m.status = 'active' and m.deleted_at is null;
   if v_membership is null then return null; end if;
 
@@ -835,6 +837,7 @@ begin
   if v_run.id is null or v_item.id is null then return null; end if;
 
   return jsonb_build_object(
+    'staffName', v_name,
     'status', v_run.status, 'periodStart', v_run.period_start, 'periodEnd', v_run.period_end,
     'publishedAt', v_pub.published_at, 'breakdown', v_item.breakdown, 'total', v_item.gross_pay,
     'customRows', coalesce((
