@@ -357,15 +357,30 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
         exercised the export route AS a genuinely permission-restricted groomer. Re-verified fixed
         after the change; also re-ran gates 4-7 fresh (Section 9) to confirm no regression.
       - Full gate suite (1-7) run fresh end-to-end on the FINAL code, all green (Section 9).
-      **Still NOT done**: a populated-upgrade replay test (existing paid history surviving a
-      migration applied to an already-populated DB, distinct from the fresh-migrate GATE 4 already
-      proven), mobile 375px layout check, retention boundary tests beyond the one-payout-per-member
-      unique-index guarantee (no-term-yet/maturity-exact-boundary/already-paid/undo scenarios with
-      real fixture dates), cross-tenant negative tests (a second org's membership attempting to
-      read/act on this org's payroll — GATE 6b only tested cross-ROLE within one org), and the two
-      brief-mandated self-review passes (a written requirement trace UI->action->RPC->permission->
-      database->export; then a dedicated money/security/concurrency/upgrade/historical-behavior
-      challenge pass, distinct from the ordinary implementation work already done).
+      **Also completed since**: retention-deposit boundary tests (not-yet-eligible rejection,
+      exact hand-computed payout amount, idempotent-retry via the unique-index no-op path, no
+      cross-membership leak -- 7 new GATE 6b assertions) and cross-tenant isolation tests (a
+      second org's owner cannot approve/act on org1's payroll run by ID, cannot pay retention for
+      an org1 membership id -- 3 more GATE 6b assertions; GATE 6b is now 33/33). **Populated-
+      upgrade replay verified**: built a disposable DB with realistic PRE-EXISTING data (org,
+      staff_compensation, and three payroll_runs in draft/approved/paid status with payroll_items,
+      inserted using the schema as it existed BEFORE this engine's migrations), then applied this
+      engine's 3 migrations on top -- all pre-existing rows survived with byte-identical values,
+      the new `revision` column defaulted to 0 on old rows, and both original immutability
+      triggers (`payroll_items` block-update, `payroll_runs` freeze-after-approval) still fire
+      correctly against the pre-existing paid history after the upgrade. Evidence and exact SQL
+      in this session's transcript; not saved as a committed script (ad hoc, disposable-DB only).
+      **Real export evidence saved**: `docs/handoffs/logs/ENGINE-3-S32-S33/samples/` has an actual
+      generated `.xlsx` (verified `Microsoft Excel 2007+` via `file(1)`), `.csv`, and payslip
+      `.pdf` (verified `PDF document, version 1.3`).
+      **Mobile 375px verified**: `/payroll` (header, cycle nav, export buttons, stat cards, staff
+      card with all 9 component rows) and `/my-schedule` both render cleanly at a 375px viewport --
+      no horizontal overflow, buttons wrap, values stay right-aligned and readable, bottom mobile
+      nav visible and not overlapping content.
+      **Still NOT done**: the two brief-mandated self-review passes (a written requirement trace
+      UI->action->RPC->permission->database->export; then a dedicated money/security/concurrency/
+      upgrade/historical-behavior challenge pass, distinct from the ordinary implementation work
+      already done).
 
 ## 7. Dependencies / shared-file edit log
 
