@@ -137,6 +137,9 @@ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20260721001350_test_ass
 step "GATE 6 — package-reservation regression tests"
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20260721001350_test_reservation.sql
 
+step "GATE 6b — payroll engine tests (sections 32-33)"
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261001100000_test_payroll_engine.sql
+
 step "GATE 7 — real authenticated-role integration (incl reserve_package_session)"
 psql_db operro_gate -q -v ON_ERROR_STOP=1 -c \
   "do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role operro_gate_client login noinherit; exception when duplicate_object then null; end \$\$; alter role operro_gate_client login noinherit password 'stagingpw'; grant anon to operro_gate_client; grant authenticated to operro_gate_client; grant usage on schema public, app to anon, authenticated;"
