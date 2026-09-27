@@ -191,6 +191,14 @@ begin
   end loop;
 end $$;
 
+-- Table-level grants for the new tables (found missing by the PG16 gate
+-- harness, GATE 4 — the Supabase-managed dev stack auto-applies default
+-- privileges for new tables, which silently masked this; a bare Postgres
+-- does not). Matches the convention every prior migration follows for its
+-- own new tables (e.g. 20260917100000_customer_addresses.sql:62).
+grant select, insert, update, delete on public.manual_visits to authenticated;
+grant select, insert, update, delete on public.visit_manual_billing to authenticated;
+
 -- Organization-wide "automatic visit logging" toggle. Reuses organizations.settings
 -- jsonb (no new table) — see 20260721000200_identity_access.sql:100.
 create or replace function app.set_visit_auto_log_enabled(p_enabled boolean)

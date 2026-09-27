@@ -78,6 +78,11 @@ create policy organization_bank_accounts_write on public.organization_bank_accou
   using (app.is_platform_admin() or app.has_permission('settings.manage'))
   with check (app.is_platform_admin() or app.has_permission('settings.manage'));
 
+-- Table-level grant, matching every prior migration's own-new-table convention
+-- (found missing by the PG16 gate harness — see 20260927100000's grant block
+-- for the full explanation).
+grant select, insert, update, delete on public.organization_bank_accounts to authenticated;
+
 create or replace function app.upsert_organization_bank_account(
   p_id uuid, p_bank_name text, p_account_number text, p_account_holder text, p_is_primary boolean, p_sort_order integer)
 returns public.organization_bank_accounts language plpgsql security definer set search_path = app, public as $$

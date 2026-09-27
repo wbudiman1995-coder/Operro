@@ -27,6 +27,23 @@
 \set ON_ERROR_STOP on
 begin;
 
+-- Test-local override of auth.uid(): the real Supabase platform provides a
+-- working auth.uid() that resolves the JWT's 'sub' claim (never checked into
+-- this repo's migrations — it ships with the platform). The bare-Postgres
+-- gate harness's own stub (integration/gate_bootstrap_extensions.sql)
+-- deliberately hard-codes it to NULL, which is fine for the EXISTING gate
+-- tests (they never feed an actor column into a NOT-NULL/CHECK constraint)
+-- but trips this suite's chk_visit_manual_billing_undo the first time an
+-- RPC's auth.uid()-sourced actor column actually has to be non-null.
+-- CREATE OR REPLACE FUNCTION is transactional DDL, so this override is
+-- rolled back with everything else at the bottom of this file — it never
+-- persists, and it is harmless on the real Supabase stack (temporarily
+-- shadows the platform's own definition for the lifetime of this
+-- transaction, restored automatically on rollback).
+create or replace function auth.uid() returns uuid language sql stable as $$
+  select (nullif(current_setting('request.jwt.claims', true), '')::jsonb->>'sub')::uuid
+$$;
+
 create or replace function pg_temp.ok(cond boolean, label text) returns void language plpgsql as $$
 begin if cond then raise notice 'PASS: %', label; else raise exception 'FAIL: %', label; end if; end $$;
 create or replace function pg_temp.act_as(u uuid, o uuid) returns void language plpgsql as $$

@@ -1,0 +1,60 @@
+BEGIN
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+DO
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: create_manual_visit inserts a row
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: create_manual_visit rejects unknown customer
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: create_invoice_from_manual_visit blocked by active manual billing
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: second manual billing on same visit rejected
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: manual visit soft-deleted after billing undone
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: create_invoice_from_manual_visit is idempotent on request_key
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:204: NOTICE:  PASS: S30: manual billing rejects non-completed booking
+DO
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:204: NOTICE:  PASS: S30: manual billing recorded for completed booking with no active order
+DO
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: bank_transfer without proof rejected
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: unlinked attachment rejected as proof
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: bank_transfer payment starts awaiting_screenshot
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: payment status unaffected by review stage
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: invoice marked paid once succeeded payments cover total
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: proof attachment also linked to the payment record
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: retry with same request_key returns one row
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: retry did not insert a duplicate payment
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: changed-input retry rejected
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: bank validation blocked before screenshot confirmation
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: screenshot confirmation advances stage
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: bank validation reaches terminal stage
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: validated payment is immutable against direct UPDATE (blocked before the trigger even runs)
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: freeze trigger independently blocks editing a validated payment even bypassing the privilege revoke
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: direct table INSERT into payments blocked at the privilege layer
+DO
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:311: NOTICE:  PASS: S29: overpayment still marks invoice paid
+DO
+DO
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:311: NOTICE:  PASS: S29: overpaid_amount recorded without tripping tg_invoices_freeze
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:322: NOTICE:  PASS: S29: a payment inserted after this migration still defaults to not_applicable unless recorded via record_payment (documents the default; app code never inserts directly any more)
+DO
+DO
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:333: NOTICE:  PASS: S29: cash package-purchase payment recorded via RPC
+DO
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:359: NOTICE:  PASS: S27: two bank accounts stored
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:359: NOTICE:  PASS: S27: bank account cap of 2 enforced
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:359: NOTICE:  PASS: S27: branding tagline persisted
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:359: NOTICE:  PASS: S27: customer-notes edit correctly rejected once invoice is paid
+DO
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:411: NOTICE:  PASS: S28: assigned groomer can delete their own evidence upload
+DO
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:411: NOTICE:  PASS: S28: unassigned groomer denied deleting evidence for a job they are not assigned to
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:426: NOTICE:  PASS: Finding 7: wildcard-provisioned Owner role (the only real new-org pattern) has both new permissions
+psql:/repo/supabase/tests/S27-S30/test_backend.sql:426: NOTICE:  PASS: Finding 7: narrow Groomer role created after this migration does NOT gain payment.validate/evidence.read_all
+DO
+DO
+               result                
+-------------------------------------
+ S27-S30 BACKEND TEST SUITE COMPLETE
+(1 row)
+
+ROLLBACK
