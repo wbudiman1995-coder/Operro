@@ -1,6 +1,6 @@
 # Sections 27–30 handoff — HomePaw parity: invoice documents, grooming photos, payment control, visit management
 
-**Status as of this revision: all four milestones (M0–M4) implemented and mostly browser-verified live; final verification (PG16 gate suite, true two-session concurrency, second-organization empty-state) is the remaining work.** Do not call any of the four modules "complete" until §7's remaining checklist is closed — several real UI paths (bank-transfer proof upload via a real file picker, one customer-notes save) could not be exercised live in THIS session because of host tooling/infrastructure limits documented inline, not because the code is unverified by other means (SQL test suite + equivalent UI patterns). This file is the single entry point; it has been updated after every milestone commit.
+**Status as of this revision: IN CLOSEOUT.** An external review (Codex, at `acf5268`) reproduced a real gate failure (`run_all_gates.sh`'s `EXPECTED_MIGRATIONS` never listed the four sections-27-30 migrations — fixed) and found genuine correctness/authorization defects in the payment-idempotency, payment-review-UI, package-payment, register-filtering, and storage-authorization code, plus several catalog items this handoff had marked done while a real gap remained. **Do not treat any milestone as complete while §11 (closeout findings) has open rows.** This file is the single entry point; §11 tracks the closeout pass, §1–§10 are the prior state (left intact for history, superseded where §11 says so).
 
 ## 1. Identity, paths, branch
 
@@ -213,3 +213,24 @@ Use the demo login (`wbudiman1995@gmail.com` / `operro-local-qa`, org "HomePaw D
 8. **Jadwal saya** (login sebagai `groomer@homepaw.local` / sandi sama) → pada pekerjaan yang belum selesai, coba unggah beberapa foto sekaligus ke "Dokumentasi layanan" (drag beberapa file, atau klik untuk pilih banyak). *Expected:* semua foto masuk galeri dengan label kategori dan tanggal; tombol ✕ pada setiap foto meminta konfirmasi sebelum menghapus.
 
 Any deviation from the "Expected" column is a real regression, not a flaky test — investigate before dismissing it (this handoff's own history has two examples of exactly that: §5 items 8-9).
+
+## 11. Closeout pass (Codex review of `acf5268`)
+
+Status per finding. Evidence lands under `docs/handoffs/logs/S27-S30/closeout/`.
+
+| # | Finding | Files | Status |
+|---|---|---|---|
+| Gate | `run_all_gates.sh` `EXPECTED_MIGRATIONS` never listed the 4 sections-27-30 migrations — hard `Migration lineage mismatch` before Gate 1 | `run_all_gates.sh` | **Fixed** |
+| P1 | Payment idempotency breaks at the app boundary: fresh `external_ref`/proof attachment on every submit defeats `record_payment`'s changed-input check; `PaymentForm`'s request key never advances after success | `apps/web/src/app/pilot-actions.ts`, `apps/web/src/components/pilot-forms.tsx`, migration | *(in progress)* |
+| P2 | Payment register never shows the proof being confirmed, no actor/time, confirm/validate buttons not capability-gated | `apps/web/src/components/payment-register.tsx`, `apps/web/src/lib/payment-register.ts` | *(in progress)* |
+| P3 | New package payments mislabeled `legacy_unreviewed`; obsolete package-sale-outside-invoice path duplicated the already-existing `app.create_package_invoice` | `apps/web/src/app/pilot-actions.ts`, `apps/web/src/components/pilot-forms.tsx`, migration | *(in progress)* |
+| P4 | Register hard-limits 200 rows before filtering; totals don't match the search/month scope | `apps/web/src/lib/payment-register.ts`, `apps/web/src/components/payment-register.tsx` | *(in progress)* |
+| S1 | Storage UPDATE/DELETE for grooming evidence still open to any `booking.update` holder org-wide; evidence-delete RPC doesn't verify the attachment is actually grooming evidence before deleting; payment-proof isolation not guaranteed | migration | *(in progress)* |
+| C1 | Brand logo: text-only, no real upload | `settings/documents`, migration | *(in progress)* |
+| C2 | Before/after: one zone + dropdown, not two labeled zones | `grooming-evidence-form.tsx` | *(in progress)* |
+| C3 | Evidence history: no cross-job page | — | *(in progress)* |
+| C4 | Notes: customer_notes is a fresh free-text field, not sourced from `grooming_jobs.groomer_notes` with an explicit review/copy step | `invoice-customer-notes-editor.tsx`, migration | *(in progress)* |
+| C5 | Document pages: never verified against a real invoice with lines/photos/terms | fixtures + PDF inspection | *(in progress)* |
+| C6 | Auto-visit setting: persists, nothing reads it | `visit-register.ts` | *(in progress)* |
+| C7 | Visit invoicing: `invoicedStatus`/`invoiceId` derived from order existence, not a real non-void invoice; pet filter compares names not IDs; 300-row cap | `lib/visit-register.ts` | *(in progress)* |
+| C8 | Package balance: metadata match only, not canonical ledger linkage | `lib/invoice-document.ts` | *(in progress)* |
