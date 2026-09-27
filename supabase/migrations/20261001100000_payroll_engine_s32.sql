@@ -328,6 +328,7 @@ create table public.payroll_publications (
   published_at    timestamptz   not null default now(),
   published_by    uuid,
   updated_at      timestamptz   not null default now(),
+  created_by      uuid, updated_by uuid,
   constraint pk_payroll_publications primary key (id),
   constraint fk_pp_organizations foreign key (organization_id)
     references public.organizations (id) on delete cascade,
@@ -345,43 +346,27 @@ create trigger trg_pp_audit after insert or update or delete on public.payroll_p
   for each row execute function app.tg_write_audit();
 
 -- =====================================================================
--- SECTION 11 — payroll_operation_log: idempotency for financial mutations.
--- A retry with the SAME key returns the stored result without re-running
--- the mutation; a unique-key violation on insert is caught and treated as
--- "already applied", not surfaced as a failure (brief requirement: a
--- unique-key violation is not itself a successful idempotent response --
--- the RPC must re-fetch and return the ORIGINAL result on conflict).
--- =====================================================================
-create table public.payroll_operation_log (
-  id                uuid          not null default app.fn_uuid_v7(),
-  organization_id   uuid          not null,
-  operation         text          not null,   -- approve | pay | undo_pay | retention_payout | retention_undo
-  idempotency_key   text          not null,
-  payroll_run_id    uuid,
-  membership_id     uuid,
-  request_fingerprint jsonb       not null default '{}'::jsonb,
-  result            jsonb         not null default '{}'::jsonb,
-  created_at        timestamptz   not null default now(),
-  created_by        uuid,
-  constraint pk_payroll_operation_log primary key (id),
-  constraint fk_pol_organizations foreign key (organization_id)
-    references public.organizations (id) on delete cascade,
-  constraint uq_pol_org_operation_key unique (organization_id, operation, idempotency_key)
-);
-create trigger trg_pol_created_by before insert on public.payroll_operation_log
-  for each row execute function app.tg_set_created_by();
-create trigger trg_pol_block_update before update on public.payroll_operation_log
-  for each row execute function app.tg_block_update();
-create trigger trg_pol_block_delete before delete on public.payroll_operation_log
-  for each row execute function app.tg_block_hard_delete();
-
--- =====================================================================
 -- SECTION 099 — RLS: enable + org isolation (0010 pattern) on every new
 -- table. Restrictive module/capability policies are added in the next
 -- migration alongside the RPCs, once the exact write surface (which
 -- tables get direct payroll.manage writes vs RPC-only) is finalized by
 -- those RPC definitions -- kept together so the privilege model and the
 -- functions that rely on it ship as one reviewable unit.
+--
+-- NOTE ON IDEMPOTENCY (no separate request-id ledger table): this codebase's
+-- established convention for idempotent financial/state mutations is a
+-- natural-state or natural-unique-constraint check, never a generic
+-- request-id log -- see app.fn_accrue_commission ("if exists ... return"),
+-- app.consume_package_reservation ("if already consumed return"), and
+-- app.complete_booking ("if already completed, return the same success").
+-- The payroll lifecycle RPCs in the next migration follow the same pattern:
+-- row-lock the aggregate first (serializes concurrent callers), then check
+-- payroll_runs.status / the retention payout's own unique index for
+-- "already done" before doing any work, and treat a caught unique_violation
+-- as an idempotent success (re-fetch and return the existing result) rather
+-- than a failure -- satisfying the brief's idempotency requirements with the
+-- mechanism this repository already uses everywhere else, instead of a
+-- second, inconsistent one.
 -- =====================================================================
 alter table public.payroll_cycle_settings   enable row level security;
 alter table public.staff_payroll_settings   enable row level security;
@@ -389,6 +374,5 @@ alter table public.payroll_item_overrides   enable row level security;
 alter table public.payroll_custom_rows      enable row level security;
 alter table public.payroll_retention_events enable row level security;
 alter table public.payroll_publications     enable row level security;
-alter table public.payroll_operation_log    enable row level security;
 
 commit;

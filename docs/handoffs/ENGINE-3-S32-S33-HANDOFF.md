@@ -302,9 +302,22 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
 
 ## 6. Checkpoints
 
-- [ ] Checkpoint 1: Cycle & calculation (spec, settings UI, cycle nav, calculation engine, fixtures)
-- [ ] Checkpoint 2: Controls & snapshots (draft edits, compute/approve/pay/undo, immutable snapshots, retention, security/transaction tests)
-- [ ] Checkpoint 3: Publication & exports (groomer access, publish/hide, XLSX/CSV/PDF)
+- [x] Checkpoint 1 (backend half): calculation engine — `supabase/migrations/20261001100000_payroll_engine_s32.sql`
+      (schema) + `20261001110000_payroll_engine_s32_rpcs.sql` (cycle bounds, working-day stats,
+      eligible-pets/transport-shares, `compute_payroll_item`, `recompute_payroll_run`,
+      `approve/pay/undo_payroll_run`, override/custom-row RPCs, retention payout, publish/unpublish,
+      `get_my_payroll_snapshot`, RLS). Manually smoke-tested end to end against the local DB
+      (`operro-payroll-s3233-local`, ports 54351-54354): recompute → approve → pay → idempotent
+      pay-retry (no duplicate ledger entry) → undo (compensating ledger entry, run back to draft,
+      original `payroll_items` never touched) all verified; publish → groomer
+      `get_my_payroll_snapshot()` read verified; a groomer without `payroll.manage` calling
+      `recompute_payroll_run` is denied (RLS). **Still open in this checkpoint: the
+      `apps/web/src/app/payroll/page.tsx` UI, pilot-actions.ts wiring, cycle settings/per-groomer
+      override UI, and the deterministic fixture-based automated test suite** (brief section 10 —
+      independently-computed expected values, not the function checking itself) — the manual psql
+      checks above are a smoke test, not the required permanent test suite.
+- [ ] Checkpoint 2: Controls & snapshots UI (draft edit forms, approve/pay/undo buttons, security/transaction automated tests)
+- [ ] Checkpoint 3: Publication & exports (groomer-facing page, publish/hide UI, XLSX/CSV/PDF)
 - [ ] Checkpoint 4: Final acceptance (upgrade test, gates, browser E2E, consolidated evidence)
 
 ## 7. Dependencies / shared-file edit log
