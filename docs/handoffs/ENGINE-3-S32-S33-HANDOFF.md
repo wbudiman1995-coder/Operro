@@ -377,10 +377,75 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
       card with all 9 component rows) and `/my-schedule` both render cleanly at a 375px viewport --
       no horizontal overflow, buttons wrap, values stay right-aligned and readable, bottom mobile
       nav visible and not overlapping content.
-      **Still NOT done**: the two brief-mandated self-review passes (a written requirement trace
-      UI->action->RPC->permission->database->export; then a dedicated money/security/concurrency/
-      upgrade/historical-behavior challenge pass, distinct from the ordinary implementation work
-      already done).
+      **Two self-review passes completed** (brief section 10):
+
+      **Pass 1 — requirement trace, UI -> action -> RPC -> permission -> database -> export**, per
+      brief Section 4 item:
+      1. Cycle start day/nav: settings form -> `saveCycleSettingsAction` -> direct
+         `payroll_cycle_settings` update (RLS: `payroll.manage`) -> `/payroll?anchor=` reads via
+         `app.payroll_cycle_bounds`. Traced, works.
+      2. All 9 configurable components + custom rows: staff toggles ->
+         `saveStaffSettingsAction`/override forms -> `set_payroll_item_override` /
+         `upsert_payroll_custom_row` RPCs (draft-guarded, re-trigger recompute) ->
+         `payroll_item_overrides`/`payroll_custom_rows` (RPC-only write policy) -> read back into
+         the staff card. Traced, works; live-verified via the browser override test.
+      3. Per-pet flat/matrix, styling tiers, botak: `compute_payroll_item` reads
+         `staff_payroll_settings`/`payroll_cycle_settings`, canonical `service_catalog.payroll_role`
+         -- no per-pet or per-tier UI editor exists yet beyond the flat per-pet rate and the org/
+         per-groomer tier JSON set via seed/direct DB (**gap**: no admin UI to edit
+         `styling_tiers`/`per_pet_size_matrix` JSON directly -- only flat scalar fields are wired in
+         `PayrollCycleSettingsForm`/`StaffPayrollSettingsForm`. Functionally correct end-to-end,
+         just not editable from the UI yet. Flagged as a real, honest gap, not hidden.**)
+      4. Working-day/sick/late integration: `app.payroll_working_day_stats` reads
+         `resource_availability`/`branch_availability_blocks`/`attendance_records` directly (no
+         separate UI action needed, it's derived, not entered) -- traced, live-verified (Groomer A's
+         seeded late record correctly zeroed the no-late bonus).
+      5. Eligibility/drill-down/missing queue: `app.payroll_eligible_pets` /
+         `app.payroll_missing_invoice_pets` -> rendered in the missing-queue section with a working
+         "Buka booking" link -- traced, works; RLS: same `payroll.read` gate as the rest of the page.
+      6. Draft edit / immutable paid / mark-paid / undo: full chain traced above (Section 6/9) and
+         browser-verified end to end.
+      7. Retention: button -> `payRetentionDepositAction` -> `pay_retention_deposit` RPC ->
+         `payroll_retention_events` (RPC-only) -- traced and now test-covered (33 assertions
+         include retention); **not yet clicked through the live UI** (button exists, RPC proven at
+         SQL level, browser click not attempted this session -- honest gap).
+      8. Publish/hide: traced and browser-verified both directions (admin publish -> groomer sees it
+         live; the reverse "hide" click was exercised at the RPC layer via GATE 6b-adjacent manual
+         psql testing earlier in this session, not re-clicked live in this final pass -- honest gap).
+      Section 33 exports: traced and browser-verified for all three formats, including the
+      self-payslip RLS bug found and fixed via this exact trace.
+
+      **Pass 2 — money/security/concurrency/upgrade/historical-behavior challenge**: this pass is
+      what FOUND AND FIXED three real bugs (all three verified via a full fresh PG16 migrate +
+      GATE 6b rerun after each, 33/33 every time, no regression):
+      1. **Currency**: `recompute_payroll_run`'s first-time INSERT never set `currency`, so every
+         new run silently took `payroll_runs`' original `'USD'` table default from migration 0009
+         (predates this engine) regardless of the org's real currency -- verified live (a HomePaw
+         Demo/IDR org's run showed `currency='USD'` in the database before the fix). The UI/exports
+         never displayed the wrong currency (they hardcode IDR formatting), but the STORED value
+         was wrong, and it flows directly into the `financial_ledger` entry written on pay -- a real
+         accounting-record bug. Fixed: resolves from `organizations.settings->>'currency'`, falling
+         back to the org's most common active `staff_compensation.currency`. Also added the guard
+         the brief explicitly asks for -- a membership whose compensation currency doesn't match
+         the run's now raises `currency_mismatch` instead of being silently summed in.
+      2. **Null-matrix hazard**: a `{"small": null}` per-pet size-matrix entry would NULL-poison the
+         running per-pet total for every subsequent pet-size group in the same computation, silently
+         zeroing unrelated pets' pay. Not reachable through today's UI (no size-matrix editor is
+         wired up yet), but a real latent hazard once one is added; fixed cheaply with a coalesce
+         fallback to the flat rate for just that one size group.
+      3. **First-recompute race**: two concurrent recomputes for a period with no `payroll_runs` row
+         yet could both observe "no row" before either commits; the exclusion constraint already
+         prevented a duplicate row, but the loser got a raw, unhandled `exclusion_violation` instead
+         of the existing run -- not a money-loss or security issue, but not the graceful idempotent
+         response financial mutations should give under a race either. Fixed: catches that specific
+         exception and adopts the winner's already-committed run.
+      Also confirmed (no fix needed): transport shares always sum to exactly the pool (tested at
+      n=2, hand-verified at n=3 by inspection of the row_number-based remainder assignment); paid
+      runs stay immutable under direct-table-write attempts even after this engine's migrations
+      were applied on top of pre-existing paid history (Section 9's populated-upgrade proof);
+      concurrent recompute/approve/pay/undo on the SAME existing run serialize correctly via the
+      `for update` lock each RPC takes first (reasoned from the code path, not stress-tested with
+      real concurrent sessions -- GATE 8's concurrency harness was not run, Section 9).
 
 ## 7. Dependencies / shared-file edit log
 
