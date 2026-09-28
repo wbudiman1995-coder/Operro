@@ -32,7 +32,7 @@ The authoritative, independently-computed-expected-values test suite lives at
 `supabase/tests/20261001100000_test_payroll_engine.sql` (33 assertions covering styling tiers,
 botak stacking, the transport-split bugfix, per-pet size matrix, the full lifecycle, retention,
 and cross-tenant isolation) and is registered as `GATE 6b` in `run_all_gates.sh`. Run it against
-any Postgres 16+ instance with all migrations through `20261001120000` applied:
+any Postgres 16+ instance with all migrations through `20261010120000` applied:
 
 ```
 psql -v ON_ERROR_STOP=1 -f supabase/tests/20261001100000_test_payroll_engine.sql

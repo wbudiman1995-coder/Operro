@@ -6,7 +6,7 @@
  * - loadMyPayrollSnapshot: the groomer's own published snapshot (my-schedule page).
  *
  * All money/date decisions are computed server-side by the app.* RPCs in
- * 20261001110000_payroll_engine_s32_rpcs.sql -- this module only shapes the RPC/table
+ * 20261010110000_payroll_engine_s32_rpcs.sql -- this module only shapes the RPC/table
  * results for the UI; it does not itself decide a period boundary or compute a component.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";

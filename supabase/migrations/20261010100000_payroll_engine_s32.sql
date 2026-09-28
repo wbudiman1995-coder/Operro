@@ -1,7 +1,7 @@
 -- =====================================================================
 -- MIGRATION MANIFEST
 -- =====================================================================
--- Migration        20261001100000_payroll_engine_s32
+-- Migration        20261010100000_payroll_engine_s32
 -- Purpose          HomePaw parity section 32 (payroll engine): configurable
 --                  cycles, canonical service roles (basic_grooming/styling/
 --                  botak), org + per-groomer compensation settings with

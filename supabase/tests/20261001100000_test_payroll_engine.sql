@@ -4,7 +4,7 @@
 -- contract (docs/handoffs/ENGINE-3-S32-S33-HANDOFF.md Section 5), not by
 -- calling the function under test to generate its own expected result
 -- (brief section 10 requirement).
--- Run: apply 0001..20261001120000, then
+-- Run: apply 0001..20261010120000, then
 --   psql -v ON_ERROR_STOP=1 -f supabase/tests/20261001100000_test_payroll_engine.sql
 -- Uses a FULLY PAST period (2026-01-26..2026-02-26) so the "cap worked-days at
 -- today" rule in app.payroll_working_day_stats never truncates results,

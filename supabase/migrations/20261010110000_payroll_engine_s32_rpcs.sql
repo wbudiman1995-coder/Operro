@@ -1,10 +1,10 @@
 -- =====================================================================
 -- MIGRATION MANIFEST
 -- =====================================================================
--- Migration        20261001110000_payroll_engine_s32_rpcs
+-- Migration        20261010110000_payroll_engine_s32_rpcs
 -- Purpose          The actual payroll calculation + lifecycle RPCs
 --                  implementing docs/handoffs/ENGINE-3-S32-S33-HANDOFF.md
---                  Section 5, on top of 20261001100000's schema.
+--                  Section 5, on top of 20261010100000's schema.
 -- Objects Created  app.org_today, app.payroll_cycle_bounds,
 --                  app.payroll_working_day_stats, app.payroll_eligible_pets,
 --                  app.payroll_transport_shares, app.compute_payroll_item,
@@ -15,12 +15,12 @@
 --                  app.pay_retention_deposit, app.publish_payroll_snapshot,
 --                  app.unpublish_payroll_snapshot, app.get_my_payroll_snapshot.
 --                  Restrictive RLS capability policies for every table added
---                  in 20261001100000 (module 'payroll').
+--                  in 20261010100000 (module 'payroll').
 -- Concurrency      Every mutating RPC locks payroll_runs (`for update`) FIRST,
 --                  then re-checks state -- this serializes recompute vs
 --                  approve vs pay vs undo on the SAME run, and idempotency is
 --                  "check natural state, no-op if already done" (see the note
---                  at the end of 20261001100000), not a request-id ledger.
+--                  at the end of 20261010100000), not a request-id ledger.
 -- =====================================================================
 
 begin;
@@ -545,7 +545,7 @@ grant execute on function app.recompute_payroll_run(date, date, uuid) to authent
 -- SECTION 7 — approve / pay / undo. Row-locked on payroll_runs; each
 -- checks a natural state transition and no-ops (returns current state) if
 -- already applied, matching this codebase's established idempotency
--- pattern (see the note at the end of 20261001100000).
+-- pattern (see the note at the end of 20261010100000).
 -- =====================================================================
 create or replace function app.approve_payroll_run(p_run_id uuid)
 returns public.payroll_runs
@@ -903,7 +903,7 @@ grant execute on function app.publish_payroll_snapshot(uuid, uuid), app.unpublis
 -- tables are new, so 0010's static per-table list can't cover them; adding
 -- the identical policy shape here is additive, not a rewrite of that
 -- historical migration) PLUS restrictive capability policies (0011
--- pattern) for every table added in 20261001100000.
+-- pattern) for every table added in 20261010100000.
 -- =====================================================================
 
 -- Base permissive layer: org match + active membership (0010 SECTION 004's

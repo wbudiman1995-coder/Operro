@@ -1,5 +1,9 @@
 # Engine 3 — Sections 32-33 Payroll & Payroll Exports — Handoff
 
+## Integration note — migration version correction (Codex, 2026-09-28)
+
+This branch is called **Engine 4** in the owner's chat tracking; its Git branch, code paths, and existing evidence retain the original Engine 3 naming. Engine 2 independently created migration `20261001100000_payment_workflow_closeout.sql`. Supabase identifies migrations by their numeric version, so that version collided with this branch's `20261001100000_payroll_engine_s32.sql` when branches were combined. Before integration, Codex renamed this branch's three payroll migrations, without changing executable SQL, to `20261010100000_payroll_engine_s32.sql`, `20261010110000_payroll_engine_s32_rpcs.sql`, and `20261010120000_payroll_export_detail_rpc.sql`. The gate manifest and source/handoff references were updated accordingly. These versions were checked against the current Engine 1 and Engine 2 migration directories. Earlier gate logs are evidence for the same executable SQL under its original filenames, not a combined-branch replay. Combined-branch testing remains required. A disposable local database that applied the old payroll versions must be reset or recreated before testing the renamed migration chain; no production database applied them.
+
 Single entry point for this engine's work. Updated at every checkpoint.
 
 ## 1. Scope
@@ -311,8 +315,8 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
       by the dedicated new modules — see Section 7 for the exact shared-file edits. Added
       `payroll.approve` to `CAPABILITY_KEYS` in `authorization.ts` (was missing; the DB permission
       already existed but nothing in the frontend checked it).
-- [x] Checkpoint 1 (backend half): calculation engine — `supabase/migrations/20261001100000_payroll_engine_s32.sql`
-      (schema) + `20261001110000_payroll_engine_s32_rpcs.sql` (cycle bounds, working-day stats,
+- [x] Checkpoint 1 (backend half): calculation engine — `supabase/migrations/20261010100000_payroll_engine_s32.sql`
+      (schema) + `20261010110000_payroll_engine_s32_rpcs.sql` (cycle bounds, working-day stats,
       eligible-pets/transport-shares, `compute_payroll_item`, `recompute_payroll_run`,
       `approve/pay/undo_payroll_run`, override/custom-row RPCs, retention payout, publish/unpublish,
       `get_my_payroll_snapshot`, RLS). Manually smoke-tested end to end against the local DB
@@ -606,7 +610,7 @@ one comment fix in `supabase/seed.sql`. No edits to any other engine's migration
 4. `bash run_all_gates.sh` against a disposable PostgreSQL 16 (see Section 9 for exactly how this
    session did it, since this WSL environment has no native `psql` client).
 5. `psql -f supabase/tests/20261001100000_test_payroll_engine.sql` against any Postgres 16+ with
-   migrations through `20261001120000` applied — 33/33 assertions, rolls back, safe to re-run.
+   migrations through `20261010120000` applied — 33/33 assertions, rolls back, safe to re-run.
 
 No merge, no deployment, no PR opened per the brief's instructions — only this isolated branch,
 pushed after all of the above validation.

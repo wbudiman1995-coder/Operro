@@ -1,10 +1,10 @@
 -- =====================================================================
 -- MIGRATION MANIFEST
 -- =====================================================================
--- Migration        20261001120000_payroll_export_detail_rpc
+-- Migration        20261010120000_payroll_export_detail_rpc
 -- Purpose          Section 33 (payroll exports): the appointment-level detail
 --                  rows the XLSX/CSV export's "Detail Job" sheet needs, on top
---                  of app.payroll_eligible_pets (20261001110000). Returns raw
+--                  of app.payroll_eligible_pets (20261010110000). Returns raw
 --                  joined data only -- no money calculation happens here, so
 --                  the export can never compute a number independently of
 --                  app.compute_payroll_item / the frozen payroll_items

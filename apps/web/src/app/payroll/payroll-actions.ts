@@ -2,7 +2,7 @@
 
 /**
  * Function index: payroll lifecycle (sections 32-33), all through the app.* RPCs in
- * 20261001110000_payroll_engine_s32_rpcs.sql -- no direct table writes for anything
+ * 20261010110000_payroll_engine_s32_rpcs.sql -- no direct table writes for anything
  * that has a server-side invariant (draft-only edits, approve/pay/undo, retention,
  * publish/unpublish). Cycle settings and per-groomer settings are the two exceptions
  * (plain config, no financial-state invariant, gated by payroll.manage RLS directly).
