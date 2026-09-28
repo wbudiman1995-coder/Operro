@@ -7,7 +7,6 @@ const root = path.join(__dirname, "../../..");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/20261002090000_retention_renewal_followups.sql"), "utf8");
 const gates = fs.readFileSync(path.join(root, "run_all_gates.sh"), "utf8");
 const capabilities = fs.readFileSync(path.join(root, "apps/web/src/lib/authorization.ts"), "utf8");
-const followupRetention = fs.readFileSync(path.join(root, "apps/web/src/lib/followup-retention.ts"), "utf8");
 const followupMessages = fs.readFileSync(path.join(root, "apps/web/src/lib/followup-messages.ts"), "utf8");
 const followupActions = fs.readFileSync(path.join(root, "apps/web/src/app/followups/actions.ts"), "utf8");
 const followupsPage = fs.readFileSync(path.join(root, "apps/web/src/app/followups/page.tsx"), "utf8");
@@ -186,4 +185,24 @@ test("S35: buildWhatsAppUrl already handles 0/62/+62/international/malformed num
   assert.match(customer360, /digits\.startsWith\("0"\) \? `62\$\{digits\.slice\(1\)\}` : digits/);
   assert.match(overdueQueue, /bukan bukti pesan sudah terkirim atau dibaca/);
   assert.match(renewalQueue, /bukan invoice/);
+});
+
+/**
+ * Found live in the browser as the seeded groomer role (booking.read/update/complete only,
+ * no membership.read): visiting the renewal tab called loadRenewalQueue straight away, which
+ * throws on the RPC's 42501 denial, crashing the whole page into Next.js's generic error
+ * boundary instead of an explicit restricted state -- exactly the class of failure
+ * authorization.ts's own header comment warns against ("renders an explicit restricted state
+ * instead of a zero or an empty list"), just inverted (a denial crashing instead of a denial
+ * masquerading as empty). Fixed by checking the capability BEFORE calling the loader.
+ */
+test("S35: /followups checks booking.read/membership.read up front and renders an explicit restricted state, rather than letting the RPC's authorization denial crash the page", () => {
+  const overdueGate = followupsPage.indexOf('tab === "overdue" && !workspace.capabilities["booking.read"]');
+  const renewalGate = followupsPage.indexOf('tab === "renewal" && !workspace.capabilities["membership.read"]');
+  assert.ok(overdueGate >= 0, "expected an explicit booking.read gate before the overdue loader");
+  assert.ok(renewalGate >= 0, "expected an explicit membership.read gate before the renewal loader");
+  const overdueLoaderCall = followupsPage.indexOf("loadOverdueQueue(workspace.supabase");
+  const renewalLoaderCall = followupsPage.indexOf("loadRenewalQueue(workspace.supabase");
+  assert.ok(overdueGate < overdueLoaderCall, "the booking.read gate must run before loadOverdueQueue is ever called");
+  assert.ok(renewalGate < renewalLoaderCall, "the membership.read gate must run before loadRenewalQueue is ever called");
 });

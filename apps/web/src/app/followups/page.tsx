@@ -10,7 +10,7 @@ import Link from "next/link";
 
 import { FollowupSettingsPanel } from "@/components/followup-settings-panel";
 import { OverdueQueueList } from "@/components/overdue-queue";
-import { PageHeader } from "@/components/pilot-ui";
+import { EmptyState, PageHeader } from "@/components/pilot-ui";
 import { RenewalQueueList } from "@/components/renewal-queue";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import {
@@ -63,6 +63,29 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
   );
 
   const currentPath = buildHref(params, { tab });
+
+  if (tab === "overdue" && !workspace.capabilities["booking.read"]) {
+    return (
+      <WorkspaceShell {...workspace} activePath="/followups">
+        <PageHeader eyebrow="Retensi pelanggan" title="Follow-up & perpanjangan" description="Pelanggan yang perlu dihubungi dan membership yang perlu diperpanjang." />
+        <section className="mt-7 rounded-3xl border border-slate-200 bg-white shadow-sm">
+          {tabs}
+          <div className="p-5"><EmptyState title="Tidak memiliki akses" description="Anda memerlukan izin booking.read untuk melihat antrean hewan overdue." /></div>
+        </section>
+      </WorkspaceShell>
+    );
+  }
+  if (tab === "renewal" && !workspace.capabilities["membership.read"]) {
+    return (
+      <WorkspaceShell {...workspace} activePath="/followups">
+        <PageHeader eyebrow="Retensi pelanggan" title="Follow-up & perpanjangan" description="Pelanggan yang perlu dihubungi dan membership yang perlu diperpanjang." />
+        <section className="mt-7 rounded-3xl border border-slate-200 bg-white shadow-sm">
+          {tabs}
+          <div className="p-5"><EmptyState title="Tidak memiliki akses" description="Anda memerlukan izin membership.read untuk melihat antrean perpanjangan membership." /></div>
+        </section>
+      </WorkspaceShell>
+    );
+  }
 
   if (tab === "overdue") {
     const branchId = params.branch && UUID.test(params.branch) ? params.branch : null;

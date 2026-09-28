@@ -1,221 +1,200 @@
 # Handoff: Section 35 — Retention and renewal
 
-## Status
+## Status and implementation SHA
 
-**In progress.** This file is being kept current as milestones land, per the
-S35 brief's instruction to checkpoint continuously rather than leave only
-chat claims. See "Checklist" below for exact state.
+**Complete.** All automated gates pass (typecheck, lint, `run_all_gates.sh`
+GATE 1-8, batch1a, batch1b, the new S35 SQL behavioral suite,
+`migration_upgrade_replay.sh`). Browser verification covers the owner role,
+the groomer (no-membership-access) role, a real end-to-end renewal through
+the focused deep link, threshold persistence across reload, and a mobile
+viewport. One real production bug was found live in the browser and fixed
+(F11 — see the evidence table). See "Genuine remaining limits" for the
+precise, honest boundary of what was and was not exercised.
 
 Baseline SHA (branch point): `bbdffb9eb3563fe5f4c884c5cf186c05522d41aa`
-(sections 23-26 Codex closeout, branch `claude/sections-23-26-memberships`).
-Worktree: `E:\Claude\operro-retention-s35`. Branch:
-`claude/section-35-retention-renewal`.
+(sections 23-26 Codex closeout). Worktree: `E:\Claude\operro-retention-s35`.
+Branch: `claude/section-35-retention-renewal`.
 
 ## Requirement-to-existing-code map
 
 | Requirement | Reused from | Notes |
 |---|---|---|
-| Renewal preview/pricing/fingerprint | `app.preview_package_renewal`, `previewPackageRenewalAction` | Already gated on `membership.read` only (verified by reading the RPC body) -- no weakening needed, a read-only role can already price a renewal. |
+| Renewal preview/pricing/fingerprint | `app.preview_package_renewal`, `previewPackageRenewalAction` | Already gated on `membership.read` only -- no weakening needed. |
 | Renewal mutation | `app.renew_customer_package`, `renewCustomerPackageAction`, `MembershipManager` | Gated on `invoice.issue` + `membership.manage`. Reused unmodified; deep-linked via a new `focusMembershipId` prop, not forked. |
-| Membership row shape / mutable-field remount key | `apps/web/src/lib/membership-admin.ts`, `membership-filter-list.tsx` | Preserved; extended with fields needed for the renewal queue (recurrence_interval, ledger-derived held/consumed). |
+| Membership row shape / mutable-field remount key | `apps/web/src/lib/membership-admin.ts`, `membership-filter-list.tsx` | Preserved. |
 | Correction form date semantics | `apps/web/src/lib/membership-correction.ts`, `timezone.ts` | Reused as-is; not modified. |
-| Calendar-day math in business timezone | `zonedDaysBetween`, `zonedDayISO` (`timezone.ts`) | Reused directly in TS; SQL side uses the equivalent `(x at time zone 'Asia/Jakarta')::date` subtraction so both layers agree (documented in migration comments). |
-| WhatsApp link + encoding | `buildWhatsAppUrl` (`customer-360.tsx`) | Reused unmodified -- already handles 0/62/+62/international/malformed correctly. |
-| Org-level settings storage | `organizations.settings` jsonb (no dedicated settings table exists) | New `followup_retention` sub-key added via safe `jsonb ||` merge (never a blind full-object replace), so branding/other future keys are untouched. |
-| Settings write permission | `settings.manage` (already seeded; already used for `organizations_write` RLS) | Reused; added to `CAPABILITY_KEYS` in `authorization.ts` (was missing from the TS-side allow-list even though the DB permission existed). |
-| Audit trail for settings writes | `app.tg_write_audit` / `app.audit_log` | `organizations` never had this trigger attached (deliberately, per its own comment, since it lacks `organization_id`). The trigger already falls back to `app.fn_active_organization()` when that column is absent, so attaching it is safe reuse, not new machinery. |
+| Calendar-day math in business timezone | `zonedDaysBetween`, `zonedDayISO` (`timezone.ts`) | Reused directly in TS; SQL side uses the equivalent `(x at time zone 'Asia/Jakarta')::date` subtraction. |
+| WhatsApp link + encoding | `buildWhatsAppUrl` (`customer-360.tsx`) | Reused unmodified; confirmed live in the browser (F14). |
+| Org-level settings storage | `organizations.settings` jsonb | New `followup_retention` sub-key via safe `jsonb ||` merge, other keys untouched (proven live and in SQL, F12). |
+| Settings write permission | `settings.manage` (already seeded) | Added to `CAPABILITY_KEYS` in `authorization.ts` (was missing from the TS allow-list). |
+| Audit trail for settings writes | `app.audit_log`, explicit insert in `update_followup_retention_settings` | A generic trigger on `organizations` was tried first and reverted; it broke the seed script -- see "Errors and fixes." |
 | Tenant/branch authorization | `app.assert_tenant_authorized`, `app.has_branch` | Reused inside the two new RPCs; no bypass. |
-| Last-groomed source of truth | `grooming_job_pets` (status), `bookings` (timing) per `pilot-data.ts`'s own comment that this join is intentional | Fixed the real bug: the old loader required `bookings.status = 'completed'` (whole booking), which hides a pet that is individually `complete` while a sibling pet on the same booking is not. New logic keys off `grooming_job_pets.status = 'complete'` directly and only excludes canceled/no_show/deleted bookings. Added `grooming_job_pets.completed_at` (did not exist) since `updated_at` is re-stamped by the existing generic trigger on ANY later edit (e.g. editing instructions after completion), so it cannot be trusted as "the moment of completion." |
-| One-off vs recurring package | `packages.recurrence_interval` (`'none'` = one-off token; `week`/`month`/`year` = recurring) | Reused as the classification field; no new column. |
-| Held / available / consumed | `customer_packages.sessions_remaining` (cache) + `package_reservations` (status) + `customer_package_ledger` (consumption sum) | Same formula already used in `preview_package_renewal` (`available = sessions_remaining - reserved_count`); consumed derived from the ledger, never inferred as `total - available`. |
+| Last-groomed source of truth | `grooming_job_pets` (status), `bookings` (timing) | Fixed a real bug: old loader required `bookings.status='completed'` (whole booking), hiding a pet individually `complete` while a sibling pet on the same booking is not. Added `grooming_job_pets.completed_at` since `updated_at` is re-stamped on any later edit. |
+| One-off vs recurring package | `packages.recurrence_interval` (`'none'` = token) | Confirmed live on real seed data -- both existing HomePaw Demo packages are one-off tokens, correctly excluded from "Perlu tindakan" by default. A real recurring membership was created and sold live to prove the actionable path (see F10). |
+| Held / available / consumed | `customer_packages.sessions_remaining` + `package_reservations` + `customer_package_ledger` | Same formula as `preview_package_renewal`; consumed derived from the ledger. |
 
-## Checklist
+## Exact permission mapping
 
-- [x] Worktree/branch created from verified SHA; isolation confirmed (own
-      Supabase ports 54361-54364, own `.env.local` not yet written this
-      round, no shared containers touched).
-- [x] Requirement-to-code map (above).
-- [x] Migration `supabase/migrations/20261002090000_retention_renewal_followups.sql`:
-      `grooming_job_pets.completed_at` + stamping trigger + legacy backfill;
-      `followup_retention` settings backfill (existing orgs -> 30,
-      documented 14-day fallback for new orgs at read time);
-      `app.get_followup_retention_settings` / `app.update_followup_retention_settings`
-      (guarded write, `updated_at`-based concurrency check, placeholder
-      validation, explicit `app.audit_log` insert -- NOT a generic trigger,
-      see the migration's SECTION 2 comment for why that first attempt
-      broke the seed script and was reverted);
-      `app.list_overdue_customers` and `app.list_renewal_queue` (paginated,
-      customer-grouped, branch/tenant authorized).
-      **Verified**: applies cleanly via `supabase start` against a fresh
-      disposable local stack (all migrations + all seeds), confirmed by a
-      real `npx supabase start` run this session.
-- [x] `/followups` page rewritten (two URL-persisted tabs, settings panel,
-      search/branch/view filters as plain `<Link>`/GET-form navigation).
-- [x] `/programs/memberships?membershipId=&return=` focused deep link
-      (sanitized internal-only return path; reuses `MembershipManager`
-      unmodified via new `autoExpand`/`returnTo` props).
-- [x] Message draft UI (`overdue-queue.tsx`, `renewal-queue.tsx`): editable
-      preview, `buildWhatsAppUrl` reuse, copy-to-clipboard with failure
-      state, multi-select combined renewal draft with blocked-preview
-      handling (F09-shaped logic).
-- [x] `npm run typecheck -w apps/web` -- **clean** (0 errors), verified
-      this session after a fresh `npm install` in this worktree (git
-      worktrees do not share `node_modules`).
-- [x] `npm run -w apps/web lint` -- **clean** (0 errors), after fixing two
-      real `react-hooks/set-state-in-effect` violations this repo's custom
-      lint config hard-errors on (synchronous `setState` reachable directly
-      from a `useEffect` body) -- see the two commits' messages for the
-      exact fix in each file (deferred into a transition callback in
-      `membership-manager.tsx`; replaced with a pure derived-value +
-      manual-override pattern, no effect at all, in `renewal-queue.tsx`).
-- [x] `run_all_gates.sh`'s hardcoded `EXPECTED_MIGRATIONS` array updated to
-      include the new migration (it does a strict lineage-equality check
-      against the actual files in `supabase/migrations/` and would
-      otherwise hard-fail immediately on GATE 1 for an unrelated reason).
-- [ ] **NOT YET DONE**: `bash run_all_gates.sh` itself has not completed a
-      passing run this session (see blocker below).
-- [ ] **NOT YET DONE**: SQL behavioral tests for F01-F15 as actual
-      authenticated roles (planned as a new
-      `integration/retention_renewal_followups_smoke.sql`, following the
-      exact `pg_temp.ok`/`pg_temp.act_as`/`smoke_ids` convention already
-      used by `integration/package_lifecycle_smoke.sql` -- not yet
-      written).
-- [ ] **NOT YET DONE**: JS contract tests for the new files (planned:
-      extend `apps/web/test/package-lifecycle-contract.test.ts` or a new
-      `followup-retention-contract.test.ts`, following the existing
-      `revoke all on function ...`-bounded-slice pattern).
-- [ ] **NOT YET DONE**: `npm run test:batch1a` / `test:batch1b` re-run
-      (nothing in this change should affect them, but they have not
-      actually been re-run this session to confirm).
-- [ ] **NOT YET DONE**: `integration/migration_upgrade_replay.sh` re-run
-      against a populated database with the new migration.
-- [ ] **NOT YET DONE**: browser verification of any kind (owner, read-only
-      role, groomer/no-access, cross-org, mobile) -- the local Supabase
-      stack for THIS worktree was started successfully this session, but
-      the dev server was never started and no browser session was opened.
-- [ ] **NOT YET DONE**: final F01-F15 evidence table, push, final report.
+| Action | Permission required | Where enforced |
+|---|---|---|
+| View overdue-pet queue | `booking.read` (+ modules `crm`, `scheduling`) | `app.list_overdue_customers`; also gated in `/followups/page.tsx` before the loader runs |
+| View renewal queue | `membership.read` (+ module `membership`) | `app.list_renewal_queue`; also gated in `/followups/page.tsx` |
+| Change inactivity threshold / templates | `settings.manage` | `app.update_followup_retention_settings` |
+| Price a renewal (preview) | `membership.read` | `app.preview_package_renewal` (pre-existing, unmodified) |
+| Issue a renewal invoice | `invoice.issue` + `membership.manage` | `app.renew_customer_package` (pre-existing, unmodified) |
+| Branch-scoped visibility | `branches.all`, else `membership_branch_access` grant | `app.has_branch`, inside `list_overdue_customers` for both `p_branch` and the visit/upcoming joins |
 
-## Current blocker / exact resume point (session interrupted by usage limit)
+## F01-F15 evidence table
 
-**Where this stopped**: setting up the disposable PostgreSQL 16 gate
-container (`operro_pg16_gate`, the same docker-exec-based transport the
-S23-26 closeout used, documented in
-`E:\Claude\operro-review-s23-s26\docs\handoffs\S23-S26-HANDOFF.md`) to run
-`run_all_gates.sh` and the new SQL behavioral tests. The container was
-created (`docker run -d --name operro_pg16_gate -e POSTGRES_PASSWORD=postgres
--v /mnt/e/Claude/operro-retention-s35:/work postgres:16`), started, then
-observed to receive a "fast shutdown request" and stop on its own shortly
-after (see `docker logs operro_pg16_gate` -- ends with a clean shutdown
-sequence, cause not yet diagnosed: possibly a resource-constrained WSL2/
-Docker Desktop restart, not obviously caused by anything this session ran
-against it). A `docker start operro_pg16_gate` was issued to bring it back
-up and had not yet been confirmed successful when the session was
-interrupted.
+| ID | Result | Evidence |
+|---|---|---|
+| F01 | PASS | SQL log: "F01 30-day pet included" / "F01 29-day pet excluded" |
+| F02 | PASS | SQL log: "F02 00:30 Jakarta completion counts as exactly 1 day, got 1" |
+| F03 | PASS | SQL log: both F03 assertions |
+| F04 | PASS | SQL log: "F04 one visit with two service lines yields exactly one pet entry, got 1" |
+| F05 | PASS | SQL log: all 5 F05 assertions |
+| F06 | PASS | SQL log: both F06 assertions |
+| F07 | PASS | SQL log: all 5 F07 assertions (available=0/held=2/consumed=2) |
+| F08 | PASS | SQL log: all 9 F08 assertions |
+| F09 | PASS (SQL + JS contract) | SQL log F09 assertion (a canceled membership's own preview reports `blocking_reason`); JS test asserting `canCombine` requires zero errored previews before a combined total is shown. Not reproduced live with two real memberships, one genuinely blocked, selected together in one draft (only a single-membership live draft was exercised). |
+| F10 | **PASS (browser, real end-to-end)** | Created a real recurring package ("S35 Monthly Membership", 4 sessions/Rp400.000/monthly) in the catalog, sold it to a real seeded customer (Cynthia Tan) via the existing invoice flow, then renewed it through the focused `?membershipId=` deep link from the renewal queue: exactly one invoice (`PKR-20260928-81B6DE12`), submit button correctly disabled after success (mutable-field remount fix intact), "Kembali ke antrean" returned to a queue with refreshed balance (4/4 sessions). A combined-customer message draft was then built from a **real fetched preview** (`previewPackageRenewalAction`), correctly showing `Rp 400.000`. Double-click/retry and a stale-preview submit were not separately reproduced live this round; `renew_customer_package`/`renewCustomerPackageAction` are unmodified and already proven for those cases in the S23-26 closeout. |
+| F11 | **PASS, one real bug found and fixed live** | SQL: all F11 assertions (read-only membership.read role, branch-restricted role, zero-permission role, cross-org, no-membership-at-all). **Browser, as `groomer@homepaw.local`** (booking.read/update/complete only -- no membership.read, no settings.manage): overdue tab correctly showed real data with no settings button; **renewal tab crashed the whole page** (`Error: renewal_queue_failed:missing_permission:membership.read` reaching an unhandled Next.js error boundary) instead of an explicit restricted state. **Fixed** in `apps/web/src/app/followups/page.tsx`: both tabs now check `booking.read`/`membership.read` explicitly before calling either loader, rendering "Tidak memiliki akses" otherwise -- matching this codebase's own documented convention in `authorization.ts`. **Re-verified live after the fix**: reloading `/followups?tab=renewal` as the groomer now shows "Tidak memiliki akses -- Anda memerlukan izin membership.read untuk melihat antrean perpanjangan membership," no crash; the overdue tab still renders correctly for the same role. Covered by a new JS contract test asserting the gate runs before the loader call. |
+| F12 | PASS | SQL log: all 3 F12 assertions + 4 validation rejections. Also live: threshold changed 14 -> 5 -> 1 across real page reloads (owner role), persisted correctly each time. |
+| F13 | PASS | SQL log: all 4 F13 assertions (1104 total groups, page-size-100 pagination, final page reachable, large-single-customer-group truncation count). |
+| F14 | PASS (SQL + browser) | SQL log: special-character customer name (`Cust F14 O'Brien & Co` + emoji) and a malformed phone preserved verbatim. Browser: a real draft for customer "Cynthia Tan" / pet "Bubu" produced correct interpolation and a correctly-encoded `wa.me` URL (`https://wa.me/6281210000301?text=...`); the clipboard-copy failure path was exercised live (this sandboxed browser blocks `navigator.clipboard`), showing the designed fallback message rather than a false success. |
+| F15 | PASS (live, partial) | Threshold save+reload persistence confirmed live twice (5 -> reload -> 5; 1 -> reload -> 1). **Org switch was attempted but the seeded owner account has only one organization** (`/organizations` auto-redirects straight to the dashboard), so a second/empty-organization view could not be reached live with the available seed data -- tenant isolation itself is separately proven in SQL (F11's cross-org assertions, real RLS/RPC authorization, not a service-role shortcut). Mobile viewport (375x812) checked on both tabs: no horizontal overflow, filters/buttons wrap and remain usable; one minor cosmetic note -- on the renewal tab, the search input and the "Tampilkan token sekali pakai" checkbox share a row and the input's placeholder text truncates at this width (still fully functional, not a blocking issue, not required by any specific F-item). |
 
-**Exact next commands to resume, from `E:\Claude\operro-retention-s35`**:
+## Errors and fixes (this session)
 
-```bash
-wsl -d Ubuntu -- bash -lc "docker ps -a --filter name=operro_pg16_gate --format '{{.Names}} {{.Status}}'"
-# If not running:
-wsl -d Ubuntu -- bash -lc "docker start operro_pg16_gate && sleep 2 && docker exec operro_pg16_gate pg_isready -U postgres"
-# If it keeps dying, recreate it (safe -- disposable, no data to lose):
-wsl -d Ubuntu -- bash -lc "docker rm -f operro_pg16_gate; docker run -d --name operro_pg16_gate -e POSTGRES_PASSWORD=postgres -v /mnt/e/Claude/operro-retention-s35:/work postgres:16"
-```
+- **`organizations` audit trigger broke the seed script.** First attempt attached the generic `app.tg_write_audit` trigger to `organizations`. `app.fn_active_organization()` returns NULL outside an authenticated session, violating `audit_log.organization_id`'s NOT NULL constraint during seeding. Fixed with an explicit `app.audit_log` insert inside `update_followup_retention_settings` itself.
+- **Docker/WSL transport instability**: the PG16 gate container, and separately this worktree's own Supabase stack, were repeatedly observed to stop or restart between *separate* tool invocations even though stable within one continuous script; container auto-restarts were also observed independent of any command this session issued (likely host/Docker Desktop resource contention, given ~40 containers were running concurrently across this machine's several worktree stacks). Fixed the gate/test runs by wrapping each in a single shell script (`docs/handoffs/logs/S35/run_*.sh`) that starts/verifies the container and runs the actual test in one uninterrupted process. For final shutdown, stopped this worktree's Supabase containers by exact name (`docker stop supabase_*_operro-retention-s35-local`) rather than `supabase stop`, after discovering that running `supabase stop` concurrently with reverting `supabase/config.toml` raced and caused it to resolve the wrong project id.
+- **`psql`/`createdb`/`dropdb` wrappers didn't pass `PGUSER`/`PGPASSWORD`** into the container (`docker exec` doesn't inherit env), defaulting to OS user `root`. Fixed with explicit `-e PGUSER=postgres -e PGPASSWORD=postgres`.
+- **GATE 8 needs `/tmp` bind-mounted** (its concurrency harness references host temp paths through the `psql` wrapper). Fixed with `-v /tmp:/tmp`.
+- **Real SQL smoke-test bugs found while iterating** (all in the new test file, none in the migration): malformed UUIDs using invalid hex letters; a stale-planner-statistics slowdown after a 2200-row bulk insert (fixed with explicit `ANALYZE`, matching what a real deployment's autovacuum would already have done for organically-grown data); a fixture double-counting `sessions_remaining` against the ledger-apply trigger; a fixture referencing `bookings.pet_id`, a column a prior migration (20260721001300) already dropped; a search-term fixture mismatch; and a test-methodology fix for F12 (Postgres freezes `now()` for a whole transaction, so two sequential writes can't be told apart by timestamp within one script -- restructured to prove the guard's actual contract instead of depending on wall-clock advancement).
+- **Real production bug found live in the browser (F11)**: the renewal tab crashed instead of denying gracefully for the groomer role. Fixed and re-verified live -- see F11 row above.
 
-Then, once the container is confirmed healthy (`pg_isready` returns
-"accepting connections"):
+## Cross-engine migration note (out of S35 scope, flagged per explicit request)
 
-1. Run `bash run_all_gates.sh` with `PGHOST`/`PGPORT` etc. routed into the
-   container via the same tiny `psql`/`createdb`/`dropdb` PATH-wrapper
-   approach the S23-26 closeout used (wrappers that `exec docker exec -i -w
-   /work operro_pg16_gate <realcmd> "$@"`, with `RUN_AS_POSTGRES=0` so the
-   script's own `run_as_postgres` helper does not additionally try `su
-   postgres` on the WSL host, which has no such user). GATE 7/8's
-   concurrency harness specifically needs the harness directory `docker
-   cp`'d into the container and run via `docker exec ... bash
-   run_concurrency_assembly.sh` with `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/<db>`
-   (container-internal loopback), per the S23-S26 handoff's own note on
-   why a plain host-side wrapper is not enough for that one step.
-2. Write `integration/retention_renewal_followups_smoke.sql` (new file,
-   not started yet) covering F01-F09, F12-F14 as real fixtures/RPC calls
-   against two organizations, a `membership.read`-without-`membership.manage`
-   role (already proven possible in this codebase -- see the S23-26
-   closeout's `read-only-membership.png` evidence and its role setup in
-   `package_lifecycle_smoke.sql`), a branch-restricted user, and a
-   no-module/no-permission user. Run it via
-   `docker exec -i operro_pg16_gate psql -U postgres -d operro_gate <
-   integration/retention_renewal_followups_smoke.sql` against the same
-   `operro_gate` database `run_all_gates.sh`'s GATE 4 already builds with
-   the full migration lineage (no need for a third throwaway database).
-3. F10, F11, F15 are best proven live (real renewal double-click/retry,
-   real org switch, real correction-panel revisit) -- do these in the
-   browser verification pass (step 6 below), not only in SQL.
-4. Extend `integration/migration_upgrade_replay.sh` or confirm it still
-   passes unmodified (this migration only ADDS a column + two backfills +
-   new functions; it should not need the byte-identical-content-hash
-   strengthening the S23-26 closeout added for a DIFFERENT migration, but
-   verify by actually running it, not by assuming).
-5. JS contract tests: add a bounded slice (own `revoke all on function
-   app.list_overdue_customers...` / `app.list_renewal_queue...` /
-   `app.update_followup_retention_settings...` anchors) to
-   `apps/web/test/package-lifecycle-contract.test.ts` or a new
-   `followup-retention-contract.test.ts`, then run
-   `npm run test:batch1b -w apps/web` (add the new file to that script's
-   file list in `apps/web/package.json` if it is a new file) and confirm
-   `test:batch1a` is unaffected.
-6. Browser verification: start this worktree's own dev server
-   (`.env.local` pointing at `http://127.0.0.1:54361` /
-   `sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH`, printed by the
-   `supabase start` output already captured this session) via the Bash
-   tool's `run_in_background: true` (the WSL-backgrounding gotcha from the
-   S23-26 session applies here too -- do not use a bare `(cmd &)` inside a
-   single `wsl` invocation, it does not survive). Then exercise, as real
-   browser sessions: owner (settings threshold change + reload persistence
-   at the exact boundary; overdue queue with a multi-pet customer covering
-   overdue/recent/never-groomed/future-booked; a real renewal through the
-   focused `?membershipId=` deep link with exactly one invoice and a
-   refreshed queue; message draft copy/open with a special-character
-   customer name and a malformed phone number); the seeded
-   `membership.read`-only role and the seeded `groomer@homepaw.local`
-   no-access role against both tabs and against the settings save
-   directly; switching to a second, then an empty, organization; and a
-   narrow mobile viewport.
-7. Only after all of the above: fill in the final F01-F15 evidence table
-   in this handoff with real PASS/FAIL/evidence-path entries (do not mark
-   anything PASS that was not actually run), revert `supabase/config.toml`
-   (currently modified in this worktree to ports 54361-54364 / project_id
-   `operro-retention-s35-local` -- purely a local verification
-   convenience, must be `git checkout -- supabase/config.toml`'d before
-   the final commit, exactly like the S23-26 closeout's own note), stop
-   this worktree's dev server and `npx supabase stop`, commit, push
-   `claude/section-35-retention-renewal` only, and report back.
+While finishing this closeout, a file **not created by this branch** was
+found sitting untracked in this worktree:
+`supabase/migrations/20261012100000_invoice_number_random_suffix.sql`,
+along with matching uncommitted edits to `integration/invoice_parity_smoke.sql`
+and `run_all_gates.sh`. These were **reverted from this worktree's tracked
+files** (`git checkout --`) before the final commit below and are **not
+part of this branch** -- S35 does not touch invoicing. The untracked
+migration file itself was left on disk (not deleted, since it was not
+created by this session and its purpose there is unclear) but was not
+staged or committed.
 
-## Files changed so far (this session)
+Investigation (`git log --all -- supabase/migrations/20261012100000_invoice_number_random_suffix.sql`)
+found this exact filename independently committed on **two different
+engine branches**:
+
+- `claude/sections-27-30-documents-payments-visits` (Engine 2), commit
+  `eca7bb3` -- "Fix: invoice_number can collide on back-to-back issuance
+  (UUIDv7 timestamp prefix)". Also touches `package.json` (+5 lines,
+  unrelated win32-binary fix) and `integration/invoice_parity_smoke.sql` /
+  `run_all_gates.sh` (adds the new migration to the gate's expected list).
+- `claude/sections-32-33-payroll-exports` (Engine 3), commit `cb42478` --
+  "Apply invoice number suffix fix through forward migration". Same new
+  migration file and the same `integration/invoice_parity_smoke.sql` /
+  `run_all_gates.sh` additions, but **additionally edits the already-applied
+  migration `20260924140000_invoice_discounts_charges.sql` in place**,
+  reverting an apparent prior direct edit of that file's
+  `issue_invoice_for_booking` function back to its original (buggy,
+  `substr(...,1,8)`) text -- restoring that historical migration to match
+  what was actually applied, while the real fix lives in the new forward
+  migration (correct practice; editing an *already-applied* migration
+  directly is otherwise the wrong way to ship this kind of fix).
+
+**The new migration file itself (`20261012100000_invoice_number_random_suffix.sql`)
+is byte-for-byte identical between the two branches** (`diff` confirms zero
+difference), as is the `integration/invoice_parity_smoke.sql` addition and
+the `run_all_gates.sh` line. **The only real differences are each branch's
+own unrelated extra change** (Engine 2's `package.json` fix; Engine 3's
+cleanup of the pre-existing direct edit to `20260924140000`).
+
+**Recommendation for integration**: because the new migration's filename,
+timestamp, and content are identical on both branches, applying it via
+*either* branch's merge is sufficient -- the second branch's copy of that
+one file should be dropped (not re-applied) when merging, to avoid a
+redundant `create or replace` (harmless on its own, since the function body
+is identical, but a needless duplicate migration file). Engine 2's
+`package.json` change and Engine 3's `20260924140000` cleanup are each
+real, non-duplicate changes and should both be kept from their respective
+branches. This branch (S35) does not need this migration at all and does
+not include it.
+
+## Changed-file map
 
 - `supabase/migrations/20261002090000_retention_renewal_followups.sql` (new)
 - `run_all_gates.sh` (added the new migration to `EXPECTED_MIGRATIONS`)
-- `supabase/config.toml` (local-only port/project_id override -- MUST be
-  reverted before final commit, not yet done)
-- `apps/web/src/lib/authorization.ts` (added `settings.manage` to
-  `CAPABILITY_KEYS`)
+- `apps/web/src/lib/authorization.ts` (`settings.manage` added to `CAPABILITY_KEYS`)
 - `apps/web/src/lib/followup-retention.ts` (new)
 - `apps/web/src/lib/followup-messages.ts` (new)
 - `apps/web/src/app/followups/actions.ts` (new)
-- `apps/web/src/app/followups/page.tsx` (rewritten)
-- `apps/web/src/app/programs/memberships/page.tsx` (deep-link support added)
+- `apps/web/src/app/followups/page.tsx` (rewritten; includes the F11 permission-gate fix)
+- `apps/web/src/app/programs/memberships/page.tsx` (deep-link support)
 - `apps/web/src/components/followup-settings-panel.tsx` (new)
 - `apps/web/src/components/overdue-queue.tsx` (new)
 - `apps/web/src/components/renewal-queue.tsx` (new)
 - `apps/web/src/components/membership-filter-list.tsx` (focus-row support)
-- `apps/web/src/components/membership-manager.tsx` (`autoExpand`/`returnTo`
-  props only -- the renewal/correction logic itself is untouched)
+- `apps/web/src/components/membership-manager.tsx` (`autoExpand`/`returnTo` props only)
+- `apps/web/test/followup-retention-contract.test.ts` (new, 28 assertions, in `test:batch1b`)
+- `integration/retention_renewal_followups_smoke.sql` (new, F01-F14 SQL tests)
+- `docs/handoffs/logs/S35/*.sh` and `*.log` (test-runner scripts and raw output, kept as evidence)
 
-Two checkpoint commits exist on this branch so far:
-1. `S35: checkpoint handoff with architecture plan`
-2. `S35: implement retention/renewal queues, settings, and deep link
-   (typecheck+lint clean)`
+Migration order: newest in the repository (`20261002090000`), after Engine 1's own `20260927090000`. Not related to, and does not include, the separate `20261012100000` invoice-number migration discussed above.
 
-`git status` as of this checkpoint still shows `run_all_gates.sh` and
-`supabase/config.toml` as uncommitted modifications (config.toml must be
-reverted, not committed; run_all_gates.sh's migration-list fix should be
-committed once the gates actually pass).
+## Reproduction sequence
+
+From `E:\Claude\operro-retention-s35`:
+
+```bash
+npm install
+npm run typecheck -w apps/web
+npm run -w apps/web lint
+npm run test:batch1a -w apps/web
+npm run test:batch1b -w apps/web
+bash run_all_gates.sh
+```
+
+```bash
+psql -v ON_ERROR_STOP=1 -f integration/retention_renewal_followups_smoke.sql
+bash integration/migration_upgrade_replay.sh
+```
+
+Browser verification: `supabase start` in this worktree (temporarily sets
+`supabase/config.toml` to ports 54361-54364 -- **reverted after this
+session's verification, not part of the committed state**),
+`apps/web/.env.local` -> `http://127.0.0.1:54361` with the publishable key
+`supabase start` prints, `npm run dev -w apps/web`, sign in as
+`wbudiman1995@gmail.com` / `operro-local-qa` (owner) or
+`groomer@homepaw.local` / `operro-local-qa` (no membership access).
+
+## Raw log index
+
+- `docs/handoffs/logs/S35/run_all_gates.log` -- `ALL GATES PASSED`, exit 0
+- `docs/handoffs/logs/S35/retention_renewal_followups_smoke.log` -- full F01-F14 SQL suite, final `smoke test exit=0`
+- `docs/handoffs/logs/S35/migration_upgrade_replay.log` -- `FOLLOW-ON MIGRATIONS AND COMPLETE LIFECYCLE SMOKE PASSED`, exit 0
+- `docs/handoffs/logs/S35/run_gates_via_pg16_container.sh`, `run_smoke_test.sh`, `run_upgrade_replay.sh` -- exact transport scripts used
+
+## Integration notes for Engines 2/3
+
+Not touched: `E:\Claude\operro-sections-27-30`, `E:\Claude\operro-payroll-s32-s33`,
+their branches, worktrees, containers, or databases. This worktree's local
+Supabase stack used its own isolated ports (54361-54364) and project id
+(`operro-retention-s35-local`) during verification, confirmed not colliding
+with the other engines' running stacks, and was fully stopped afterward.
+Exactly one new, uniquely-timestamped migration is included in this branch.
+See the "Cross-engine migration note" above for a separate, unrelated
+finding about Engines 2 and 3 sharing an identical migration filename.
+
+## Genuine remaining limits (reported plainly)
+
+- **No seeded role holds `membership.read` without `membership.manage`.** This exact case was proven in SQL (F11) but not driven through a live login, because no such user exists in the seed data and creating one was judged out of scope for this module. The groomer role tested live has neither permission -- a stronger, different denial case, not a substitute.
+- **Org switch to a second/empty organization could not be exercised live** -- the seeded owner account has only one organization available. Tenant isolation is proven thoroughly in SQL via real RLS/RPC authorization (F11's cross-org assertions), not by a UI observation.
+- **A genuinely blocked/errored preview inside a multi-select combined renewal draft** (F09's core interaction) was proven in a JS contract test and via the RPC correctly reporting `blocking_reason` for a canceled membership (SQL), but not reproduced live with two real memberships selected together, one of them genuinely blocked.
+- **Double-click/retry and a stale-fingerprint submit were not independently reproduced live** for the S35 deep-link path specifically; the underlying idempotency and fingerprint guarantees are unchanged from the S23-26 closeout, which did prove them live, and `renew_customer_package`/`renewCustomerPackageAction` were not modified by this branch.
+
+None of the above are known failures -- each rests on an equivalent SQL/contract proof or unmodified, previously-proven code. Listed precisely rather than folded into a blanket "done," per the brief's own instruction that a passing build does not prove a UI works.
