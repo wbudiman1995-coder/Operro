@@ -1,0 +1,57 @@
+PASS: evidence read/sign — groomerAssigned
+PASS: evidence signed-url actually fetchable — groomerAssigned — status=200
+PASS: evidence read/sign — owner
+PASS: evidence signed-url actually fetchable — owner — status=200
+PASS: evidence read/sign — groomerUnassigned — Object not found
+PASS: evidence read/sign — evidenceAdminB — Object not found
+PASS: evidence read/sign — financeOnly — Object not found
+PASS: evidence direct-storage delete — groomerUnassigned
+PASS: evidence direct-storage delete — groomerAssigned
+PASS: payment-proof read/sign — financeOnly
+PASS: payment-proof read/sign — owner
+PASS: payment-proof read/sign — groomerAssigned — Object not found
+PASS: payment-proof read/sign — evidenceAdminB — Object not found
+PASS: payment-proof update denied even for owner
+PASS: payment-proof pre-commit still readable before delete check
+PASS: record_payment succeeds for payment.manage-only persona (no booking.update)
+PASS: committed payment proof survives a delete attempt (evidence preserved) — delete call did not error, checking object presence instead
+PASS: delete_grooming_evidence rejects a payment-proof attachment (evidence admin) — not_grooming_evidence
+PASS: delete_grooming_evidence succeeds for the assigned groomer on real evidence
+PASS: assigned groomer can remove the actual bytes after RPC soft-delete
+PASS: deleted evidence bytes actually removed from storage
+PASS: fresh 1s-TTL signed URL is fetchable immediately — status=200
+PASS: 1s-TTL signed URL rejected after it expires — status=400
+
+23/23 passed.
+
+--- Notes ---
+Run against the isolated local Supabase stack (operro-s2730-local) after a
+fresh `supabase db reset` (all migrations incl. 20261001100000, 20261002100000,
+20261003100000 applied) and s1_storage_fixtures.sql applied once. This is a
+REAL run against real Auth/Storage/PostgREST over HTTP, not a SQL-only helper
+check — every persona signed in via supabase.auth.signInWithPassword and every
+read/sign/update/delete went through the actual Storage REST API.
+
+An earlier attempt (kept as a documented finding, not hidden) showed
+groomerUnassigned/evidenceAdminB/financeOnly all incorrectly ALLOWED to read
+Andi's grooming evidence. Root-caused via direct SQL impersonation
+(set_config('request.jwt.claims', ...) + calling app.fn_attachments_object_readable
+directly) to a TEST FIXTURE bug, not a policy bug: the attachments metadata row
+for the evidence object had not yet been (re-)applied via
+s1_storage_fixtures.sql, so every read fell through to the function's
+deliberate "nothing committed at this path yet" allowance (the same narrow
+mid-upload-race fallback that lets a fresh uploader read their own
+in-flight object before its attachments row exists). Once the fixture was
+applied, the same real HTTP test correctly denied all three personas — see
+the 23/23 run above. The destructive nature of the delete-evidence test
+means this script is single-shot per `supabase db reset` +
+s1_storage_fixtures.sql application: rerunning it against already-consumed
+fixtures (the evidence attachment soft-deleted, its bytes removed) will
+show the same class of false "Object not found" outcomes for an unrelated
+reason (fixture already consumed, not a policy gap) — reset and reapply
+fixtures before rerunning.
+
+Commands:
+  supabase stop --project-id operro-s2730-local && supabase start && supabase db reset
+  docker exec -i supabase_db_operro-s2730-local psql -U postgres -d postgres < docs/handoffs/logs/S27-S30/closeout/s1_storage_fixtures.sql
+  node apps/web/scripts/s1-storage-auth-check.mjs

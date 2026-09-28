@@ -5,7 +5,7 @@
  * - CustomerForm, TaskForm, ServiceForm, PackageForm, ResourceForm, InventoryForm, PaymentForm, ExpenseForm: interactive pilot forms.
  * - ActionMessage: consistent success and error feedback.
  */
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   adjustInventoryAction,
@@ -140,7 +140,33 @@ export function InventoryForm({ branches, products }: { branches: Array<{ id: st
 
 export function PaymentForm({ invoices }: { invoices: Array<{ id: string; number: string; total: number }> }) {
   const [state, action, pending] = useActionState(recordPaymentAction, initialPilotActionState);
-  return <form action={action} className="space-y-3"><select className={inputClass} name="invoiceId" required>{invoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number} · Rp{invoice.total.toLocaleString("id-ID")}</option>)}</select><div className="grid grid-cols-2 gap-3"><select className={inputClass} name="method" defaultValue="bank_transfer"><option value="cash">Tunai</option><option value="bank_transfer">Transfer</option><option value="card">Kartu</option><option value="wallet">Wallet</option><option value="other">Lainnya</option></select><input className={inputClass} type="number" min="1" step="1000" name="amount" placeholder="Jumlah Rp" required /></div><ActionMessage state={state} /><button className={buttonClass} disabled={pending || invoices.length === 0}>{pending ? "Menyimpan..." : "Catat pembayaran"}</button></form>;
+  // Generated once per form mount and resubmitted unchanged on retry — this is
+  // what makes app.record_payment's request_key idempotency actually work. A
+  // fresh key on every submit would defeat it (see recordPaymentAction). Only
+  // regenerated after an ACKNOWLEDGED success, so a second, intentional
+  // payment on the same invoice gets its own identity while an ambiguous
+  // failed attempt keeps retrying under the same one.
+  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+  const [method, setMethod] = useState("bank_transfer");
+  // Adjusting state during render (React-recommended in place of an effect):
+  // regenerate the request key the moment an acknowledged success is seen,
+  // before this render commits, so a second submit never reuses the key of
+  // the payment that just succeeded.
+  const [ackedSuccess, setAckedSuccess] = useState(state.success);
+  if (state.success !== ackedSuccess) {
+    setAckedSuccess(state.success);
+    if (state.success) setRequestKey(crypto.randomUUID());
+  }
+  return <form action={action} className="space-y-3" key={requestKey}>
+    <input type="hidden" name="requestKey" value={requestKey} />
+    <select className={inputClass} name="invoiceId" required>{invoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number} · Rp{invoice.total.toLocaleString("id-ID")}</option>)}</select>
+    <div className="grid grid-cols-2 gap-3">
+      <select className={inputClass} name="method" value={method} onChange={(event) => setMethod(event.target.value)}><option value="cash">Tunai</option><option value="bank_transfer">Transfer</option><option value="card">Kartu</option><option value="wallet">Wallet</option><option value="other">Lainnya</option></select>
+      <input className={inputClass} type="number" min="1" step="1" name="amount" placeholder="Jumlah Rp" required />
+    </div>
+    {method === "bank_transfer" ? <div className="space-y-1"><label className="text-xs font-semibold text-slate-600">Bukti transfer (wajib)</label><input className={inputClass} type="file" name="proof" accept="image/jpeg,image/png,image/webp" required /></div> : null}
+    <ActionMessage state={state} /><button className={buttonClass} disabled={pending || invoices.length === 0}>{pending ? "Menyimpan..." : "Catat pembayaran"}</button>
+  </form>;
 }
 
 export function ExpenseForm({ branches }: { branches: Array<{ id: string; name: string }> }) {

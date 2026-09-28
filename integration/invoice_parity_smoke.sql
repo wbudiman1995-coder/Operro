@@ -69,3 +69,42 @@ begin
   raise notice 'PASS preview and issued total=200, discount=20, transport fee=20, manual groomer';
 end $$;
 commit;
+
+-- Regression: two invoices issued back-to-back (no artificial delay) for the same org must not
+-- collide on invoice_number, even though both fall in the same millisecond-truncated window.
+insert into public.bookings(id,organization_id,branch_id,customer_id,booking_type,status,starts_at,ends_at,fulfillment_mode,travel_fee)
+values
+  ('0e000000-0000-4000-8000-00000000ba03','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-0000000000a1','0e000000-0000-4000-8000-0000000000f0','grooming','completed',now()-interval '1 hour',now(),'in_store',0),
+  ('0e000000-0000-4000-8000-00000000ba04','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-0000000000a1','0e000000-0000-4000-8000-0000000000f0','grooming','completed',now()-interval '1 hour',now(),'in_store',0);
+insert into public.grooming_jobs(booking_id,organization_id)
+values
+  ('0e000000-0000-4000-8000-00000000ba03','0e000000-0000-4000-8000-000000000001'),
+  ('0e000000-0000-4000-8000-00000000ba04','0e000000-0000-4000-8000-000000000001');
+insert into public.grooming_job_pets(id,organization_id,grooming_job_id,pet_id,status,sequence)
+values
+  ('0e000000-0000-4000-8000-00000000be03','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-00000000ba03','0e000000-0000-4000-8000-0000000000f1','complete',1),
+  ('0e000000-0000-4000-8000-00000000be04','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-00000000ba04','0e000000-0000-4000-8000-0000000000f1','complete',1);
+insert into public.grooming_job_pet_services(id,organization_id,grooming_job_pet_id,service_id,service_name_snapshot,quantity,unit_price_snapshot,currency)
+values
+  ('0e000000-0000-4000-8000-00000000fe03','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-00000000be03','0e000000-0000-4000-8000-000000005001','Bath',1,100,'IDR'),
+  ('0e000000-0000-4000-8000-00000000fe04','0e000000-0000-4000-8000-000000000001','0e000000-0000-4000-8000-00000000be04','0e000000-0000-4000-8000-000000005001','Bath',1,100,'IDR');
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims',json_build_object(
+  'sub','0e000000-0000-4000-8000-0000000000c1',
+  'role','authenticated',
+  'active_org_id','0e000000-0000-4000-8000-000000000001')::text,true);
+do $$
+declare v_invoice_id_a uuid; v_invoice_id_b uuid; v_number_a text; v_number_b text;
+begin
+  v_invoice_id_a:=app.issue_invoice_for_booking('0e000000-0000-4000-8000-00000000ba03',null,'[]','[]','[]',now(),now()+interval '1 day','invoice',null,'Alex',null);
+  v_invoice_id_b:=app.issue_invoice_for_booking('0e000000-0000-4000-8000-00000000ba04',null,'[]','[]','[]',now(),now()+interval '1 day','invoice',null,'Alex',null);
+  select invoice_number into v_number_a from public.invoices where id=v_invoice_id_a;
+  select invoice_number into v_number_b from public.invoices where id=v_invoice_id_b;
+  if v_number_a = v_number_b then raise exception 'invoice_number collision on back-to-back issuance: % = %',v_number_a,v_number_b; end if;
+  if right(v_number_a,8) is distinct from (select upper(right(replace(order_id::text,'-',''),8)) from public.invoices where id=v_invoice_id_a) then raise exception 'first invoice suffix is not UUIDv7 random tail: %',v_number_a; end if;
+  if right(v_number_b,8) is distinct from (select upper(right(replace(order_id::text,'-',''),8)) from public.invoices where id=v_invoice_id_b) then raise exception 'second invoice suffix is not UUIDv7 random tail: %',v_number_b; end if;
+  raise notice 'PASS back-to-back invoices got distinct numbers: % vs %',v_number_a,v_number_b;
+end $$;
+commit;

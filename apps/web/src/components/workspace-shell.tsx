@@ -58,6 +58,7 @@ const primaryNavigation: NavigationItemConfig[] = [
 
 const managementNavigation: NavigationItemConfig[] = [
   { label: "Operasional", href: "/operations", icon: GroomingIcon, permission: "booking.update" },
+  { label: "Kunjungan", href: "/visits", icon: GroomingIcon, permission: "booking.read" },
   { label: "Jadwal saya", href: "/my-schedule", icon: MyScheduleIcon, permission: "booking.read" },
   { label: "Layanan & tim", href: "/catalog", icon: CatalogIcon, anyPermission: ["service.manage", "resource.manage"] },
   { label: "Paket", href: "/programs", icon: ProgramsIcon, permission: "membership.read" },
@@ -69,6 +70,7 @@ const managementNavigation: NavigationItemConfig[] = [
   { label: "Leaderboard", href: "/leaderboard", icon: LeaderboardIcon, permission: "booking.read" },
   { label: "Follow-up", href: "/followups", icon: FollowupIcon, permission: "customer.read" },
   { label: "Keluhan", href: "/complaints", icon: TasksIcon, anyPermission: ["customer.read", "task.manage", "reports.view"] },
+  { label: "Pengaturan dokumen", href: "/settings/documents", icon: FinanceIcon, permission: "settings.manage" },
 ];
 
 function NavigationItem({

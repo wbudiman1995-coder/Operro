@@ -1,0 +1,59 @@
+BEGIN
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+DO
+NOTICE:  PASS: S30: create_manual_visit inserts a row
+NOTICE:  PASS: S30: create_manual_visit rejects unknown customer
+NOTICE:  PASS: S30: create_invoice_from_manual_visit blocked by active manual billing
+NOTICE:  PASS: S30: second manual billing on same visit rejected
+NOTICE:  PASS: S30: manual visit soft-deleted after billing undone
+DO
+NOTICE:  PASS: S30: create_invoice_from_manual_visit is idempotent on request_key
+NOTICE:  PASS: S30: manual billing rejects non-completed booking
+NOTICE:  PASS: S30: manual billing recorded for completed booking with no active order
+DO
+NOTICE:  PASS: S29: bank_transfer without proof rejected
+NOTICE:  PASS: S29: unlinked attachment rejected as proof
+NOTICE:  PASS: S29: bank_transfer payment starts awaiting_screenshot
+NOTICE:  PASS: S29: payment status unaffected by review stage
+NOTICE:  PASS: S29: invoice marked paid once succeeded payments cover total
+NOTICE:  PASS: S29: proof attachment also linked to the payment record
+NOTICE:  PASS: S29: retry with same request_key returns one row
+NOTICE:  PASS: S29: retry did not insert a duplicate payment
+NOTICE:  PASS: S29: changed-input retry rejected
+NOTICE:  PASS: S29: bank validation blocked before screenshot confirmation
+NOTICE:  PASS: S29: screenshot confirmation advances stage
+NOTICE:  PASS: S29: bank validation reaches terminal stage
+NOTICE:  PASS: S29: validated payment is immutable against direct UPDATE (blocked before the trigger even runs)
+NOTICE:  PASS: S29: freeze trigger independently blocks editing a validated payment even bypassing the privilege revoke
+NOTICE:  PASS: S29: direct table INSERT into payments blocked at the privilege layer
+DO
+NOTICE:  PASS: S29: overpayment still marks invoice paid
+NOTICE:  PASS: S29: overpaid_amount recorded without tripping tg_invoices_freeze
+DO
+DO
+NOTICE:  PASS: S29: a payment inserted after this migration still defaults to not_applicable unless recorded via record_payment (documents the default; app code never inserts directly any more)
+DO
+DO
+NOTICE:  PASS: S29: cash package-purchase payment recorded via RPC
+DO
+NOTICE:  PASS: S27: two bank accounts stored
+NOTICE:  PASS: S27: bank account cap of 2 enforced
+NOTICE:  PASS: S27: branding tagline persisted
+NOTICE:  PASS: S27: customer-notes edit correctly rejected once invoice is paid
+DO
+NOTICE:  PASS: S28: assigned groomer can delete their own evidence upload
+NOTICE:  PASS: S28: unassigned groomer denied deleting evidence for a job they are not assigned to
+DO
+NOTICE:  PASS: Finding 7: wildcard-provisioned Owner role (the only real new-org pattern) has both new permissions
+NOTICE:  PASS: Finding 7: narrow Groomer role created after this migration does NOT gain payment.validate/evidence.read_all
+DO
+DO
+               result                
+-------------------------------------
+ S27-S30 BACKEND TEST SUITE COMPLETE
+(1 row)
+
+ROLLBACK

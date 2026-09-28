@@ -52,17 +52,22 @@ export async function loadDashboardData(supabase: SupabaseClient, organizationId
   const start = new Date(now); start.setHours(0, 0, 0, 0);
   const end = new Date(start); end.setDate(end.getDate() + 1);
   const upcomingEnd = new Date(start); upcomingEnd.setDate(upcomingEnd.getDate() + 7);
-  const [bookingCount, customerCount, taskCount, paymentRows, bookingRows] = await Promise.all([
+  const [bookingCount, customerCount, taskCount, paymentRows, manualBillingRows, bookingRows] = await Promise.all([
     supabase.from("bookings").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).gte("starts_at", start.toISOString()).lt("starts_at", end.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).in("status", ["todo", "in_progress"]).is("deleted_at", null),
     supabase.from("payments").select("amount").eq("organization_id", organizationId).eq("status", "succeeded").gte("paid_at", start.toISOString()).lt("paid_at", end.toISOString()),
+    // Section 30: manual-billing revenue (a visit marked "manually billed" instead
+    // of invoiced). Never overlaps with `payments` — a source can only be actively
+    // manually billed OR invoiced, never both (enforced by the RPCs), so summing
+    // both here cannot double count.
+    supabase.from("visit_manual_billing").select("amount").eq("organization_id", organizationId).is("undone_at", null).gte("billed_at", start.toISOString()).lt("billed_at", end.toISOString()),
     supabase.from("bookings").select("id,starts_at,status,customers(display_name),grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", now.toISOString()).lt("starts_at", upcomingEnd.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null).order("starts_at").limit(6),
   ]);
-  for (const [scope, result] of [["dashboard_bookings", bookingCount], ["dashboard_customers", customerCount], ["dashboard_tasks", taskCount], ["dashboard_payments", paymentRows], ["dashboard_upcoming", bookingRows]] as const) assertResult(scope, result.error);
+  for (const [scope, result] of [["dashboard_bookings", bookingCount], ["dashboard_customers", customerCount], ["dashboard_tasks", taskCount], ["dashboard_payments", paymentRows], ["dashboard_manual_billing", manualBillingRows], ["dashboard_upcoming", bookingRows]] as const) assertResult(scope, result.error);
   return {
     bookingToday: bookingCount.count ?? 0,
-    revenueToday: (paymentRows.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
+    revenueToday: (paymentRows.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0) + (manualBillingRows.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
     activeCustomers: customerCount.count ?? 0,
     openTasks: taskCount.count ?? 0,
     upcoming: (bookingRows.data ?? []).map((row) => ({ id: row.id, startsAt: row.starts_at, status: row.status, customerName: embeddedCustomerName(row.customers), petNames: embeddedPetNames(row.grooming_jobs) })),
@@ -230,18 +235,24 @@ export async function loadFinanceWorkspace(supabase: SupabaseClient, organizatio
 
 export async function loadReportWorkspace(supabase: SupabaseClient, organizationId: string) {
   const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
-  const [bookings, payments, expenses] = await Promise.all([
+  const [bookings, payments, expenses, manualBilling] = await Promise.all([
     supabase.from("bookings").select("status,fulfillment_mode").eq("organization_id", organizationId).gte("starts_at", start.toISOString()).is("deleted_at", null),
     supabase.from("payments").select("amount,method,status").eq("organization_id", organizationId).gte("paid_at", start.toISOString()),
     supabase.from("expenses").select("amount,status").eq("organization_id", organizationId).gte("incurred_at", start.toISOString().slice(0, 10)).is("deleted_at", null),
+    // Section 30: manually billed visits are real revenue that never flows through
+    // `payments` (that's the point of the manual-billing state) - reported as its
+    // own line so it is visible, not silently folded into "revenue" and mistaken
+    // for a payment-method total.
+    supabase.from("visit_manual_billing").select("amount").eq("organization_id", organizationId).is("undone_at", null).gte("billed_at", start.toISOString()),
   ]);
-  assertResult("report_bookings", bookings.error); assertResult("report_payments", payments.error); assertResult("report_expenses", expenses.error);
+  assertResult("report_bookings", bookings.error); assertResult("report_payments", payments.error); assertResult("report_expenses", expenses.error); assertResult("report_manual_billing", manualBilling.error);
   const revenue = (payments.data ?? []).filter((row) => row.status === "succeeded").reduce((sum, row) => sum + Number(row.amount), 0);
+  const manualBilledRevenue = (manualBilling.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
   const expense = (expenses.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
   const completed = (bookings.data ?? []).filter((row) => row.status === "completed").length;
   const canceled = (bookings.data ?? []).filter((row) => ["canceled", "no_show"].includes(row.status)).length;
   const methodTotals = new Map<string, number>(); for (const row of payments.data ?? []) if (row.status === "succeeded") methodTotals.set(row.method, (methodTotals.get(row.method) ?? 0) + Number(row.amount));
-  return { revenue, expense, net: revenue - expense, totalBookings: (bookings.data ?? []).length, completed, canceled, completionRate: (bookings.data ?? []).length ? Math.round(completed / (bookings.data ?? []).length * 100) : 0, methodTotals: [...methodTotals.entries()].map(([method, total]) => ({ method, total })) };
+  return { revenue, manualBilledRevenue, expense, net: revenue + manualBilledRevenue - expense, totalBookings: (bookings.data ?? []).length, completed, canceled, completionRate: (bookings.data ?? []).length ? Math.round(completed / (bookings.data ?? []).length * 100) : 0, methodTotals: [...methodTotals.entries()].map(([method, total]) => ({ method, total })) };
 }
 
 function embeddedStaffName(value: unknown) {
@@ -515,7 +526,7 @@ export async function loadLeaderboardWorkspace(supabase: SupabaseClient, organiz
 
 export interface GroomerPerformanceDetail {
   summary: LeaderboardRow;
-  visits: Array<{ bookingId: string; startsAt: string; customerName: string; petNames: string[]; actualDurationMinutes: number | null; documented: boolean; evidenceCount: number }>;
+  visits: Array<{ bookingId: string; startsAt: string; customerName: string; petNames: string[]; actualDurationMinutes: number | null; documented: boolean; evidenceCount: number; photos: Array<{ id: string; category: string; url: string }> }>;
 }
 
 export async function loadGroomerPerformanceDetail(supabase: SupabaseClient, organizationId: string, resourceId: string, periodStart: string, periodEnd: string): Promise<GroomerPerformanceDetail | null> {
@@ -533,14 +544,31 @@ export async function loadGroomerPerformanceDetail(supabase: SupabaseClient, org
     supabase.from("attachment_links").select("attachment_id,subject_id").eq("organization_id", organizationId).eq("subject_type", "booking").in("subject_id", ownBookingIds),
   ]);
   assertResult("groomer_detail_pets", pets.error); assertResult("groomer_detail_customers", customers.error); assertResult("groomer_detail_events", events.error); assertResult("groomer_detail_links", links.error);
-  const attachmentIds = (links.data ?? []).map((link) => link.attachment_id); const attachments = attachmentIds.length ? await supabase.from("attachments").select("id,metadata").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null) : { data: [], error: null };
-  assertResult("groomer_detail_attachments", attachments.error); const categories = new Map((attachments.data ?? []).map((row) => [row.id, row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) && typeof row.metadata.category === "string" ? row.metadata.category : "other"]));
+  const attachmentIds = (links.data ?? []).map((link) => link.attachment_id); const attachments = attachmentIds.length ? await supabase.from("attachments").select("id,storage_path,metadata").eq("organization_id", organizationId).in("id", attachmentIds).is("deleted_at", null) : { data: [] as { id: string; storage_path: string; metadata: unknown }[], error: null };
+  assertResult("groomer_detail_attachments", attachments.error); const categories = new Map((attachments.data ?? []).map((row) => [row.id, row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) && typeof (row.metadata as Record<string, unknown>).category === "string" ? (row.metadata as Record<string, string>).category : "other"]));
+  // Cross-job/date evidence for this workflow (C3): reuse the SAME
+  // attachments/attachment_links records the per-job gallery already reads,
+  // batched into one signed-URL call — no duplicate photo store.
+  const nonAttendance = (attachments.data ?? []).filter((row) => categories.get(row.id) !== "attendance");
+  let signedUrlByPath = new Map<string, string>();
+  if (nonAttendance.length) {
+    const signed = await supabase.storage.from("attachments").createSignedUrls(nonAttendance.map((a) => a.storage_path), 3600);
+    if (!signed.error) signedUrlByPath = new Map((signed.data ?? []).flatMap((s) => (s.signedUrl ? [[s.path ?? "", s.signedUrl]] : [])));
+  }
+  const pathByAttachment = new Map((attachments.data ?? []).map((row) => [row.id, row.storage_path]));
   const petNames = new Map((pets.data ?? []).map((pet) => [pet.id, pet.name])); const customerNames = new Map((customers.data ?? []).map((customer) => [customer.id, customer.display_name]));
   const visits = ownBookings.map((booking) => {
     const ownEvents = (events.data ?? []).filter((event) => event.subject_id === booking.id); const started = ownEvents.find((event) => event.event_type === "booking.status_changed" && event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).to === "in_progress"); const completed = ownEvents.find((event) => event.event_type === "booking.completed");
     const rawMinutes = started && completed ? Math.round((new Date(completed.occurred_at).getTime() - new Date(started.occurred_at).getTime()) / 60000) : null; const actualDurationMinutes = rawMinutes !== null && rawMinutes >= 0 && rawMinutes <= 1440 ? rawMinutes : null;
     const ownLinks = (links.data ?? []).filter((link) => link.subject_id === booking.id); const ownCategories = new Set(ownLinks.map((link) => categories.get(link.attachment_id)));
-    return { bookingId: booking.id, startsAt: booking.starts_at, customerName: customerNames.get(booking.customer_id) ?? "Pelanggan", petNames: (petJobs.data ?? []).filter((petJob) => petJob.grooming_job_id === booking.id).map((petJob) => petNames.get(petJob.pet_id) ?? "Hewan"), actualDurationMinutes, documented: ownCategories.has("before") && ownCategories.has("after"), evidenceCount: ownLinks.length };
+    const photos = ownLinks.flatMap((link) => {
+      const category = categories.get(link.attachment_id) ?? "other";
+      if (category === "attendance") return [];
+      const path = pathByAttachment.get(link.attachment_id);
+      const url = path ? signedUrlByPath.get(path) : undefined;
+      return url ? [{ id: link.attachment_id, category, url }] : [];
+    });
+    return { bookingId: booking.id, startsAt: booking.starts_at, customerName: customerNames.get(booking.customer_id) ?? "Pelanggan", petNames: (petJobs.data ?? []).filter((petJob) => petJob.grooming_job_id === booking.id).map((petJob) => petNames.get(petJob.pet_id) ?? "Hewan"), actualDurationMinutes, documented: ownCategories.has("before") && ownCategories.has("after"), evidenceCount: ownLinks.length, photos };
   });
   return { summary, visits };
 }
