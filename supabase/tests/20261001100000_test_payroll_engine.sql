@@ -335,7 +335,7 @@ insert into public.staff_payroll_settings (organization_id, membership_id, reten
   ('0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000d5', true, 200000, 2);
 
 do $$
-declare v_event public.payroll_retention_events%rowtype; v_count int;
+declare v_event public.payroll_retention_events%rowtype; v_count int; v_ledger_before int;
 begin
   -- D: not yet eligible (tenure 1 < term 2) -> rejected, no event written.
   begin
@@ -348,9 +348,12 @@ begin
   perform pg_temp.ok(v_count = 0, 'D has no retention event recorded after the rejected attempt');
 
   -- C: eligible (tenure 3 >= term 2) -> min(term=2, tenure=3) * 200000 = 400000.
+  select count(*) into v_ledger_before from public.financial_ledger;
   v_event := app.pay_retention_deposit('0f200000-0000-4000-8000-0000000000d4');
   perform pg_temp.ok(v_event.amount = 400000, 'C retention payout = min(term_months=2, tenure=3) * 200000/month = 400000');
   perform pg_temp.ok(v_event.kind = 'payout', 'C retention event kind is payout');
+  select count(*) into v_count from public.financial_ledger;
+  v_ledger_before := v_count; -- baseline after the first (real) payout write, before the retry
 
   -- Idempotent retry: the unique index (one payout per member) is caught and the
   -- SAME event is returned, not a raw constraint error and not a second row.
@@ -358,6 +361,13 @@ begin
   perform pg_temp.ok(v_event.amount = 400000, 'C retention retry returns the SAME already-recorded amount (idempotent)');
   select count(*) into v_count from public.payroll_retention_events where membership_id = '0f200000-0000-4000-8000-0000000000d4' and kind = 'payout';
   perform pg_temp.ok(v_count = 1, 'C has exactly one payout event despite two calls -- unique index enforced, not a duplicate lump sum');
+
+  -- The retry above must not have written a second financial_ledger row for the same
+  -- payout: compare against the baseline captured right after the first (real) call,
+  -- not a hardcoded count, since whether the first call itself wrote a ledger row at
+  -- all depends on this fixture membership having an active staff_compensation row.
+  select count(*) into v_count from public.financial_ledger;
+  perform pg_temp.ok(v_count = v_ledger_before, 'C retention retry did not write a second financial_ledger row for the same payout');
 
   -- D remains unaffected by C's payout (independent per-membership eligibility).
   select count(*) into v_count from public.payroll_retention_events where membership_id = '0f200000-0000-4000-8000-0000000000d5';

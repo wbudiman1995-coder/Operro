@@ -662,3 +662,92 @@ the fresh PG16 gate replay is the authoritative migration and permission check.
 
 No combined-branch merge, PR or deployment occurred in this closeout. The local demo database
 has an approved future payroll cycle created for publish/hide browser QA; it is local-only.
+
+## 13. Retention-payout follow-up: RPC-level verification and a real ledger fix (2026-09-28)
+
+Picked up after Section 12's closeout commit (`78b812a`) landed on this same branch mid-session.
+Section 12 already covers the tier/matrix UI, publish/hide, and the recompute concurrency fix with
+live-browser evidence — this section only adds what was still open after that: the retention-payout
+button, and a second, different concurrency angle.
+
+- **Retention payout, RPC-level (the live-browser click is still open — see below):** the seeded
+  demo groomer still has no `hired_at` and retention disabled, so clicking the button in the demo
+  org isn't possible without hand-editing seed data through the UI first, same constraint Section 12
+  already documented. Instead, exercised `app.pay_retention_deposit` directly against the real
+  local Postgres with a real authenticated owner JWT (`request.jwt.claims` set via `set_config`,
+  the same technique GATE 7 already uses): enabled retention and backdated `hired_at` for the demo
+  groomer, called it once (tenure 44mo, term 12mo -> `min(12,44)*500000 = 6,000,000`, matches the
+  formula exactly), then called it again to test the documented idempotency claim.
+- **Found a real bug this way**: `payroll_retention_events` correctly stayed at one row (its unique
+  index does what GATE 6b already asserted), but the unconditional `insert into financial_ledger`
+  right after that dedup ran on *every* call, so the retry wrote a second `-6,000,000` ledger row
+  for a payout that only happened once — a real double-count, not a cosmetic issue. GATE 6b's
+  existing suite only ever calls `pay_retention_deposit` twice and checks the *event* table, so it
+  never caught the ledger side.
+- **Fixed** in a new forward migration, `20261014100000_payroll_retention_ledger_idempotent.sql`
+  (added to `run_all_gates.sh`'s `EXPECTED_MIGRATIONS`, additive, same pattern as `20261012100000`/
+  `20261013100000`): `pay_retention_deposit` now only writes the `financial_ledger` row on the
+  branch where a *new* event was actually inserted, mirroring `pay_payroll_run`'s own
+  already-paid short-circuit. Added a 34th assertion to
+  `supabase/tests/20261001100000_test_payroll_engine.sql` (right after the existing "exactly one
+  payout event" check) comparing a `financial_ledger` row-count snapshot taken right after the
+  first real payout against the count after the idempotent retry, instead of a hardcoded count,
+  since whether the *first* call itself writes a ledger row depends on that test fixture having an
+  active `staff_compensation` row. Reran GATE 4 (fresh migrate, now 35 migrations) + GATE 6b
+  against the disposable `operro-gate-pg16` PostgreSQL 16 container: **34/34 PASS**, including the
+  new assertion. GATE 1/2/3/5/7/8 were not rerun — this change touches one payroll RPC and its own
+  test file only, and Section 12 already has a fresh all-green run of the full suite on top of the
+  same migration lineage this file extends. Applied the same migration to the local dev-stack
+  Supabase Postgres and re-called the RPC a third time: the event count stayed at 1 and no new
+  ledger row was added (two duplicate rows from the pre-fix bug-discovery calls remain in that
+  disposable local demo DB as harmless residue, not a live bug).
+- **Draft-vs-paid invariance, independently reproduced with real booking data** (Section 12 verified
+  this through a live settings-form save/reload/restore cycle; this is a second, RPC-level
+  reproduction using real invoiced jobs rather than re-testing the form): created one real completed
+  + invoiced Basic Grooming booking and one real Styling booking for the seeded groomer through the
+  actual `app.assembly_add_pet` / `assembly_add_line` / `assembly_assign_pet_resource` /
+  `complete_booking` / `issue_invoice_for_booking` RPCs (the same ones a real booking flow calls,
+  not a second calculation path), recomputed a draft run (styling `10,000` at the 10% tier, `perDog`
+  `20,000` at the flat rate), changed the org's tier pct and size-matrix default, recomputed again on
+  the *same still-draft* run (styling -> `20,000`, `perDog` -> `99,000`, proving the settings change
+  reached the draft calculation), then approved and paid that run, changed the settings a third time,
+  and called `recompute_payroll_run` again: it was refused with `run_not_editable:paid`, and the
+  paid run's `payroll_items.breakdown` still reads the exact frozen `20,000` / `99,000` values from
+  the pay moment. Restored the org's tier/matrix defaults to their pre-test values afterward.
+- **Publish -> groomer reads it -> hide -> groomer reads nothing**, reproduced at the RPC level with
+  two real JWTs (owner and the groomer's own `auth.users` id, not the membership id): published the
+  paid run above for the groomer, called `app.get_my_payroll_snapshot()` as the groomer and got back
+  the exact frozen breakdown and total; called `app.unpublish_payroll_snapshot`, then called
+  `get_my_payroll_snapshot()` again as the groomer and got `null`. Re-published afterward so the
+  local demo DB is left in a published state.
+- **A second, independent concurrency proof** (Section 12's fix targets the *recompute* insert race;
+  this one targets concurrent *pay* attempts, which recompute's advisory lock doesn't cover): created
+  and approved a fresh draft run, then fired two real, separately-authenticated `psql` sessions at
+  `app.pay_payroll_run` for the same run at nearly the same instant, with one session holding the
+  run's row lock (`select ... for update`) for 4 seconds before calling the RPC. The second session's
+  call blocked for ~2.3s on that lock, then returned the *first* session's already-committed `paid`
+  row unchanged (same `revision`, same `updated_at`) via the function's own
+  `if v_run.status = 'paid' then return v_run` short-circuit. Confirmed the run ended at `revision`
+  incremented exactly once and `financial_ledger` has exactly one `payroll_paid` row for that run —
+  a real two-connection race with a verified single financial effect, not a code-reading exercise.
+- **Environment note:** browser click-testing of the retention-payout button specifically (as
+  opposed to the RPC-level proof above) could not be completed this session. The shared WSL2
+  environment restarted the payroll stack's own Postgres container mid-session and repeatedly
+  OOM-killed this worktree's dev server on every port tried (3011-3013, confirmed via `ps`/`free`
+  showing the process vanish with no error while memory was under genuine pressure from other
+  concurrent engine sessions) — the same class of instability Section 8/9 already documented, not a
+  regression in this engine's code. `node_modules/.bin` also ended up with Linux-only symlinks
+  (no `.cmd` shims) partway through this session from a `npm run dev` invoked through WSL, which is
+  why the final typecheck/lint/build gates above were run from inside WSL against this same
+  worktree rather than natively on Windows; they are otherwise the real, current results.
+- Typecheck, lint and `next build` were rerun (from WSL, for the reason above) after all of this
+  section's changes: **typecheck clean, lint 0 errors/1 pre-existing unrelated warning
+  (`test/invoice-workflow-contract.test.ts`, not touched by this branch), build succeeds** including
+  `/payroll` and `/payroll/export`.
+
+### What's honestly still open, updated
+- The retention-payout button itself has still never been clicked in a live browser in this demo
+  org, for the same seed-data reason Section 12 gave. The RPC it calls is now verified correct
+  *and* idempotent end-to-end (event table and ledger both), which was not true before this section.
+- GATE 8 and full-branch combined-engine integration: unchanged from Section 12 — GATE 8 was run
+  there (all 8 gates green); combined-branch testing is still explicitly out of scope for this task.
