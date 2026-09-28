@@ -1,11 +1,14 @@
 "use client";
 
 /**
- * Section 30 — visit register UI: search/customer/invoiced-status filters,
- * newest/oldest sort, manual visit creation, mark-billed/undo, safe delete,
- * and session-source badges.
+ * Section 30 — visit register UI: search/customer/pet/invoiced-status
+ * filters, newest/oldest sort, manual visit creation, mark-billed/undo,
+ * safe delete, and session-source badges. Filtering/sorting/pagination are
+ * all server-side now (app.search_visit_register) — the filter bar is a
+ * native GET form (selects auto-submit on change) that navigates with new
+ * search params, not client-side re-filtering of an already-fetched array.
  */
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   createInvoiceFromManualVisitAction,
@@ -17,7 +20,7 @@ import {
 } from "@/app/visit-actions";
 import type { VisitActionState } from "@/app/visit-actions";
 import { formatRupiah } from "@/lib/pilot-data";
-import type { InvoicedStatus, VisitRow } from "@/lib/visit-register";
+import type { InvoicedStatus, VisitRegisterPage } from "@/lib/visit-register";
 
 const initialState: VisitActionState = { error: null, success: null };
 
@@ -102,27 +105,25 @@ function CreateInvoiceFromVisitForm({ visitId }: { visitId: string }) {
   </form>;
 }
 
-export function VisitRegister({ rows, autoLogEnabled, branches, customers, pets }: {
-  rows: VisitRow[]; autoLogEnabled: boolean;
+interface VisitFilters { search: string; customerId: string; petId: string; invoicedStatus: InvoicedStatus | "all"; sort: "newest" | "oldest" }
+
+function buildVisitHref(filters: VisitFilters, cursor: string): string {
+  const params = new URLSearchParams();
+  if (filters.search) params.set("q", filters.search);
+  if (filters.customerId) params.set("customerId", filters.customerId);
+  if (filters.petId) params.set("petId", filters.petId);
+  if (filters.invoicedStatus && filters.invoicedStatus !== "all") params.set("status", filters.invoicedStatus);
+  if (filters.sort && filters.sort !== "newest") params.set("sort", filters.sort);
+  params.set("cursor", cursor);
+  return `/visits?${params.toString()}#daftar-kunjungan`;
+}
+
+export function VisitRegister({ page, filters, autoLogEnabled, branches, customers, pets }: {
+  page: VisitRegisterPage; filters: VisitFilters; autoLogEnabled: boolean;
   branches: Array<{ id: string; name: string }>; customers: Array<{ id: string; name: string }>; pets: Array<{ id: string; name: string; customerId: string }>;
 }) {
-  const [search, setSearch] = useState("");
-  const [customerId, setCustomerId] = useState("");
-  const [petId, setPetId] = useState("");
-  const [invoicedStatus, setInvoicedStatus] = useState<InvoicedStatus | "all">("all");
-  const [sort, setSort] = useState<"newest" | "oldest">("newest");
-  const petsForFilter = customerId ? pets.filter((p) => p.customerId === customerId) : pets;
-
-  const filtered = useMemo(() => {
-    // Matched by pet ID, not name — two pets can share a display name.
-    let result = rows.filter((r) =>
-      (!customerId || r.customerId === customerId)
-      && (!petId || r.petIds.includes(petId))
-      && (invoicedStatus === "all" || r.invoicedStatus === invoicedStatus)
-      && (!search.trim() || r.customerName.toLowerCase().includes(search.trim().toLowerCase()) || r.petNames.some((n) => n.toLowerCase().includes(search.trim().toLowerCase())) || r.description.toLowerCase().includes(search.trim().toLowerCase())));
-    result = [...result].sort((a, b) => sort === "oldest" ? a.visitAt.localeCompare(b.visitAt) : b.visitAt.localeCompare(a.visitAt));
-    return result;
-  }, [rows, search, customerId, petId, invoicedStatus, sort]);
+  const petsForFilter = filters.customerId ? pets.filter((p) => p.customerId === filters.customerId) : pets;
+  const autoSubmit = (e: React.ChangeEvent<HTMLSelectElement>) => e.currentTarget.form?.requestSubmit();
 
   return <div className="space-y-6">
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -133,22 +134,23 @@ export function VisitRegister({ rows, autoLogEnabled, branches, customers, pets 
       <ManualVisitForm branches={branches} customers={customers} pets={pets} />
     </section>
 
-    <div className="grid gap-3 sm:grid-cols-5">
-      <input className={inputClass()} placeholder="Cari pelanggan, hewan, layanan" value={search} onChange={(e) => setSearch(e.target.value)} />
-      <select className={inputClass()} value={customerId} onChange={(e) => { setCustomerId(e.target.value); setPetId(""); }}><option value="">Semua pelanggan</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-      <select className={inputClass()} value={petId} onChange={(e) => setPetId(e.target.value)}><option value="">Semua hewan</option>{petsForFilter.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-      <select className={inputClass()} value={invoicedStatus} onChange={(e) => setInvoicedStatus(e.target.value as InvoicedStatus | "all")}>
+    <form action="/visits" method="get" id="daftar-kunjungan" className="grid gap-3 sm:grid-cols-6">
+      <input className={inputClass()} name="q" placeholder="Cari pelanggan, hewan, layanan" defaultValue={filters.search} />
+      <select className={inputClass()} name="customerId" defaultValue={filters.customerId} onChange={autoSubmit}><option value="">Semua pelanggan</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <select className={inputClass()} name="petId" defaultValue={filters.petId} onChange={autoSubmit}><option value="">Semua hewan</option>{petsForFilter.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+      <select className={inputClass()} name="status" defaultValue={filters.invoicedStatus} onChange={autoSubmit}>
         <option value="all">Semua status tagihan</option>
         <option value="unbilled">Belum tertagih</option>
         <option value="manually_billed">Tertagih manual</option>
         <option value="invoiced">Sudah invoice</option>
       </select>
-      <select className={inputClass()} value={sort} onChange={(e) => setSort(e.target.value as "newest" | "oldest")}><option value="newest">Terbaru</option><option value="oldest">Terlama</option></select>
-    </div>
+      <select className={inputClass()} name="sort" defaultValue={filters.sort} onChange={autoSubmit}><option value="newest">Terbaru</option><option value="oldest">Terlama</option></select>
+      <button className="h-10 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white">Terapkan</button>
+    </form>
 
     <div className="divide-y rounded-3xl border border-slate-200 bg-white shadow-sm">
-      {filtered.length === 0 ? <p className="p-5 text-sm text-slate-500">Tidak ada kunjungan yang cocok dengan filter ini.</p> : null}
-      {filtered.map((row) => <div key={`${row.sessionSource}-${row.id}`} className="flex flex-wrap items-start justify-between gap-3 p-5">
+      {page.rows.length === 0 ? <p className="p-5 text-sm text-slate-500">Tidak ada kunjungan yang cocok dengan filter ini.</p> : null}
+      {page.rows.map((row) => <div key={`${row.sessionSource}-${row.id}`} className="flex flex-wrap items-start justify-between gap-3 p-5">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${row.sessionSource === "booking" ? "bg-sky-100 text-sky-800" : "bg-violet-100 text-violet-800"}`}>{row.sessionSource === "booking" ? "Dari booking" : "Manual"}</span>
@@ -167,5 +169,9 @@ export function VisitRegister({ rows, autoLogEnabled, branches, customers, pets 
         </div>
       </div>)}
     </div>
+
+    {page.hasMore && page.nextCursor ? <div className="flex justify-center">
+      <a href={buildVisitHref(filters, `${encodeURIComponent(page.nextCursor.visitAt)}_${page.nextCursor.id}`)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Muat lebih banyak</a>
+    </div> : null}
   </div>;
 }

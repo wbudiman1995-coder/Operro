@@ -1,25 +1,23 @@
-"use client";
-
 /**
  * Section 29 — payment-control register UI: stage/service-month/search
  * filters, clickable stage totals, per-row confirm/validate actions, and a
- * WhatsApp shortcut. Reads the full register (server-loaded) and filters
- * client-side. Stage totals deliberately ignore the currently-selected stage
- * filter (so you can compare stage totals while narrowing by month/search) —
- * that is an intentional convention, not a bug. Confirm/validate buttons are
- * gated on the caller's OWN capability (payment.manage / payment.validate),
- * not just the row's stage: the server RPCs remain the authoritative check,
- * this only avoids showing a reader a button they cannot actually use.
+ * WhatsApp shortcut. A plain SERVER component now: filtering, service-month
+ * bucketing, and pagination all happen server-side (app.search_payment_register
+ * / app.payment_register_stage_totals), so this file just renders the page
+ * it's given — the filter bar is a native GET form and stage cards/pagination
+ * are plain links, both of which cause a real navigation with new search
+ * params rather than re-filtering an in-memory array. Stage totals
+ * deliberately ignore the currently-selected stage filter (so you can
+ * compare stage totals while narrowing by month/search) — that is an
+ * intentional convention, not a bug. Confirm/validate buttons are gated on
+ * the caller's OWN capability (payment.manage / payment.validate), not just
+ * the row's stage: the server RPCs remain the authoritative check, this
+ * only avoids showing a reader a button they cannot actually use.
  */
-import { useActionState, useMemo, useState } from "react";
-
-import { confirmPaymentScreenshotAction, validatePaymentBankAccountAction } from "@/app/payment-actions";
-import type { PaymentActionState } from "@/app/payment-actions";
+import { ConfirmButton, ValidateButton } from "@/components/payment-register-actions";
 import { buildWhatsAppUrl } from "@/components/customer-360";
-import type { PaymentRegisterRow, PaymentStage } from "@/lib/payment-register";
+import type { PaymentRegisterPage, PaymentStage } from "@/lib/payment-register";
 import { formatRupiah } from "@/lib/pilot-data";
-
-const initialState: PaymentActionState = { error: null, success: null };
 
 const stageLabel: Record<PaymentStage, string> = {
   not_applicable: "Tidak perlu review",
@@ -37,68 +35,45 @@ const stageTone: Record<PaymentStage, string> = {
   legacy_unreviewed: "bg-slate-100 text-slate-500",
 };
 
-function ConfirmButton({ paymentId }: { paymentId: string }) {
-  const [state, action, pending] = useActionState(confirmPaymentScreenshotAction, initialState);
-  return <form action={action} className="inline-flex flex-col items-end gap-1">
-    <input type="hidden" name="paymentId" value={paymentId} />
-    <button className="rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60" disabled={pending}>{pending ? "..." : "Konfirmasi screenshot"}</button>
-    {state.error ? <p className="text-[10px] font-semibold text-rose-600">{state.error}</p> : null}
-  </form>;
+interface Filters { stage: PaymentStage | "all"; month: string; search: string }
+
+function buildHref(filters: Filters, overrides: Partial<Filters & { cursor: string }> = {}): string {
+  const params = new URLSearchParams();
+  const stage = overrides.stage ?? filters.stage;
+  const month = overrides.month ?? filters.month;
+  const search = overrides.search ?? filters.search;
+  if (stage && stage !== "all") params.set("stage", stage);
+  if (month) params.set("month", month);
+  if (search) params.set("q", search);
+  if (overrides.cursor) params.set("cursor", overrides.cursor);
+  const query = params.toString();
+  return query ? `/finance?${query}#kontrol-pembayaran` : "/finance#kontrol-pembayaran";
 }
 
-function ValidateButton({ paymentId }: { paymentId: string }) {
-  const [state, action, pending] = useActionState(validatePaymentBankAccountAction, initialState);
-  return <form action={action} className="inline-flex flex-col items-end gap-1">
-    <input type="hidden" name="paymentId" value={paymentId} />
-    <button className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60" disabled={pending}>{pending ? "..." : "Validasi rekening"}</button>
-    {state.error ? <p className="text-[10px] font-semibold text-rose-600">{state.error}</p> : null}
-  </form>;
-}
-
-export function PaymentRegister({ rows, canManage, canValidate }: { rows: PaymentRegisterRow[]; canManage: boolean; canValidate: boolean }) {
-  const [stageFilter, setStageFilter] = useState<PaymentStage | "all">("all");
-  const [monthFilter, setMonthFilter] = useState("");
-  const [search, setSearch] = useState("");
-
-  // Month/search scope, WITHOUT the stage filter — this is what totals and
-  // the stage cards read from, so narrowing to one stage never changes what
-  // the OTHER stage cards report.
-  const scoped = useMemo(() => rows.filter((row) =>
-    (!monthFilter || row.serviceMonth === monthFilter)
-    && (!search.trim() || row.invoiceNumber?.toLowerCase().includes(search.trim().toLowerCase()) || row.customerName.toLowerCase().includes(search.trim().toLowerCase()))
-  ), [rows, monthFilter, search]);
-
-  const filtered = useMemo(() => scoped.filter((row) => stageFilter === "all" || row.stage === stageFilter), [scoped, stageFilter]);
-
-  const stageTotals = useMemo(() => {
-    const totals = new Map<PaymentStage, number>();
-    for (const row of scoped) totals.set(row.stage, (totals.get(row.stage) ?? 0) + row.amount);
-    return totals;
-  }, [scoped]);
-
-  return <div className="space-y-4">
-    <div className="grid gap-3 sm:grid-cols-3">
-      <input className="h-10 rounded-xl border border-slate-200 px-3 text-sm" placeholder="Cari invoice atau pelanggan" value={search} onChange={(e) => setSearch(e.target.value)} />
-      <input className="h-10 rounded-xl border border-slate-200 px-3 text-sm" type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} aria-label="Filter bulan layanan" />
-      <select className="h-10 rounded-xl border border-slate-200 px-3 text-sm" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PaymentStage | "all")}>
-        <option value="all">Semua tahap</option>
-        {(Object.keys(stageLabel) as PaymentStage[]).map((stage) => <option key={stage} value={stage}>{stageLabel[stage]}</option>)}
-      </select>
-    </div>
+export function PaymentRegister({ page, filters, canManage, canValidate }: { page: PaymentRegisterPage; filters: Filters; canManage: boolean; canValidate: boolean }) {
+  return <div id="kontrol-pembayaran" className="space-y-4">
+    <form action="/finance" method="get" className="grid gap-3 sm:grid-cols-3">
+      <input type="hidden" name="stage" value={filters.stage === "all" ? "" : filters.stage} />
+      <input className="h-10 rounded-xl border border-slate-200 px-3 text-sm" name="q" placeholder="Cari invoice atau pelanggan" defaultValue={filters.search} />
+      <input className="h-10 rounded-xl border border-slate-200 px-3 text-sm" type="month" name="month" defaultValue={filters.month} aria-label="Filter bulan layanan" />
+      <button className="h-10 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white">Terapkan</button>
+    </form>
 
     <div className="flex flex-wrap gap-2">
-      {(Object.keys(stageLabel) as PaymentStage[]).map((stage) => (
-        <button key={stage} type="button" onClick={() => setStageFilter(stageFilter === stage ? "all" : stage)}
-          className={`rounded-xl px-3 py-2 text-left text-xs font-bold ${stageTone[stage]} ${stageFilter === stage ? "ring-2 ring-slate-900/40" : ""}`}>
+      {(Object.keys(stageLabel) as PaymentStage[]).map((stage) => {
+        const totals = page.stageTotals[stage];
+        const active = filters.stage === stage;
+        return <a key={stage} href={buildHref(filters, { stage: active ? "all" : stage })}
+          className={`rounded-xl px-3 py-2 text-left text-xs font-bold ${stageTone[stage]} ${active ? "ring-2 ring-slate-900/40" : ""}`}>
           <div>{stageLabel[stage]}</div>
-          <div className="text-sm">{formatRupiah(stageTotals.get(stage) ?? 0)}</div>
-        </button>
-      ))}
+          <div className="text-sm">{formatRupiah(totals.amount)} <span className="font-normal">({totals.count})</span></div>
+        </a>;
+      })}
     </div>
 
     <div className="divide-y rounded-3xl border border-slate-200 bg-white shadow-sm">
-      {filtered.length === 0 ? <p className="p-5 text-sm text-slate-500">Tidak ada pembayaran yang cocok dengan filter ini.</p> : null}
-      {filtered.map((row) => {
+      {page.rows.length === 0 ? <p className="p-5 text-sm text-slate-500">Tidak ada pembayaran yang cocok dengan filter ini.</p> : null}
+      {page.rows.map((row) => {
         const waUrl = buildWhatsAppUrl(row.customerPhone, `Halo ${row.customerName}, terkait pembayaran invoice ${row.invoiceNumber ?? ""}.`);
         const needsProof = row.method === "bank_transfer";
         return <div key={row.id} className="flex flex-wrap items-start justify-between gap-4 p-5">
@@ -129,5 +104,9 @@ export function PaymentRegister({ rows, canManage, canValidate }: { rows: Paymen
         </div>;
       })}
     </div>
+
+    {page.hasMore && page.nextCursor ? <div className="flex justify-center">
+      <a href={buildHref(filters, { cursor: `${encodeURIComponent(page.nextCursor.paidAt)}_${page.nextCursor.id}` })} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Muat lebih banyak</a>
+    </div> : null}
   </div>;
 }

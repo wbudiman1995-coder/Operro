@@ -6,17 +6,29 @@ import { PaymentRegister } from "@/components/payment-register";
 import { PageHeader, StatCard, StatusBadge } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { formatRupiah, loadCatalogWorkspace, loadFinanceWorkspace } from "@/lib/pilot-data";
-import { loadPaymentRegister } from "@/lib/payment-register";
+import { loadPaymentRegister, PAYMENT_STAGES, type PaymentStage } from "@/lib/payment-register";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 
 export const metadata = { title: "Keuangan" };
 
-export default async function FinancePage() {
+function parseCursor(raw: string | undefined): { paidAt: string; id: string } | undefined {
+  if (!raw) return undefined;
+  const sep = raw.lastIndexOf("_");
+  if (sep < 0) return undefined;
+  const paidAt = decodeURIComponent(raw.slice(0, sep));
+  const id = raw.slice(sep + 1);
+  return paidAt && id ? { paidAt, id } : undefined;
+}
+
+export default async function FinancePage({ searchParams }: { searchParams: Promise<{ stage?: string; month?: string; q?: string; cursor?: string }> }) {
   const workspace = await requireActiveWorkspace();
+  const params = await searchParams;
+  const stage = params.stage && (PAYMENT_STAGES as string[]).includes(params.stage) ? (params.stage as PaymentStage) : undefined;
+  const registerFilters = { stage, serviceMonth: params.month || undefined, search: params.q || undefined, cursor: parseCursor(params.cursor) };
   const [data, catalog, paymentRegister] = await Promise.all([
     loadFinanceWorkspace(workspace.supabase, workspace.activeOrganization.id),
     loadCatalogWorkspace(workspace.supabase, workspace.activeOrganization.id),
-    loadPaymentRegister(workspace.supabase, workspace.activeOrganization.id),
+    loadPaymentRegister(workspace.supabase, workspace.activeOrganization.id, registerFilters),
   ]);
   const paid = data.payments.filter((item) => item.status === "succeeded").reduce((sum, item) => sum + item.amount, 0);
   const expense = data.expenses.reduce((sum, item) => sum + item.amount, 0);
@@ -27,7 +39,7 @@ export default async function FinancePage() {
 
     <section className="mt-7">
       <h2 className="mb-4 font-bold">Kontrol pembayaran</h2>
-      <PaymentRegister rows={paymentRegister} canManage={workspace.capabilities["payment.manage"]} canValidate={workspace.capabilities["payment.validate"]} />
+      <PaymentRegister page={paymentRegister} filters={{ stage: stage ?? "all", month: params.month ?? "", search: params.q ?? "" }} canManage={workspace.capabilities["payment.manage"]} canValidate={workspace.capabilities["payment.validate"]} />
     </section>
   </WorkspaceShell>;
 }
