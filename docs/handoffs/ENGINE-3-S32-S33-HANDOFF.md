@@ -334,7 +334,7 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
       `app.get_my_payroll_snapshot()` live), publish/unpublish buttons on the admin side, real
       `.xlsx` (ExcelJS)/CSV (with formula-injection escaping)/payslip PDF (PDFKit) via
       `GET /payroll/export`.
-- [~] Checkpoint 4: Final acceptance — PARTIALLY DONE this pass. Completed once the environment
+- [x] Checkpoint 4: Final acceptance — DONE. Completed once the environment
       stabilized (Section 8's instability was intermittent, not permanent):
       - **Full live browser click-through** as the real owner QA login: Hitung payroll -> Setujui
         -> Tandai sudah dibayar -> Publish ke staf, all via actual button clicks (not RPC calls),
@@ -524,35 +524,89 @@ exports (Section 8), in that order per the checkpoint plan (Section 6).
   - **GATE 8 (completion-vs-assembly/reservation concurrency harness) was NOT run.** It shells out to a bash script (`run_concurrency_assembly.sh`) that itself spawns multiple concurrent `psql` processes against a `DATABASE_URL`; wrapping that whole harness through the docker-exec shim approach was judged not worth the added fragility for a harness that doesn't touch payroll code at all (it predates this engine and tests booking-assembly concurrency, not payroll). Not a payroll-specific gap, but honestly unverified this session.
   - The disposable `operro-gate-pg16` container (and its `~/gate-shims/*` wrapper scripts) are local-only, throwaway, not part of any commit, and safe to `docker rm -f` -- they exist purely so gates could run without installing anything system-wide or touching another engine's environment.
 
-## 10. Status as of latest work (superseded by Section 6/9/11 above where they disagree — this section predates the gate run and the export/test-suite work; kept for the historical record of the earlier pause)
+## 10. Superseded interim status (kept for the historical record only — see Section 11 for final status)
 
-- Branch: `claude/sections-32-33-payroll-exports` (not pushed yet — local commits only)
-- SHA at pause: `4e62d832d1eca8d19bfac443e52310e214da583b`
+Earlier in this session, at a temporary usage-limit pause, this section recorded an interim
+snapshot (backend done, frontend/exports/tests not yet started). Everything it described as
+outstanding was subsequently completed in the same session — see Section 11 for the real final
+state. Left in place rather than deleted so the handoff's own history stays honest about how this
+work actually proceeded, including the pause and resume.
+
+## 11. Final delivery
+
+- Branch: `claude/sections-32-33-payroll-exports`
+- Branch URL: https://github.com/wbudiman1995-coder/Operro/tree/claude/sections-32-33-payroll-exports
+- Final SHA: `19136175558485ef3b23c5c39e6b2c3cf2efb054` (this doc's own commit will move HEAD one
+  further after this edit — check `git log -1 --format=%H` on this branch for the literal latest;
+  every commit through this one is tested and green, so any of the last several SHAs is a safe
+  handoff point)
 - Absolute handoff path: `E:\Claude\operro-payroll-s32-s33\docs\handoffs\ENGINE-3-S32-S33-HANDOFF.md`
-- **Section 32 (payroll engine): calculation + lifecycle backend DONE and verified (RPC-level,
-  via direct psql — recompute/approve/pay/idempotent-retry/undo/retention/publish all confirmed
-  correct). Frontend UI DONE, typechecks/lints clean, partially verified live in-browser (login +
-  full page render + one live override save, matching the RPC-level state exactly) before local
-  environment instability (Section 8) interrupted further click-through testing.**
-- **Section 33 (payroll exports): NOT STARTED.** No XLSX/CSV/PDF code written yet. `exceljs` and
-  `pdfkit` are installed (`apps/web/package.json`) and picked as the libraries, decision recorded
-  in Section 3, but no export route/RPC/UI exists.
-- **NOT DONE**: the permanent automated test suite (SQL functional tests under `supabase/tests/`,
-  a deterministic-fixture calculation unit test per brief section 10, concurrency tests, RLS
-  negative tests) — this session's psql checks were manual smoke tests only, not committed as
-  reusable tests. `run_all_gates.sh` has never actually been run in this session (needs a
-  disposable Postgres 16 container per Section 3's plan, not yet set up).
-- **NOT DONE**: retention-deposit UI has a button but the "eligible" boundary conditions
-  (no-term-yet, maturity boundary, already-paid, undo) are untested beyond the RPC's own
-  unique-index guarantee. Groomer-side "Gaji saya" card on `/my-schedule` — NOT built yet
-  (`loadMyPayrollSnapshot` exists in `payroll-data.ts` but nothing calls it from a page yet).
-- Material blockers: none in the code itself. The only real blocker hit this session was
-  environmental (Section 8) — concurrent-stack resource contention on this machine's WSL2 VM,
-  not anything wrong with this branch's implementation.
-- **Exact resume point**: build the `/my-schedule` "Gaji saya" card (small, `loadMyPayrollSnapshot`
-  already exists), then Section 33 exports (XLSX via `exceljs`, CSV with formula-injection
-  escaping, PDF payslip via `pdfkit`, all reading the same `payroll_items.breakdown` snapshot the
-  UI already reads — no second calculation), then the permanent test suite, then a full
-  `run_all_gates.sh` pass, then the remaining browser QA (approve/pay/undo/publish click-through,
-  cross-tenant/cross-role negative tests, mobile 375px, retention boundary cases) once the shared
-  environment isn't contended, then update this section with real final status before pushing.
+- Absolute evidence log path: `E:\Claude\operro-payroll-s32-s33\docs\handoffs\logs\ENGINE-3-S32-S33\`
+- WSL equivalents: `/mnt/e/Claude/operro-payroll-s32-s33/docs/handoffs/...`
+
+### Section 32 (payroll engine): DONE
+Cycle configuration, all 9 compensation components (basic/weekly/no-late/no-sick/styling-tiers/
+botak/transport-half-share/per-pet flat+size-matrix/daily), working-day and attendance
+integration, job/invoice eligibility with a missing-invoice exception queue, editable draft
+overrides and custom rows that survive recompute, immutable paid snapshots, approve/pay/auditable-
+undo lifecycle, retention deposits, and groomer publish/hide — all implemented, all backed by RPCs
+with server-side authorization and revision guards, all verified both at the RPC/gate level (33
+deterministic assertions, independently hand-computed expected values) and live through the real
+UI in a browser (recompute → approve → pay → publish, and the groomer's own "Gaji saya" view).
+
+### Section 33 (payroll exports): DONE
+Real `.xlsx` workbook (ExcelJS: Summary / Detail Job / Missing & Review sheets, numeric cells as
+numbers, dates as dates, frozen header rows), cycle CSV (with formula-injection escaping — a
+deliberate improvement over HomePaw's own source, which has none), and a per-groomer payslip PDF
+(PDFKit) — all reading the exact same `payroll_items.breakdown` snapshot the UI shows, no second
+calculation anywhere in the export path. Server-side permission enforcement (`payroll.read` for
+whole-cycle exports; a groomer may additionally download only their own published payslip).
+Verified live in the browser for all three formats (correct magic bytes, content types, and a CSV
+data row matching the UI/database exactly) — this exact testing is what caught and fixed a real
+bug (self-payslip download 404ing for a groomer without `payroll.read`, Section 6/9).
+
+### What's honestly still open (not blocking, not hidden)
+- No admin UI yet to edit the `styling_tiers` / `per_pet_size_matrix` JSON directly — only the flat
+  scalar org/per-groomer fields are wired into `PayrollCycleSettingsForm`/`StaffPayrollSettingsForm`.
+  The tiers/matrix work correctly end to end (proven by the test suite and the seed data), they're
+  just only settable via direct DB access or a future small settings-form addition, not a bug.
+- The retention "pay deposit" button and the publish→unpublish (hide) direction are proven correct
+  at the RPC/gate level (33/33 includes retention boundary + idempotency assertions) but were not
+  individually re-clicked in a live browser pass in this session's final sweep (publish was
+  clicked live; pay-retention and unpublish were exercised via direct RPC calls earlier in the
+  session, and via GATE 6b, not re-clicked as UI buttons in the final pass).
+- `run_all_gates.sh` GATE 8 (booking-assembly/reservation concurrency harness — predates this
+  engine, doesn't touch payroll code) was not run; documented honestly in Section 9 rather than
+  forced through a fragile workaround.
+- A genuinely concurrent real-browser two-tab payout race was reasoned through and one specific
+  race (first recompute for a not-yet-existing period) was found and fixed; it was not stress-
+  tested with actual simultaneous sessions/connections.
+- Combined-branch, multi-engine integration testing (this engine's branch merged together with
+  Engine 1's and Engine 2's) has not happened and is explicitly out of scope for this task — the
+  brief reserves that for after all three engines are reviewed.
+
+### Section 31/34
+Not touched, not implied complete. Payroll's UI does not link to capital/cash management or the
+WhatsApp center.
+
+### Shared-file edits and overlap risk with Engine 1/2
+See Section 7 — small, payroll-scoped removals from `pilot-actions.ts`/`pilot-data.ts`, one
+additive line in `authorization.ts`, additive appends to `run_all_gates.sh`'s migration list, and
+one comment fix in `supabase/seed.sql`. No edits to any other engine's migration files.
+
+### Owner QC checklist (no committed secrets; QA accounts already exist in the seed data)
+1. `cd apps/web && npm run dev` (or `PORT=3010 npm run dev` if 3000 is taken by an unrelated
+   project's launch config on this machine — see Section 9) against this worktree's own Supabase
+   stack (`supabase start`, ports 54351-54354).
+2. Sign in as `wbudiman1995@gmail.com` / `operro-local-qa` (owner) → `/payroll` → Hitung payroll →
+   Setujui → Tandai sudah dibayar → Publish ke staf → Export Excel/CSV, inspect the downloaded
+   files.
+3. Sign in as `groomer@homepaw.local` / `operro-local-qa` (Andi) → `/my-schedule` → confirm the
+   "Gaji saya" card shows the published amount → download the payslip PDF.
+4. `bash run_all_gates.sh` against a disposable PostgreSQL 16 (see Section 9 for exactly how this
+   session did it, since this WSL environment has no native `psql` client).
+5. `psql -f supabase/tests/20261001100000_test_payroll_engine.sql` against any Postgres 16+ with
+   migrations through `20261001120000` applied — 33/33 assertions, rolls back, safe to re-run.
+
+No merge, no deployment, no PR opened per the brief's instructions — only this isolated branch,
+pushed after all of the above validation.
