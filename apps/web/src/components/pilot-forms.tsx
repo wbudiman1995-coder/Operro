@@ -2,8 +2,7 @@
 
 /**
  * Function index:
- * - CustomerForm, TaskForm, ServiceForm, ResourceForm, InventoryForm, PaymentForm, ExpenseForm: interactive pilot forms.
- * - PackageSaleForm: sells a catalog package to a customer.
+ * - CustomerForm, TaskForm, ServiceForm, PackageForm, ResourceForm, InventoryForm, PaymentForm, ExpenseForm: interactive pilot forms.
  * - ActionMessage: consistent success and error feedback.
  */
 import { useActionState } from "react";
@@ -11,12 +10,12 @@ import { useActionState } from "react";
 import {
   adjustInventoryAction,
   createCustomerAction,
+  createPackageAction,
   createResourceAction,
   createServiceAction,
   createTaskAction,
   recordExpenseAction,
   recordPaymentAction,
-  sellPackageAction,
 } from "@/app/pilot-actions";
 import type { PilotActionState } from "@/app/pilot-actions";
 import { MapsCoordinateFields } from "@/components/customer-address-forms";
@@ -100,6 +99,35 @@ export function ServiceForm() {
   </form>;
 }
 
+/** Section 24: package/membership catalog terms. Governs future sales only -- see createPackageAction. */
+export function PackageForm({ services }: { services: Array<{ id: string; name: string }> }) {
+  const [state, action, pending] = useActionState(createPackageAction, initialPilotActionState);
+  return <form action={action} className="space-y-3">
+    <input className={inputClass} name="name" placeholder="Nama paket" required />
+    <input className={inputClass} name="description" placeholder="Deskripsi (opsional)" />
+    <div className="grid gap-3 sm:grid-cols-2">
+      <input className={inputClass} type="number" min="1" step="1" name="sessions" placeholder="Jumlah sesi" required />
+      <input className={inputClass} type="number" min="0" step="1000" name="price" placeholder="Harga Rp" required />
+    </div>
+    <select className={inputClass} name="serviceId" defaultValue="" aria-label="Berlaku untuk layanan">
+      <option value="">Berlaku untuk semua layanan</option>
+      {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+    </select>
+    <div className="grid gap-3 sm:grid-cols-3">
+      <input className={inputClass} type="number" min="1" step="1" name="validityDays" placeholder="Masa berlaku (hari, opsional)" />
+      <select className={inputClass} name="recurrenceInterval" defaultValue="none" aria-label="Interval perpanjangan">
+        <option value="none">Sekali beli (tidak berulang)</option><option value="week">Mingguan</option><option value="month">Bulanan</option><option value="year">Tahunan</option>
+      </select>
+      <select className={inputClass} name="rolloverPolicy" defaultValue="none" aria-label="Kebijakan rollover">
+        <option value="none">Sesi tidak digabung</option><option value="rollover">Sesi bisa digabung (rollover)</option>
+      </select>
+    </div>
+    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700"><input type="checkbox" name="perPet" />Khusus satu hewan per pembelian (bukan berbagi antar hewan pelanggan)</label>
+    <ActionMessage state={state} />
+    <button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Tambah paket"}</button>
+  </form>;
+}
+
 export function ResourceForm({ branches, memberships }: { branches: Array<{ id: string; name: string }>; memberships: Array<{ id: string; name: string }> }) {
   const [state, action, pending] = useActionState(createResourceAction, initialPilotActionState);
   return <form action={action} className="space-y-3"><input className={inputClass} name="name" placeholder="Nama groomer" required /><div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="phone" placeholder="Telepon / WhatsApp" /><input className={`${inputClass} p-1`} type="color" name="color" defaultValue="#0f766e" aria-label="Warna kalender" /></div><select className={inputClass} name="branchId" required>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><select className={inputClass} name="membershipId" defaultValue=""><option value="">Tanpa akun staf</option>{memberships.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><input className={inputClass} name="baseLabel" placeholder="Alamat / titik keberangkatan groomer" /><MapsCoordinateFields /><ActionMessage state={state} /><button className={buttonClass} disabled={pending}>{pending ? "Menyimpan..." : "Tambah groomer"}</button></form>;
@@ -113,11 +141,6 @@ export function InventoryForm({ branches, products }: { branches: Array<{ id: st
 export function PaymentForm({ invoices }: { invoices: Array<{ id: string; number: string; total: number }> }) {
   const [state, action, pending] = useActionState(recordPaymentAction, initialPilotActionState);
   return <form action={action} className="space-y-3"><select className={inputClass} name="invoiceId" required>{invoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number} · Rp{invoice.total.toLocaleString("id-ID")}</option>)}</select><div className="grid grid-cols-2 gap-3"><select className={inputClass} name="method" defaultValue="bank_transfer"><option value="cash">Tunai</option><option value="bank_transfer">Transfer</option><option value="card">Kartu</option><option value="wallet">Wallet</option><option value="other">Lainnya</option></select><input className={inputClass} type="number" min="1" step="1000" name="amount" placeholder="Jumlah Rp" required /></div><ActionMessage state={state} /><button className={buttonClass} disabled={pending || invoices.length === 0}>{pending ? "Menyimpan..." : "Catat pembayaran"}</button></form>;
-}
-
-export function PackageSaleForm({ customers, packages, branches }: { customers: Array<{ id: string; name: string }>; packages: Array<{ id: string; name: string; sessions: number; price: number }>; branches: Array<{ id: string; name: string }> }) {
-  const [state, action, pending] = useActionState(sellPackageAction, initialPilotActionState);
-  return <form action={action} className="space-y-3"><select className={inputClass} name="customerId" required><option value="">Pilih pelanggan</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select><select className={inputClass} name="packageId" required><option value="">Pilih paket</option>{packages.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.sessions} sesi · Rp{item.price.toLocaleString("id-ID")}</option>)}</select><div className="grid grid-cols-2 gap-3"><select className={inputClass} name="branchId" required>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><select className={inputClass} name="method" defaultValue="cash"><option value="cash">Tunai</option><option value="bank_transfer">Transfer</option><option value="card">Kartu</option><option value="wallet">Wallet</option><option value="other">Lainnya</option></select></div><ActionMessage state={state} /><button className={buttonClass} disabled={pending || customers.length === 0 || packages.length === 0}>{pending ? "Menyimpan..." : "Jual paket"}</button></form>;
 }
 
 export function ExpenseForm({ branches }: { branches: Array<{ id: string; name: string }> }) {

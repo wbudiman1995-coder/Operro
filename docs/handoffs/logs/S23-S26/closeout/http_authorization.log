@@ -1,0 +1,7 @@
+PASS: reader correction denied (42501)
+PASS: reader repair denied (42501)
+PASS: owner null revision denied (40001)
+PASS: locked scope tampering denied (23514)
+PASS: authenticated reader can view membership
+PASS: no-access groomer sees zero membership rows through RLS
+PASS: all rejected HTTP writes preserve the complete membership row

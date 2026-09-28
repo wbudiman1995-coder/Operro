@@ -1,0 +1,1462 @@
+### GATE 4-6 + both SQL smoke tests (final migration state, review round 3)
+NOTICE:  database "operro_gate16_r3" does not exist, skipping
+CREATE EXTENSION
+CREATE SCHEMA
+CREATE FUNCTION
+CREATE FUNCTION
+NOTICE:  extension "pgcrypto" already exists, skipping
+CREATE EXTENSION
+CREATE EXTENSION
+CREATE SCHEMA
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+COMMENT
+CREATE EXTENSION
+NOTICE:  extension "pgcrypto" already exists, skipping
+CREATE FUNCTION
+COMMENT
+ALTER INDEX
+ALTER INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER FUNCTION
+ALTER FUNCTION
+ALTER FUNCTION
+ALTER FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+INSERT 0 7
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 9
+INSERT 0 7
+INSERT 0 3
+INSERT 0 17
+INSERT 0 12
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+GRANT
+GRANT
+GRANT
+GRANT
+DO
+DO
+DO
+DO
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 1
+INSERT 0 28
+CREATE FUNCTION
+DO
+CREATE TABLE
+INSERT 0 15
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+GRANT
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+DO
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+BEGIN
+DROP TRIGGER
+DROP TRIGGER
+DROP TRIGGER
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE FUNCTION
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+INSERT 0 1
+INSERT 0 0
+INSERT 0 0
+INSERT 0 0
+DO
+NOTICE:  BACKFILL OK: all legacy grooming pet/service values mapped; no non-grooming booking carries pet_id/service_id.
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+COMMENT
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE FUNCTION
+COMMENT
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DO
+DO
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+REVOKE
+REVOKE
+GRANT
+GRANT
+REVOKE
+GRANT
+GRANT
+REVOKE
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+REVOKE
+REVOKE
+REVOKE
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+DO
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+COMMENT
+CREATE FUNCTION
+COMMENT
+REVOKE
+CREATE TRIGGER
+CREATE FUNCTION
+COMMENT
+REVOKE
+CREATE TRIGGER
+DO
+INSERT 0 0
+CREATE FUNCTION
+COMMENT
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+ALTER POLICY
+ALTER POLICY
+ALTER POLICY
+ALTER POLICY
+ALTER POLICY
+ALTER POLICY
+CREATE FUNCTION
+COMMENT
+REVOKE
+GRANT
+GRANT
+REVOKE
+GRANT
+GRANT
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+COMMIT
+CREATE FUNCTION
+COMMENT
+REVOKE
+GRANT
+NOTICE:  policy "membership_plans_org_isolation" for relation "public.membership_plans" does not exist, skipping
+NOTICE:  policy "customer_memberships_org_isolation" for relation "public.customer_memberships" does not exist, skipping
+NOTICE:  policy "packages_org_isolation" for relation "public.packages" does not exist, skipping
+NOTICE:  policy "customer_packages_org_isolation" for relation "public.customer_packages" does not exist, skipping
+NOTICE:  policy "customer_package_ledger_org_isolation" for relation "public.customer_package_ledger" does not exist, skipping
+NOTICE:  policy "loyalty_accounts_org_isolation" for relation "public.loyalty_accounts" does not exist, skipping
+NOTICE:  policy "loyalty_ledger_org_isolation" for relation "public.loyalty_ledger" does not exist, skipping
+NOTICE:  policy "wallet_accounts_org_isolation" for relation "public.wallet_accounts" does not exist, skipping
+NOTICE:  policy "wallet_ledger_org_isolation" for relation "public.wallet_ledger" does not exist, skipping
+NOTICE:  policy "referrals_org_isolation" for relation "public.referrals" does not exist, skipping
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+GRANT
+INSERT 0 0
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+GRANT
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+GRANT
+COMMENT
+COMMENT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+INSERT 0 1
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+NOTIFY
+CREATE FUNCTION
+REVOKE
+GRANT
+NOTIFY
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+GRANT
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+NOTIFY
+INSERT 0 1
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE INDEX
+INSERT 0 1
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+DROP FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+NOTIFY
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+NOTIFY
+BEGIN
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+GRANT
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+CREATE FUNCTION
+REVOKE
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+NOTIFY
+COMMIT
+BEGIN
+CREATE FUNCTION
+REVOKE
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+GRANT
+CREATE POLICY
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+INSERT 0 1
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+REVOKE
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+NOTIFY
+COMMIT
+BEGIN
+ALTER TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+ALTER TABLE
+ALTER TABLE
+COMMENT
+ALTER TABLE
+ALTER TABLE
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMIT
+BEGIN
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMIT
+BEGIN
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+UPDATE 0
+UPDATE 0
+COMMENT
+COMMENT
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+DROP FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMIT
+BEGIN
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+COMMENT
+CREATE FUNCTION
+DROP FUNCTION
+NOTICE:  function app.renew_customer_package(uuid,uuid,timestamptz,timestamptz,text,uuid) does not exist, skipping
+DROP FUNCTION
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMIT
+### operro_gate16_r3: 43 migrations applied
+assembly fns: 8
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 4
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 3
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+DO
+NOTICE:  PASS: C1 add_pet accepts pet owned by booking customer
+DO
+NOTICE:  PASS: C2 cross-customer pet rejected pet_customer_mismatch
+DO
+NOTICE:  PASS: C3 add_line snapshots catalog duration 90 (not default 60)
+NOTICE:  PASS: C4 inactive service rejected
+NOTICE:  PASS: C5 soft-deleted service rejected
+DO
+NOTICE:  PASS: C6 assign_pet_resource sets the groomer
+NOTICE:  PASS: C7 reassignment writes a reassigned audit event
+NOTICE:  PASS: C8 retired/inactive resource rejected
+NOTICE:  PASS: C8b cross-branch resource rejected (not_active_or_not_in_branch)
+DO
+NOTICE:  PASS: C9 reserve rejects qty<>1 line (package_requires_unit_quantity)
+NOTICE:  PASS: C10 qty=1 line reserves a package session
+DO
+NOTICE:  PASS: C11 set_qty rejects line with package reservation (any status)
+NOTICE:  PASS: C12 availability is 2 (1 reserved of 3) before removal
+NOTICE:  PASS: C13 remove_pet released the reservation; availability back to 3
+NOTICE:  PASS: C14 reservation row preserved with status released
+NOTICE:  PASS: C15 repeated removal cannot double-release (pet_not_found)
+DO
+DO
+NOTICE:  PASS: C16 re-adding a removed pet raises stable pet_removal_is_permanent
+ROLLBACK
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 4
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 5
+INSERT 0 5
+DO
+CREATE SEQUENCE
+CREATE FUNCTION
+NOTICE:  PASS: R1 qty<>1 rejected (package_requires_unit_quantity)
+DO
+NOTICE:  PASS: R2 qty=1 accepted
+DO
+NOTICE:  PASS: R3 expired package rejected (package_expired)
+DO
+DO
+NOTICE:  PASS: R4 service mismatch rejected
+DO
+NOTICE:  PASS: R5 customer mismatch rejected
+NOTICE:  PASS: R6 missing package rejected (package_not_found)
+DO
+NOTICE:  PASS: R7a exactly three reserved lifecycle rows exist
+NOTICE:  PASS: R7b availability is 0 before expiration processing (three stale-but-reserved holds)
+NOTICE:  PASS: R7c new reservation succeeds after stale holds expired
+NOTICE:  PASS: R7d the three stale rows changed to expired
+NOTICE:  PASS: R7e the new reservation is reserved
+DO
+NOTICE:  PASS: R7f final availability is correct (3 total - 1 active = 2)
+NOTICE:  PASS: R8a set_qty rejected while RESERVED
+NOTICE:  PASS: R8b set_qty rejected while CONSUMED
+NOTICE:  PASS: R8c set_qty rejected while REVERSED/RELEASED
+DO
+DO
+NOTICE:  PASS: R8d set_qty rejected while RELEASED
+NOTICE:  PASS: R8e set_qty rejected while EXPIRED
+DO
+NOTICE:  PASS: R9 reserve rejected on completed booking (booking_not_open_for_assembly)
+DO
+ROLLBACK
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 3
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 4
+INSERT 0 3
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+DO
+NOTICE:  PASS package invoice, idempotency, package line, and 3-session balance
+COMMIT
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+NOTICE:  PASS preview and issued total=200, discount=20, transport fee=20, manual groomer
+DO
+COMMIT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+INSERT 0 3
+INSERT 0 2
+INSERT 0 2
+INSERT 0 2
+INSERT 0 2
+INSERT 0 3
+INSERT 0 0
+INSERT 0 8
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 6
+INSERT 0 2
+INSERT 0 2
+INSERT 0 2
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+INSERT 0 2
+DO
+DO
+NOTICE:  PASS: S1 per-pet package rejects the wrong pet
+DO
+DO
+NOTICE:  PASS: S2 per-pet package reserves for its own pet
+DO
+NOTICE:  PASS: S3 coverage listing shows 3 available before any reservation
+DO
+DO
+NOTICE:  PASS: S4 reconcile reports a healthy (matching) balance
+NOTICE:  PASS: S5 revision reflects the purchase's own ledger-driven bump (default 1 + 1)
+UPDATE 1
+DO
+NOTICE:  PASS: S6 reconcile detects the induced mismatch
+NOTICE:  PASS: S7 reconcile reports the exact cached vs ledger values
+NOTICE:  PASS: S8 repair rejects a stale revision (40001 stale_repair_request)
+DO
+NOTICE:  PASS: S9 repair restores the cached balance to match the ledger
+NOTICE:  PASS: S10 repeating the same repair request_key is idempotent (no double-adjustment)
+DO
+DO
+NOTICE:  PASS: S11 reconcile confirms the package is healthy again after repair
+INSERT 0 1
+UPDATE 1
+NOTICE:  PASS: S12 renewal produces a real invoice with status issued (not paid -- an issued invoice is never proof of payment)
+NOTICE:  PASS: S13 renewal invoice total matches the catalog price
+NOTICE:  PASS: S14 renewal invoice metadata links back to the membership it renews
+NOTICE:  PASS: S15 renewal reactivates an exhausted/expired package
+NOTICE:  PASS: S16 renewal tops up a fresh term's worth of sessions (rollover: additive on top of whatever was left)
+NOTICE:  PASS: S17 renewal extends expiry into the future
+NOTICE:  PASS: S18 renewal increments renewal_count
+NOTICE:  PASS: S19 the renewal ledger row links to the renewal invoice (invoice_id)
+NOTICE:  PASS: S20 repeating the same renewal request_key returns the SAME invoice (idempotent), even with a garbage terms_fingerprint -- a retry never re-checks it
+DO
+NOTICE:  PASS: S21 the idempotent retry did not double-apply (renewal_count still 1)
+DO
+NOTICE:  PASS: S22 renewal request_key reused for a different membership is rejected
+NOTICE:  PASS: S23 a healthy package is not auto_repairable (nothing to repair)
+NOTICE:  PASS: S24 a fully-linked, non-legacy package has zero manual_review_issues
+DO
+INSERT 0 1
+DO
+NOTICE:  PASS: S25 an orphan consumption ledger row (no reservation link) is flagged for manual review
+NOTICE:  PASS: S26 reservation_consumption_matches turns false once a link is broken, even though the raw counts alone would look plausible
+INSERT 0 1
+NOTICE:  PASS: S27 a legacy package with no source_invoice_id is flagged missing_source_invoice, never silently treated as healthy
+DO
+DO
+NOTICE:  PASS: S28 archive refuses a package with a reserved session outstanding
+DO
+UPDATE 1
+NOTICE:  PASS: S29 archive succeeds once no reservation remains outstanding
+DO
+DO
+DO
+NOTICE:  PASS: S30 cross-org reconcile correctly denies access (package_not_found)
+NOTICE:  PASS: S31 cross-org repair correctly denies access (package_not_found)
+DO
+NOTICE:  PASS: S32 cross-org renewal correctly denies access (package_not_found) even though the caller supplied ITS OWN valid branch
+DO
+SET
+DO
+DO
+NOTICE:  PASS: S33 as authenticated role in org B, org A's customer_packages row is invisible under RLS
+DO
+NOTICE:  PASS: S34 as authenticated role in org A (its own org), the package IS visible under RLS
+DO
+RESET
+DO
+DO
+NOTICE:  PASS: S35 read-only member is denied membership.manage even on an already-used request_key (authorization re-checked every call)
+DO
+NOTICE:  PASS: S36 read-only member is denied repair (membership.manage required)
+NOTICE:  PASS: S37 read-only member is denied archive (membership.manage required)
+DO
+NOTICE:  PASS: S38 a read-only member CAN preview reconciliation (membership.read is sufficient for the read-only path)
+DO
+DO
+DO
+INSERT 0 1
+DO
+NOTICE:  PASS: S39 rollover_policy=none: remaining ends at reserved(1) + total_sessions(5) = 6 (5 sold, -4 unreserved excess discarded, +5 renewal)
+DO
+NOTICE:  PASS: S40 rollover_policy=none: the HELD (reserved) session survives the renewal untouched -- available afterward is exactly total_sessions (6 remaining - 1 reserved = 5)
+DO
+NOTICE:  PASS: S41 rollover_policy=none: the compensating adjustment discards exactly the unreserved excess (4 = 5 sold - 1 held), never the held session, and is a real ledger row, not a raw cache overwrite
+DO
+NOTICE:  PASS: S42 renewal invoice captures the catalog price observed at the time of the ORIGINAL call (150000)
+DO
+UPDATE 1
+DO
+NOTICE:  PASS: S43 a legitimate retry of the SAME request_key with IDENTICAL inputs after a catalog price change still returns the ORIGINAL invoice (review finding #1/#3 -- this used to be rejected as request_key_reused_for_different_renewal, which was the actual bug)
+NOTICE:  PASS: S44 the returned invoice keeps its originally captured total (150000), unaffected by the later catalog price edit to 999999
+NOTICE:  PASS: S44b renewal request_key reused with a different issued_at is rejected
+DO
+NOTICE:  PASS: S44c renewal request_key reused with different admin_notes is rejected
+DO
+DO
+NOTICE:  PASS: S45 renewal request_key reused at a different branch is rejected, not silently accepted
+NOTICE:  PASS: S46 preview_package_renewal writes nothing (revision/sessions_remaining unchanged)
+NOTICE:  PASS: S47 preview exposes price/currency/sessions/expiry/pet/service scope and a terms_fingerprint
+NOTICE:  PASS: S48 preview reports compatible while the catalog per_pet flag still matches the membership's actual pet scope
+DO
+DO
+NOTICE:  PASS: S48b a new renewal without a terms_fingerprint is refused (renewal_preview_required)
+DO
+NOTICE:  PASS: S48c a stale terms_fingerprint (catalog price changed since the preview was generated) is refused, not silently accepted
+DO
+NOTICE:  PASS: S48d after reloading the preview (fresh fingerprint), the SAME request succeeds and charges the NEW catalog price (deliberate re-confirmation, not a silent block forever)
+DO
+UPDATE 1
+UPDATE 1
+NOTICE:  PASS: S49 catalog per_pet drifting from true to false while the membership keeps its OPTIONALLY-bound pet is COMPATIBLE (the review round 3 bug fix -- pet presence alone is not proof the catalog changed)
+DO
+UPDATE 1
+DO
+UPDATE 1
+DO
+NOTICE:  PASS: S50 catalog per_pet drifting from false to true for a membership that was sold with NO pet bound at all is genuinely incompatible
+NOTICE:  PASS: S50b preview reports the specific blocking reason before any write is attempted
+NOTICE:  PASS: S51 renewal correctly refuses to charge for a now-incompatible catalog product rather than silently topping it up
+DO
+UPDATE 1
+INSERT 0 1
+UPDATE 1
+DO
+NOTICE:  PASS: S52 catalog service_id changing from the purchased service (Grooming) to a DIFFERENT specific service (Spa) is incompatible (a real held reservation is present throughout this check)
+DO
+NOTICE:  PASS: S53 renewal correctly refuses a service A->B drift, not silently charging for Spa while topping up a Grooming entitlement
+UPDATE 1
+DO
+NOTICE:  PASS: S54 catalog service_id broadening from a specific service to NULL ("any service") is compatible -- the purchased entitlement keeps its own specific scope regardless
+UPDATE 1
+UPDATE 1
+NOTICE:  PASS: S55 catalog service_id narrowing from NULL to a specific service, for a membership purchased under "any service", is compatible
+DO
+NOTICE:  PASS: S56 a legitimate renewal under a compatible (broadened-then-narrowed) service scope succeeds as a real RPC call, not merely a passing preview
+DO
+UPDATE 1
+DO
+INSERT 0 1
+DO
+NOTICE:  PASS: S57 a renewal ledger row linked to an invoice belonging to a DIFFERENT package is flagged invalid_invoice_links -- a non-null invoice_id alone is not treated as proof of correct provenance
+INSERT 0 2
+DO
+UPDATE 1
+DO
+NOTICE:  PASS: S58 a reservation released after consumption with no reversal_ledger_id is flagged missing_reversal_link
+DO
+DO
+NOTICE:  PASS: S59 two reservations sharing the same consumption_ledger_id are flagged duplicate_consumption_links, not assumed impossible
+NOTICE:  PASS: S60 a healthy purchase with a real, correctly-linked source invoice is not missing_source_invoice
+NOTICE:  PASS: S61 a healthy purchase's source invoice validates correctly (right customer, right package, matching session snapshot)
+DO
+INSERT 0 1
+INSERT 0 1
+DO
+UPDATE 1
+NOTICE:  PASS: S62 a historical source_invoice_id pointing at a REAL invoice for the right package but a DIFFERENT customer (Cust A2, not fingerprint_cp's actual owner Cust A1) is flagged invalid_source_invoice
+DO
+UPDATE 1
+DO
+NOTICE:  PASS: S63 a historical source_invoice_id pointing at an invoice for the right customer but a DIFFERENT package is flagged invalid_source_invoice
+DO
+UPDATE 1
+UPDATE 1
+DO
+NOTICE:  PASS: S64 a historical source_invoice_id pointing at a VOID invoice (right customer/package, wrong status) is flagged invalid_source_invoice
+DO
+UPDATE 1
+NOTICE:  PASS: S65 a historical source invoice with the RIGHT customer/package/status but a MISMATCHED session snapshot (corrupted to 999) is flagged invalid_source_invoice -- never today's catalog sessions, the actual invoice line snapshot at the time
+DO
+UPDATE 1
+DO
+INSERT 0 1
+NOTICE:  PASS: S66 a renewal ledger row for the SAME membership but linked to a DIFFERENT renewal's invoice (request_key mismatch) is flagged invalid_invoice_links -- renewal_of matching alone is not sufficient proof
+DO
+INSERT 0 1
+NOTICE:  PASS: S67 a legacy renewal ledger row with invoice_id NULL (predating this migration) is flagged unlinked_renewal_invoice, an explicit disclosed gap, never invented history
+DO
+DO
+NOTICE:  PASS: S68 allowed correction updates pet_id
+NOTICE:  PASS: S68b allowed correction updates service_id
+NOTICE:  PASS: S68c the revision is bumped so a concurrent stale request is now detectable
+NOTICE:  PASS: S69 a terms correction never touches sessions_remaining (no balance edit)
+NOTICE:  PASS: S69b the source invoice's total is untouched by a terms correction (no retroactive rewriting of invoice terms)
+DO
+NOTICE:  PASS: S70 the correction is audited in timeline_events with the reason
+NOTICE:  PASS: S70b the audit row records both the before and after pet_id
+NOTICE:  PASS: S71 a stale revision on a terms correction is rejected (40001), matching repair_customer_package_balance's pattern
+DO
+DO
+DO
+NOTICE:  PASS: S72 read-only member is denied terms correction (membership.manage required)
+DO
+NOTICE:  PASS: S73 a pet belonging to the SAME customer is accepted
+DO
+NOTICE:  PASS: S74 assigning a pet that belongs to a different customer is rejected (pet_not_found_for_customer)
+DO
+NOTICE:  PASS: S75 pet/service scope is locked once a membership has ANY reservation history or has been renewed
+DO
+DO
+NOTICE:  PASS: S76 expires_at remains correctable on a scope-locked membership as long as pet_id/service_id are resubmitted UNCHANGED
+DO
+ROLLBACK

@@ -75,6 +75,10 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20260924120000_invoice_workflow.sql
   supabase/migrations/20260924130000_service_size_pricing.sql
   supabase/migrations/20260924140000_invoice_discounts_charges.sql
+  supabase/migrations/20260925100000_package_membership_lifecycle.sql
+  supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql
+  supabase/migrations/20260927090000_membership_revision_null_guards.sql
+  supabase/migrations/20261002090000_retention_renewal_followups.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -115,7 +119,7 @@ step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
 run_as_postgres dropdb --if-exists operro_gate
 run_as_postgres createdb operro_gate
 psql_db operro_gate -q -v ON_ERROR_STOP=1 -c \
-  "create schema if not exists auth; create table if not exists auth.users(id uuid primary key, email text, raw_user_meta_data jsonb); create schema if not exists storage; create table if not exists storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]); create table if not exists storage.objects(id uuid, bucket_id text, name text); create or replace function storage.foldername(name text) returns text[] language sql immutable as \$\$ select string_to_array(name, '/') \$\$; do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role service_role nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role supabase_auth_admin nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
+  "create schema if not exists extensions; create extension if not exists pgcrypto with schema extensions; create schema if not exists auth; create table if not exists auth.users(id uuid primary key, email text, raw_user_meta_data jsonb); create or replace function auth.uid() returns uuid language sql stable as \$\$ select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid \$\$; create schema if not exists storage; create table if not exists storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]); create table if not exists storage.objects(id uuid, bucket_id text, name text); create or replace function storage.foldername(name text) returns text[] language sql immutable as \$\$ select string_to_array(name, '/') \$\$; do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role service_role nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role supabase_auth_admin nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
 psql_db operro_gate -q -v ON_ERROR_STOP=1 -f integration/gate_bootstrap_extensions.sql
 for migration in "${EXPECTED_MIGRATIONS[@]}"; do
   psql_db operro_gate -q -v ON_ERROR_STOP=1 -f "$migration"
@@ -147,7 +151,7 @@ step "GATE 8 — completion vs assembly/reservation concurrency"
 run_as_postgres dropdb --if-exists operro_cc
 run_as_postgres createdb operro_cc
 psql_db operro_cc -q -v ON_ERROR_STOP=1 -c \
-  "create schema if not exists auth; create table if not exists auth.users(id uuid primary key, email text, raw_user_meta_data jsonb); create schema if not exists storage; create table if not exists storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]); create table if not exists storage.objects(id uuid, bucket_id text, name text); create or replace function storage.foldername(name text) returns text[] language sql immutable as \$\$ select string_to_array(name, '/') \$\$; do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role service_role nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role supabase_auth_admin nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
+  "create schema if not exists extensions; create extension if not exists pgcrypto with schema extensions; create schema if not exists auth; create table if not exists auth.users(id uuid primary key, email text, raw_user_meta_data jsonb); create or replace function auth.uid() returns uuid language sql stable as \$\$ select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid \$\$; create schema if not exists storage; create table if not exists storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]); create table if not exists storage.objects(id uuid, bucket_id text, name text); create or replace function storage.foldername(name text) returns text[] language sql immutable as \$\$ select string_to_array(name, '/') \$\$; do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role service_role nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role supabase_auth_admin nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticated nologin noinherit; exception when duplicate_object then null; end \$\$;"
 psql_db operro_cc -q -v ON_ERROR_STOP=1 -f integration/gate_bootstrap_extensions.sql
 for migration in "${EXPECTED_MIGRATIONS[@]}"; do
   psql_db operro_cc -q -v ON_ERROR_STOP=1 -f "$migration"
@@ -157,6 +161,8 @@ CONC_TMP="$(mktemp -d /tmp/operro-concurrency.XXXXXX)"
 trap 'rm -rf "$CONC_TMP"' EXIT
 
 cp -a supabase/tests/concurrency/. "$CONC_TMP/"
+# Execute portable copies from Windows checkouts without changing source files.
+find "$CONC_TMP" -type f -name '*.sh' -exec sed -i 's/\r$//' {} +
 chmod -R a+rX "$CONC_TMP"
 
 run_as_postgres env DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/operro_cc" \

@@ -1,0 +1,31 @@
+INSERT 0 4
+INSERT 0 3
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/invoice_parity_smoke.sql:36: NOTICE:  PASS package invoice, idempotency, package line, and 3-session balance
+DO
+COMMIT
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+DO
+psql:integration/invoice_parity_smoke.sql:70: NOTICE:  PASS preview and issued total=200, discount=20, transport fee=20, manual groomer
+COMMIT

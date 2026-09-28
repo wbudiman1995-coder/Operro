@@ -5,7 +5,7 @@ export interface CustomerOption { id: string; name: string; phone: string | null
 export interface PetOption { id: string; customerId: string; name: string; breed: string | null }
 export interface ServiceOption { id: string; name: string; category: string; durationMinutes: number; basePrice: number; currency: string }
 export interface ResourceOption { id: string; branchId: string; name: string }
-export interface CustomerPackageOption { id: string; customerId: string; name: string; serviceId: string | null; sessionsRemaining: number; expiresAt: string | null }
+export interface CustomerPackageOption { id: string; customerId: string; name: string; serviceId: string | null; petId: string | null; sessionsRemaining: number; reservedSessions: number; availableSessions: number; expiresAt: string | null }
 export interface AddressOption { id: string; customerId: string; label: string; formattedLine: string; kecamatan: string | null; kabupatenKota: string | null; latitude: number | null; longitude: number | null; isDefault: boolean }
 export interface ServiceAreaOption { branchId: string; kecamatan: string | null; kabupatenKota: string; travelFee: number; estimatedTravelMinutes: number }
 export interface NextDiscountOption { customerId: string; label: string; rules: Record<string, { type: string; value: number }>; expiresAt: string | null }
@@ -54,7 +54,7 @@ export async function loadBookingWorkspace(
   from: string,
   to: string,
 ): Promise<BookingWorkspaceData> {
-  const [branchResult, customerResult, petResult, serviceResult, resourceResult, addressResult, serviceAreaResult, nextDiscountResult, packageResult, bookingResult] = await Promise.all([
+  const [branchResult, customerResult, petResult, serviceResult, resourceResult, addressResult, serviceAreaResult, nextDiscountResult, packageResult, reservedResult, bookingResult] = await Promise.all([
     supabase.from("branches").select("id,name,timezone").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("customers").select("id,display_name,phone").eq("organization_id", organizationId).in("status", ["lead", "active"]).is("deleted_at", null).order("display_name"),
     supabase.from("pets").select("id,customer_id,name,breed").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
@@ -63,11 +63,14 @@ export async function loadBookingWorkspace(
     supabase.from("customer_addresses").select("id,customer_id,label,line1,line2,kecamatan,kabupaten_kota,province,postal_code,latitude,longitude,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
     supabase.from("branch_service_areas").select("branch_id,kecamatan,kabupaten_kota,travel_fee,estimated_travel_minutes").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null),
     supabase.from("customer_next_discounts").select("customer_id,label,rules,expires_at").eq("organization_id", organizationId).eq("status", "active").or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
-    supabase.from("customer_packages").select("id,customer_id,service_id,sessions_remaining,expires_at,packages(name)").eq("organization_id", organizationId).eq("status", "active").gt("sessions_remaining", 0).is("deleted_at", null).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
+    supabase.from("customer_packages").select("id,customer_id,service_id,pet_id,sessions_remaining,expires_at,packages(name)").eq("organization_id", organizationId).eq("status", "active").gt("sessions_remaining", 0).is("deleted_at", null).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
+    // Coverage detection (section 23): available = sessions_remaining - already-reserved,
+    // so the wizard can warn before a selection collides with server-side availability.
+    supabase.from("package_reservations").select("customer_package_id").eq("organization_id", organizationId).eq("status", "reserved"),
     supabase.from("bookings").select("id,branch_id,customer_id,starts_at,ends_at,status,fulfillment_mode,grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", from).lt("starts_at", to).is("deleted_at", null).order("starts_at"),
   ]);
 
-  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["addresses", addressResult], ["service_areas", serviceAreaResult], ["next_discounts", nextDiscountResult], ["customer_packages", packageResult], ["bookings", bookingResult]] as const) {
+  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["addresses", addressResult], ["service_areas", serviceAreaResult], ["next_discounts", nextDiscountResult], ["customer_packages", packageResult], ["package_reservations", reservedResult], ["bookings", bookingResult]] as const) {
     if (result.error) fail(scope, result.error.message);
   }
 
@@ -90,14 +93,24 @@ export async function loadBookingWorkspace(
       }));
       return { customerId: row.customer_id, label: row.label, rules, expiresAt: row.expires_at };
     }),
-    customerPackages: (packageResult.data ?? []).map((row) => ({
-      id: row.id,
-      customerId: row.customer_id,
-      name: (() => { const value = relationRows(row.packages)[0]?.name; return typeof value === "string" ? value : "Paket"; })(),
-      serviceId: row.service_id,
-      sessionsRemaining: row.sessions_remaining,
-      expiresAt: row.expires_at,
-    })),
+    customerPackages: (() => {
+      const reservedByPackage = new Map<string, number>();
+      for (const row of reservedResult.data ?? []) reservedByPackage.set(row.customer_package_id, (reservedByPackage.get(row.customer_package_id) ?? 0) + 1);
+      return (packageResult.data ?? []).map((row) => {
+        const reserved = reservedByPackage.get(row.id) ?? 0;
+        return {
+          id: row.id,
+          customerId: row.customer_id,
+          name: (() => { const value = relationRows(row.packages)[0]?.name; return typeof value === "string" ? value : "Paket"; })(),
+          serviceId: row.service_id,
+          petId: row.pet_id,
+          sessionsRemaining: row.sessions_remaining,
+          reservedSessions: reserved,
+          availableSessions: Math.max(0, row.sessions_remaining - reserved),
+          expiresAt: row.expires_at,
+        };
+      });
+    })(),
     addresses: (addressResult.data ?? []).map((row) => ({
       id: row.id,
       customerId: row.customer_id,

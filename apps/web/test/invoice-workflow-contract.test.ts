@@ -7,7 +7,6 @@ const root = path.join(__dirname, "../../..");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/20260924120000_invoice_workflow.sql"), "utf8");
 const studio = fs.readFileSync(path.join(root, "apps/web/src/components/invoice-studio.tsx"), "utf8");
 const actions = fs.readFileSync(path.join(root, "apps/web/src/app/invoices/actions.ts"), "utf8");
-const pilotActions = fs.readFileSync(path.join(root, "apps/web/src/app/pilot-actions.ts"), "utf8");
 
 test("invoice workflow separates visit and package billing with immutable identity", () => {
   assert.match(migration, /billing_mode in \('after_visit','package_sale'\)/);

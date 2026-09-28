@@ -9,10 +9,10 @@ export interface InvoiceStudioData {
     pets: Array<{ id: string; name: string }>;
     serviceLines: Array<{ id: string; serviceId: string; name: string }>;
   }>;
-  customers: Array<{ id: string; name: string; code: string; petNames: string[]; address: string; searchText: string }>;
+  customers: Array<{ id: string; name: string; code: string; petNames: string[]; pets: Array<{ id: string; name: string }>; address: string; searchText: string }>;
   branches: Array<{ id: string; name: string }>;
   groomers: Array<{ id: string; branchId: string; name: string }>;
-  packages: Array<{ id: string; name: string; sessions: number; price: number; currency: string }>;
+  packages: Array<{ id: string; name: string; sessions: number; price: number; currency: string; perPet: boolean; recurrenceInterval: string }>;
 }
 
 export async function loadInvoiceStudioData(supabase: SupabaseClient, organizationId: string): Promise<InvoiceStudioData> {
@@ -25,7 +25,7 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
     supabase.from("customer_addresses").select("customer_id,line1,kecamatan,kabupaten_kota,province,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
     supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,name").eq("organization_id", organizationId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).order("name"),
-    supabase.from("packages").select("id,name,total_sessions,price,currency").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
+    supabase.from("packages").select("id,name,total_sessions,price,currency,per_pet,recurrence_interval").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
   ]);
   for (const [scope, result] of [["invoice_bookings", bookings], ["invoice_customers", customers], ["invoice_pets", pets], ["invoice_addresses", addresses], ["invoice_branches", branches], ["invoice_groomers", groomers], ["invoice_packages", packages]] as const) fail(scope, result.error);
   const bookingIds = (bookings.data ?? []).map((row) => row.id);
@@ -47,11 +47,12 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
   const petMap = new Map((pets.data ?? []).map((row) => [row.id, row.name]));
   const groomerMap = new Map((groomers.data ?? []).map((row) => [row.id, row.name]));
   const customerRows = (customers.data ?? []).map((customer) => {
-    const petNames = (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => pet.name);
+    const customerPets = (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name }));
+    const petNames = customerPets.map((pet) => pet.name);
     const addressRow = (addresses.data ?? []).find((address) => address.customer_id === customer.id);
     const address = addressRow ? [addressRow.line1, addressRow.kecamatan, addressRow.kabupaten_kota, addressRow.province].filter(Boolean).join(", ") : "";
     const code = `CUS-${customer.id.slice(0, 8).toUpperCase()}`;
-    return { id: customer.id, name: customer.display_name, code, petNames, address, searchText: [customer.display_name, code, address, ...petNames].join(" ").toLowerCase() };
+    return { id: customer.id, name: customer.display_name, code, petNames, pets: customerPets, address, searchText: [customer.display_name, code, address, ...petNames].join(" ").toLowerCase() };
   });
   return {
     recentBookings: (bookings.data ?? []).filter((booking) => !invoicedBookings.has(booking.id)).map((booking) => {
@@ -66,6 +67,6 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
     }),
     customers: customerRows,
     branches: branches.data ?? [], groomers: (groomers.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, name: row.name })),
-    packages: (packages.data ?? []).map((pkg) => ({ id: pkg.id, name: pkg.name, sessions: pkg.total_sessions, price: Number(pkg.price), currency: pkg.currency })),
+    packages: (packages.data ?? []).map((pkg) => ({ id: pkg.id, name: pkg.name, sessions: pkg.total_sessions, price: Number(pkg.price), currency: pkg.currency, perPet: pkg.per_pet, recurrenceInterval: pkg.recurrence_interval })),
   };
 }

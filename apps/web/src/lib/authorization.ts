@@ -49,6 +49,7 @@ export const CAPABILITY_KEYS = [
   "booking.cancel",
   "resource.manage",
   "invoice.issue",
+  "settings.manage",
 ] as const;
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number];
 export type CapabilityMap = Record<CapabilityKey, boolean>;

@@ -290,14 +290,14 @@ export default async function CustomerDetailPage({
               {packages.map((item) => (
                 <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-800">{item.packageName}</p>
+                    <p className="truncate text-sm font-bold text-slate-800">{item.packageName}{item.petName ? ` · ${item.petName}` : ""}</p>
                     <p className="mt-0.5 text-xs text-slate-500">
                       Dibeli {formatZonedDate(item.purchasedAt, branchContext.defaultTimezone)}
                       {item.expiresAt ? ` · berlaku sampai ${formatZonedDate(item.expiresAt, branchContext.defaultTimezone)}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-emerald-700">{item.sessionsRemaining} sesi</span>
+                    <span className="text-sm font-bold text-emerald-700">{item.availableSessions}/{item.sessionsRemaining} sesi{item.reservedSessions > 0 ? ` (${item.reservedSessions} dipesan)` : ""}</span>
                     <StatusBadge status={item.status} />
                   </div>
                 </li>

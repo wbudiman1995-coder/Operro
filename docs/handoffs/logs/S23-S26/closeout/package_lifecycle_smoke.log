@@ -1,0 +1,255 @@
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+INSERT 0 3
+INSERT 0 2
+INSERT 0 2
+INSERT 0 2
+INSERT 0 2
+INSERT 0 3
+INSERT 0 0
+INSERT 0 8
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 6
+INSERT 0 2
+INSERT 0 2
+INSERT 0 2
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+INSERT 0 2
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:122: NOTICE:  PASS: S1 per-pet package rejects the wrong pet
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:126: NOTICE:  PASS: S2 per-pet package reserves for its own pet
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:141: NOTICE:  PASS: S3 coverage listing shows 3 available before any reservation
+DO
+psql:integration/package_lifecycle_smoke.sql:150: NOTICE:  PASS: S4 reconcile reports a healthy (matching) balance
+psql:integration/package_lifecycle_smoke.sql:150: NOTICE:  PASS: S5 revision reflects the purchase's own ledger-driven bump (default 1 + 1)
+UPDATE 1
+psql:integration/package_lifecycle_smoke.sql:158: NOTICE:  PASS: S6 reconcile detects the induced mismatch
+psql:integration/package_lifecycle_smoke.sql:158: NOTICE:  PASS: S7 reconcile reports the exact cached vs ledger values
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:166: NOTICE:  PASS: S8 repair rejects a stale revision (40001 stale_repair_request)
+psql:integration/package_lifecycle_smoke.sql:176: NOTICE:  PASS: S9 repair restores the cached balance to match the ledger
+DO
+psql:integration/package_lifecycle_smoke.sql:176: NOTICE:  PASS: S10 repeating the same repair request_key is idempotent (no double-adjustment)
+DO
+psql:integration/package_lifecycle_smoke.sql:180: NOTICE:  PASS: S11 reconcile confirms the package is healthy again after repair
+INSERT 0 1
+UPDATE 1
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S12 renewal produces a real invoice with status issued (not paid -- an issued invoice is never proof of payment)
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S13 renewal invoice total matches the catalog price
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S14 renewal invoice metadata links back to the membership it renews
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S15 renewal reactivates an exhausted/expired package
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S16 renewal tops up a fresh term's worth of sessions (rollover: additive on top of whatever was left)
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S17 renewal extends expiry into the future
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S18 renewal increments renewal_count
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S19 the renewal ledger row links to the renewal invoice (invoice_id)
+DO
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S20 repeating the same renewal request_key returns the SAME invoice (idempotent), even with a garbage terms_fingerprint -- a retry never re-checks it
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S21 the idempotent retry did not double-apply (renewal_count still 1)
+DO
+psql:integration/package_lifecycle_smoke.sql:227: NOTICE:  PASS: S22 renewal request_key reused for a different membership is rejected
+psql:integration/package_lifecycle_smoke.sql:236: NOTICE:  PASS: S23 a healthy package is not auto_repairable (nothing to repair)
+DO
+psql:integration/package_lifecycle_smoke.sql:236: NOTICE:  PASS: S24 a fully-linked, non-legacy package has zero manual_review_issues
+INSERT 0 1
+psql:integration/package_lifecycle_smoke.sql:251: NOTICE:  PASS: S25 an orphan consumption ledger row (no reservation link) is flagged for manual review
+psql:integration/package_lifecycle_smoke.sql:251: NOTICE:  PASS: S26 reservation_consumption_matches turns false once a link is broken, even though the raw counts alone would look plausible
+DO
+INSERT 0 1
+psql:integration/package_lifecycle_smoke.sql:261: NOTICE:  PASS: S27 a legacy package with no source_invoice_id is flagged missing_source_invoice, never silently treated as healthy
+DO
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:274: NOTICE:  PASS: S28 archive refuses a package with a reserved session outstanding
+UPDATE 1
+DO
+psql:integration/package_lifecycle_smoke.sql:279: NOTICE:  PASS: S29 archive succeeds once no reservation remains outstanding
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:288: NOTICE:  PASS: S30 cross-org reconcile correctly denies access (package_not_found)
+DO
+psql:integration/package_lifecycle_smoke.sql:294: NOTICE:  PASS: S31 cross-org repair correctly denies access (package_not_found)
+DO
+psql:integration/package_lifecycle_smoke.sql:300: NOTICE:  PASS: S32 cross-org renewal correctly denies access (package_not_found) even though the caller supplied ITS OWN valid branch
+SET
+DO
+psql:integration/package_lifecycle_smoke.sql:308: NOTICE:  PASS: S33 as authenticated role in org B, org A's customer_packages row is invisible under RLS
+DO
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:313: NOTICE:  PASS: S34 as authenticated role in org A (its own org), the package IS visible under RLS
+RESET
+DO
+psql:integration/package_lifecycle_smoke.sql:330: NOTICE:  PASS: S35 read-only member is denied membership.manage even on an already-used request_key (authorization re-checked every call)
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:336: NOTICE:  PASS: S36 read-only member is denied repair (membership.manage required)
+DO
+psql:integration/package_lifecycle_smoke.sql:342: NOTICE:  PASS: S37 read-only member is denied archive (membership.manage required)
+DO
+psql:integration/package_lifecycle_smoke.sql:347: NOTICE:  PASS: S38 a read-only member CAN preview reconciliation (membership.read is sufficient for the read-only path)
+DO
+DO
+INSERT 0 1
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:374: NOTICE:  PASS: S39 rollover_policy=none: remaining ends at reserved(1) + total_sessions(5) = 6 (5 sold, -4 unreserved excess discarded, +5 renewal)
+DO
+psql:integration/package_lifecycle_smoke.sql:378: NOTICE:  PASS: S40 rollover_policy=none: the HELD (reserved) session survives the renewal untouched -- available afterward is exactly total_sessions (6 remaining - 1 reserved = 5)
+DO
+psql:integration/package_lifecycle_smoke.sql:382: NOTICE:  PASS: S41 rollover_policy=none: the compensating adjustment discards exactly the unreserved excess (4 = 5 sold - 1 held), never the held session, and is a real ledger row, not a raw cache overwrite
+DO
+psql:integration/package_lifecycle_smoke.sql:392: NOTICE:  PASS: S42 renewal invoice captures the catalog price observed at the time of the ORIGINAL call (150000)
+UPDATE 1
+DO
+psql:integration/package_lifecycle_smoke.sql:400: NOTICE:  PASS: S43 a legitimate retry of the SAME request_key with IDENTICAL inputs after a catalog price change still returns the ORIGINAL invoice (review finding #1/#3 -- this used to be rejected as request_key_reused_for_different_renewal, which was the actual bug)
+psql:integration/package_lifecycle_smoke.sql:400: NOTICE:  PASS: S44 the returned invoice keeps its originally captured total (150000), unaffected by the later catalog price edit to 999999
+psql:integration/package_lifecycle_smoke.sql:411: NOTICE:  PASS: S44b renewal request_key reused with a different issued_at is rejected
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:417: NOTICE:  PASS: S44c renewal request_key reused with different admin_notes is rejected
+DO
+psql:integration/package_lifecycle_smoke.sql:426: NOTICE:  PASS: S45 renewal request_key reused at a different branch is rejected, not silently accepted
+psql:integration/package_lifecycle_smoke.sql:438: NOTICE:  PASS: S46 preview_package_renewal writes nothing (revision/sessions_remaining unchanged)
+psql:integration/package_lifecycle_smoke.sql:438: NOTICE:  PASS: S47 preview exposes price/currency/sessions/expiry/pet/service scope and a terms_fingerprint
+DO
+psql:integration/package_lifecycle_smoke.sql:438: NOTICE:  PASS: S48 preview reports compatible while the catalog per_pet flag still matches the membership's actual pet scope
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:459: NOTICE:  PASS: S48b a new renewal without a terms_fingerprint is refused (renewal_preview_required)
+psql:integration/package_lifecycle_smoke.sql:469: NOTICE:  PASS: S48c a stale terms_fingerprint (catalog price changed since the preview was generated) is refused, not silently accepted
+DO
+psql:integration/package_lifecycle_smoke.sql:475: NOTICE:  PASS: S48d after reloading the preview (fresh fingerprint), the SAME request succeeds and charges the NEW catalog price (deliberate re-confirmation, not a silent block forever)
+DO
+UPDATE 1
+UPDATE 1
+DO
+psql:integration/package_lifecycle_smoke.sql:487: NOTICE:  PASS: S49 catalog per_pet drifting from true to false while the membership keeps its OPTIONALLY-bound pet is COMPATIBLE (the review round 3 bug fix -- pet presence alone is not proof the catalog changed)
+UPDATE 1
+DO
+UPDATE 1
+psql:integration/package_lifecycle_smoke.sql:499: NOTICE:  PASS: S50 catalog per_pet drifting from false to true for a membership that was sold with NO pet bound at all is genuinely incompatible
+DO
+psql:integration/package_lifecycle_smoke.sql:499: NOTICE:  PASS: S50b preview reports the specific blocking reason before any write is attempted
+psql:integration/package_lifecycle_smoke.sql:505: NOTICE:  PASS: S51 renewal correctly refuses to charge for a now-incompatible catalog product rather than silently topping it up
+DO
+UPDATE 1
+INSERT 0 1
+UPDATE 1
+psql:integration/package_lifecycle_smoke.sql:518: NOTICE:  PASS: S52 catalog service_id changing from the purchased service (Grooming) to a DIFFERENT specific service (Spa) is incompatible (a real held reservation is present throughout this check)
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:524: NOTICE:  PASS: S53 renewal correctly refuses a service A->B drift, not silently charging for Spa while topping up a Grooming entitlement
+UPDATE 1
+psql:integration/package_lifecycle_smoke.sql:529: NOTICE:  PASS: S54 catalog service_id broadening from a specific service to NULL ("any service") is compatible -- the purchased entitlement keeps its own specific scope regardless
+DO
+UPDATE 1
+UPDATE 1
+psql:integration/package_lifecycle_smoke.sql:541: NOTICE:  PASS: S55 catalog service_id narrowing from NULL to a specific service, for a membership purchased under "any service", is compatible
+DO
+psql:integration/package_lifecycle_smoke.sql:545: NOTICE:  PASS: S56 a legitimate renewal under a compatible (broadened-then-narrowed) service scope succeeds as a real RPC call, not merely a passing preview
+DO
+UPDATE 1
+DO
+INSERT 0 1
+DO
+psql:integration/package_lifecycle_smoke.sql:563: NOTICE:  PASS: S57 a renewal ledger row linked to an invoice belonging to a DIFFERENT package is flagged invalid_invoice_links -- a non-null invoice_id alone is not treated as proof of correct provenance
+INSERT 0 2
+DO
+UPDATE 1
+psql:integration/package_lifecycle_smoke.sql:583: NOTICE:  PASS: S58 a reservation released after consumption with no reversal_ledger_id is flagged missing_reversal_link
+DO
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:595: NOTICE:  PASS: S59 two reservations sharing the same consumption_ledger_id are flagged duplicate_consumption_links, not assumed impossible
+psql:integration/package_lifecycle_smoke.sql:609: NOTICE:  PASS: S60 a healthy purchase with a real, correctly-linked source invoice is not missing_source_invoice
+psql:integration/package_lifecycle_smoke.sql:609: NOTICE:  PASS: S61 a healthy purchase's source invoice validates correctly (right customer, right package, matching session snapshot)
+DO
+INSERT 0 1
+INSERT 0 1
+DO
+UPDATE 1
+DO
+psql:integration/package_lifecycle_smoke.sql:621: NOTICE:  PASS: S62 a historical source_invoice_id pointing at a REAL invoice for the right package but a DIFFERENT customer (Cust A2, not fingerprint_cp's actual owner Cust A1) is flagged invalid_source_invoice
+UPDATE 1
+DO
+psql:integration/package_lifecycle_smoke.sql:629: NOTICE:  PASS: S63 a historical source_invoice_id pointing at an invoice for the right customer but a DIFFERENT package is flagged invalid_source_invoice
+DO
+UPDATE 1
+UPDATE 1
+DO
+psql:integration/package_lifecycle_smoke.sql:641: NOTICE:  PASS: S64 a historical source_invoice_id pointing at a VOID invoice (right customer/package, wrong status) is flagged invalid_source_invoice
+DO
+UPDATE 1
+DO
+psql:integration/package_lifecycle_smoke.sql:665: NOTICE:  PASS: S65 a historical source invoice with the RIGHT customer/package/status but a MISMATCHED session snapshot (corrupted to 999) is flagged invalid_source_invoice -- never today's catalog sessions, the actual invoice line snapshot at the time
+UPDATE 1
+DO
+INSERT 0 1
+DO
+psql:integration/package_lifecycle_smoke.sql:689: NOTICE:  PASS: S66 a renewal ledger row for the SAME membership but linked to a DIFFERENT renewal's invoice (request_key mismatch) is flagged invalid_invoice_links -- renewal_of matching alone is not sufficient proof
+INSERT 0 1
+DO
+psql:integration/package_lifecycle_smoke.sql:700: NOTICE:  PASS: S67 a legacy renewal ledger row with invoice_id NULL (predating this migration) is flagged unlinked_renewal_invoice, an explicit disclosed gap, never invented history
+DO
+psql:integration/package_lifecycle_smoke.sql:731: NOTICE:  PASS: S68 allowed correction updates pet_id
+psql:integration/package_lifecycle_smoke.sql:731: NOTICE:  PASS: S68b allowed correction updates service_id
+psql:integration/package_lifecycle_smoke.sql:731: NOTICE:  PASS: S68c the revision is bumped so a concurrent stale request is now detectable
+psql:integration/package_lifecycle_smoke.sql:731: NOTICE:  PASS: S69 a terms correction never touches sessions_remaining (no balance edit)
+psql:integration/package_lifecycle_smoke.sql:731: NOTICE:  PASS: S69b the source invoice's total is untouched by a terms correction (no retroactive rewriting of invoice terms)
+psql:integration/package_lifecycle_smoke.sql:731: NOTICE:  PASS: S70 the correction is audited in timeline_events with the reason
+psql:integration/package_lifecycle_smoke.sql:731: NOTICE:  PASS: S70b the audit row records both the before and after pet_id
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:740: NOTICE:  PASS: S71 a stale revision on a terms correction is rejected (40001), matching repair_customer_package_balance's pattern
+DO
+psql:integration/package_lifecycle_smoke.sql:751: NOTICE:  PASS: S72 read-only member is denied terms correction (membership.manage required)
+DO
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:762: NOTICE:  PASS: S73 a pet belonging to the SAME customer is accepted
+DO
+psql:integration/package_lifecycle_smoke.sql:771: NOTICE:  PASS: S74 assigning a pet that belongs to a different customer is rejected (pet_not_found_for_customer)
+psql:integration/package_lifecycle_smoke.sql:782: NOTICE:  PASS: S75 pet/service scope is locked once a membership has ANY reservation history or has been renewed
+DO
+psql:integration/package_lifecycle_smoke.sql:787: NOTICE:  PASS: S76 expires_at remains correctable on a scope-locked membership as long as pet_id/service_id are resubmitted UNCHANGED
+DO
+DO
+psql:integration/package_lifecycle_smoke.sql:813: NOTICE:  PASS: C1 NULL correction revision rejected
+psql:integration/package_lifecycle_smoke.sql:813: NOTICE:  PASS: C2 rejected correction leaves row and audit untouched
+psql:integration/package_lifecycle_smoke.sql:813: NOTICE:  PASS: C3 stale correction revision rejected
+DO
+psql:integration/package_lifecycle_smoke.sql:813: NOTICE:  PASS: C4 valid expiry correction preserves locked scope and advances revision
+UPDATE 1
+psql:integration/package_lifecycle_smoke.sql:836: NOTICE:  PASS: C5 repair fixture contains actual drift
+psql:integration/package_lifecycle_smoke.sql:836: NOTICE:  PASS: C6 NULL revision with fresh repair key rejected
+psql:integration/package_lifecycle_smoke.sql:836: NOTICE:  PASS: C7 rejected repair leaves drift, revision and audit untouched
+DO
+psql:integration/package_lifecycle_smoke.sql:836: NOTICE:  PASS: C8 valid repair and original-revision retry have one effect
+DO
+SET
+DO
+psql:integration/package_lifecycle_smoke.sql:846: NOTICE:  PASS: C9 successful repair key cannot bypass read-only authorization
+DO
+psql:integration/package_lifecycle_smoke.sql:852: NOTICE:  PASS: C10 read-only correction denied before revision checks
+RESET
+ROLLBACK

@@ -1,0 +1,10 @@
+
+> web@0.1.0 lint
+> eslint
+
+
+/mnt/e/Claude/operro-local-dev/apps/web/test/invoice-workflow-contract.test.ts
+  10:7  warning  'pilotActions' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
