@@ -460,9 +460,29 @@ begin
        group by sc.currency order by count(*) desc limit 1),
       'USD'
     ) into v_currency;
-    insert into public.payroll_runs (organization_id, branch_id, period_start, period_end, status, currency)
-    values (v_org, p_branch, p_period_start, p_period_end, 'draft', v_currency)
-    returning id, status into v_run_id, v_status;
+    -- Two concurrent FIRST recomputes for the same not-yet-existing period can both
+    -- see "no row" before either commits. excl_payroll_runs_no_overlap still
+    -- prevents a duplicate row (the loser's INSERT blocks until the winner
+    -- commits, then fails), but a raw exclusion_violation is not the "successful-
+    -- looking failed action" the brief warns against either -- catch it and adopt
+    -- the winner's already-committed run instead of erroring the loser out.
+    begin
+      insert into public.payroll_runs (organization_id, branch_id, period_start, period_end, status, currency)
+      values (v_org, p_branch, p_period_start, p_period_end, 'draft', v_currency)
+      returning id, status into v_run_id, v_status;
+    exception when exclusion_violation then
+      select id, status, currency into v_run_id, v_status, v_currency from public.payroll_runs
+      where organization_id = v_org and coalesce(branch_id, '00000000-0000-0000-0000-000000000000'::uuid)
+          = coalesce(p_branch, '00000000-0000-0000-0000-000000000000'::uuid)
+        and period_start = p_period_start and period_end = p_period_end
+      for update;
+      if v_run_id is null then
+        raise; -- genuinely not our period after all (e.g. a broader overlapping range) -- surface it
+      end if;
+      if v_status <> 'draft' then
+        raise exception 'run_not_editable:%', v_status using errcode = 'check_violation';
+      end if;
+    end;
   elsif v_status <> 'draft' then
     raise exception 'run_not_editable:%', v_status using errcode = 'check_violation';
   end if;
