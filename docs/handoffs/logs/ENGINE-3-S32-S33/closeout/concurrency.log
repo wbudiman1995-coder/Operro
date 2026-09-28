@@ -1,0 +1,30 @@
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+error: deadlock detected
+    at C:\Users\DW_wi\Documents\Codex\2026-09-10\recap-all-you-know-about-operro\outputs\payroll-browser-tools\node_modules\pg\lib\client.js:535:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async authenticatedCall (C:\Users\DW_wi\Documents\Codex\2026-09-10\recap-all-you-know-about-operro\outputs\payroll-browser-tools\concurrency.cjs:18:15)
+    at async Promise.all (index 1)
+    at async C:\Users\DW_wi\Documents\Codex\2026-09-10\recap-all-you-know-about-operro\outputs\payroll-browser-tools\concurrency.cjs:32:23 {
+  length: 668,
+  severity: 'ERROR',
+  code: '40P01',
+  detail: 'Process 20206 waits for ShareLock on transaction 6377; blocked by process 20205.\n' +
+    'Process 20205 waits for ShareLock on transaction 6375; blocked by process 20206.',
+  hint: 'See server log for query details.',
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: 'while checking exclusion constraint on tuple (0,16) in relation "payroll_runs"\n' +
+    'SQL statement "insert into public.payroll_runs (organization_id, branch_id, period_start, period_end, status, currency)\n' +
+    "      values (v_org, p_branch, p_period_start, p_period_end, 'draft', v_currency)\n" +
+    '      returning id, status"\n' +
+    'PL/pgSQL function recompute_payroll_run(date,date,uuid) line 50 at SQL statement',
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'deadlock.c',
+  line: '1130',
+  routine: 'DeadLockReport'
+}

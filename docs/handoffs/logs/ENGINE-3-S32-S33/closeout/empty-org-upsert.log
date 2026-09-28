@@ -1,0 +1,11 @@
+BEGIN
+DELETE 1
+SET
+SET
+           organization_id            |    styling_tiers_default     | per_pet_size_matrix_default 
+--------------------------------------+------------------------------+-----------------------------
+ d0000000-0000-4000-8000-000000000001 | [{"pct": 10, "min_jobs": 1}] | {"small": 25000}
+(1 row)
+
+INSERT 0 1
+ROLLBACK

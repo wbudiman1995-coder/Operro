@@ -86,7 +86,12 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261002090000_retention_renewal_followups.sql
   supabase/migrations/20261002100000_payment_visit_register_pagination.sql
   supabase/migrations/20261003100000_storage_authorization_review.sql
+  supabase/migrations/20261010100000_payroll_engine_s32.sql
+  supabase/migrations/20261010110000_payroll_engine_s32_rpcs.sql
+  supabase/migrations/20261010120000_payroll_export_detail_rpc.sql
   supabase/migrations/20261012100000_invoice_number_random_suffix.sql
+  supabase/migrations/20261013100000_payroll_recompute_race_lock.sql
+  supabase/migrations/20261014100000_payroll_retention_ledger_idempotent.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -146,6 +151,9 @@ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20260721001350_test_ass
 step "GATE 6 — package-reservation regression tests"
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20260721001350_test_reservation.sql
 
+step "GATE 6b — payroll engine tests (sections 32-33)"
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261001100000_test_payroll_engine.sql
+
 step "GATE 7 — real authenticated-role integration (incl reserve_package_session)"
 psql_db operro_gate -q -v ON_ERROR_STOP=1 -c \
   "do \$\$ begin create role anon nologin noinherit; exception when duplicate_object then null; end \$\$; do \$\$ begin create role operro_gate_client login noinherit; exception when duplicate_object then null; end \$\$; alter role operro_gate_client login noinherit password 'stagingpw'; grant anon to operro_gate_client; grant authenticated to operro_gate_client; grant usage on schema public, app to anon, authenticated;"
@@ -165,19 +173,30 @@ for migration in "${EXPECTED_MIGRATIONS[@]}"; do
   psql_db operro_cc -q -v ON_ERROR_STOP=1 -f "$migration"
 done
 psql_db operro_cc -q -v ON_ERROR_STOP=1 -f supabase/tests/concurrency/conc_seed.sql
-CONC_TMP="$(mktemp -d /tmp/operro-concurrency.XXXXXX)"
-trap 'rm -rf "$CONC_TMP"' EXIT
-
-cp -a supabase/tests/concurrency/. "$CONC_TMP/"
-# Execute portable copies from Windows checkouts without changing source files.
-find "$CONC_TMP" -type f -name '*.sh' -exec sed -i 's/\r$//' {} +
-chmod -R a+rX "$CONC_TMP"
-
-run_as_postgres env DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/operro_cc" \
-  bash "$CONC_TMP/run_concurrency_assembly.sh"
-
-rm -rf "$CONC_TMP"
-trap - EXIT
+if [ -n "${GATE8_CONTAINER:-}" ]; then
+  # WSL hosts without a native psql client can run the unchanged harness inside
+  # the disposable PG16 container that has this repository mounted at /workspace.
+  docker exec -w /workspace \
+    -e DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@127.0.0.1:5432/operro_cc" \
+    "$GATE8_CONTAINER" bash -lc '
+      conc_tmp=$(mktemp -d /tmp/operro-concurrency.XXXXXX)
+      trap '\''rm -rf "$conc_tmp"'\'' EXIT
+      cp -a supabase/tests/concurrency/. "$conc_tmp/"
+      sed -i '\''s/\r$//'\'' "$conc_tmp/run_concurrency_assembly.sh"
+      bash "$conc_tmp/run_concurrency_assembly.sh"
+    '
+else
+  CONC_TMP="$(mktemp -d /tmp/operro-concurrency.XXXXXX)"
+  trap 'rm -rf "$CONC_TMP"' EXIT
+  cp -a supabase/tests/concurrency/. "$CONC_TMP/"
+  # Windows checkouts may materialize shell scripts with CRLF.
+  sed -i 's/\r$//' "$CONC_TMP/run_concurrency_assembly.sh"
+  chmod -R a+rX "$CONC_TMP"
+  run_as_postgres env DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/operro_cc" \
+    bash "$CONC_TMP/run_concurrency_assembly.sh"
+  rm -rf "$CONC_TMP"
+  trap - EXIT
+fi
 
 echo ""
 echo "ALL GATES PASSED"

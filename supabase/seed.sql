@@ -14,7 +14,10 @@
 -- against the GoTrue version your installed Supabase CLI actually bundles.
 --
 -- QA logins (password for both: "operro-local-qa"):
---   owner@homepaw.local    — full access, same role/org as homepaw_demo.sql
+--   wbudiman1995@gmail.com — owner, full access, same role/org as homepaw_demo.sql (this
+--                            comment previously said "owner@homepaw.local", which the actual
+--                            insert below never creates -- corrected during Engine 3 QA,
+--                            2026-09-27, after that stale value failed to sign in).
 --   groomer@homepaw.local  — same org, linked to the "Andi" resource for /my-schedule
 -- =====================================================================
 

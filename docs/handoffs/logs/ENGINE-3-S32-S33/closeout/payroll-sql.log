@@ -1,0 +1,48 @@
+                                                complete_booking                                                 
+-----------------------------------------------------------------------------------------------------------------
+ {"reason": null, "completed": true, "booking_id": "0f200000-0000-4000-8000-00000000ba01", "lines_processed": 8}
+(1 row)
+
+      issue_invoice_for_booking       
+--------------------------------------
+ 01a0e810-70a2-7c07-aba1-19b32259993d
+(1 row)
+
+                                                complete_booking                                                 
+-----------------------------------------------------------------------------------------------------------------
+ {"reason": null, "completed": true, "booking_id": "0f200000-0000-4000-8000-00000000ba05", "lines_processed": 1}
+(1 row)
+
+NOTICE:  PASS: recompute creates a run for the fully-past fixture period
+NOTICE:  PASS: A basic salary passthrough = 1000000
+NOTICE:  PASS: A no-late bonus is ZERO (one unwaived late record)
+NOTICE:  PASS: A no-sick bonus is full (zero sick days)
+NOTICE:  PASS: A perDog = 15000 (small matrix) + 20000 (nosize) + 20000 (transport pet, flat) = 55000, botak-only pet excluded
+NOTICE:  PASS: A botak incentive = 10000 (one botak-only pet, org default rate)
+NOTICE:  PASS: A styling = round(100000 revenue * 10%% tier for count=2) = 10000
+NOTICE:  PASS: A transport half-share = 25000 (100000 travel_fee / 2, split equally with B)
+NOTICE:  PASS: B styling = round(50000 revenue * 50%% PER-GROOMER override tier) = 25000, not the org default
+NOTICE:  PASS: B transport half-share = 25000 -- A+B shares sum to exactly 50000, never exceeding the pool
+NOTICE:  PASS: B perDog = 20000 (flat default, transport pet has no size)
+NOTICE:  PASS: exactly one completed-but-uninvoiced pet is flagged, not silently dropped
+NOTICE:  PASS: approve moves draft -> approved
+NOTICE:  PASS: pay moves approved -> paid
+NOTICE:  PASS: exactly one payroll_paid ledger entry after the first pay
+NOTICE:  PASS: paying an already-paid run again is a no-op -- still exactly one ledger entry
+NOTICE:  PASS: undo moves paid -> draft
+NOTICE:  PASS: undo adds a SECOND compensating ledger entry -- the original is never deleted
+NOTICE:  PASS: the two ledger entries (pay -total_net, undo +total_net) net to exactly zero
+NOTICE:  PASS: the original payroll_items snapshot rows still exist after undo (not deleted)
+NOTICE:  PASS: run metadata records exactly one correction
+NOTICE:  PASS: excl_payroll_runs_no_overlap rejects an overlapping period for the same org
+NOTICE:  PASS: recompute_payroll_run denies a member without payroll.manage (insufficient_privilege)
+NOTICE:  PASS: D retention payout rejected: retention_not_yet_payable
+NOTICE:  PASS: D has no retention event recorded after the rejected attempt
+NOTICE:  PASS: C retention payout = min(term_months=2, tenure=3) * 200000/month = 400000
+NOTICE:  PASS: C retention event kind is payout
+NOTICE:  PASS: C retention retry returns the SAME already-recorded amount (idempotent)
+NOTICE:  PASS: C has exactly one payout event despite two calls -- unique index enforced, not a duplicate lump sum
+NOTICE:  PASS: D still has zero retention events -- C's payout did not leak across memberships
+NOTICE:  PASS: org1's run id resolved for the cross-tenant probe below
+NOTICE:  PASS: org2's owner cannot approve org1's run by id (run_not_found, not a cross-tenant read)
+NOTICE:  PASS: org2's owner cannot pay retention for an org1 membership id (no_hire_date_on_record -- org1's data never read)

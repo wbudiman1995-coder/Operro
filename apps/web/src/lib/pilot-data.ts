@@ -7,7 +7,7 @@
  * - loadCatalogWorkspace: loads services, groomers, packages, products, and stock.
  * - loadFinanceWorkspace: loads invoices, payments, and expenses.
  * - loadReportWorkspace: aggregates the current month's operating report.
- * - loadPayrollWorkspace: loads staff base pay + accrued commission for a period, and any existing run.
+ * - Payroll (sections 32-33) has its own loader in @/lib/payroll-data, not here.
  * - loadMyScheduleWorkspace: loads the current user's own assigned, incomplete grooming jobs.
  * - loadLeaderboardWorkspace: ranks staff by dogs groomed and commission earned this month.
  * - loadFollowupWorkspace: finds customers whose pets are overdue for grooming.
@@ -255,31 +255,11 @@ export async function loadReportWorkspace(supabase: SupabaseClient, organization
   return { revenue, manualBilledRevenue, expense, net: revenue + manualBilledRevenue - expense, totalBookings: (bookings.data ?? []).length, completed, canceled, completionRate: (bookings.data ?? []).length ? Math.round(completed / (bookings.data ?? []).length * 100) : 0, methodTotals: [...methodTotals.entries()].map(([method, total]) => ({ method, total })) };
 }
 
-function embeddedStaffName(value: unknown) {
-  const user = relationRows(relationRows(value)[0]?.users)[0];
-  const name = user?.full_name ?? user?.email;
-  return typeof name === "string" && name.length > 0 ? name : "Staf";
-}
-
-export interface PayrollWorkspace {
-  run: { id: string; status: string; totalGross: number; totalNet: number } | null;
-  staff: Array<{ membershipId: string; name: string; basePay: number; commissionTotal: number; grossPay: number; currency: string; attendanceTotal: number; lateCount: number; missingPhotoCount: number; waivedCount: number; lateMinutes: number }>;
-}
-
-export async function loadPayrollWorkspace(supabase: SupabaseClient, organizationId: string, periodStart: string, periodEnd: string): Promise<PayrollWorkspace> {
-  const [staff, commissions, run, attendance] = await Promise.all([
-    supabase.from("staff_compensation").select("membership_id,base_amount,currency,memberships(users(email,full_name))").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null),
-    supabase.from("commission_entries").select("membership_id,commission_amount").eq("organization_id", organizationId).eq("status", "accrued").gte("occurred_at", periodStart).lt("occurred_at", periodEnd),
-    supabase.from("payroll_runs").select("id,status,total_gross,total_net").eq("organization_id", organizationId).eq("period_start", periodStart).eq("period_end", periodEnd).maybeSingle(),
-    supabase.from("attendance_records").select("membership_id,classification,late_minutes,waived_at").eq("organization_id", organizationId).gte("scheduled_at", periodStart).lt("scheduled_at", periodEnd).is("deleted_at", null),
-  ]);
-  assertResult("payroll_staff", staff.error); assertResult("payroll_commissions", commissions.error); assertResult("payroll_run", run.error); assertResult("payroll_attendance", attendance.error);
-  const commissionByMembership = new Map<string, number>(); for (const row of commissions.data ?? []) commissionByMembership.set(row.membership_id, (commissionByMembership.get(row.membership_id) ?? 0) + Number(row.commission_amount));
-  return {
-    run: run.data ? { id: run.data.id, status: run.data.status, totalGross: Number(run.data.total_gross), totalNet: Number(run.data.total_net) } : null,
-    staff: (staff.data ?? []).map((row) => { const basePay = Number(row.base_amount); const commissionTotal = commissionByMembership.get(row.membership_id) ?? 0; const ownAttendance = (attendance.data ?? []).filter((item) => item.membership_id === row.membership_id); return { membershipId: row.membership_id, name: embeddedStaffName(row.memberships), basePay, commissionTotal, grossPay: Math.round((basePay + commissionTotal) * 100) / 100, currency: row.currency, attendanceTotal: ownAttendance.length, lateCount: ownAttendance.filter((item) => item.classification === "late" && !item.waived_at).length, missingPhotoCount: ownAttendance.filter((item) => item.classification === "missing_photo").length, waivedCount: ownAttendance.filter((item) => Boolean(item.waived_at)).length, lateMinutes: ownAttendance.filter((item) => item.classification === "late" && !item.waived_at).reduce((sum, item) => sum + item.late_minutes, 0) }; }),
-  };
-}
+// Payroll (sections 32-33) has its own dedicated loader/action modules --
+// see @/lib/payroll-data and @/app/payroll/payroll-actions. The previous
+// single-cycle, no-settings PayrollWorkspace/loadPayrollWorkspace pair that
+// lived here was removed in favor of those (calendar-month-only cycles,
+// no attendance-driven bonuses, no overrides/custom rows/retention/publish).
 
 export interface AttendanceWorkspace {
   rows: Array<{ id: string; resourceId: string; resourceName: string; bookingId: string; scheduledAt: string; checkedInAt: string; classification: string; lateMinutes: number; lateReason: string | null; waivedAt: string | null; waiverReason: string | null; latitude: number | null; longitude: number | null; photoUrl: string | null }>;
