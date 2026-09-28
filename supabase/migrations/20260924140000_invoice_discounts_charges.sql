@@ -344,9 +344,7 @@ begin
             jsonb_build_object('created_from', 'homepaw_pilot') || case when v_line->>'line_id' is not null then jsonb_build_object('grooming_job_pet_service_id', v_line->>'line_id') else '{}'::jsonb end);
   end loop;
 
-  -- Use the UUIDv7's low-order (random) bytes, not the high-order timestamp bytes: two invoices
-  -- issued within the same millisecond window would otherwise share the same 8-char prefix.
-  v_invoice_number := 'INV-' || to_char(v_issued_at, 'YYYYMMDD') || '-' || upper(right(replace(v_order_id::text,'-',''),8));
+  v_invoice_number := 'INV-' || to_char(v_issued_at, 'YYYYMMDD') || '-' || upper(substr(replace(v_order_id::text,'-',''),1,8));
   insert into public.invoices (organization_id, branch_id, customer_id, order_id, invoice_number, status, currency, subtotal, discount_total, tax_total, total, issued_at, due_at, billing_mode, document_type, groomer_resource_id, groomer_name_snapshot, admin_notes, metadata)
   values (b.organization_id, b.branch_id, b.customer_id, v_order_id, v_invoice_number, 'issued', 'IDR', v_pricing.subtotal, v_pricing.discount_total, 0, v_pricing.total,
           v_issued_at, v_due_at, 'after_visit', v_document_type, v_groomer, v_groomer_name, left(nullif(btrim(p_admin_notes),''),2000), jsonb_build_object('created_from', 'homepaw_pilot', 'booking_id', b.id, 'discount_inputs', jsonb_build_object(
