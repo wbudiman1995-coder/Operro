@@ -79,6 +79,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261010110000_payroll_engine_s32_rpcs.sql
   supabase/migrations/20261010120000_payroll_export_detail_rpc.sql
   supabase/migrations/20261012100000_invoice_number_random_suffix.sql
+  supabase/migrations/20261013100000_payroll_recompute_race_lock.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -160,17 +161,30 @@ for migration in "${EXPECTED_MIGRATIONS[@]}"; do
   psql_db operro_cc -q -v ON_ERROR_STOP=1 -f "$migration"
 done
 psql_db operro_cc -q -v ON_ERROR_STOP=1 -f supabase/tests/concurrency/conc_seed.sql
-CONC_TMP="$(mktemp -d /tmp/operro-concurrency.XXXXXX)"
-trap 'rm -rf "$CONC_TMP"' EXIT
-
-cp -a supabase/tests/concurrency/. "$CONC_TMP/"
-chmod -R a+rX "$CONC_TMP"
-
-run_as_postgres env DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/operro_cc" \
-  bash "$CONC_TMP/run_concurrency_assembly.sh"
-
-rm -rf "$CONC_TMP"
-trap - EXIT
+if [ -n "${GATE8_CONTAINER:-}" ]; then
+  # WSL hosts without a native psql client can run the unchanged harness inside
+  # the disposable PG16 container that has this repository mounted at /workspace.
+  docker exec -w /workspace \
+    -e DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@127.0.0.1:5432/operro_cc" \
+    "$GATE8_CONTAINER" bash -lc '
+      conc_tmp=$(mktemp -d /tmp/operro-concurrency.XXXXXX)
+      trap '\''rm -rf "$conc_tmp"'\'' EXIT
+      cp -a supabase/tests/concurrency/. "$conc_tmp/"
+      sed -i '\''s/\r$//'\'' "$conc_tmp/run_concurrency_assembly.sh"
+      bash "$conc_tmp/run_concurrency_assembly.sh"
+    '
+else
+  CONC_TMP="$(mktemp -d /tmp/operro-concurrency.XXXXXX)"
+  trap 'rm -rf "$CONC_TMP"' EXIT
+  cp -a supabase/tests/concurrency/. "$CONC_TMP/"
+  # Windows checkouts may materialize shell scripts with CRLF.
+  sed -i 's/\r$//' "$CONC_TMP/run_concurrency_assembly.sh"
+  chmod -R a+rX "$CONC_TMP"
+  run_as_postgres env DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/operro_cc" \
+    bash "$CONC_TMP/run_concurrency_assembly.sh"
+  rm -rf "$CONC_TMP"
+  trap - EXIT
+fi
 
 echo ""
 echo "ALL GATES PASSED"

@@ -1,0 +1,4 @@
+STAFF_BEFORE {"tiers":[],"matrix":{},"enabled":{"weeklySalaryEnabled":true,"noLateEnabled":true,"noSickEnabled":true,"stylingEnabled":true,"botakEnabled":true,"perPetEnabled":true,"dailyEnabled":false,"retentionEnabled":false}}
+STAFF_SAVED {"tiers":[{"pct":12.5,"min_jobs":1}],"matrix":{"medium":30000},"enabled":{"weeklySalaryEnabled":true,"noLateEnabled":true,"noSickEnabled":true,"stylingEnabled":true,"botakEnabled":true,"perPetEnabled":true,"dailyEnabled":false,"retentionEnabled":false}}
+STAFF_RESTORED {"tiers":[],"matrix":{},"enabled":{"weeklySalaryEnabled":true,"noLateEnabled":true,"noSickEnabled":true,"stylingEnabled":true,"botakEnabled":true,"perPetEnabled":true,"dailyEnabled":false,"retentionEnabled":false}}
+PASS staff tier/matrix and component toggles browser save, reload, restore

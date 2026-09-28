@@ -614,3 +614,51 @@ one comment fix in `supabase/seed.sql`. No edits to any other engine's migration
 
 No merge, no deployment, no PR opened per the brief's instructions — only this isolated branch,
 pushed after all of the above validation.
+
+## 12. Closeout after the tool-classifier outage (2026-09-28)
+
+This section supersedes the four open payroll items in Section 11. The isolated payroll branch
+contains the final changes; no other engine's worktree or database was changed.
+
+- The org and groomer payroll forms now edit styling tiers and the per-pet size matrix. A live
+  owner-browser test saved non-default values, reloaded, verified them, restored the prior values,
+  and reloaded again. The groomer form also preserves all stored component-enabled flags. During
+  this test, a real bug was found and fixed: the prior form derived enabled flags from the
+  *current payout amount*, so a zero-payout enabled component appeared unchecked and could be
+  silently disabled by saving an unrelated tier change. The loader and form now use the persisted
+  settings flags. The cycle settings save now uses a tenant-scoped upsert so a brand-new org with
+  no settings row does not get a false success from an update that touched zero rows; an
+  authenticated-role insert/upsert was exercised in a rollback transaction.
+- The self-service payslip export's `PayrollStaffCard` adapter was updated for the new settings
+  fields. This fixed a real TypeScript error caught before the build.
+- Publish and hide were both clicked through in the real local owner browser against an approved
+  cycle. The initial publication state was restored. The seeded groomer has no `hired_at` value
+  and retention is disabled, so the **retention payout button could not be clicked** without
+  manufacturing a payout in the demo org. The real RPC retention boundary, amount and
+  idempotency remain verified by GATE 6b; a live UI click is still open.
+- A genuine two-connection recompute race initially reproduced PostgreSQL `40P01` deadlock at
+  the exclusion constraint. The first successful trial had missed this intermittent failure.
+  Forward migration `20261013100000_payroll_recompute_race_lock.sql` now takes a transaction-
+  scoped advisory lock for each org/branch before first insertion or later recompute. The
+  historical `20261010110000` migration remains unchanged. After applying the forward migration
+  to a disposable PG17 clone, 12 consecutive independent two-session recompute+pay trials
+  passed: each yielded one run and exactly one payout ledger row. The committed
+  `integration/run_concurrency_payroll.sh` provides a repeatable authenticated-session test
+  against an unused period in a disposable seeded DB.
+- The complete `run_all_gates.sh` wrapper was rerun against a disposable PostgreSQL 16.15
+  container: gates 1, 2, 3, 4, 5, 6, 6b, 7 and 8 all passed, with the literal final marker
+  `ALL GATES PASSED`. For WSL without a host `psql`, set `GATE8_CONTAINER=operro-gate-pg16`;
+  the runner now executes the unchanged concurrency harness inside that mounted container.
+  The Windows checkout has CRLF shell scripts, so the command ran an LF-normalized temporary
+  copy of `run_all_gates.sh` without changing its repository contents.
+
+Raw evidence is in `docs/handoffs/logs/ENGINE-3-S32-S33/closeout/`: `full-gates-final.log`,
+`concurrency-after-fix.log`, `concurrency-script.log`, `org-browser.log`,
+`staff-browser.log`, `publish-browser.log`, `empty-org-upsert.log`, and the individual
+typecheck/lint/build/batch logs. `concurrency.log` captures the pre-fix `40P01` failure;
+`full-gates.log` captures the initial Windows CRLF harness failure before the runner fix.
+The disposable PG17 clone's restore skipped one Supabase `vault.secrets` table-data ACL operation;
+the fresh PG16 gate replay is the authoritative migration and permission check.
+
+No combined-branch merge, PR or deployment occurred in this closeout. The local demo database
+has an approved future payroll cycle created for publish/hide browser QA; it is local-only.

@@ -31,6 +31,51 @@ function numberValue(formData: FormData, key: string) {
   return Number.isFinite(value) ? value : null;
 }
 
+const SIZE_KEYS = new Set(["small", "medium", "large", "extra_large"]);
+type StylingTier = { min_jobs: number; pct: number };
+type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+/** Empty/blank input parses to an empty array -- callers decide what "no tiers configured"
+ *  means for their own table (org: a real, deliberate "styling never pays" state; per-groomer:
+ *  already treated as "inherit the org default" by compute_payroll_item's own nullif check). */
+function parseStylingTiersJson(raw: FormDataEntryValue | null): ParseResult<StylingTier[]> {
+  const text = typeof raw === "string" ? raw.trim() : "";
+  if (text.length === 0) return { ok: true, value: [] };
+  let parsed: unknown;
+  try { parsed = JSON.parse(text); } catch { return { ok: false, error: "format tier tidak valid (JSON rusak)" }; }
+  if (!Array.isArray(parsed)) return { ok: false, error: "format tier harus berupa daftar" };
+  if (parsed.length > 20) return { ok: false, error: "maksimum 20 tier" };
+  const seen = new Set<number>();
+  const tiers: StylingTier[] = [];
+  for (const row of parsed) {
+    const minJobs = Number((row as Record<string, unknown> | null)?.min_jobs);
+    const pct = Number((row as Record<string, unknown> | null)?.pct);
+    if (!Number.isInteger(minJobs) || minJobs < 1) return { ok: false, error: "min job tiap tier harus bilangan bulat >= 1" };
+    if (!Number.isFinite(pct) || pct < 0) return { ok: false, error: "persen tiap tier harus >= 0" };
+    if (seen.has(minJobs)) return { ok: false, error: `min job ${minJobs} muncul dua kali pada tier` };
+    seen.add(minJobs);
+    tiers.push({ min_jobs: minJobs, pct });
+  }
+  tiers.sort((a, b) => a.min_jobs - b.min_jobs);
+  return { ok: true, value: tiers };
+}
+
+function parseSizeMatrixJson(raw: FormDataEntryValue | null): ParseResult<Record<string, number>> {
+  const text = typeof raw === "string" ? raw.trim() : "";
+  if (text.length === 0) return { ok: true, value: {} };
+  let parsed: unknown;
+  try { parsed = JSON.parse(text); } catch { return { ok: false, error: "format matriks ukuran tidak valid (JSON rusak)" }; }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { ok: false, error: "format matriks ukuran harus berupa objek" };
+  const out: Record<string, number> = {};
+  for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!SIZE_KEYS.has(key)) return { ok: false, error: `ukuran tidak dikenal: ${key}` };
+    const num = Number(val);
+    if (!Number.isFinite(num) || num < 0) return { ok: false, error: `nilai untuk ukuran ${key} harus >= 0` };
+    out[key] = num;
+  }
+  return { ok: true, value: out };
+}
+
 async function workspace() {
   const supabase = await createClient();
   const context = await loadAuthContext(supabase);
@@ -176,7 +221,12 @@ export async function saveCycleSettingsAction(_previous: PilotActionState, formD
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   const cycleStartDay = numberValue(formData, "cycleStartDay");
   if (cycleStartDay === null || cycleStartDay < 1 || cycleStartDay > 28) return databaseError("Pengaturan", "tanggal mulai cycle harus 1-28");
+  const tiers = parseStylingTiersJson(formData.get("stylingTiersJson"));
+  if (!tiers.ok) return databaseError("Tier styling", tiers.error);
+  const matrix = parseSizeMatrixJson(formData.get("perPetSizeMatrixJson"));
+  if (!matrix.ok) return databaseError("Matriks ukuran per dog", matrix.error);
   const patch = {
+    organization_id: context.organizationId,
     cycle_start_day: cycleStartDay,
     weekly_salary_amount_default: numberValue(formData, "weeklySalaryAmountDefault") ?? 0,
     no_late_amount_default: numberValue(formData, "noLateAmountDefault") ?? 0,
@@ -186,9 +236,15 @@ export async function saveCycleSettingsAction(_previous: PilotActionState, formD
     daily_amount_default: numberValue(formData, "dailyAmountDefault") ?? 0,
     retention_amount_per_month_default: numberValue(formData, "retentionAmountPerMonthDefault") ?? 0,
     retention_term_months_default: numberValue(formData, "retentionTermMonthsDefault") ?? 24,
+    // Org-level tiers must stay a real (possibly empty) array -- payroll_cycle_settings.
+    // styling_tiers_default is NOT NULL and DB-trigger-validated as an array shape; an
+    // empty array here is a deliberate "styling commission never pays" org state, not an
+    // "inherit" sentinel (there is nothing above the org level to inherit from).
+    styling_tiers_default: tiers.value,
+    per_pet_size_matrix_default: matrix.value,
   };
   const result = await context.supabase.from("payroll_cycle_settings")
-    .update(patch).eq("organization_id", context.organizationId);
+    .upsert(patch, { onConflict: "organization_id" });
   if (result.error) return databaseError("Pengaturan gagal disimpan", result.error.message);
   revalidatePath("/payroll");
   return ok("Pengaturan payroll tersimpan.");
@@ -197,6 +253,10 @@ export async function saveCycleSettingsAction(_previous: PilotActionState, formD
 export async function saveStaffSettingsAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   const membershipId = idValue(formData, "membershipId"); if (!membershipId) return databaseError("Pengaturan staf", "staf tidak valid");
+  const tiers = parseStylingTiersJson(formData.get("stylingTiersJson"));
+  if (!tiers.ok) return databaseError("Tier styling", tiers.error);
+  const matrix = parseSizeMatrixJson(formData.get("perPetSizeMatrixJson"));
+  if (!matrix.ok) return databaseError("Matriks ukuran per dog", matrix.error);
   const patch = {
     organization_id: context.organizationId, membership_id: membershipId,
     weekly_salary_enabled: formData.get("weeklySalaryEnabled") === "on",
@@ -207,6 +267,14 @@ export async function saveStaffSettingsAction(_previous: PilotActionState, formD
     styling_enabled: formData.get("stylingEnabled") === "on",
     daily_enabled: formData.get("dailyEnabled") === "on",
     retention_enabled: formData.get("retentionEnabled") === "on",
+    // Per-groomer override: an empty tier list is already treated as "inherit the org
+    // default" by compute_payroll_item's own nullif([]) check, so it's safe to write
+    // through as-is. The size matrix has NO such nullif on the empty-object case, so an
+    // empty matrix here is written as SQL NULL instead of {} -- {} would otherwise
+    // silently REPLACE the org default matrix with "no sizes configured" (flat rate only)
+    // rather than inheriting it.
+    styling_tiers: tiers.value,
+    per_pet_size_matrix: Object.keys(matrix.value).length > 0 ? matrix.value : null,
   };
   const result = await context.supabase.from("staff_payroll_settings")
     .upsert(patch, { onConflict: "organization_id,membership_id" });

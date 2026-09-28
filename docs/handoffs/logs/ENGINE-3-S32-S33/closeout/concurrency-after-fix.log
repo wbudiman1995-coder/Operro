@@ -1,0 +1,48 @@
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":97}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":88}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":87}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":95}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":89}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":93}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":90}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":87}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":87}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":100}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":87}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row
+DATABASE PostgreSQL 17.6 on x86_64-pc-linux-gnu
+RECOMPUTE_RACE {"sameId":true,"rows":1,"revision":2,"ms":78}
+PAY_RACE {"status":"paid","revision":4,"total_net":"3600000.00","ledger_rows":1,"ledger_amount":"-3600000.00"}
+PASS two independent authenticated connections; one run, one payout ledger row

@@ -1,0 +1,13 @@
+== case: complete_booking vs set_line_quantity ==
+  A_RC=0 B_RC=0
+  blocking OK (causal): B saw frozen booking; A~1790600339.88 B~1790600339.89
+  OK: complete_booking vs set_line_quantity — no deadlock, A committed, B blocked then rejected, booking=completed
+== case: complete_booking vs void_line ==
+  A_RC=0 B_RC=0
+  blocking OK (causal): B saw frozen booking; A~1790600343.09 B~1790600343.10
+  OK: complete_booking vs void_line — no deadlock, A committed, B blocked then rejected, booking=completed
+== case: complete_booking vs reserve_package_session ==
+  A_RC=0 B_RC=0
+  blocking OK (causal): B saw frozen booking; A~1790600346.30 B~1790600346.30
+  OK: complete_booking vs reserve_package_session — no deadlock, A committed, B blocked then rejected, booking=completed
+CONC PASS: all three cases serialized; no deadlock; A committed; B blocked then rejected; final state correct.

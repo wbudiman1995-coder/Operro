@@ -52,6 +52,14 @@ export interface PayrollStaffCard {
   retentionAlreadyPaid: boolean;
   published: boolean;
   publishedRunId: string | null;
+  /** Per-groomer override; null/empty = inherits the org default (payroll_cycle_settings). */
+  stylingTiers: Array<{ min_jobs: number; pct: number }> | null;
+  /** Per-groomer override; null = inherits the org default matrix entirely (whole-object override, not merged per-key). */
+  perPetSizeMatrix: Record<string, number> | null;
+  componentEnabled: {
+    weekly: boolean; noLate: boolean; noSick: boolean; styling: boolean;
+    botak: boolean; perPet: boolean; daily: boolean;
+  };
 }
 
 export interface PayrollCycleSettings {
@@ -178,6 +186,17 @@ export async function loadPayrollWorkspace(
       retentionAlreadyPaid: retentionPaidSet.has(membershipId),
       published: Boolean(publication?.enabled),
       publishedRunId: (publication?.payroll_run_id as string | undefined) ?? null,
+      stylingTiers: (staffSettingsRow?.styling_tiers as Array<{ min_jobs: number; pct: number }> | null) ?? null,
+      perPetSizeMatrix: (staffSettingsRow?.per_pet_size_matrix as Record<string, number> | null) ?? null,
+      componentEnabled: {
+        weekly: Boolean(staffSettingsRow?.weekly_salary_enabled),
+        noLate: Boolean(staffSettingsRow?.no_late_enabled),
+        noSick: Boolean(staffSettingsRow?.no_sick_enabled),
+        styling: Boolean(staffSettingsRow?.styling_enabled),
+        botak: staffSettingsRow?.botak_enabled !== false,
+        perPet: staffSettingsRow?.per_pet_enabled !== false,
+        daily: Boolean(staffSettingsRow?.daily_enabled),
+      },
     };
   });
 

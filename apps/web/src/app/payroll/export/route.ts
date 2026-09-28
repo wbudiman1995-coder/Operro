@@ -39,6 +39,8 @@ export async function GET(request: Request) {
       customRows: snapshot.customRows.map((r, i) => ({ id: String(i), label: r.label, amount: r.amount, sortOrder: i })),
       overrides: [], grossPay: snapshot.total, hiredAt: null, retentionEnabled: false,
       retentionEligible: false, retentionAlreadyPaid: false, published: true, publishedRunId: null,
+      stylingTiers: null, perPetSizeMatrix: null,
+      componentEnabled: { weekly: false, noLate: false, noSick: false, styling: false, botak: false, perPet: false, daily: false },
     };
     const fmt = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
     const exportData: PayrollExportData = {
