@@ -1,5 +1,16 @@
 # Operro combined integration — S23–S35
 
+## Remote release status — 2026-09-29
+
+- The linked Supabase project is `tekgjynseoetoxestweb` (`operro-batch2-final-staging` in the dashboard). Its **pre-upgrade** SQL backup is outside Git at `E:\Claude\operro-release-backups\2026-09-29-before-s23-s35\`: roles, schema, data, migration-history schema/data, and a SHA256 manifest. The backup includes Auth and Storage metadata; `storage.objects` had zero rows. Treat these files as sensitive and do not commit them.
+- The actual remote database had 37 applied migrations. The first dry run found 22 unapplied migrations, including the older calendar migration `20260919120000`. All 22 were applied in order with `supabase db push --linked --include-all --skip-vault --yes` (raw output: `E:\Claude\operro-release-backups\2026-09-29-before-s23-s35\migration-push.log`). A post-upgrade dump retained 2 Auth users, 2 organizations, 9 customers, and 33 bookings.
+- The original HomePaw organization had an active Owner membership but zero role permissions, enabled modules, subscriptions, or branches; this caused sign-in to fall back to `/organizations`. The exact-org bootstrap migration `20261015100000_homepaw_owner_workspace_bootstrap.sql` safely provisioned that existing workspace without touching HomePaw Demo. Its separate push log is in the backup directory. The owner can now switch into the empty HomePaw workspace and load Dashboard, Customers, Bookings, Schedule, Catalog, Programs, Finance, and Payroll. Future organization self-service provisioning remains unimplemented.
+- The Vercel integration preview loads Dashboard, Bookings, Follow-ups, Memberships, Finance, Payroll, Visits, and Operations after the migration. The dashboard's narrow missing-relation fallback is no longer active. Preview and Production currently point at the same Supabase project, so browser mutation acceptance testing must not use throwaway data there. The earlier isolated local PostgreSQL and browser checks are recorded below.
+- The production Vercel branch `local/design-adoption` is an ancestor of this integration branch (`git rev-list --left-right --count origin/local/design-adoption...HEAD` returned `0 70` at integration SHA `d999552`). The integration checkout is clean. The separate `E:\Claude\operro-local-dev` checkout has unrelated uncommitted work and must not be overwritten. As of this status entry, the live `operro-web.vercel.app` alias has **not** been updated.
+- `integration/run_populated_upgrade_rehearsal.sh` now models the remote 37-migration baseline plus an incomplete HomePaw organization. It applied 23 upgrade migrations and finished `HOMEPAW OWNER WORKSPACE PROVISION PASS` and `POPULATED UPGRADE PASS`. Full PG16 `integration/run_combined_gates.sh` finished `ALL GATES PASSED`. Logs are under `docs/handoffs/logs/INTEGRATION/`.
+
+The earlier “Still required before production launch” section below describes the state **before** this remote release work. Its backup and migration prerequisites have been completed; the remaining launch decisions are preview promotion, live smoke testing, separate QA backend, and generic tenant onboarding.
+
 ## Identity and scope
 
 - Isolated checkout: `E:\Claude\operro-integration` (WSL: `/mnt/e/Claude/operro-integration`)
