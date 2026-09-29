@@ -1,0 +1,101 @@
+PostgreSQL: 16.15 (Debian 16.15-1.pgdg13+2)
+Baseline migration: 20260924110000
+CREATE SCHEMA
+CREATE TABLE
+CREATE SCHEMA
+CREATE TABLE
+CREATE TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+DO
+DO
+DO
+CREATE SCHEMA
+CREATE EXTENSION
+CREATE FUNCTION
+DO
+BASELINE 20260721000100
+psql:/work/supabase/migrations/20260721000100_extensions_and_helpers.sql:47: NOTICE:  extension "pgcrypto" already exists, skipping
+BASELINE 20260721000150
+psql:/work/supabase/migrations/20260721000150_fix_uuidv7_supabase.sql:22: NOTICE:  extension "pgcrypto" already exists, skipping
+BASELINE 20260721000200
+BASELINE 20260721000300
+BASELINE 20260721000400
+BASELINE 20260721000500
+BASELINE 20260721000600
+BASELINE 20260721000700
+BASELINE 20260721000800
+BASELINE 20260721000900
+BASELINE 20260721001000
+BASELINE 20260721001100
+BASELINE 20260721001200
+BASELINE 20260721001300
+psql:/work/supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql:488: NOTICE:  BACKFILL OK: all legacy grooming pet/service values mapped; no non-grooming booking carries pet_id/service_id.
+BASELINE 20260721001350
+BASELINE 20260721001400
+BASELINE 20260910120000
+BASELINE 20260916150000
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "membership_plans_org_isolation" for relation "public.membership_plans" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_memberships_org_isolation" for relation "public.customer_memberships" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "packages_org_isolation" for relation "public.packages" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_packages_org_isolation" for relation "public.customer_packages" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_package_ledger_org_isolation" for relation "public.customer_package_ledger" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_accounts_org_isolation" for relation "public.loyalty_accounts" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_ledger_org_isolation" for relation "public.loyalty_ledger" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_accounts_org_isolation" for relation "public.wallet_accounts" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_ledger_org_isolation" for relation "public.wallet_ledger" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "referrals_org_isolation" for relation "public.referrals" does not exist, skipping
+BASELINE 20260917100000
+BASELINE 20260917100100
+BASELINE 20260917100200
+BASELINE 20260917100300
+BASELINE 20260918130000
+BASELINE 20260918140000
+BASELINE 20260918150000
+BASELINE 20260918160000
+BASELINE 20260918170000
+BASELINE 20260918180000
+BASELINE 20260919100000
+BASELINE 20260919110000
+BASELINE 20260919120000
+BASELINE 20260922100000
+BASELINE 20260922110000
+BASELINE 20260922120000
+BASELINE 20260922130000
+BASELINE 20260922140000
+BASELINE 20260924100000
+BASELINE 20260924110000
+Baseline migrations applied: 38
+INSERT 0 1
+ERROR:  duplicate key value violates unique constraint "pk_users"
+DETAIL:  Key (id)=(e0000000-0000-4000-8000-000000000001) already exists.
+psql:supabase/seeds/homepaw_demo.sql:160: NOTICE:  HomePaw Demo ready for wbudiman1995@gmail.com. Switch workspace to HomePaw Demo and refresh the session.
+DO
+Populated baseline counts org,customer,pet,booking: 1,6,7,6
+UPGRADE 20260924120000
+UPGRADE 20260924130000
+UPGRADE 20260924140000
+UPGRADE 20260925100000
+UPGRADE 20260926090000
+psql:/work/supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql:221: NOTICE:  function app.renew_customer_package(uuid,uuid,timestamptz,timestamptz,text,uuid) does not exist, skipping
+UPGRADE 20260927090000
+UPGRADE 20260927100000
+UPGRADE 20260928100000
+UPGRADE 20260929100000
+UPGRADE 20260930100000
+UPGRADE 20261001100000
+UPGRADE 20261002090000
+UPGRADE 20261002100000
+UPGRADE 20261003100000
+UPGRADE 20261010100000
+UPGRADE 20261010110000
+UPGRADE 20261010120000
+UPGRADE 20261012100000
+UPGRADE 20261013100000
+UPGRADE 20261013110000
+UPGRADE 20261014100000
+Upgrade migrations applied: 21
+After upgrade counts org,customer,pet,booking: 1,6,7,6
+t|t
+POPULATED UPGRADE PASS
