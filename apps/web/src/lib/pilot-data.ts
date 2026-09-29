@@ -42,6 +42,7 @@ export function formatRupiah(value: number) {
 export interface DashboardData {
   bookingToday: number;
   revenueToday: number;
+  revenueIncomplete: boolean;
   activeCustomers: number;
   openTasks: number;
   upcoming: Array<{ id: string; startsAt: string; status: string; customerName: string; petNames: string[] }>;
@@ -64,10 +65,20 @@ export async function loadDashboardData(supabase: SupabaseClient, organizationId
     supabase.from("visit_manual_billing").select("amount").eq("organization_id", organizationId).is("undone_at", null).gte("billed_at", start.toISOString()).lt("billed_at", end.toISOString()),
     supabase.from("bookings").select("id,starts_at,status,customers(display_name),grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", now.toISOString()).lt("starts_at", upcomingEnd.toISOString()).not("status", "in", "(canceled,no_show)").is("deleted_at", null).order("starts_at").limit(6),
   ]);
-  for (const [scope, result] of [["dashboard_bookings", bookingCount], ["dashboard_customers", customerCount], ["dashboard_tasks", taskCount], ["dashboard_payments", paymentRows], ["dashboard_manual_billing", manualBillingRows], ["dashboard_upcoming", bookingRows]] as const) assertResult(scope, result.error);
+  // Preview can run against a database that has not received the visit-register
+  // migration yet. Only that missing relation is optional; permission and other
+  // database errors must still fail closed rather than display misleading KPIs.
+  const manualBillingUnavailable = Boolean(
+    manualBillingRows.error &&
+    (manualBillingRows.error.code === "PGRST205" || manualBillingRows.error.code === "42P01") &&
+    manualBillingRows.error.message.includes("visit_manual_billing"),
+  );
+  for (const [scope, result] of [["dashboard_bookings", bookingCount], ["dashboard_customers", customerCount], ["dashboard_tasks", taskCount], ["dashboard_payments", paymentRows], ["dashboard_upcoming", bookingRows]] as const) assertResult(scope, result.error);
+  if (!manualBillingUnavailable) assertResult("dashboard_manual_billing", manualBillingRows.error);
   return {
     bookingToday: bookingCount.count ?? 0,
     revenueToday: (paymentRows.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0) + (manualBillingRows.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
+    revenueIncomplete: manualBillingUnavailable,
     activeCustomers: customerCount.count ?? 0,
     openTasks: taskCount.count ?? 0,
     upcoming: (bookingRows.data ?? []).map((row) => ({ id: row.id, startsAt: row.starts_at, status: row.status, customerName: embeddedCustomerName(row.customers), petNames: embeddedPetNames(row.grooming_jobs) })),
