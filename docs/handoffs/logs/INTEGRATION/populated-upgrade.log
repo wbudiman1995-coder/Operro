@@ -58,7 +58,6 @@ BASELINE 20260918170000
 BASELINE 20260918180000
 BASELINE 20260919100000
 BASELINE 20260919110000
-BASELINE 20260919120000
 BASELINE 20260922100000
 BASELINE 20260922110000
 BASELINE 20260922120000
@@ -66,13 +65,18 @@ BASELINE 20260922130000
 BASELINE 20260922140000
 BASELINE 20260924100000
 BASELINE 20260924110000
-Baseline migrations applied: 38
+Baseline migrations applied: 37
 INSERT 0 1
-ERROR:  duplicate key value violates unique constraint "pk_users"
-DETAIL:  Key (id)=(e0000000-0000-4000-8000-000000000001) already exists.
+INSERT 0 1
 psql:supabase/seeds/homepaw_demo.sql:160: NOTICE:  HomePaw Demo ready for wbudiman1995@gmail.com. Switch workspace to HomePaw Demo and refresh the session.
 DO
-Populated baseline counts org,customer,pet,booking: 1,6,7,6
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+Populated baseline counts org,customer,pet,booking: 2,6,7,6
+UPGRADE 20260919120000
 UPGRADE 20260924120000
 UPGRADE 20260924130000
 UPGRADE 20260924140000
@@ -95,7 +99,10 @@ UPGRADE 20261012100000
 UPGRADE 20261013100000
 UPGRADE 20261013110000
 UPGRADE 20261014100000
-Upgrade migrations applied: 21
-After upgrade counts org,customer,pet,booking: 1,6,7,6
+UPGRADE 20261015100000
+Upgrade migrations applied: 23
+After upgrade counts org,customer,pet,booking: 2,6,7,6
+DO
+HOMEPAW OWNER WORKSPACE PROVISION PASS
 t|t
 POPULATED UPGRADE PASS

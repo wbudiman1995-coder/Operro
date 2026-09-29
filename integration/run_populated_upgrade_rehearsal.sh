@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Rehearse the shared Supabase project's 20260924110000 -> combined-head upgrade
 # against a disposable PostgreSQL 16 database containing HomePaw demo records.
+# The remote history also skipped 20260919120000; apply it after the baseline,
+# exactly as Supabase CLI's --include-all plan does.
 # Does not connect to or modify any Supabase project.
 set -euo pipefail
 
@@ -22,7 +24,13 @@ for i in $(seq 1 60); do
   sleep 1
 done
 docker exec "$container" pg_isready -U postgres >/dev/null
-sql() { docker exec -i -w /work "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 "$@"; }
+sql() {
+  docker exec -i -w /work "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 "$@" || {
+    result=$?
+    echo "SQL command failed with exit $result" >&2
+    exit "$result"
+  }
+}
 
 {
   echo "PostgreSQL: $(docker exec "$container" psql -U postgres -Atc 'show server_version')"
@@ -45,7 +53,7 @@ SQL
   for migration in "$scratch"/supabase/migrations/*.sql; do
     version=$(basename "$migration")
     version=${version%%_*}
-    if [[ "$version" > "$cutoff" ]]; then continue; fi
+    if [[ "$version" > "$cutoff" || "$version" == "20260919120000" ]]; then continue; fi
     echo "BASELINE $version"
     sql -q -f "/work/supabase/migrations/$(basename "$migration")"
     baseline_count=$((baseline_count + 1))
@@ -56,9 +64,26 @@ SQL
 insert into auth.users(id,email,raw_user_meta_data)
 values ('e0000000-0000-4000-8000-000000000001','wbudiman1995@gmail.com','{}');
 insert into public.users(id,full_name,email,status)
-values ('e0000000-0000-4000-8000-000000000001','HomePaw Owner','wbudiman1995@gmail.com','active');
+values ('e0000000-0000-4000-8000-000000000001','HomePaw Owner','wbudiman1995@gmail.com','active')
+on conflict (id) do update set full_name=excluded.full_name,email=excluded.email,status=excluded.status;
 SQL
   sql -f supabase/seeds/homepaw_demo.sql
+  sql <<'SQL'
+-- The real HomePaw org was created without owner grants or entitlements.
+-- Reproduce that exact identity tuple and empty configuration before upgrade.
+insert into auth.users(id,email,raw_user_meta_data)
+values ('047f1e5c-5935-4566-b793-417df9f7cc9c','homepaw-owner@local.test','{}');
+insert into public.users(id,full_name,email,status)
+values ('047f1e5c-5935-4566-b793-417df9f7cc9c','HomePaw Owner','homepaw-owner@local.test','active')
+on conflict (id) do update set full_name=excluded.full_name,email=excluded.email,status=excluded.status;
+insert into public.organizations(id,name,slug,status,vertical)
+values ('019fbdd0-ee52-7f57-8318-a288203c78c1','HomePaw','homepaw','active','grooming');
+insert into public.roles(id,organization_id,name,is_system)
+values ('019fbdd0-ee64-7327-97e4-fe23f30dbff1','019fbdd0-ee52-7f57-8318-a288203c78c1','Owner',true);
+insert into public.memberships(id,user_id,organization_id,role_id,status)
+values ('019fbdd0-ee6c-7f31-861b-7a981bc599be','047f1e5c-5935-4566-b793-417df9f7cc9c',
+        '019fbdd0-ee52-7f57-8318-a288203c78c1','019fbdd0-ee64-7327-97e4-fe23f30dbff1','active');
+SQL
   before=$(docker exec "$container" psql -U postgres -Atc \
     "select (select count(*) from public.organizations)||','||(select count(*) from public.customers)||','||(select count(*) from public.pets)||','||(select count(*) from public.bookings)")
   echo "Populated baseline counts org,customer,pet,booking: $before"
@@ -67,7 +92,7 @@ SQL
   for migration in "$scratch"/supabase/migrations/*.sql; do
     version=$(basename "$migration")
     version=${version%%_*}
-    if [[ "$version" < "$cutoff" || "$version" == "$cutoff" ]]; then continue; fi
+    if [[ "$version" != "20260919120000" && ( "$version" < "$cutoff" || "$version" == "$cutoff" ) ]]; then continue; fi
     echo "UPGRADE $version"
     sql -q -f "/work/supabase/migrations/$(basename "$migration")"
     upgrade_count=$((upgrade_count + 1))
@@ -77,6 +102,23 @@ SQL
     "select (select count(*) from public.organizations)||','||(select count(*) from public.customers)||','||(select count(*) from public.pets)||','||(select count(*) from public.bookings)")
   echo "After upgrade counts org,customer,pet,booking: $after"
   [[ "$before" == "$after" ]] || { echo "FAIL: demo records changed in count"; exit 1; }
+  sql <<'SQL'
+do $$
+declare v_org uuid := '019fbdd0-ee52-7f57-8318-a288203c78c1';
+        v_role uuid := '019fbdd0-ee64-7327-97e4-fe23f30dbff1';
+begin
+  if (select count(*) from public.role_permissions where organization_id=v_org and role_id=v_role)
+     <> (select count(*) from public.permissions where deleted_at is null) then
+    raise exception 'HomePaw owner grants incomplete';
+  end if;
+  if (select count(*) from public.subscriptions where organization_id=v_org and status='active' and deleted_at is null) <> 1
+    or (select count(*) from public.organization_modules where organization_id=v_org and enabled)
+       <> (select count(*) from public.modules where is_active and deleted_at is null)
+    or (select count(*) from public.branches where organization_id=v_org and is_default and deleted_at is null) <> 1
+  then raise exception 'HomePaw workspace provision incomplete'; end if;
+end $$;
+SQL
+  echo "HOMEPAW OWNER WORKSPACE PROVISION PASS"
   sql -Atc "select to_regprocedure('app.list_audit_events(text,uuid,integer)') is not null as audit_rpc, to_regprocedure('app.record_payment(uuid,text,numeric,text,uuid,uuid)') is not null as payment_rpc"
   echo "POPULATED UPGRADE PASS"
 } >"$log" 2>&1 || { tail -70 "$log"; exit 1; }
