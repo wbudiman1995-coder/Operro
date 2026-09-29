@@ -39,7 +39,7 @@ export default async function VisitsPage({ searchParams }: { searchParams: Promi
   ]);
 
   return <WorkspaceShell {...workspace} activePath="/visits">
-    <PageHeader eyebrow="Riwayat layanan" title="Kunjungan" description="Riwayat kunjungan otomatis dari booking selesai, ditambah kunjungan manual di luar sistem booking." />
+    <PageHeader eyebrow="Riwayat layanan" title="Kunjungan" description="Riwayat booking selesai dan catatan kunjungan lama di luar sistem. Booking mendatang dibuat melalui Kalender." />
     <div className="mt-7">
       <VisitRegister
         page={page}

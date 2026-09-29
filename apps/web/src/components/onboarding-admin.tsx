@@ -15,7 +15,7 @@ import {
 type LinkRow={id:string;status:string;source:string|null;internal_note:string|null;expires_at:string;created_at:string};
 type SubmissionRow={id:string;payload:Record<string,unknown>;created_at:string};
 type Settings={whatsapp_template:string;reference_retention_days:number};
-const defaultTemplate="Halo kak! Isi data kamu dan anabul untuk {business} melalui link ini:\n\n{link}\n\nLink berlaku dua hari.";
+const defaultTemplate="Halo kak! Isi data kamu dan pet untuk {business} melalui link ini:\n\n{link}\n\nLink berlaku dua hari.";
 const initialLink:OnboardingActionState={error:null,success:null};
 const initialSettings:OnboardingSettingsState={error:null,success:null};
 const initialCleanup:StorageCleanupState={error:null,success:null};

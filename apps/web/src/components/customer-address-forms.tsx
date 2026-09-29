@@ -15,6 +15,7 @@ import {
   type PilotActionState,
 } from "@/app/pilot-actions";
 import type { CustomerAddress } from "@/lib/customer-360";
+import { IndonesiaRegionFields } from "@/components/indonesia-region-fields";
 import { isSupportedShortMapsUrl, parseMapCoordinates } from "@/lib/maps";
 
 const initialState: PilotActionState = { error: null, success: null };
@@ -45,17 +46,13 @@ export function CustomerAddressForm({ customerId, existing }: { customerId: stri
         <div><label className={labelClass}>Detail tambahan</label><input className={inputClass} name="line2" defaultValue={existing?.line2 ?? ""} placeholder="Blok, unit" /></div>
         <div><label className={labelClass}>Patokan</label><input className={inputClass} name="landmark" defaultValue={existing?.landmark ?? ""} /></div>
       </div>
-      <div className="grid gap-2.5 sm:grid-cols-4">
+      <div className="grid gap-2.5 sm:grid-cols-3">
         <div><label className={labelClass}>RT</label><input className={inputClass} name="rt" defaultValue={existing?.rt ?? ""} /></div>
         <div><label className={labelClass}>RW</label><input className={inputClass} name="rw" defaultValue={existing?.rw ?? ""} /></div>
         <div><label className={labelClass}>Kelurahan</label><input className={inputClass} name="kelurahan" defaultValue={existing?.kelurahan ?? ""} /></div>
-        <div><label className={labelClass}>Kecamatan</label><input className={inputClass} name="kecamatan" defaultValue={existing?.kecamatan ?? ""} /></div>
       </div>
-      <div className="grid gap-2.5 sm:grid-cols-3">
-        <div><label className={labelClass}>Kabupaten/Kota</label><input className={inputClass} name="kabupatenKota" defaultValue={existing?.kabupatenKota ?? ""} /></div>
-        <div><label className={labelClass}>Provinsi</label><input className={inputClass} name="province" defaultValue={existing?.province ?? ""} /></div>
-        <div><label className={labelClass}>Kode pos</label><input className={inputClass} name="postalCode" defaultValue={existing?.postalCode ?? ""} /></div>
-      </div>
+      <IndonesiaRegionFields initial={{ province: existing?.province ?? "", kabupatenKota: existing?.kabupatenKota ?? "", kecamatan: existing?.kecamatan ?? "" }} className={inputClass} />
+      <div><label className={labelClass}>Kode pos</label><input className={inputClass} name="postalCode" defaultValue={existing?.postalCode ?? ""} /></div>
       <div><label className={labelClass}>Catatan akses (pagar, parkir, keamanan)</label><textarea className={`${inputClass} h-auto py-2`} rows={2} name="accessNotes" defaultValue={existing?.accessNotes ?? ""} /></div>
       <MapsCoordinateFields initialLatitude={existing?.latitude} initialLongitude={existing?.longitude} />
       <div className="flex items-center justify-between gap-3 pt-1">

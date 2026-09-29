@@ -5,6 +5,7 @@ import { useActionState, useMemo, useState } from "react";
 import { createBookingAction, type CreateBookingState } from "@/app/bookings/actions";
 import type { AddressOption, BranchOption, CustomerOption, CustomerPackageOption, NextDiscountOption, PetOption, ResourceOption, ServiceAreaOption, ServiceOption } from "@/lib/bookings";
 import type { FulfillmentMode } from "@/lib/booking-validation";
+import { addWallMinutes, toBranchInstant } from "@/lib/booking-wall-time";
 
 interface Props {
   branches: BranchOption[];
@@ -22,6 +23,8 @@ interface Props {
    * customer inside the active organization, so this is never a raw browser-supplied id.
    */
   preselectedCustomerId?: string;
+  initialBranchId?: string;
+  initialResourceId?: string;
 }
 
 interface PetSelection { petId: string; resourceId: string; serviceIds: string[]; packageByService: Record<string, string> }
@@ -40,24 +43,20 @@ interface SlotRecommendation {
 }
 const initialState: CreateBookingState = { error: null };
 
-function addMinutes(localDateTime: string, minutes: number) {
-  const date = new Date(localDateTime);
-  if (!Number.isFinite(date.valueOf())) return "";
-  date.setMinutes(date.getMinutes() + minutes);
-  const offset = date.getTimezoneOffset();
-  return new Date(date.valueOf() - offset * 60_000).toISOString().slice(0, 16);
+function serviceAreaCity(value: string | null): string {
+  return (value ?? "").replace(/^(Kota|Kabupaten) Administrasi\s+/i, "").trim().toLocaleLowerCase("id-ID");
 }
 
-export function BookingWizard({ branches, customers, pets, services, resources, addresses, serviceAreas, nextDiscounts, customerPackages, defaultStart, preselectedCustomerId }: Props) {
+export function BookingWizard({ branches, customers, pets, services, resources, addresses, serviceAreas, nextDiscounts, customerPackages, defaultStart, preselectedCustomerId, initialBranchId, initialResourceId }: Props) {
   const [state, action, pending] = useActionState(createBookingAction, initialState);
   const [step, setStep] = useState(1);
-  const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
+  const [branchId, setBranchId] = useState(branches.some((branch) => branch.id === initialBranchId) ? initialBranchId! : branches[0]?.id ?? "");
   // Only honored when the id is actually in the loaded, organization-scoped option list,
   // so a stale or unauthorized value simply opens the wizard unselected.
   const initialCustomerId = preselectedCustomerId && customers.some((customer) => customer.id === preselectedCustomerId) ? preselectedCustomerId : "";
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [startsAt, setStartsAt] = useState(defaultStart);
-  const [endsAt, setEndsAt] = useState(addMinutes(defaultStart, 60));
+  const [manualEndsAt, setManualEndsAt] = useState<string | null>(null);
   const [fulfillmentMode, setFulfillmentMode] = useState<FulfillmentMode>("home");
   const [customerNotes, setCustomerNotes] = useState("");
   const [groomerNotes, setGroomerNotes] = useState("");
@@ -78,14 +77,18 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   const routeAnchorOptions = addresses.filter((address) => address.latitude !== null && address.longitude !== null && address.id !== customerAddressId);
   const branchAreas = serviceAreas.filter((area) => area.branchId === branchId);
   const matchedArea = selectedAddress ? branchAreas
-    .filter((area) => area.kabupatenKota === selectedAddress.kabupatenKota && (area.kecamatan === null || area.kecamatan === selectedAddress.kecamatan))
+    .filter((area) => serviceAreaCity(area.kabupatenKota) === serviceAreaCity(selectedAddress.kabupatenKota) && (area.kecamatan === null || area.kecamatan.trim().toLocaleLowerCase("id-ID") === selectedAddress.kecamatan?.trim().toLocaleLowerCase("id-ID")))
     .sort((left, right) => Number(right.kecamatan !== null) - Number(left.kecamatan !== null))[0] : undefined;
   const coverage = !selectedAddress ? null : branchAreas.length === 0 ? { allowed: true, fee: 0, minutes: 0, unconfigured: true } : matchedArea ? { allowed: true, fee: matchedArea.travelFee, minutes: matchedArea.estimatedTravelMinutes, unconfigured: false } : { allowed: false, fee: 0, minutes: 0, unconfigured: false };
   const branchResources = resources.filter((resource) => resource.branchId === branchId);
   const selectedCategories = [...new Set(selectedPets.flatMap((pet) => pet.serviceIds.map((id) => services.find((service) => service.id === id)?.category).filter((value): value is string => Boolean(value))))];
-  const duration = Math.max(60, ...selectedPets.flatMap((pet) => pet.serviceIds.map((id) => services.find((service) => service.id === id)?.durationMinutes ?? 60)));
+  // Services for one pet run sequentially; pets can run in parallel with different groomers.
+  // A zero-minute paid treatment stays on the invoice without extending the slot.
+  const duration = Math.max(60, ...selectedPets.map((pet) => pet.serviceIds.reduce((total, id) => total + (services.find((service) => service.id === id)?.durationMinutes ?? 0), 0)));
+  const endsAt = manualEndsAt ?? addWallMinutes(startsAt, duration);
+  const branchTimeZone = branches.find((branch) => branch.id === branchId)?.timezone ?? "Asia/Jakarta";
   const payload = JSON.stringify({
-    branchId, customerId, startsAt, endsAt, fulfillmentMode, customerNotes, groomerNotes, internalNotes, pets: selectedPets,
+    branchId, customerId, startsAt: toBranchInstant(startsAt, branchTimeZone), endsAt: toBranchInstant(endsAt, branchTimeZone), fulfillmentMode, customerNotes, groomerNotes, internalNotes, pets: selectedPets,
     categoryDiscounts: selectedCategories.flatMap((category) => { const rule = categoryDiscounts[category]; const value = Number(rule?.value); return rule && Number.isFinite(value) && value > 0 ? [{ category, type: rule.type, value }] : []; }),
     ...(fulfillmentMode === "home" && customerAddressId ? { customerAddressId } : {}),
   });
@@ -97,12 +100,14 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
     setCustomerAddressId(defaultAddress?.id ?? "");
   }
   function togglePet(petId: string) {
-    setSelectedPets((current) => current.some((pet) => pet.petId === petId) ? current.filter((pet) => pet.petId !== petId) : [...current, { petId, resourceId: branchResources[0]?.id ?? "", serviceIds: [], packageByService: {} }]);
+    setManualEndsAt(null);
+    setSelectedPets((current) => current.some((pet) => pet.petId === petId) ? current.filter((pet) => pet.petId !== petId) : [...current, { petId, resourceId: branchResources.find((resource) => resource.id === initialResourceId)?.id ?? branchResources[0]?.id ?? "", serviceIds: [], packageByService: {} }]);
   }
   function updatePet(petId: string, patch: Partial<PetSelection>) {
     setSelectedPets((current) => current.map((pet) => pet.petId === petId ? { ...pet, ...patch } : pet));
   }
   function toggleService(petId: string, serviceId: string) {
+    setManualEndsAt(null);
     const pet = selectedPets.find((candidate) => candidate.petId === petId);
     if (!pet) return;
     if (pet.serviceIds.includes(serviceId)) {
@@ -150,12 +155,12 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
   }
   function chooseRecommendedSlot(slot: SlotRecommendation) {
     setStartsAt(`${slot.dateISO}T${slot.startTime}`);
-    setEndsAt(`${slot.dateISO}T${slot.endTime}`);
+    setManualEndsAt(`${slot.dateISO}T${slot.endTime}`);
   }
   function canContinue() {
     if (step === 1) return Boolean(branchId && customerId && selectedPets.length);
-    if (step === 2) return selectedPets.every((pet) => pet.serviceIds.length > 0 && pet.resourceId);
-    if (step === 3) return Boolean(startsAt && endsAt && new Date(endsAt) > new Date(startsAt) && (fulfillmentMode !== "home" || (customerAddressId && coverage?.allowed)));
+    if (step === 2) return selectedPets.every((pet) => pet.serviceIds.some((id) => (services.find((service) => service.id === id)?.durationMinutes ?? 0) > 0) && pet.resourceId);
+    if (step === 3) return Boolean(startsAt && endsAt && endsAt > startsAt && (fulfillmentMode !== "home" || (customerAddressId && coverage?.allowed)));
     return true;
   }
 
@@ -188,7 +193,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
                 const checked = selection.serviceIds.includes(service.id);
                 const eligiblePackages = customerPackages.filter((item) => item.customerId === customerId && (item.serviceId === null || item.serviceId === service.id) && (item.petId === null || item.petId === selection.petId));
                 return <div key={service.id} className={`rounded-xl border p-3 ${checked ? "border-emerald-200 bg-emerald-50/60" : "border-transparent bg-slate-50"}`}>
-                  <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={checked} onChange={() => toggleService(selection.petId, service.id)} className="mt-1 accent-emerald-700" /><span><span className="block text-sm font-semibold">{service.name}</span><span className="text-xs text-slate-500">{service.category} · {service.durationMinutes} menit · {new Intl.NumberFormat("id-ID", { style: "currency", currency: service.currency, maximumFractionDigits: 0 }).format(service.basePrice)}</span></span></label>
+                  <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={checked} onChange={() => toggleService(selection.petId, service.id)} className="mt-1 accent-emerald-700" /><span><span className="block text-sm font-semibold">{service.name}</span><span className="text-xs text-slate-500">{service.category} · {service.durationMinutes === 0 ? "tidak menambah durasi" : `${service.durationMinutes} menit`} · {new Intl.NumberFormat("id-ID", { style: "currency", currency: service.currency, maximumFractionDigits: 0 }).format(service.basePrice)}</span></span></label>
                   {checked && eligiblePackages.length > 0 ? (() => {
                     const selectedPackageId = selection.packageByService[service.id] ?? "";
                     const otherAllocationsForPackage = selectedPets.reduce((count, other) => count + Object.entries(other.packageByService).filter(([otherServiceId, id]) => id === selectedPackageId && !(other.petId === selection.petId && otherServiceId === service.id)).length, 0);
@@ -207,6 +212,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
               <Field label="Groomer"><select value={selection.resourceId} onChange={(event) => updatePet(selection.petId, { resourceId: event.target.value })} className="field"><option value="">Pilih groomer</option>{branchResources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}</select></Field>
             </section>;
           })}
+          {selectedPets.some((pet) => pet.serviceIds.length > 0 && !pet.serviceIds.some((id) => (services.find((service) => service.id === id)?.durationMinutes ?? 0) > 0)) ? <p className="rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800">Setiap pet perlu satu layanan utama yang memiliki durasi. Layanan tambahan tanpa durasi tidak bisa dipesan sendiri.</p> : null}
           {selectedCategories.length > 0 ? <section className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 sm:p-5">
             <h3 className="font-bold text-amber-950">Diskon per kategori (opsional)</h3>
             <p className="mt-1 text-xs leading-5 text-amber-800">Diskon disimpan sebagai snapshot booking dan diterapkan pada invoice. Layanan yang dibayar dengan paket tetap bernilai nol.</p>
@@ -219,7 +225,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
 
         {step === 3 ? <div className="space-y-6">
           <WizardTitle title="Jadwal dan metode layanan" helper="Konflik jadwal groomer akan diperiksa kembali oleh database saat disimpan." />
-          <div className="grid gap-4 sm:grid-cols-2"><Field label="Mulai"><input type="datetime-local" value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setEndsAt(addMinutes(event.target.value, duration)); }} className="field" /></Field><Field label="Selesai"><input type="datetime-local" value={endsAt} min={startsAt} onChange={(event) => setEndsAt(event.target.value)} className="field" /></Field></div>
+          <div className="grid gap-4 sm:grid-cols-2"><Field label="Mulai"><input type="datetime-local" value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setManualEndsAt(null); }} className="field" /></Field><Field label="Selesai"><input type="datetime-local" value={endsAt} min={startsAt} onChange={(event) => setManualEndsAt(event.target.value)} className="field" /></Field></div>
           <Field label="Metode layanan"><div className="grid gap-2 sm:grid-cols-3">{([['home','Ke rumah'],['in_store','Di lokasi'],['pickup_delivery','Antar-jemput']] as const).map(([value,label]) => <button type="button" key={value} onClick={() => setFulfillmentMode(value)} className={`rounded-xl border px-3 py-3 text-sm font-semibold ${fulfillmentMode === value ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200"}`}>{label}</button>)}</div></Field>
           {fulfillmentMode === "home" ? (
             <Field label="Alamat pelanggan">
@@ -265,7 +271,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
 
         {step === 4 ? <div className="space-y-6">
           <WizardTitle title="Periksa dan konfirmasi" helper="Booking akan langsung dikonfirmasi setelah semua bagian berhasil disimpan." />
-          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={new Date(startsAt).toLocaleString("id-ID")} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} /><Summary label="Paket dialokasikan" value={`${selectedPets.reduce((count, pet) => count + Object.keys(pet.packageByService).length, 0)} layanan`} /><Summary label="Diskon kategori" value={selectedCategories.filter((category) => Number(categoryDiscounts[category]?.value) > 0).join(", ") || "Tidak ada"} />{nextDiscount ? <Summary label="Penawaran" value={`${nextDiscount.label} · otomatis satu kali`} /> : null}{fulfillmentMode === "home" ? <><Summary label="Alamat" value={selectedAddress?.formattedLine ?? "—"} /><Summary label="Perjalanan" value={coverage?.allowed ? `${coverage.minutes} menit · ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(coverage.fee)}` : "Di luar area layanan"} /></> : null}</dl>
+          <dl className="grid gap-4 rounded-2xl bg-slate-50 p-5 sm:grid-cols-2"><Summary label="Pelanggan" value={customers.find((item) => item.id === customerId)?.name ?? "—"} /><Summary label="Hewan" value={selectedPets.map((item) => pets.find((pet) => pet.id === item.petId)?.name).join(", ")} /><Summary label="Mulai" value={`${startsAt.replace("T", " ")} (${branchTimeZone})`} /><Summary label="Metode" value={{home:"Ke rumah",in_store:"Di lokasi",pickup_delivery:"Antar-jemput"}[fulfillmentMode]} /><Summary label="Paket dialokasikan" value={`${selectedPets.reduce((count, pet) => count + Object.keys(pet.packageByService).length, 0)} layanan`} /><Summary label="Diskon kategori" value={selectedCategories.filter((category) => Number(categoryDiscounts[category]?.value) > 0).join(", ") || "Tidak ada"} />{nextDiscount ? <Summary label="Penawaran" value={`${nextDiscount.label} · otomatis satu kali`} /> : null}{fulfillmentMode === "home" ? <><Summary label="Alamat" value={selectedAddress?.formattedLine ?? "—"} /><Summary label="Perjalanan" value={coverage?.allowed ? `${coverage.minutes} menit · ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(coverage.fee)}` : "Di luar area layanan"} /></> : null}</dl>
           {state.error ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{state.error}</p> : null}
         </div> : null}
       </div>

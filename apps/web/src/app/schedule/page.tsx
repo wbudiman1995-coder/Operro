@@ -1,5 +1,6 @@
 /** Dispatcher calendar route — the daily control loop surface for Batch 1A. */
 import { PageHeader } from "@/components/pilot-ui";
+import { loadBookingWorkspace } from "@/lib/bookings";
 import { RestrictedNotice } from "@/components/restricted-notice";
 import { ScheduleBoard } from "@/components/schedule-board";
 import { WorkspaceShell } from "@/components/workspace-shell";
@@ -7,7 +8,7 @@ import { loadBranchAccess, loadCapabilities } from "@/lib/authorization";
 import { parseScheduleView } from "@/lib/schedule-layout";
 import { NoAccessibleBranchError, loadBookingDetail, loadScheduleWorkspace } from "@/lib/schedule";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
-import { isValidDateISO, zonedDayISO } from "@/lib/timezone";
+import { addDaysISO, isValidDateISO, zonedDateTimeToUtc, zonedDayISO } from "@/lib/timezone";
 
 export const metadata = { title: "Kalender" };
 
@@ -25,7 +26,7 @@ function firstValue(value: string | string[] | undefined): string | undefined {
 export default async function SchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string; branch?: string | string[]; groomer?: string | string[]; booking?: string | string[] }>;
+  searchParams: Promise<{ view?: string; date?: string; branch?: string | string[]; groomer?: string | string[]; booking?: string | string[]; create?: string; time?: string; resource?: string; customerId?: string }>;
 }) {
   const params = await searchParams;
   const workspace = await requireActiveWorkspace();
@@ -40,7 +41,7 @@ export default async function SchedulePage({
     <PageHeader
       eyebrow="Kalender operasional"
       title="Kalender dispatcher"
-      description="Lihat beban kerja per groomer, cek detail booking, dan pantau ketersediaan tim dalam satu tampilan."
+      description="Klik ruang kosong pada kalender untuk membuat booking. Lihat beban kerja, detail booking, dan ketersediaan groomer di sini."
     />
   );
 
@@ -111,6 +112,20 @@ export default async function SchedulePage({
     ? await loadBookingDetail(workspace.supabase, organizationId, resolved.activeBranch.id, bookingId, resolved.activeBranch.timezone)
     : null;
 
+  const createDate = isValidDateISO(anchorCandidate) ? anchorCandidate : todayISO;
+  const createTime = /^([01]\d|2[0-3]):(00|30)$/.test(params.time ?? "") ? params.time! : "09:00";
+  const createResourceId = params.resource && resolved.branchResources.some((item) => item.id === params.resource) ? params.resource : undefined;
+  const createRequested = params.create === "1" && capabilities["booking.create"];
+  const bookingWorkspace = createRequested
+    ? await loadBookingWorkspace(
+      workspace.supabase, organizationId,
+      zonedDateTimeToUtc(createDate, 0, resolved.activeBranch.timezone).toISOString(),
+      zonedDateTimeToUtc(addDaysISO(createDate, 1), 0, resolved.activeBranch.timezone).toISOString(),
+    )
+    : null;
+  const customerId = params.customerId && UUID_PATTERN.test(params.customerId) && bookingWorkspace?.customers.some((item) => item.id === params.customerId)
+    ? params.customerId : undefined;
+
   return (
     <WorkspaceShell {...workspace} activePath="/schedule">
       {header}
@@ -124,6 +139,11 @@ export default async function SchedulePage({
         canUpdateBooking={capabilities["booking.update"]}
         canCancelBooking={capabilities["booking.cancel"]}
         canManageResources={capabilities["resource.manage"]}
+        canCreateBooking={capabilities["booking.create"]}
+        bookingWorkspace={bookingWorkspace}
+        createStart={`${createDate}T${createTime}`}
+        createResourceId={createResourceId}
+        preselectedCustomerId={customerId}
       />
     </WorkspaceShell>
   );

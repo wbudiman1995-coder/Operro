@@ -94,6 +94,8 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261013110000_uuidv7_authenticated_defaults.sql
   supabase/migrations/20261014100000_payroll_retention_ledger_idempotent.sql
   supabase/migrations/20261015100000_homepaw_owner_workspace_bootstrap.sql
+  supabase/migrations/20261016100000_homepaw_customer_intake.sql
+  supabase/migrations/20261016110000_zero_time_service_addons.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then

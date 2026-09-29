@@ -128,7 +128,7 @@ export function VisitRegister({ page, filters, autoLogEnabled, branches, custome
   return <div className="space-y-6">
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-bold">Catat kunjungan manual</h2>
+        <div><h2 className="font-bold">Catat kunjungan lampau</h2><p className="mt-1 text-xs text-slate-500">Hanya untuk layanan yang sudah terjadi di luar Operro. Untuk janji mendatang, pilih ruang kosong di Kalender.</p></div>
         <AutoLogToggle enabled={autoLogEnabled} />
       </div>
       <ManualVisitForm branches={branches} customers={customers} pets={pets} />

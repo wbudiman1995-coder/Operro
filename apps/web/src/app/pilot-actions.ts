@@ -4,7 +4,7 @@ import { correctedMembershipExpiry } from "@/lib/membership-correction";
 
 /**
  * Function index:
- * - createCustomerAction: creates a customer and optional first pet and address.
+ * - createCustomerAction: atomically creates a customer, pets and optional address.
  * - createCustomerAddressAction / updateCustomerAddressAction / deleteCustomerAddressAction / setDefaultCustomerAddressAction: manages saved addresses.
  * - createTaskAction / updateTaskStatusAction: manages operational tasks.
  * - transitionBookingAction / updatePetJobStatusAction: advances grooming work.
@@ -28,6 +28,7 @@ import { revalidatePath } from "next/cache";
 import { loadAuthContext } from "@/lib/auth-context";
 import { loadCapabilities } from "@/lib/authorization";
 import { INVOICE_DISCOUNT_CATEGORIES } from "@/lib/invoice-discount-categories";
+import { canonicalRegionNames, type RegionNames } from "@/lib/indonesia-regions";
 import { createClient } from "@/lib/supabase/server";
 
 export interface PilotActionState { error: string | null; success: string | null }
@@ -121,9 +122,12 @@ interface AddressFieldValues {
 interface AddressFieldsInvalid { invalid: string }
 
 /** Reads the optional full-address fields shared by customer creation and address CRUD. */
-function addressFields(formData: FormData): AddressFieldValues | AddressFieldsInvalid | null {
+function addressFields(formData: FormData, existingRegion?: RegionNames): AddressFieldValues | AddressFieldsInvalid | null {
   const line1 = textValue(formData, "line1", 200);
-  if (!line1) return null;
+  if (!line1) {
+    const hasOtherAddressData = ["line2", "rt", "rw", "kelurahan", "province", "kabupatenKota", "kecamatan", "postalCode", "landmark", "accessNotes", "latitude", "longitude"].some((key) => String(formData.get(key) ?? "").trim());
+    return hasOtherAddressData ? { invalid: "Isi nama jalan dan nomor rumah agar alamat dapat disimpan" } : null;
+  }
   const recipientPhone = textValue(formData, "recipientPhone", 40);
   const postalCode = textValue(formData, "postalCode", 10);
   if (recipientPhone && !PHONE_PATTERN.test(recipientPhone)) return { invalid: "Nomor telepon penerima tidak valid" };
@@ -139,6 +143,14 @@ function addressFields(formData: FormData): AddressFieldValues | AddressFieldsIn
   };
   const latitude = coordinate("latitude");
   const longitude = coordinate("longitude");
+  const requestedRegion: RegionNames = {
+    province: textValue(formData, "province", 100),
+    kabupatenKota: textValue(formData, "kabupatenKota", 100),
+    kecamatan: textValue(formData, "kecamatan", 100),
+  };
+  const region = canonicalRegionNames(requestedRegion)
+    ?? (existingRegion && Object.entries(requestedRegion).every(([key, value]) => existingRegion[key as keyof RegionNames] === value) ? existingRegion : null);
+  if (!region) return { invalid: "Pilih provinsi, kabupaten/kota, dan kecamatan dari daftar" };
   return {
     label: textValue(formData, "label", 60) || "Rumah",
     recipient_name: textValue(formData, "recipientName", 120) || null,
@@ -148,9 +160,9 @@ function addressFields(formData: FormData): AddressFieldValues | AddressFieldsIn
     rt: textValue(formData, "rt", 10) || null,
     rw: textValue(formData, "rw", 10) || null,
     kelurahan: textValue(formData, "kelurahan", 100) || null,
-    kecamatan: textValue(formData, "kecamatan", 100) || null,
-    kabupaten_kota: textValue(formData, "kabupatenKota", 100) || null,
-    province: textValue(formData, "province", 100) || null,
+    kecamatan: region.kecamatan,
+    kabupaten_kota: region.kabupatenKota,
+    province: region.province,
     postal_code: postalCode || null,
     landmark: textValue(formData, "landmark", 200) || null,
     access_notes: textValue(formData, "accessNotes", 500) || null,
@@ -164,33 +176,30 @@ export async function createCustomerAction(_previous: PilotActionState, formData
   if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   const name = textValue(formData, "name", 120);
   const phone = textValue(formData, "phone", 40);
-  const petName = textValue(formData, "petName", 80);
-  const breed = textValue(formData, "breed", 100);
-  const species = textValue(formData, "species", 30) || "dog";
-  const sizeRaw = textValue(formData, "size", 20);
-  const size = ["small", "medium", "large", "extra_large"].includes(sizeRaw) ? sizeRaw : null;
   if (name.length < 2) return databaseError("Pelanggan", "nama wajib diisi");
+  let pets: Array<{ name: string; species: string; breed: string; size: string; weightKg: string; color: string; age: string; notes: string }>;
+  try {
+    pets = JSON.parse(textValue(formData, "petsJson", 20_000)) as typeof pets;
+  } catch { return databaseError("Pet", "data pet tidak valid"); }
+  if (!Array.isArray(pets) || pets.length < 1 || pets.length > 5 || pets.some((pet) =>
+    !pet || typeof pet.name !== "string" || !pet.name.trim() || pet.name.length > 80
+    || !["dog", "cat"].includes(pet.species)
+    || !["", "small", "medium", "large", "extra_large"].includes(pet.size)
+    || (pet.weightKg && (!Number.isFinite(Number(pet.weightKg)) || Number(pet.weightKg) <= 0))
+  )) return databaseError("Pet", "isi satu hingga lima pet dengan nama dan jenis yang valid");
 
   const address = addressFields(formData);
   if (address && "invalid" in address) return databaseError("Alamat", address.invalid);
 
-  const { data: customer, error } = await context.supabase.from("customers").insert({ organization_id: context.organizationId, display_name: name, phone: phone || null, status: "active", source: "Operro", metadata: { created_from: "homepaw_pilot" } }).select("id").single();
-  if (error || !customer) return databaseError("Pelanggan gagal dibuat", error?.message ?? "unknown");
-  if (petName) {
-    const { error: petError } = await context.supabase.from("pets").insert({ organization_id: context.organizationId, customer_id: customer.id, name: petName, species, breed: breed || null, size, status: "active", metadata: { created_from: "homepaw_pilot" } });
-    if (petError) {
-      await context.supabase.from("customers").update({ deleted_at: new Date().toISOString() }).eq("organization_id", context.organizationId).eq("id", customer.id);
-      return databaseError("Hewan gagal dibuat", petError.message);
-    }
-  }
-  if (address && !("invalid" in address)) {
-    const { error: addressError } = await context.supabase.from("customer_addresses").insert({ organization_id: context.organizationId, customer_id: customer.id, is_default: true, ...address });
-    // A bad address must not silently discard an otherwise-valid new customer — report it,
-    // but the customer record (and pet, if any) already committed successfully above.
-    if (addressError) return { error: null, success: `${name} berhasil ditambahkan, tetapi alamat gagal disimpan: ${addressError.message}` };
-  }
+  const { error } = await context.supabase.schema("app").rpc("create_customer_household", {
+    p_name: name,
+    p_phone: phone || null,
+    p_pets: pets.map((pet) => ({ ...pet, name: pet.name.trim(), weightKg: pet.weightKg || null })),
+    p_address: address,
+  });
+  if (error) return databaseError("Pelanggan gagal dibuat", error.message);
   revalidatePath("/customers"); revalidatePath("/bookings"); revalidatePath("/dashboard");
-  return { error: null, success: `${name} berhasil ditambahkan.` };
+  return { error: null, success: `${name} dan ${pets.length} pet berhasil ditambahkan.` };
 }
 
 export async function importCustomerHouseholdAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
@@ -264,7 +273,15 @@ export async function updateCustomerAddressAction(_previous: PilotActionState, f
   const addressId = idValue(formData, "addressId");
   const customerId = idValue(formData, "customerId");
   if (!addressId || !customerId) return databaseError("Alamat", "alamat tidak valid");
-  const address = addressFields(formData);
+  const { data: currentAddress } = await context.supabase.from("customer_addresses")
+    .select("province,kabupaten_kota,kecamatan")
+    .eq("organization_id", context.organizationId).eq("customer_id", customerId).eq("id", addressId).maybeSingle();
+  if (!currentAddress) return databaseError("Alamat", "alamat tidak ditemukan");
+  const address = addressFields(formData, {
+    province: currentAddress.province ?? "",
+    kabupatenKota: currentAddress.kabupaten_kota ?? "",
+    kecamatan: currentAddress.kecamatan ?? "",
+  });
   if (!address) return databaseError("Alamat", "alamat baris pertama wajib diisi");
   if ("invalid" in address) return databaseError("Alamat", address.invalid);
   const { error } = await context.supabase.from("customer_addresses").update(address).eq("organization_id", context.organizationId).eq("customer_id", customerId).eq("id", addressId);
@@ -642,9 +659,9 @@ function serviceCategory(formData: FormData): string | null {
 export async function createServiceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Layanan", "izin service.manage diperlukan");
-  const name = textValue(formData, "name", 100); const duration = numberValue(formData, "duration"); const price = numberValue(formData, "price");
-  const additionalDuration = numberValue(formData, "additionalDuration") ?? 0;
-  if (name.length < 2 || !duration || duration < 15 || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
+  const name = textValue(formData, "name", 100); const zeroTime = formData.get("zeroTimeAddon") === "on"; const duration = zeroTime ? 0 : numberValue(formData, "duration"); const price = numberValue(formData, "price");
+  const additionalDuration = zeroTime ? 0 : numberValue(formData, "additionalDuration") ?? 0;
+  if (name.length < 2 || duration === null || (!zeroTime && duration < 15) || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
   const priceMatrix = servicePriceMatrix(formData);
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
   const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), metadata: { created_from: "homepaw_pilot" }, ...priceMatrix });
@@ -656,9 +673,9 @@ export async function updateServiceAction(_previous: PilotActionState, formData:
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Layanan", "izin service.manage diperlukan");
   const serviceId = idValue(formData, "serviceId"); if (!serviceId) return databaseError("Layanan", "layanan tidak valid");
-  const name = textValue(formData, "name", 100); const duration = numberValue(formData, "duration"); const price = numberValue(formData, "price");
-  const additionalDuration = numberValue(formData, "additionalDuration") ?? 0;
-  if (name.length < 2 || !duration || duration < 15 || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
+  const name = textValue(formData, "name", 100); const zeroTime = formData.get("zeroTimeAddon") === "on"; const duration = zeroTime ? 0 : numberValue(formData, "duration"); const price = numberValue(formData, "price");
+  const additionalDuration = zeroTime ? 0 : numberValue(formData, "additionalDuration") ?? 0;
+  if (name.length < 2 || duration === null || (!zeroTime && duration < 15) || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
   const priceMatrix = servicePriceMatrix(formData);
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
   const isActive = formData.get("isActive") === "on";

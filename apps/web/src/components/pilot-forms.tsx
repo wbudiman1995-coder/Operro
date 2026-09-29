@@ -19,6 +19,7 @@ import {
 } from "@/app/pilot-actions";
 import type { PilotActionState } from "@/app/pilot-actions";
 import { MapsCoordinateFields } from "@/components/customer-address-forms";
+import { IndonesiaRegionFields } from "@/components/indonesia-region-fields";
 
 const initialPilotActionState: PilotActionState = { error: null, success: null };
 
@@ -32,7 +33,17 @@ function ActionMessage({ state }: { state: PilotActionState }) {
 
 export function CustomerForm() {
   const [state, action, pending] = useActionState(createCustomerAction, initialPilotActionState);
-  return <form action={action} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="name" placeholder="Nama pelanggan" required /><input className={inputClass} name="phone" placeholder="WhatsApp, contoh 0812..." /></div><div className="grid gap-3 sm:grid-cols-4"><input className={inputClass} name="petName" placeholder="Nama hewan" /><select className={inputClass} name="species" defaultValue="dog"><option value="dog">Anjing</option><option value="cat">Kucing</option><option value="rabbit">Kelinci</option></select><input className={inputClass} name="breed" placeholder="Ras" /><select className={inputClass} name="size" defaultValue="" aria-label="Ukuran hewan"><option value="">Ukuran (opsional)</option><option value="small">Kecil</option><option value="medium">Sedang</option><option value="large">Besar</option><option value="extra_large">Extra besar</option></select></div>
+  type PetDraft = { id: number; name: string; species: "dog" | "cat"; breed: string; size: string; weightKg: string; color: string; age: string; notes: string };
+  const [pets, setPets] = useState<PetDraft[]>([{ id: 0, name: "", species: "dog", breed: "", size: "", weightKg: "", color: "", age: "", notes: "" }]);
+  const patchPet = (id: number, key: keyof PetDraft, value: string) => setPets(current => current.map(pet => pet.id === id ? { ...pet, [key]: value } : pet));
+  return <form action={action} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="name" placeholder="Nama pelanggan" required /><input className={inputClass} name="phone" placeholder="WhatsApp, contoh 0812..." /></div>
+    <input type="hidden" name="petsJson" value={JSON.stringify(pets.map((pet) => ({ name: pet.name, species: pet.species, breed: pet.breed, size: pet.size, weightKg: pet.weightKg, color: pet.color, age: pet.age, notes: pet.notes })))} />
+    <div className="space-y-3"><p className="text-sm font-semibold text-slate-700">Pet pelanggan</p>{pets.map((pet, index) => <section key={pet.id} className="space-y-3 rounded-xl border border-slate-200 p-3">
+      <div className="flex items-center justify-between"><strong className="text-xs">Pet {index + 1}</strong>{pets.length > 1 ? <button type="button" onClick={() => setPets(current => current.filter(item => item.id !== pet.id))} className="text-xs font-bold text-rose-700">Hapus</button> : null}</div>
+      <div className="grid gap-3 sm:grid-cols-4"><input className={inputClass} value={pet.name} onChange={event => patchPet(pet.id, "name", event.target.value)} placeholder="Nama pet" aria-label={`Nama pet ${index + 1}`} required /><select className={inputClass} value={pet.species} onChange={event => patchPet(pet.id, "species", event.target.value)} aria-label={`Jenis pet ${index + 1}`}><option value="dog">Anjing</option><option value="cat">Kucing</option></select><input className={inputClass} value={pet.breed} onChange={event => patchPet(pet.id, "breed", event.target.value)} placeholder="Ras" aria-label={`Ras pet ${index + 1}`} /><select className={inputClass} value={pet.size} onChange={event => patchPet(pet.id, "size", event.target.value)} aria-label={`Ukuran pet ${index + 1}`}><option value="">Ukuran (opsional)</option><option value="small">Kecil</option><option value="medium">Sedang</option><option value="large">Besar</option><option value="extra_large">Extra besar</option></select></div>
+      <div className="grid gap-3 sm:grid-cols-3"><input className={inputClass} value={pet.weightKg} onChange={event => patchPet(pet.id, "weightKg", event.target.value)} placeholder="Berat kg" aria-label={`Berat pet ${index + 1}`} inputMode="decimal" /><input className={inputClass} value={pet.color} onChange={event => patchPet(pet.id, "color", event.target.value)} placeholder="Warna bulu" aria-label={`Warna pet ${index + 1}`} /><input className={inputClass} value={pet.age} onChange={event => patchPet(pet.id, "age", event.target.value)} placeholder="Umur" aria-label={`Umur pet ${index + 1}`} /></div>
+      <textarea className={`${inputClass} h-auto py-2`} value={pet.notes} onChange={event => patchPet(pet.id, "notes", event.target.value)} placeholder="Catatan pet untuk groomer" aria-label={`Catatan pet ${index + 1}`} rows={2} />
+    </section>)}{pets.length < 5 ? <button type="button" onClick={() => setPets(current => [...current, { id: Math.max(...current.map(pet => pet.id)) + 1, name: "", species: "dog", breed: "", size: "", weightKg: "", color: "", age: "", notes: "" }])} className="w-full rounded-xl border-2 border-dashed border-emerald-300 py-3 text-sm font-bold text-emerald-700">+ Tambah pet</button> : null}</div>
     <details className="rounded-xl border border-slate-200 p-3">
       <summary className="cursor-pointer text-sm font-semibold text-slate-700">Alamat (opsional, untuk layanan home service)</summary>
       <div className="mt-3 space-y-3">
@@ -42,17 +53,13 @@ export function CustomerForm() {
         </div>
         <input className={inputClass} name="line1" placeholder="Nama jalan dan nomor rumah" />
         <div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="line2" placeholder="Detail tambahan (blok, unit)" /><input className={inputClass} name="landmark" placeholder="Patokan (contoh: sebelah minimarket)" /></div>
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-3">
           <input className={inputClass} name="rt" placeholder="RT" />
           <input className={inputClass} name="rw" placeholder="RW" />
           <input className={inputClass} name="kelurahan" placeholder="Kelurahan/Desa" />
-          <input className={inputClass} name="kecamatan" placeholder="Kecamatan" />
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <input className={inputClass} name="kabupatenKota" placeholder="Kabupaten/Kota" />
-          <input className={inputClass} name="province" placeholder="Provinsi" />
-          <input className={inputClass} name="postalCode" placeholder="Kode pos" />
-        </div>
+        <IndonesiaRegionFields className={inputClass} />
+        <input className={inputClass} name="postalCode" placeholder="Kode pos" />
         <textarea className={`${inputClass} h-auto py-2`} name="accessNotes" placeholder="Catatan akses (pagar, parkir, keamanan)" rows={2} />
         <MapsCoordinateFields />
       </div>
@@ -74,16 +81,19 @@ const SERVICE_SIZE_FIELDS = [
 
 export function ServiceForm() {
   const [state, action, pending] = useActionState(createServiceAction, initialPilotActionState);
+  const [zeroTime, setZeroTime] = useState(false);
+  const [duration, setDuration] = useState("60");
   return <form action={action} className="space-y-3">
     <input className={inputClass} name="name" placeholder="Nama layanan" required />
     <select className={inputClass} name="category" defaultValue="" aria-label="Kategori layanan">
       <option value="">Kategori (opsional)</option><option value="Basic Grooming">Basic Grooming</option><option value="Styling">Styling</option><option value="Special Charges">Special Charges</option><option value="Other Fees">Other Fees</option>
     </select>
     <div className="grid gap-3 sm:grid-cols-2">
-      <input className={inputClass} type="number" min="15" step="15" name="duration" defaultValue="60" aria-label="Durasi menit" />
+      <input className={inputClass} type="number" min="15" step="5" name="duration" value={duration} onChange={(event) => setDuration(event.target.value)} disabled={zeroTime} aria-label="Durasi menit" />
       <input className={inputClass} type="number" min="0" step="1000" name="price" placeholder="Harga dasar Rp" required />
     </div>
-    <input className={inputClass} type="number" min="0" step="5" name="additionalDuration" placeholder="Menit tambahan per unit ekstra (opsional)" />
+    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700"><input type="checkbox" name="zeroTimeAddon" checked={zeroTime} onChange={(event) => setZeroTime(event.target.checked)} />Layanan tambahan: berbayar, tidak menambah waktu booking (contoh: mandi kutu/jamur)</label>
+    <input className={inputClass} type="number" min="0" step="5" name="additionalDuration" disabled={zeroTime} placeholder="Menit tambahan per unit ekstra (opsional)" />
     <div>
       <p className="mb-2 text-xs font-semibold text-slate-500">Harga per ukuran hewan (opsional, kosongkan untuk pakai harga dasar)</p>
       <div className="grid gap-3 sm:grid-cols-4">

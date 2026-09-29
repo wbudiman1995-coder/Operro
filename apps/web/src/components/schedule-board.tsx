@@ -22,9 +22,11 @@ import { cancelScheduleBookingsAction, moveScheduleBookingsAction } from "@/app/
 import { BlackoutManager } from "@/components/blackout-manager";
 import { BranchAvailabilityManager } from "@/components/branch-availability-manager";
 import { BookingArchiveForm, BookingCancelForm, BookingEditForm, BookingSeriesForm } from "@/components/booking-edit-form";
+import { BookingWizard } from "@/components/booking-wizard";
 import { StatusBadge } from "@/components/pilot-ui";
 import { WeeklyAvailabilityManager } from "@/components/weekly-availability-manager";
 import { isCancellable, isReschedulable } from "@/lib/booking-mutations";
+import type { BookingWorkspaceData } from "@/lib/bookings";
 import { SCHEDULE_ROW_LIMIT, type BookingDetail, type ScheduleWorkspace } from "@/lib/schedule";
 import { IDLE_STATE, type MutationState } from "@/lib/schedule/idle_state";
 import {
@@ -49,6 +51,11 @@ interface ScheduleBoardProps {
   canUpdateBooking: boolean;
   canCancelBooking: boolean;
   canManageResources: boolean;
+  canCreateBooking: boolean;
+  bookingWorkspace: BookingWorkspaceData | null;
+  createStart: string;
+  createResourceId?: string;
+  preselectedCustomerId?: string;
 }
 
 function dayHeading(dayISO: string) {
@@ -70,7 +77,15 @@ function minuteAtDrop(event: DragEvent<HTMLElement>, bounds: { startMinutes: num
   return Math.max(0, Math.min(1439, Math.round(raw / 15) * 15));
 }
 
-export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canReadFinance, canUpdateBooking, canCancelBooking, canManageResources }: ScheduleBoardProps) {
+function emptySlotMinutes(bounds: { startMinutes: number; endMinutes: number }, spans: readonly { startMinutes: number; endMinutes: number }[]): number[] {
+  const minutes: number[] = [];
+  for (let minute = bounds.startMinutes; minute + 30 <= bounds.endMinutes; minute += 30) {
+    if (!spans.some((span) => span.startMinutes < minute + 30 && span.endMinutes > minute)) minutes.push(minute);
+  }
+  return minutes;
+}
+
+export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canReadFinance, canUpdateBooking, canCancelBooking, canManageResources, canCreateBooking, bookingWorkspace, createStart, createResourceId, preselectedCustomerId }: ScheduleBoardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -117,6 +132,20 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
   function closeDrawer() {
     setDrawerOpen(false);
     pushParams((params) => params.delete("booking"));
+  }
+
+  function openCreate(dayISO: string, minute: number, resourceId?: string) {
+    pushParams((params) => {
+      params.set("date", dayISO);
+      params.set("time", minutesToLabel(minute));
+      params.set("create", "1");
+      params.delete("booking");
+      if (resourceId) params.set("resource", resourceId); else params.delete("resource");
+    });
+  }
+
+  function closeCreate() {
+    pushParams((params) => { params.delete("create"); params.delete("time"); params.delete("resource"); params.delete("customerId"); });
   }
 
   function toggleBooking(bookingId: string) {
@@ -189,6 +218,7 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
 
   return (
     <div className="mt-7">
+      {searchParams.get("created") === "1" ? <p role="status" className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">Booking berhasil dibuat dan muncul di kalender.</p> : null}
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1">
@@ -227,6 +257,7 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
           <span aria-live="polite" className="ml-auto text-xs font-semibold text-slate-400">
             {pending ? "Memuat…" : `${visibleBookings.length} booking · ${data.activeBranch.timezone}`}
           </span>
+          {canCreateBooking ? <button type="button" onClick={() => openCreate(anchorISO, data.activeBranch.dayStartMinutes)} className="h-9 rounded-xl bg-emerald-700 px-3 text-xs font-bold text-white hover:bg-emerald-800">+ Booking dari kalender</button> : null}
           <button
             type="button"
             onClick={() => startTransition(() => router.refresh())}
@@ -282,6 +313,8 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
         ) : null}
       </div>
 
+      {canCreateBooking ? <p className="mt-2 text-xs font-semibold text-slate-500">Klik atau ketuk slot kosong untuk membuat booking pada tanggal, jam, dan groomer yang dipilih.</p> : null}
+
       {data.truncated ? (
         <p className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
           Periode ini melebihi {SCHEDULE_ROW_LIMIT} booking dan sebagian tidak ditampilkan. Persempit rentang tanggal atau pilih groomer tertentu — keduanya diterapkan pada kueri, sehingga baris yang tersembunyi akan muncul kembali.
@@ -312,9 +345,9 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Tambahkan sumber daya bertipe staf pada menu Layanan &amp; tim agar kalender dapat menampilkan kolom groomer.</p>
         </div>
       ) : view === "day" ? (
-        <DayResourceGrid data={data} bookings={visibleBookings} bounds={bounds} dayISO={data.days[0]} onActivate={activateBooking} onDropBooking={dropBooking} selectedIds={selectedIds} canMove={canUpdateBooking && !pending} activeBookingId={detail?.id ?? null} />
+        <DayResourceGrid data={data} bookings={visibleBookings} bounds={bounds} dayISO={data.days[0]} onActivate={activateBooking} onDropBooking={dropBooking} onCreate={openCreate} canCreate={canCreateBooking} selectedIds={selectedIds} canMove={canUpdateBooking && !pending} activeBookingId={detail?.id ?? null} />
       ) : (
-        <MultiDayCalendar data={data} bookings={visibleBookings} bounds={bounds} todayISO={todayISO} onActivate={activateBooking} onDropBooking={dropBooking} selectedIds={selectedIds} canMove={canUpdateBooking && !pending} activeBookingId={detail?.id ?? null} />
+        <MultiDayCalendar data={data} bookings={visibleBookings} bounds={bounds} todayISO={todayISO} onActivate={activateBooking} onDropBooking={dropBooking} onCreate={openCreate} canCreate={canCreateBooking} selectedIds={selectedIds} canMove={canUpdateBooking && !pending} activeBookingId={detail?.id ?? null} />
       )}
 
       {canManageResources ? (
@@ -336,6 +369,11 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
           timeZone={data.activeBranch.timezone}
         />
       ) : null}
+      {bookingWorkspace ? <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-3 sm:p-8" role="dialog" aria-modal="true" aria-label="Booking baru dari kalender">
+        <div className="mx-auto max-w-4xl"><div className="mb-2 flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-sm font-bold text-slate-700"><span>Booking baru · {createStart.replace("T", " ")} · {data.activeBranch.name}</span><button type="button" onClick={closeCreate} aria-label="Tutup booking baru" className="rounded-lg border px-3 py-1.5">Tutup</button></div>
+          <BookingWizard branches={bookingWorkspace.branches.filter((branch) => branch.id === data.activeBranch.id)} customers={bookingWorkspace.customers} pets={bookingWorkspace.pets} services={bookingWorkspace.services} resources={bookingWorkspace.resources.filter((resource) => resource.branchId === data.activeBranch.id)} addresses={bookingWorkspace.addresses} serviceAreas={bookingWorkspace.serviceAreas} nextDiscounts={bookingWorkspace.nextDiscounts} customerPackages={bookingWorkspace.customerPackages} defaultStart={createStart} preselectedCustomerId={preselectedCustomerId} initialBranchId={data.activeBranch.id} initialResourceId={createResourceId} />
+        </div>
+      </div> : null}
     </div>
   );
 }
@@ -347,6 +385,8 @@ function DayResourceGrid({
   dayISO,
   onActivate,
   onDropBooking,
+  onCreate,
+  canCreate,
   selectedIds,
   canMove,
   activeBookingId,
@@ -357,6 +397,8 @@ function DayResourceGrid({
   dayISO: string;
   onActivate: (id: string, additive?: boolean) => void;
   onDropBooking: (id: string, dayISO: string, minutes: number, resourceId?: string) => void;
+  onCreate: (dayISO: string, minutes: number, resourceId?: string) => void;
+  canCreate: boolean;
   selectedIds: ReadonlySet<string>;
   canMove: boolean;
   activeBookingId: string | null;
@@ -402,6 +444,10 @@ function DayResourceGrid({
               onDragOver={canMove ? (event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } : undefined}
               onDrop={canMove ? (event) => { event.preventDefault(); const id = readDraggedBooking(event); if (id) onDropBooking(id, dayISO, minuteAtDrop(event, bounds), resource.id); } : undefined}
             >
+              {canCreate ? emptySlotMinutes(bounds, [
+                ...dayEntries.filter((entry) => entry.booking.resourceIds.includes(resource.id)).map((entry) => entry.segment),
+                ...data.blackouts.filter((item) => item.resourceId === resource.id).flatMap((item) => item.segments.filter((segment) => segment.dayISO === dayISO)),
+              ]).map((minute) => <button key={`new-${minute}`} type="button" onClick={() => onCreate(dayISO, minute, resource.id)} aria-label={`Buat booking ${dayHeading(dayISO)} pukul ${minutesToLabel(minute)} untuk ${resource.name}`} title={`+ Booking ${minutesToLabel(minute)}`} style={{ top: `${((minute - bounds.startMinutes) / (bounds.endMinutes - bounds.startMinutes)) * 100}%`, height: `${(30 / (bounds.endMinutes - bounds.startMinutes)) * 100}%` }} className="group absolute inset-x-0 z-[1] rounded border border-transparent text-left text-xs font-bold text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 focus:z-20 focus:outline-2 focus:outline-emerald-500"><span className="pl-2 opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus:opacity-100">+ Booking</span></button>) : null}
               {markers.map((minute) => (
                 <span
                   key={minute}
@@ -421,7 +467,7 @@ function DayResourceGrid({
                     <div
                       key={`${blackout.id}:${segment.dayISO}`}
                       title={blackout.reason ? `Tidak tersedia — ${blackout.reason}` : "Tidak tersedia"}
-                      className="absolute inset-x-1 rounded-lg border border-slate-200 bg-[repeating-linear-gradient(45deg,#f1f5f9_0,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] px-2 py-1"
+                      className="absolute inset-x-1 z-10 rounded-lg border border-slate-200 bg-[repeating-linear-gradient(45deg,#f1f5f9_0,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] px-2 py-1"
                       style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%`, borderLeftColor: resource.color, borderLeftWidth: 4 }}
                     >
                       <p className="truncate text-[10px] font-bold text-slate-500">Tidak tersedia</p>
@@ -489,6 +535,8 @@ function MultiDayCalendar({
   todayISO,
   onActivate,
   onDropBooking,
+  onCreate,
+  canCreate,
   selectedIds,
   canMove,
   activeBookingId,
@@ -499,6 +547,8 @@ function MultiDayCalendar({
   todayISO: string;
   onActivate: (id: string, additive?: boolean) => void;
   onDropBooking: (id: string, dayISO: string, minutes: number) => void;
+  onCreate: (dayISO: string, minutes: number) => void;
+  canCreate: boolean;
   selectedIds: ReadonlySet<string>;
   canMove: boolean;
   activeBookingId: string | null;
@@ -541,6 +591,10 @@ function MultiDayCalendar({
             onDragOver={canMove ? (event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } : undefined}
             onDrop={canMove ? (event) => { event.preventDefault(); const id = readDraggedBooking(event); if (id) onDropBooking(id, dayISO, minuteAtDrop(event, bounds)); } : undefined}
           >
+              {canCreate ? emptySlotMinutes(bounds, [
+                ...dayBookings.map((entry) => entry.segment),
+                ...dayBlackouts.map((entry) => entry.segment),
+              ]).map((minute) => <button key={`new-${minute}`} type="button" onClick={() => onCreate(dayISO, minute)} aria-label={`Buat booking ${dayHeading(dayISO)} pukul ${minutesToLabel(minute)}`} title={`+ Booking ${minutesToLabel(minute)}`} style={{ top: `${((minute - bounds.startMinutes) / (bounds.endMinutes - bounds.startMinutes)) * 100}%`, height: `${(30 / (bounds.endMinutes - bounds.startMinutes)) * 100}%` }} className="group absolute inset-x-0 z-[1] rounded border border-transparent text-left text-xs font-bold text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 focus:z-20 focus:outline-2 focus:outline-emerald-500"><span className="pl-2 opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus:opacity-100">+ Booking</span></button>) : null}
               {markers.map((minute) => <span key={minute} aria-hidden className="absolute inset-x-0 border-t border-slate-100" style={{ top: `${((minute - bounds.startMinutes) / (bounds.endMinutes - bounds.startMinutes)) * 100}%` }} />)}
               {dayBookings.map(({ booking, segment }) => {
                 const active = booking.id === activeBookingId;
@@ -574,7 +628,7 @@ function MultiDayCalendar({
               {dayBlackouts.map(({ blackout, segment }) => {
                 const position = positionWithin(segment, bounds);
                 if (!position) return null;
-                return <div key={`${blackout.id}:${segment.dayISO}`} title={blackout.reason ?? "Tidak tersedia"} className="absolute inset-x-1 overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-100/80 px-2 py-1" style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%` }}><p className="truncate text-[10px] font-bold text-slate-500">{resourceNames.get(blackout.resourceId) ?? "Groomer"} · tidak tersedia</p></div>;
+                return <div key={`${blackout.id}:${segment.dayISO}`} title={blackout.reason ?? "Tidak tersedia"} className="absolute inset-x-1 z-10 overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-100/80 px-2 py-1" style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%` }}><p className="truncate text-[10px] font-bold text-slate-500">{resourceNames.get(blackout.resourceId) ?? "Groomer"} · tidak tersedia</p></div>;
               })}
           </section>
         );

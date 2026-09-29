@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { loadAuthContext } from "@/lib/auth-context";
 import { parseBookingDraft } from "@/lib/booking-validation";
 import { createClient } from "@/lib/supabase/server";
+import { zonedDayISO } from "@/lib/timezone";
 
 export interface CreateBookingState { error: string | null }
 
@@ -34,12 +35,16 @@ export async function createBookingAction(
     supabase.from("branches").select("id").eq("organization_id", organizationId).eq("id", draft.branchId).eq("status", "active").is("deleted_at", null).maybeSingle(),
     supabase.from("customers").select("id").eq("organization_id", organizationId).eq("id", draft.customerId).is("deleted_at", null).maybeSingle(),
     supabase.from("pets").select("id,customer_id").eq("organization_id", organizationId).in("id", draft.pets.map((pet) => pet.petId)).is("deleted_at", null),
-    supabase.from("service_catalog").select("id,category").eq("organization_id", organizationId).in("id", draft.pets.flatMap((pet) => pet.serviceIds)).eq("is_active", true).is("deleted_at", null),
+    supabase.from("service_catalog").select("id,category,duration_minutes").eq("organization_id", organizationId).in("id", draft.pets.flatMap((pet) => pet.serviceIds)).eq("is_active", true).is("deleted_at", null),
     supabase.from("resources").select("id,branch_id").eq("organization_id", organizationId).in("id", draft.pets.map((pet) => pet.resourceId)).eq("status", "active").is("deleted_at", null),
   ]);
   const requestedServiceIds = new Set(draft.pets.flatMap((pet) => pet.serviceIds));
   if (!branch || !customer || pets?.length !== draft.pets.length || pets.some((pet) => pet.customer_id !== draft.customerId) || services?.length !== requestedServiceIds.size || resources?.some((resource) => resource.branch_id !== draft.branchId) || new Set(resources?.map((resource) => resource.id)).size !== new Set(draft.pets.map((pet) => pet.resourceId)).size) {
     return { error: "Pilihan booking berubah atau tidak dapat diakses. Muat ulang halaman lalu coba lagi." };
+  }
+  const durationByService = new Map((services ?? []).map((service) => [service.id, Number(service.duration_minutes)]));
+  if (draft.pets.some((pet) => !pet.serviceIds.some((id) => (durationByService.get(id) ?? 0) > 0))) {
+    return { error: "Setiap pet harus memiliki layanan utama berdurasi. Layanan tambahan tanpa durasi tidak bisa dipesan sendiri." };
   }
   const serviceCategoryById = new Map((services ?? []).map((service) => [service.id, service.category?.trim() || "Lainnya"]));
   const requestedCategories = new Set(serviceCategoryById.values());
@@ -170,5 +175,7 @@ export async function createBookingAction(
   }
 
   revalidatePath("/bookings");
-  redirect(`/bookings?created=${booking.id}`);
+  revalidatePath("/schedule");
+  const day = zonedDayISO(new Date(draft.startsAt), (await supabase.from("branches").select("timezone").eq("id", draft.branchId).single()).data?.timezone ?? "Asia/Jakarta");
+  redirect(`/schedule?view=day&date=${day}&branch=${draft.branchId}&booking=${booking.id}&created=1`);
 }

@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 
 import { loadAuthContext } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/server";
+import { isValidDateISO, zonedDateTimeToUtc } from "@/lib/timezone";
 
 export interface VisitActionState { error: string | null; success: string | null }
 
@@ -51,8 +52,13 @@ export async function createManualVisitAction(_previous: VisitActionState, formD
   const description = String(formData.get("description") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim();
   if (!UUID.test(branchId) || !UUID.test(customerId) || !visitAtRaw || !description) return { error: "Kunjungan manual: data tidak valid", success: null };
-  const visitAt = new Date(visitAtRaw);
-  if (Number.isNaN(visitAt.getTime())) return { error: "Kunjungan manual: tanggal tidak valid", success: null };
+  const [dayISO, clock] = visitAtRaw.split("T");
+  if (!isValidDateISO(dayISO) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(clock ?? "")) return { error: "Kunjungan manual: tanggal tidak valid", success: null };
+  const { data: branch, error: branchError } = await context.supabase.from("branches").select("timezone").eq("organization_id", context.organizationId).eq("id", branchId).eq("status", "active").is("deleted_at", null).single();
+  if (branchError || !branch) return { error: "Kunjungan manual: cabang tidak tersedia", success: null };
+  const [hour, minute] = clock.split(":").map(Number);
+  const visitAt = zonedDateTimeToUtc(dayISO, hour * 60 + minute, branch.timezone);
+  if (visitAt > new Date(Date.now() + 5 * 60_000)) return { error: "Kunjungan manual hanya untuk riwayat. Buat booking mendatang di Kalender.", success: null };
   const result = await context.supabase.schema("app").rpc("create_manual_visit", {
     p_branch: branchId, p_customer: customerId, p_pet: petId, p_fulfillment_mode: fulfillmentMode,
     p_visit_at: visitAt.toISOString(), p_description: description, p_note: note || null,

@@ -22,13 +22,15 @@ const SIZE_FIELDS = [
 
 export function ServiceManager({ service, canManageService }: { service: CatalogWorkspace["services"][number]; canManageService: boolean }) {
   const [editing, setEditing] = useState(false);
+  const [zeroTime, setZeroTime] = useState(service.duration === 0);
+  const [duration, setDuration] = useState(String(service.duration || 60));
   const [state, action, pending] = useActionState(updateServiceAction, initialState);
 
   return <article className="p-5">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <p className="truncate font-bold">{service.name}</p>
-        <p className="mt-1 text-xs text-slate-500">{service.category ? `${service.category} · ` : ""}{service.duration} menit{service.additionalDuration > 0 ? ` (+${service.additionalDuration} menit/unit tambahan)` : ""} · {formatRupiah(service.price)}</p>
+        <p className="mt-1 text-xs text-slate-500">{service.category ? `${service.category} · ` : ""}{service.duration === 0 ? "Tidak menambah durasi" : `${service.duration} menit`}{service.additionalDuration > 0 ? ` (+${service.additionalDuration} menit/unit tambahan)` : ""} · {formatRupiah(service.price)}</p>
         <p className="mt-1 text-[11px] text-slate-400">
           {SIZE_FIELDS.map(([key, , label]) => `${label}: ${service[key] === null ? "pakai harga dasar" : formatRupiah(service[key] as number)}`).join(" · ")}
         </p>
@@ -45,9 +47,10 @@ export function ServiceManager({ service, canManageService }: { service: Catalog
         <option value="">Kategori (opsional)</option><option value="Basic Grooming">Basic Grooming</option><option value="Styling">Styling</option><option value="Special Charges">Special Charges</option><option value="Other Fees">Other Fees</option>
       </select>
       <div className="grid gap-3 sm:grid-cols-2">
-        <input className={field} type="number" min="15" step="15" name="duration" defaultValue={service.duration} aria-label="Durasi menit" required />
-        <input className={field} type="number" min="0" step="5" name="additionalDuration" defaultValue={service.additionalDuration} aria-label="Durasi tambahan per unit" placeholder="Menit tambahan/unit" />
+        <input className={field} type="number" min="15" step="5" name="duration" value={duration} onChange={(event) => setDuration(event.target.value)} disabled={zeroTime} aria-label="Durasi menit" required />
+        <input className={field} type="number" min="0" step="5" name="additionalDuration" defaultValue={service.additionalDuration} disabled={zeroTime} aria-label="Durasi tambahan per unit" placeholder="Menit tambahan/unit" />
       </div>
+      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700"><input type="checkbox" name="zeroTimeAddon" checked={zeroTime} onChange={(event) => setZeroTime(event.target.checked)} />Layanan tambahan berbayar, tanpa tambahan waktu booking</label>
       <input className={field} type="number" min="0" step="1000" name="price" defaultValue={service.price} placeholder="Harga dasar Rp" required />
       <div>
         <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Harga per ukuran hewan (kosongkan untuk pakai harga dasar)</p>

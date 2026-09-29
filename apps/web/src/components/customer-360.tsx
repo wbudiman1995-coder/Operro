@@ -80,7 +80,7 @@ export function Customer360Header({ overview }: { overview: CustomerOverview }) 
         {overview.mapsUrl ? <a href={overview.mapsUrl} target="_blank" rel="noreferrer" className="rounded-[10px] bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-200">Lihat lokasi</a> : null}
         {/* customerId is a preselection HINT only. /bookings re-reads it server-side,
             organization-scoped, and ignores it when the customer is not accessible. */}
-        <Link href={`/bookings?customerId=${encodeURIComponent(overview.id)}#booking-baru`} className="rounded-[10px] bg-[#0f8a72] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#0b6e5a]">Buat booking</Link>
+        <Link href={`/schedule?create=1&customerId=${encodeURIComponent(overview.id)}`} className="rounded-[10px] bg-[#0f8a72] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#0b6e5a]">Buat booking di kalender</Link>
         <Link href="/schedule" className="rounded-[10px] border border-[#e4e7ec] px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-[#fbfbfc]">Lihat kalender</Link>
       </div>
     </header>

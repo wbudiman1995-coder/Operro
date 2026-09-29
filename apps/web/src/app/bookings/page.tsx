@@ -47,6 +47,10 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   if (context.organizations.length === 0) return <NoOrganizationState email={context.user.email ?? "akun Operro"} />;
   if (!context.activeOrganization) redirect("/organizations");
   const organizationId = context.activeOrganization.id;
+  if (params.customerId) {
+    const customerId = await resolvePreselectedCustomer(supabase, organizationId, params.customerId);
+    redirect(customerId ? `/schedule?create=1&customerId=${customerId}` : "/schedule");
+  }
 
   // The week boundary carries no branch of its own, so — like every other zone-less,
   // organization-level boundary in this app (see lib/branch-context.ts) — it is resolved
@@ -60,10 +64,9 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   const from = zonedDateTimeToUtc(weekStartISO, 0, defaultTimezone).toISOString();
   const to = zonedDateTimeToUtc(weekEndISO, 0, defaultTimezone).toISOString();
 
-  const [data, preselectedCustomerId, capabilities] = await Promise.all([
+  const [data, capabilities] = await Promise.all([
     loadBookingWorkspace(supabase, organizationId, from, to),
-    resolvePreselectedCustomer(supabase, organizationId, params.customerId),
     loadCapabilities(supabase),
   ]);
-  return <BookingShell organizations={context.organizations} activeOrganization={context.activeOrganization} userEmail={context.user.email ?? "Akun Operro"} capabilities={capabilities} data={data} weekStartISO={weekStartISO} defaultTimezone={defaultTimezone} created={Boolean(params.created)} preselectedCustomerId={preselectedCustomerId} />;
+  return <BookingShell organizations={context.organizations} activeOrganization={context.activeOrganization} userEmail={context.user.email ?? "Akun Operro"} capabilities={capabilities} data={data} weekStartISO={weekStartISO} defaultTimezone={defaultTimezone} created={Boolean(params.created)} />;
 }

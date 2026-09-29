@@ -7,7 +7,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
-  BookingIcon,
   CalendarIcon,
   CatalogIcon,
   CustomersIcon,
@@ -51,7 +50,6 @@ type NavigationItemConfig = {
 const primaryNavigation: NavigationItemConfig[] = [
   { label: "Ringkasan", href: "/dashboard", icon: DashboardIcon, anyPermission: ["booking.create", "customer.read", "finance.read", "inventory.read", "membership.read", "payroll.read", "reports.view", "service.manage", "task.manage"] },
   { label: "Kalender", href: "/schedule", icon: CalendarIcon, permission: "booking.read" },
-  { label: "Booking", href: "/bookings", icon: BookingIcon, permission: "booking.create" },
   { label: "Pelanggan", href: "/customers", icon: CustomersIcon, permission: "customer.read" },
   { label: "Tugas", href: "/tasks", icon: TasksIcon, permission: "task.manage" },
 ];
