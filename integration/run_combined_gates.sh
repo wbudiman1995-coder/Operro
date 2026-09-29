@@ -3,7 +3,7 @@
 # This does not touch any engine's Supabase stack or database.
 set -euo pipefail
 
-repo=/mnt/e/Claude/operro-integration
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 scratch=$(mktemp -d /tmp/operro-combined.XXXXXX)
 wrappers=$(mktemp -d /tmp/operro-combined-bin.XXXXXX)
 container="operro_combined_pg16_$$"
@@ -15,7 +15,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-git -C "$repo" archive HEAD | tar -xf - -C "$scratch"
+# WSL cannot resolve this Windows-created worktree's E:-absolute .git pointer.
+# Copy the clean checkout directly, omitting local dependencies and this run's log.
+tar -C "$repo" --exclude=.git --exclude=node_modules --exclude=.next --exclude=.env.local \
+  --exclude=docs/handoffs/logs/INTEGRATION -cf - . | tar -xf - -C "$scratch"
 find "$scratch" -type f -name '*.sh' -exec sed -i 's/\r$//' {} +
 
 docker run -d --name "$container" -e POSTGRES_PASSWORD=postgres \
@@ -41,7 +44,7 @@ export PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres
 export RUN_AS_POSTGRES=0
 cd "$scratch"
 
-echo "Integration HEAD: $(git -C "$repo" rev-parse HEAD)" > "$log"
+echo "Integration checkout: $repo" > "$log"
 echo "PostgreSQL: $(docker exec "$container" psql -U postgres -Atc 'show server_version')" >> "$log"
 if bash run_all_gates.sh >> "$log" 2>&1; then
   echo 'run_all_gates.sh exit=0' >> "$log"

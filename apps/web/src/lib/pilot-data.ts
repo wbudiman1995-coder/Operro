@@ -78,7 +78,7 @@ export interface CustomerWorkspace {
   customers: Array<{
     id: string; name: string; phone: string | null; status: string; source: string | null; notes: string | null;
     pets: Array<{ id: string; name: string; species: string; breed: string | null; temperament: string | null }>;
-    packages: Array<{ name: string; remaining: number; expiresAt: string | null }>;
+    packages: Array<{ id: string; name: string; remaining: number; expiresAt: string | null }>;
     addresses: Array<{ id: string; label: string; formattedLine: string; latitude: number | null; longitude: number | null; isDefault: boolean }>;
     nextDiscount: { id: string; label: string; rules: Record<string, { type: string; value: number }>; expiresAt: string | null } | null;
   }>;
@@ -88,7 +88,7 @@ export async function loadCustomerWorkspace(supabase: SupabaseClient, organizati
   const [customers, pets, customerPackages, packages, addresses, nextDiscounts] = await Promise.all([
     supabase.from("customers").select("id,display_name,phone,status,source,notes").eq("organization_id", organizationId).is("deleted_at", null).order("display_name"),
     supabase.from("pets").select("id,customer_id,name,species,breed,temperament").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
-    supabase.from("customer_packages").select("customer_id,package_id,sessions_remaining,expires_at,status").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
+    supabase.from("customer_packages").select("id,customer_id,package_id,sessions_remaining,expires_at,status").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("packages").select("id,name").eq("organization_id", organizationId).is("deleted_at", null),
     supabase.from("customer_addresses").select("id,customer_id,label,line1,line2,kecamatan,kabupaten_kota,province,postal_code,latitude,longitude,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
     supabase.from("customer_next_discounts").select("id,customer_id,label,rules,expires_at").eq("organization_id", organizationId).eq("status", "active").or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
@@ -98,7 +98,7 @@ export async function loadCustomerWorkspace(supabase: SupabaseClient, organizati
   return { customers: (customers.data ?? []).map((customer) => ({
     id: customer.id, name: customer.display_name, phone: customer.phone, status: customer.status, source: customer.source, notes: customer.notes,
     pets: (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name, species: pet.species, breed: pet.breed, temperament: pet.temperament })),
-    packages: (customerPackages.data ?? []).filter((item) => item.customer_id === customer.id).map((item) => ({ name: packageMap.get(item.package_id) ?? "Paket", remaining: item.sessions_remaining, expiresAt: item.expires_at })),
+    packages: (customerPackages.data ?? []).filter((item) => item.customer_id === customer.id).map((item) => ({ id: item.id, name: packageMap.get(item.package_id) ?? "Paket", remaining: item.sessions_remaining, expiresAt: item.expires_at })),
     nextDiscount: (() => {
       const offer = (nextDiscounts.data ?? []).find((item) => item.customer_id === customer.id);
       if (!offer) return null;

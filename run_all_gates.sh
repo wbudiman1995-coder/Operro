@@ -91,6 +91,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261010120000_payroll_export_detail_rpc.sql
   supabase/migrations/20261012100000_invoice_number_random_suffix.sql
   supabase/migrations/20261013100000_payroll_recompute_race_lock.sql
+  supabase/migrations/20261013110000_uuidv7_authenticated_defaults.sql
   supabase/migrations/20261014100000_payroll_retention_ledger_idempotent.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
@@ -162,6 +163,18 @@ PGPASSWORD=stagingpw psql \
   "host=$PGHOST port=$PGPORT dbname=operro_gate user=operro_gate_client" \
   -v ON_ERROR_STOP=1 \
   -f integration/0100_integration_client.sql
+
+step "GATE 7b — invoice pricing and package coverage parity"
+psql_db operro_gate -v ON_ERROR_STOP=1 -f integration/invoice_parity_smoke.sql
+
+step "GATE 7c — membership lifecycle and reconciliation"
+psql_db operro_gate -v ON_ERROR_STOP=1 -f integration/package_lifecycle_smoke.sql
+
+step "GATE 7d — retention and renewal follow-ups"
+psql_db operro_gate -v ON_ERROR_STOP=1 -f integration/retention_renewal_followups_smoke.sql
+
+step "GATE 7e — documents, payments, evidence, and visits"
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/S27-S30/test_backend.sql
 
 step "GATE 8 — completion vs assembly/reservation concurrency"
 run_as_postgres dropdb --if-exists operro_cc

@@ -10,6 +10,14 @@ select '0e000000-0000-4000-8000-000000000001',m.id,true
 from public.modules m where m.key in ('finance','pos','membership')
 on conflict(organization_id,module_id) do update set enabled=true;
 
+-- Superuser fixture writes still pass through audit triggers that parse the
+-- request JWT. A prior authenticated transaction leaves this GUC as an empty
+-- string in a fresh psql session unless we set a valid session-level value.
+select set_config('request.jwt.claims',json_build_object(
+  'sub','0e000000-0000-4000-8000-0000000000c1',
+  'role','authenticated',
+  'active_org_id','0e000000-0000-4000-8000-000000000001')::text,false);
+
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims',json_build_object(
@@ -33,6 +41,56 @@ begin
   if not exists(select 1 from public.invoice_lines where invoice_id=first_invoice.id and item_type='package' and package_id='0e000000-0000-4000-8000-00000000a001') then raise exception 'package invoice line missing'; end if;
   if not exists(select 1 from public.customer_packages where metadata->>'source_invoice_id'=first_invoice.id::text and sessions_remaining=3) then raise exception 'package balance missing'; end if;
   raise notice 'PASS package invoice, idempotency, package line, and 3-session balance';
+end $$;
+commit;
+
+-- A covered service must use its package session, while a second service on the
+-- same pet still receives the booking-time fixed category discount. In
+-- particular, the covered line must not consume the category's fixed pool.
+insert into public.bookings
+  (id,organization_id,branch_id,customer_id,booking_type,status,starts_at,ends_at,fulfillment_mode,travel_fee,metadata)
+values
+  ('0e000000-0000-4000-8000-00000000ba05','0e000000-0000-4000-8000-000000000001',
+   '0e000000-0000-4000-8000-0000000000a1','0e000000-0000-4000-8000-0000000000f0',
+   'grooming','confirmed',now(),now()+interval '1 hour','in_store',0,
+   '{"category_discounts":{"rules":[{"category":"Bath","type":"fixed","value":30}],"service_categories":{"0e000000-0000-4000-8000-000000005001":"Bath"}}}'::jsonb);
+insert into public.grooming_jobs(booking_id,organization_id)
+values('0e000000-0000-4000-8000-00000000ba05','0e000000-0000-4000-8000-000000000001');
+insert into public.grooming_job_pets(id,organization_id,grooming_job_id,pet_id,status,sequence)
+values('0e000000-0000-4000-8000-00000000be05','0e000000-0000-4000-8000-000000000001',
+       '0e000000-0000-4000-8000-00000000ba05','0e000000-0000-4000-8000-0000000000f1','pending',1);
+insert into public.grooming_job_pet_services
+  (id,organization_id,grooming_job_pet_id,service_id,service_name_snapshot,quantity,unit_price_snapshot,currency)
+values
+  ('0e000000-0000-4000-8000-00000000fe05','0e000000-0000-4000-8000-000000000001',
+   '0e000000-0000-4000-8000-00000000be05','0e000000-0000-4000-8000-000000005001','Bath covered',1,100,'IDR'),
+  ('0e000000-0000-4000-8000-00000000fe06','0e000000-0000-4000-8000-000000000001',
+   '0e000000-0000-4000-8000-00000000be05','0e000000-0000-4000-8000-000000005001','Bath uncovered',1,100,'IDR');
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims',json_build_object(
+  'sub','0e000000-0000-4000-8000-0000000000c1',
+  'role','authenticated',
+  'active_org_id','0e000000-0000-4000-8000-000000000001')::text,true);
+do $$
+declare v_preview jsonb; v_covered jsonb; v_uncovered jsonb;
+begin
+  perform app.reserve_package_session('0e000000-0000-4000-8000-00000000fe05',
+                                      '0e000000-0000-4000-8000-0000000ca001');
+  v_preview := app.preview_invoice_pricing('0e000000-0000-4000-8000-00000000ba05');
+  select line into v_covered from jsonb_array_elements(v_preview->'lines') line
+   where line->>'line_id'='0e000000-0000-4000-8000-00000000fe05';
+  select line into v_uncovered from jsonb_array_elements(v_preview->'lines') line
+   where line->>'line_id'='0e000000-0000-4000-8000-00000000fe06';
+  if v_covered is null or v_uncovered is null then raise exception 'pricing lines missing: %',v_preview; end if;
+  if (v_covered->>'line_total')::numeric <> 0 or (v_covered->'pricing_breakdown'->>'package_coverage')::boolean is distinct from true then
+    raise exception 'covered line was charged: %',v_covered; end if;
+  if (v_uncovered->>'line_total')::numeric <> 70 or (v_uncovered->'pricing_breakdown'->>'package_coverage')::boolean is distinct from false then
+    raise exception 'uncovered line did not retain fixed discount: %',v_uncovered; end if;
+  if (v_preview->>'total')::numeric <> 70 or (v_preview->>'discount_total')::numeric <> 130 then
+    raise exception 'package/category combined totals wrong: %',v_preview; end if;
+  raise notice 'PASS package-covered line=0; uncovered same-pet line=70; fixed category pool preserved';
 end $$;
 commit;
 

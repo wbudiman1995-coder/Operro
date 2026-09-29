@@ -16,7 +16,7 @@
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",
     "exceljs": "^4.4.0",
-    "next": "16.2.12",
+    "next": "16.3.6",
     "pdfkit": "^0.20.2",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -28,7 +28,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.12",
+    "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

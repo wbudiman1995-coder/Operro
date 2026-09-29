@@ -4,6 +4,7 @@ import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { MembershipFilterList } from "@/components/membership-filter-list";
+import { RestrictedNotice } from "@/components/restricted-notice";
 import { loadMembershipAdministrationWorkspace } from "@/lib/membership-admin";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 
@@ -24,6 +25,12 @@ function sanitizeReturnTo(value: string | undefined): string | null {
 export default async function MembershipsPage({ searchParams }: { searchParams: Promise<{ membershipId?: string; return?: string }> }) {
   const params = await searchParams;
   const workspace = await requireActiveWorkspace();
+  if (!workspace.capabilities["membership.read"]) {
+    return <WorkspaceShell {...workspace} activePath="/programs">
+      <PageHeader eyebrow="Retensi pelanggan" title="Administrasi paket" description="Kelola status, perpanjangan, dan rekonsiliasi saldo paket pelanggan." />
+      <div className="mt-7"><RestrictedNotice title="Tidak memiliki akses" description="Peran ini memerlukan membership.read untuk melihat administrasi paket." /></div>
+    </WorkspaceShell>;
+  }
   const { rows, branches, services } = await loadMembershipAdministrationWorkspace(workspace.supabase, workspace.activeOrganization.id);
 
   const requestedId = params.membershipId && UUID.test(params.membershipId) ? params.membershipId : null;

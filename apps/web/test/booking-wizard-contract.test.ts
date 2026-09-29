@@ -6,7 +6,6 @@ import test from "node:test";
 const ROOT = path.join(__dirname, "..");
 const action = fs.readFileSync(path.join(ROOT, "src/app/bookings/actions.ts"), "utf8");
 const wizard = fs.readFileSync(path.join(ROOT, "src/components/booking-wizard.tsx"), "utf8");
-const invoicing = fs.readFileSync(path.join(ROOT, "src/app/pilot-actions.ts"), "utf8");
 const coverageMigration = fs.readFileSync(path.join(ROOT, "../../supabase/migrations/20260922100000_booking_package_coverage.sql"), "utf8");
 
 test("wizard exposes separate note audiences and category discounts", () => {
@@ -23,12 +22,8 @@ test("package allocation is validated then reserved against the exact service li
   assert.match(wizard, /Bayar dengan paket/);
 });
 
-test("invoice pricing honors package coverage and snapshotted category discounts", () => {
-  assert.match(invoicing, /rpc\("list_booking_package_coverage"/);
-  assert.match(invoicing, /packageId \? gross/);
-  assert.match(invoicing, /category_discount/);
-  assert.match(invoicing, /package_coverage/);
-});
+// Package coverage and discount arithmetic now run inside the invoice RPC, so
+// integration/invoice_parity_smoke.sql (GATE 7b) verifies their real totals.
 
 test("package coverage read is a narrow invoice-issuer RPC", () => {
   assert.match(coverageMigration, /assert_tenant_authorized\(v_booking\.organization_id,'finance','invoice\.issue',v_booking\.branch_id\)/);

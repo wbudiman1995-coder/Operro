@@ -1,0 +1,95 @@
+login page: Masuk | Operro
+owner landed: http://127.0.0.1:3003/dashboard
+O
+Operro
+Ringkasan
+Kalender
+Booking
+Pelanggan
+Tugas
+
+PENGELOLAAN
+
+Operasional
+Kunjungan
+Jadwal saya
+Layanan & tim
+Paket
+Inventaris
+Keuangan
+Payroll
+Kehadiran
+Laporan
+Leaderboard
+Follow-up
+Keluhan
+Pengaturan dokumen
+W
+AKUN MASUK
+wbudiman1995@gmail.com
+Keluar
+
+WORKSPACE AKTIF
+
+HomePaw Demo
+
+Cari pelanggan, hewan, booking…
+⌘K
+Pilih organisasi aktif
+HomePaw Demo
+Ganti
+
+WORKSPACE AKTIF
+
+Ringkasan operasional
+
+Kondisi bisnis hari ini berdasarkan data langsung di HomePaw Demo.
+
++ Booking baru
+
+Booking hari ini
+
+3
+
+Tidak termasuk pembatalan dan no-show.
+
+Pendapatan hari ini
+
+Rp 1.152.000
+
+Pembayaran berstatus berhasil.
+
+Pelanggan aktif
+
+6
+
+Profil pelanggan aktif di workspace.
+
+Tugas tertunda
+
+3
+
+Tug
+route /invoices/new: 200 991ms h1="Buat invoice" url=http://127.0.0.1:3003/invoices/new
+route /finance: 200 604ms h1="Keuangan" url=http://127.0.0.1:3003/finance
+route /programs: 200 527ms h1="Paket grooming" url=http://127.0.0.1:3003/programs
+route /programs/memberships: 200 454ms h1="Administrasi paket" url=http://127.0.0.1:3003/programs/memberships
+route /followups: 200 432ms h1="Follow-up & perpanjangan" url=http://127.0.0.1:3003/followups
+route /visits: 200 410ms h1="Kunjungan" url=http://127.0.0.1:3003/visits
+route /payroll: 200 431ms h1="Payroll" url=http://127.0.0.1:3003/payroll
+route /my-schedule: 200 499ms h1="Jadwal saya" url=http://127.0.0.1:3003/my-schedule
+route /leaderboard: 200 533ms h1="Kinerja groomer" url=http://127.0.0.1:3003/leaderboard
+route /reports: 200 462ms h1="Laporan pemilik" url=http://127.0.0.1:3003/reports
+route /bookings: 200 485ms h1="Booking" url=http://127.0.0.1:3003/bookings
+route /schedule: 200 441ms h1="Kalender dispatcher" url=http://127.0.0.1:3003/schedule
+route /operations: 200 463ms h1="Operasional grooming" url=http://127.0.0.1:3003/operations
+route /customers: 200 414ms h1="Pelanggan & hewan" url=http://127.0.0.1:3003/customers
+route /settings/documents: 200 473ms h1="Dokumen & pembayaran" url=http://127.0.0.1:3003/settings/documents
+groomer landed: http://127.0.0.1:3003/my-schedule h1="Jadwal saya"
+groomer route /my-schedule: 200 h1="Jadwal saya" overflow=0px url=http://127.0.0.1:3003/my-schedule
+groomer route /followups: 200 h1="Follow-up & perpanjangan" overflow=0px url=http://127.0.0.1:3003/followups
+groomer route /programs/memberships: 200 h1="Administrasi paket" overflow=0px url=http://127.0.0.1:3003/programs/memberships
+groomer /programs/memberships body: "RETENSI PELANGGAN\n\nAdministrasi paket\n\nKelola status, perpanjangan, dan rekonsiliasi saldo paket pelanggan.\n\nTidak memiliki akses\n\nPeran ini memerlukan membership.read untuk melihat administrasi paket.\n\nAKSES DIBATASI, BUKAN DATA KOSONG"
+groomer route /payroll: 200 h1="Payroll" overflow=0px url=http://127.0.0.1:3003/payroll
+groomer /payroll body: "PAYROLL\n\nPayroll\n\nKonfigurasi cycle, komponen gaji per groomer, dan siklus persetujuan/pembayaran.\n\nTidak ada izin payroll\n\nPeran ini memerlukan payroll.read.\n\nAKSES DIBATASI, BUKAN DATA KOSONG"
+browser errors: []

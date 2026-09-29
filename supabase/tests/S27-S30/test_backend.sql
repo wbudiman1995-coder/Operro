@@ -321,15 +321,27 @@ begin
     'S29: a payment inserted after this migration still defaults to not_applicable unless recorded via record_payment (documents the default; app code never inserts directly any more)');
 end $$;
 
--- package-purchase payment path (finding 4's other direct-insert site)
+-- Package sales now issue a ledger-backed invoice first, then take payment
+-- against that invoice. The obsolete record_package_purchase_payment RPC was
+-- deliberately dropped in 20261001100000_payment_workflow_closeout.sql.
 do $$ begin perform pg_temp.act_as('aa000000-0000-4000-8000-000000000010','aa000000-0000-4000-8000-000000000001'); end $$;
 do $$
-declare v_pay record;
+declare v_pay record; v_invoice public.invoices; v_issued_at timestamptz := now();
 begin
-  select * into v_pay from app.record_package_purchase_payment(
+  select * into v_invoice from app.create_package_invoice(
     'aa000000-0000-4000-8000-000000000002','aa000000-0000-4000-8000-000000000050','aa000000-0000-4000-8000-0000000000b0',
-    'cash', 400000, 'IDR', gen_random_uuid());
-  perform pg_temp.ok(v_pay.payment_stage = 'not_applicable', 'S29: cash package-purchase payment recorded via RPC');
+    v_issued_at, null, null, gen_random_uuid(), null);
+  perform pg_temp.ok(v_invoice.id is not null and v_invoice.status = 'issued',
+    'S29: package purchase produces an issued invoice');
+  perform pg_temp.ok(exists(select 1 from public.customer_packages cp join public.customer_package_ledger l
+    on l.customer_package_id=cp.id and l.invoice_id=v_invoice.id and l.reason='purchase'
+    where cp.source_invoice_id=v_invoice.id),
+    'S29: package invoice creates a linked purchase ledger entry');
+  select * into v_pay from app.record_payment(v_invoice.id,'cash',v_invoice.total,'CASH-PACKAGE',null,gen_random_uuid());
+  perform pg_temp.ok(v_pay.payment_stage = 'not_applicable',
+    'S29: cash package payment recorded against the invoice');
+  perform pg_temp.ok((select status from public.invoices where id=v_invoice.id)='paid',
+    'S29: package invoice becomes paid after cash payment');
 end $$;
 
 -- =====================================================================
@@ -399,6 +411,8 @@ begin
       'y.jpg', 'image/jpeg', 'aa000000-0000-4000-8000-000000000010',
       jsonb_build_object('category','after','grooming_job_pet_id','aa000000-0000-4000-8000-000000000090'))
     returning id into v_att2;
+    insert into public.attachment_links (organization_id, attachment_id, subject_type, subject_id)
+    values ('aa000000-0000-4000-8000-000000000001', v_att2, 'booking', 'aa000000-0000-4000-8000-000000000080');
 
     perform pg_temp.act_as(v_other_u,'aa000000-0000-4000-8000-000000000001');
     begin

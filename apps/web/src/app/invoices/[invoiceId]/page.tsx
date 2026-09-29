@@ -98,11 +98,11 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
         <div className="mt-2 grid gap-2 sm:grid-cols-2">{doc.bankAccounts.map((a, i) => <div key={i} className="rounded-xl border border-slate-200 p-3 text-sm"><p className="font-bold">{a.bankName}{a.isPrimary ? " (Utama)" : ""}</p><p>{a.accountNumber}</p><p className="text-slate-500">a.n. {a.accountHolder}</p></div>)}</div>
       </section> : null}
 
-      {isPackageSale && doc.organization.membershipTerms ? <section className="mt-6 rounded-xl border border-slate-200 p-4 text-xs text-slate-600 print:break-before-page"><p className="mb-1 font-bold text-slate-700">Syarat & Ketentuan</p><p className="whitespace-pre-line">{doc.organization.membershipTerms}</p></section> : null}
+      {isPackageSale && doc.organization.membershipTerms ? <section className="mt-6 rounded-xl border border-slate-200 p-4 text-xs text-slate-600 print:break-inside-avoid"><p className="mb-1 font-bold text-slate-700">Syarat & Ketentuan</p><p className="whitespace-pre-line">{doc.organization.membershipTerms}</p></section> : null}
 
       {doc.customerNotes ? <section className="mt-6 rounded-xl bg-slate-50 p-4 text-sm"><p className="font-bold text-slate-700">Catatan dari groomer</p><p className="mt-1 text-slate-600">{doc.customerNotes}</p></section> : null}
 
-      {!isPackageSale && doc.photos.length > 0 ? <section className="mt-6 print:break-before-page">
+      {!isPackageSale && doc.photos.length > 0 ? <section className="mt-6 print:break-inside-avoid">
         <p className="text-xs font-bold uppercase text-slate-400">Dokumentasi</p>
         {/* eslint-disable-next-line @next/next/no-img-element -- print layout needs a plain <img>, not next/image's runtime optimization */}
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">{doc.photos.map((p) => <div key={p.id} className="overflow-hidden rounded-lg border border-slate-200"><img src={p.url} alt={p.category} className="aspect-square w-full object-cover" /><p className="p-1 text-center text-[10px] font-semibold capitalize text-slate-500">{p.category}</p></div>)}</div>
