@@ -6,6 +6,7 @@ import test from "node:test";
 const root = path.join(__dirname, "../../..");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/20260924130000_service_size_pricing.sql"), "utf8");
 const householdMigration = fs.readFileSync(path.join(root, "supabase/migrations/20261016100000_homepaw_customer_intake.sql"), "utf8");
+const homepawSizeMigration = fs.readFileSync(path.join(root, "supabase/migrations/20261017100000_homepaw_size_price_duration.sql"), "utf8");
 const actions = fs.readFileSync(path.join(root, "apps/web/src/app/pilot-actions.ts"), "utf8");
 const pilotData = fs.readFileSync(path.join(root, "apps/web/src/lib/pilot-data.ts"), "utf8");
 const serviceManager = fs.readFileSync(path.join(root, "apps/web/src/components/service-manager.tsx"), "utf8");
@@ -103,9 +104,10 @@ test("service create/update stay organization-scoped and validate every size pri
   assert.match(actions, /function optionalPriceValue[\s\S]*Number\.isFinite\(parsed\) && parsed >= 0 \? parsed : "invalid"/);
 });
 
-test("pet size selection is optional and constrained to the four supported bands", () => {
-  assert.match(actions, /\["", "small", "medium", "large", "extra_large"\]\.includes\(pet\.size\)/);
+test("pet size selection remains optional and supports the new XS band", () => {
+  assert.match(actions, /\["", "extra_small", "small", "medium", "large", "extra_large"\]\.includes\(pet\.size\)/);
   assert.match(householdMigration, /v_pet->>'size' not in \('small','medium','large','extra_large'\)/);
+  assert.match(homepawSizeMigration, /v_pet->>'size' not in \('extra_small','small','medium','large','extra_large'\)/);
 });
 
 test("catalog admin UI exposes size prices, additional duration and fulfillment-mode checkboxes for editing", () => {

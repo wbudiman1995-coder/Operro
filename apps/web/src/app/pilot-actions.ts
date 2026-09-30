@@ -1,6 +1,7 @@
 "use server";
 
 import { correctedMembershipExpiry } from "@/lib/membership-correction";
+import { pricingBand } from "@/lib/pet-sizing";
 
 /**
  * Function index:
@@ -29,6 +30,7 @@ import { loadAuthContext } from "@/lib/auth-context";
 import { loadCapabilities } from "@/lib/authorization";
 import { INVOICE_DISCOUNT_CATEGORIES } from "@/lib/invoice-discount-categories";
 import { canonicalRegionNames, type RegionNames } from "@/lib/indonesia-regions";
+import { HOMEPAW_STARTER_SERVICES, starterServiceRow } from "@/lib/homepaw-starter";
 import { createClient } from "@/lib/supabase/server";
 
 export interface PilotActionState { error: string | null; success: string | null }
@@ -184,7 +186,7 @@ export async function createCustomerAction(_previous: PilotActionState, formData
   if (!Array.isArray(pets) || pets.length < 1 || pets.length > 5 || pets.some((pet) =>
     !pet || typeof pet.name !== "string" || !pet.name.trim() || pet.name.length > 80
     || !["dog", "cat"].includes(pet.species)
-    || !["", "small", "medium", "large", "extra_large"].includes(pet.size)
+    || !["", "extra_small", "small", "medium", "large", "extra_large"].includes(pet.size)
     || (pet.weightKg && (!Number.isFinite(Number(pet.weightKg)) || Number(pet.weightKg) <= 0))
   )) return databaseError("Pet", "isi satu hingga lima pet dengan nama dan jenis yang valid");
 
@@ -617,9 +619,12 @@ export async function previewInvoiceDiscountsAction(formData: FormData): Promise
   };
 }
 
-const SERVICE_SIZE_KEYS = ["small", "medium", "large", "extraLarge"] as const;
+const SERVICE_SIZE_KEYS = ["extraSmall", "small", "medium", "large", "extraLarge", "cat"] as const;
 const SERVICE_SIZE_COLUMNS: Record<(typeof SERVICE_SIZE_KEYS)[number], string> = {
-  small: "price_small", medium: "price_medium", large: "price_large", extraLarge: "price_extra_large",
+  extraSmall: "price_extra_small", small: "price_small", medium: "price_medium", large: "price_large", extraLarge: "price_extra_large", cat: "price_cat",
+};
+const SERVICE_DURATION_COLUMNS: Record<(typeof SERVICE_SIZE_KEYS)[number], string> = {
+  extraSmall: "duration_extra_small", small: "duration_small", medium: "duration_medium", large: "duration_large", extraLarge: "duration_extra_large", cat: "duration_cat",
 };
 const FULFILLMENT_MODES = new Set(["home", "in_store"]);
 
@@ -631,7 +636,7 @@ function optionalPriceValue(formData: FormData, key: string): number | null | "i
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : "invalid";
 }
 
-interface ServicePriceMatrix { price_small: number | null; price_medium: number | null; price_large: number | null; price_extra_large: number | null }
+interface ServicePriceMatrix { price_extra_small: number | null; price_small: number | null; price_medium: number | null; price_large: number | null; price_extra_large: number | null; price_cat: number | null }
 
 function servicePriceMatrix(formData: FormData): ServicePriceMatrix | { invalid: string } {
   const matrix: Record<string, number | null> = {};
@@ -641,6 +646,18 @@ function servicePriceMatrix(formData: FormData): ServicePriceMatrix | { invalid:
     matrix[SERVICE_SIZE_COLUMNS[key]] = value;
   }
   return matrix as unknown as ServicePriceMatrix;
+}
+
+function serviceDurationMatrix(formData: FormData, zeroTime: boolean): { matrix: Record<string, number | null> } | { invalid: string } {
+  const matrix: Record<string, number | null> = {};
+  for (const key of SERVICE_SIZE_KEYS) {
+    const raw = String(formData.get(`duration_${key}`) ?? "").trim();
+    if (!raw || zeroTime) { matrix[SERVICE_DURATION_COLUMNS[key]] = null; continue; }
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 15 || value > 1440) return { invalid: `durasi untuk ukuran ${key} tidak valid` };
+    matrix[SERVICE_DURATION_COLUMNS[key]] = value;
+  }
+  return { matrix };
 }
 
 function serviceFulfillmentModes(formData: FormData): string[] {
@@ -664,7 +681,9 @@ export async function createServiceAction(_previous: PilotActionState, formData:
   if (name.length < 2 || duration === null || (!zeroTime && duration < 15) || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
   const priceMatrix = servicePriceMatrix(formData);
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
-  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), metadata: { created_from: "homepaw_pilot" }, ...priceMatrix });
+  const durationMatrix = serviceDurationMatrix(formData, zeroTime);
+  if ("invalid" in durationMatrix) return databaseError("Layanan", durationMatrix.invalid);
+  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), metadata: { created_from: "homepaw_pilot" }, ...priceMatrix, ...durationMatrix.matrix });
   if (error) return databaseError("Layanan gagal dibuat", error.message);
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil ditambahkan." };
 }
@@ -678,10 +697,26 @@ export async function updateServiceAction(_previous: PilotActionState, formData:
   if (name.length < 2 || duration === null || (!zeroTime && duration < 15) || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
   const priceMatrix = servicePriceMatrix(formData);
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
+  const durationMatrix = serviceDurationMatrix(formData, zeroTime);
+  if ("invalid" in durationMatrix) return databaseError("Layanan", durationMatrix.invalid);
   const isActive = formData.get("isActive") === "on";
-  const { error } = await context.supabase.from("service_catalog").update({ name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), is_active: isActive, ...priceMatrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
+  const { error } = await context.supabase.from("service_catalog").update({ name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), is_active: isActive, ...priceMatrix, ...durationMatrix.matrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
   if (error) return databaseError("Layanan gagal diperbarui", error.message);
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil diperbarui." };
+}
+
+/** Opt-in starter import: only missing names are inserted in the active tenant.
+ * Existing catalog rows (including owner edits) and sold snapshots stay intact.
+ */
+export async function importHomepawServicesAction(_previous: PilotActionState, _formData: FormData): Promise<PilotActionState> {
+  void _previous; void _formData;
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Template", "izin service.manage diperlukan");
+  const rows = HOMEPAW_STARTER_SERVICES.map((item) => starterServiceRow(context.organizationId, item));
+  const { error } = await context.supabase.from("service_catalog").upsert(rows, { onConflict: "organization_id,name", ignoreDuplicates: true });
+  if (error) return databaseError("Template gagal ditambahkan", error.message);
+  revalidatePath("/catalog"); revalidatePath("/schedule");
+  return { error: null, success: "Template ditambahkan untuk layanan yang belum ada. Harga dan durasi layanan lama tidak diubah; semua nilai dapat diedit di bawah." };
 }
 
 export async function overrideGroomingLinePriceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
@@ -969,6 +1004,14 @@ export async function previewPackageRenewalAction(customerPackageId: string): Pr
   const result = await context.supabase.schema("app").rpc("preview_package_renewal", { p_customer_package: customerPackageId });
   if (result.error) return { error: result.error.message, preview: null };
   const data = result.data as Record<string, unknown>;
+  let sizeMismatch = false;
+  if (data.pet_id && data.package_id) {
+    const [catalog, pet] = await Promise.all([
+      context.supabase.from("packages").select("size_band").eq("organization_id", context.organizationId).eq("id", String(data.package_id)).maybeSingle(),
+      context.supabase.from("pets").select("species,size,weight_kg").eq("organization_id", context.organizationId).eq("id", String(data.pet_id)).maybeSingle(),
+    ]);
+    if (catalog.data?.size_band && pet.data) sizeMismatch = pricingBand({ species: pet.data.species, size: pet.data.size, weightKg: pet.data.weight_kg }) !== catalog.data.size_band;
+  }
   return {
     error: null,
     preview: {
@@ -980,7 +1023,7 @@ export async function previewPackageRenewalAction(customerPackageId: string): Pr
       resultingAvailable: Number(data.resulting_available), currentExpiresAt: data.current_expires_at ? String(data.current_expires_at) : null,
       resultingExpiresAt: String(data.resulting_expires_at), catalogActive: Boolean(data.catalog_active), membershipStatus: String(data.membership_status),
       petScopeIncompatible: Boolean(data.pet_scope_incompatible), serviceScopeIncompatible: Boolean(data.service_scope_incompatible),
-      incompatible: Boolean(data.incompatible), blockingReason: data.blocking_reason ? String(data.blocking_reason) : null,
+      incompatible: Boolean(data.incompatible) || sizeMismatch, blockingReason: sizeMismatch ? "Ukuran pet sudah berubah; jual paket ukuran baru untuk periode berikutnya." : data.blocking_reason ? String(data.blocking_reason) : null,
       termsFingerprint: String(data.terms_fingerprint), generatedAt: String(data.generated_at),
     },
   };
@@ -1011,7 +1054,7 @@ export async function renewCustomerPackageAction(_previous: PilotActionState, fo
     p_customer_package: customerPackageId, p_branch: branchId, p_issued_at: issuedAt, p_due_at: dueAt,
     p_admin_notes: textValue(formData, "adminNotes", 2000) || null, p_request_key: requestKey, p_terms_fingerprint: termsFingerprint,
   });
-  if (result.error) return databaseError("Perpanjangan gagal", /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage/invoice.issue diperlukan" : /renewal_terms_changed_since_preview|40001/i.test(result.error.message) ? "syarat paket berubah sejak pratinjau; muat ulang pratinjau dan coba lagi" : /renewal_preview_required/i.test(result.error.message) ? "muat pratinjau perpanjangan terlebih dahulu sebelum mengirim" : /request_key_reused/i.test(result.error.message) ? "kunci permintaan sudah dipakai untuk perpanjangan lain" : /package_canceled_cannot_renew/i.test(result.error.message) ? "paket sudah diarsipkan dan tidak dapat diperpanjang" : /package_catalog_inactive/i.test(result.error.message) ? "produk paket ini sudah tidak aktif di katalog" : /catalog_terms_changed_incompatible/i.test(result.error.message) ? "syarat katalog sudah berubah dan tidak lagi cocok dengan paket ini; perbarui katalog atau tangani secara manual" : result.error.message);
+  if (result.error) return databaseError("Perpanjangan gagal", /insufficient_privilege|42501/i.test(result.error.message) ? "izin membership.manage/invoice.issue diperlukan" : /renewal_terms_changed_since_preview|40001/i.test(result.error.message) ? "syarat paket berubah sejak pratinjau; muat ulang pratinjau dan coba lagi" : /renewal_preview_required/i.test(result.error.message) ? "muat pratinjau perpanjangan terlebih dahulu sebelum mengirim" : /request_key_reused/i.test(result.error.message) ? "kunci permintaan sudah dipakai untuk perpanjangan lain" : /package_canceled_cannot_renew/i.test(result.error.message) ? "paket sudah diarsipkan dan tidak dapat diperpanjang" : /package_catalog_inactive/i.test(result.error.message) ? "produk paket ini sudah tidak aktif di katalog" : /package_size_mismatch_on_renewal/i.test(result.error.message) ? "ukuran pet telah berubah; jual paket ukuran yang sesuai untuk periode berikutnya" : /catalog_terms_changed_incompatible/i.test(result.error.message) ? "syarat katalog sudah berubah dan tidak lagi cocok dengan paket ini; perbarui katalog atau tangani secara manual" : result.error.message);
   const row = result.data as { invoice_number?: string } | null;
   revalidatePath("/programs"); revalidatePath("/programs/memberships"); revalidatePath("/finance");
   return { error: null, success: `Paket diperpanjang. ${row?.invoice_number ?? "Invoice"} diterbitkan.` };
@@ -1056,10 +1099,12 @@ export async function updateCustomerPackageTermsAction(_previous: PilotActionSta
 
 const RECURRENCE_INTERVALS = new Set(["none", "week", "month", "year"]);
 const ROLLOVER_POLICIES = new Set(["none", "rollover"]);
+const PACKAGE_SIZE_BANDS = new Set(["extra_small", "small", "medium", "large", "extra_large", "cat"]);
 
 interface PackagePayload {
   name: string; description: string | null; service_id: string | null; total_sessions: number; price: number;
   validity_days: number | null; rollover_policy: string; recurrence_interval: string; per_pet: boolean;
+  size_band: string | null; discount_percent: number | null; visit_interval_days: number | null;
 }
 
 function packagePayload(formData: FormData): PackagePayload | { invalid: string } {
@@ -1072,12 +1117,21 @@ function packagePayload(formData: FormData): PackagePayload | { invalid: string 
   const rolloverPolicy = textValue(formData, "rolloverPolicy", 10) || "none";
   const serviceId = idValue(formData, "serviceId");
   const perPet = formData.get("perPet") === "on";
+  const sizeBand = textValue(formData, "sizeBand", 20) || null;
+  const discountText = textValue(formData, "discountPercent", 8);
+  const discountPercent = discountText ? numberValue(formData, "discountPercent") : null;
+  const visitIntervalText = textValue(formData, "visitIntervalDays", 4);
+  const visitIntervalDays = visitIntervalText ? numberValue(formData, "visitIntervalDays") : null;
   const description = textValue(formData, "description", 300) || null;
   if (name.length < 2 || !sessions || sessions < 1 || price === null || price < 0) return { invalid: "nama, jumlah sesi, atau harga tidak valid" };
   if (validityDaysText && (validityDays === null || !Number.isInteger(validityDays) || validityDays < 1)) return { invalid: "masa berlaku tidak valid" };
   if (!RECURRENCE_INTERVALS.has(recurrenceInterval)) return { invalid: "interval perpanjangan tidak valid" };
   if (!ROLLOVER_POLICIES.has(rolloverPolicy)) return { invalid: "kebijakan rollover tidak valid" };
-  return { name, description, service_id: serviceId, total_sessions: sessions, price, validity_days: validityDays, rollover_policy: rolloverPolicy, recurrence_interval: recurrenceInterval, per_pet: perPet };
+  if (sizeBand && !PACKAGE_SIZE_BANDS.has(sizeBand)) return { invalid: "ukuran paket tidak valid" };
+  if (sizeBand && (!perPet || !serviceId)) return { invalid: "paket per ukuran harus terikat pada satu hewan dan layanan" };
+  if (discountText && (discountPercent === null || discountPercent < 0 || discountPercent > 100)) return { invalid: "diskon referensi tidak valid" };
+  if (visitIntervalText && (visitIntervalDays === null || !Number.isInteger(visitIntervalDays) || visitIntervalDays < 1 || visitIntervalDays > 365)) return { invalid: "jarak antar kunjungan tidak valid" };
+  return { name, description, service_id: serviceId, total_sessions: sessions, price, validity_days: validityDays, rollover_policy: rolloverPolicy, recurrence_interval: recurrenceInterval, per_pet: perPet, size_band: sizeBand, discount_percent: discountPercent, visit_interval_days: visitIntervalDays };
 }
 
 /**
@@ -1118,7 +1172,7 @@ export async function updatePackageAction(_previous: PilotActionState, formData:
   const { error } = await context.supabase.from("packages").update({ ...payload, is_active: isActive }).eq("organization_id", context.organizationId).eq("id", packageId);
   if (error) return databaseError("Paket gagal diperbarui", error.message);
   revalidatePath("/programs"); revalidatePath("/invoices/new");
-  return { error: null, success: "Paket katalog berhasil diperbarui. Paket yang sudah terjual tidak berubah." };
+  return { error: null, success: "Paket katalog diperbarui. Saldo yang sudah terjual tidak berubah; syarat baru berlaku untuk penjualan dan perpanjangan berikutnya." };
 }
 
 export async function setCustomerPackageStatusAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {

@@ -96,6 +96,8 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261015100000_homepaw_owner_workspace_bootstrap.sql
   supabase/migrations/20261016100000_homepaw_customer_intake.sql
   supabase/migrations/20261016110000_zero_time_service_addons.sql
+  supabase/migrations/20261017100000_homepaw_size_price_duration.sql
+  supabase/migrations/20261017110000_homepaw_membership_tiers.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -178,6 +180,11 @@ psql_db operro_gate -v ON_ERROR_STOP=1 -f integration/retention_renewal_followup
 
 step "GATE 7e — documents, payments, evidence, and visits"
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/S27-S30/test_backend.sql
+
+step "GATE 7f — HomePaw intake, per-pet size pricing, and membership tiers"
+bash integration/homepaw_qc_db.sh
+psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/homepaw_qc_smoke.sql
+psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/homepaw_size_membership_smoke.sql
 
 step "GATE 8 — completion vs assembly/reservation concurrency"
 run_as_postgres dropdb --if-exists operro_cc

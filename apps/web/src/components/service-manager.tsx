@@ -14,10 +14,12 @@ function Message({ state }: { state: PilotActionState }) {
 }
 
 const SIZE_FIELDS = [
-  ["priceSmall", "small", "Kecil"],
-  ["priceMedium", "medium", "Sedang"],
-  ["priceLarge", "large", "Besar"],
-  ["priceExtraLarge", "extraLarge", "Extra besar"],
+  ["priceExtraSmall", "durationExtraSmall", "extraSmall", "XS"],
+  ["priceSmall", "durationSmall", "small", "S"],
+  ["priceMedium", "durationMedium", "medium", "M"],
+  ["priceLarge", "durationLarge", "large", "L"],
+  ["priceExtraLarge", "durationExtraLarge", "extraLarge", "XL"],
+  ["priceCat", "durationCat", "cat", "Cat"],
 ] as const;
 
 export function ServiceManager({ service, canManageService }: { service: CatalogWorkspace["services"][number]; canManageService: boolean }) {
@@ -32,7 +34,7 @@ export function ServiceManager({ service, canManageService }: { service: Catalog
         <p className="truncate font-bold">{service.name}</p>
         <p className="mt-1 text-xs text-slate-500">{service.category ? `${service.category} · ` : ""}{service.duration === 0 ? "Tidak menambah durasi" : `${service.duration} menit`}{service.additionalDuration > 0 ? ` (+${service.additionalDuration} menit/unit tambahan)` : ""} · {formatRupiah(service.price)}</p>
         <p className="mt-1 text-[11px] text-slate-400">
-          {SIZE_FIELDS.map(([key, , label]) => `${label}: ${service[key] === null ? "pakai harga dasar" : formatRupiah(service[key] as number)}`).join(" · ")}
+          {SIZE_FIELDS.map(([priceKey, durationKey, , label]) => `${label}: ${service[priceKey] === null ? "harga dasar" : formatRupiah(service[priceKey] as number)}, ${service[durationKey] ?? service.duration} menit`).join(" · ")}
         </p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2">
@@ -54,8 +56,14 @@ export function ServiceManager({ service, canManageService }: { service: Catalog
       <input className={field} type="number" min="0" step="1000" name="price" defaultValue={service.price} placeholder="Harga dasar Rp" required />
       <div>
         <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Harga per ukuran hewan (kosongkan untuk pakai harga dasar)</p>
-        <div className="grid gap-3 sm:grid-cols-4">
-          {SIZE_FIELDS.map(([key, suffix, label]) => <input key={suffix} className={field} type="number" min="0" step="1000" name={`price_${suffix}`} defaultValue={service[key] ?? ""} placeholder={label} aria-label={`Harga ${label}`} />)}
+        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          {SIZE_FIELDS.map(([priceKey, , suffix, label]) => <input key={suffix} className={field} type="number" min="0" step="1000" name={`price_${suffix}`} defaultValue={service[priceKey] ?? ""} placeholder={label} aria-label={`Harga ${label}`} />)}
+        </div>
+      </div>
+      <div>
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Durasi per ukuran (kosong = durasi dasar)</p>
+        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          {SIZE_FIELDS.map(([, durationKey, suffix, label]) => <input key={suffix} className={field} type="number" min="15" max="1440" step="5" name={`duration_${suffix}`} defaultValue={service[durationKey] ?? ""} placeholder={label} aria-label={`Durasi ${label}`} disabled={zeroTime} />)}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-700">

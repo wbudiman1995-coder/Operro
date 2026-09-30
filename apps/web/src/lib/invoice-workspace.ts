@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { pricingBand } from "@/lib/pet-sizing";
 
 function fail(scope: string, error: { message: string } | null) { if (error) throw new Error(`${scope}_failed:${error.message}`); }
 
@@ -9,10 +10,10 @@ export interface InvoiceStudioData {
     pets: Array<{ id: string; name: string }>;
     serviceLines: Array<{ id: string; serviceId: string; name: string }>;
   }>;
-  customers: Array<{ id: string; name: string; code: string; petNames: string[]; pets: Array<{ id: string; name: string }>; address: string; searchText: string }>;
+  customers: Array<{ id: string; name: string; code: string; petNames: string[]; pets: Array<{ id: string; name: string; band: string | null }>; address: string; searchText: string }>;
   branches: Array<{ id: string; name: string }>;
   groomers: Array<{ id: string; branchId: string; name: string }>;
-  packages: Array<{ id: string; name: string; sessions: number; price: number; currency: string; perPet: boolean; recurrenceInterval: string }>;
+  packages: Array<{ id: string; name: string; sessions: number; price: number; currency: string; perPet: boolean; sizeBand: string | null; recurrenceInterval: string }>;
 }
 
 export async function loadInvoiceStudioData(supabase: SupabaseClient, organizationId: string): Promise<InvoiceStudioData> {
@@ -21,11 +22,11 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
   const [bookings, customers, pets, addresses, branches, groomers, packages] = await Promise.all([
     supabase.from("bookings").select("id,branch_id,customer_id,starts_at,status").eq("organization_id", organizationId).eq("status", "completed").gte("starts_at", from.toISOString()).lte("starts_at", through.toISOString()).is("deleted_at", null).order("starts_at", { ascending: false }),
     supabase.from("customers").select("id,display_name").eq("organization_id", organizationId).is("deleted_at", null).order("display_name"),
-    supabase.from("pets").select("id,customer_id,name").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
+    supabase.from("pets").select("id,customer_id,name,species,size,weight_kg").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("customer_addresses").select("customer_id,line1,kecamatan,kabupaten_kota,province,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
     supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,name").eq("organization_id", organizationId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).order("name"),
-    supabase.from("packages").select("id,name,total_sessions,price,currency,per_pet,recurrence_interval").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
+    supabase.from("packages").select("id,name,total_sessions,price,currency,per_pet,size_band,recurrence_interval").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
   ]);
   for (const [scope, result] of [["invoice_bookings", bookings], ["invoice_customers", customers], ["invoice_pets", pets], ["invoice_addresses", addresses], ["invoice_branches", branches], ["invoice_groomers", groomers], ["invoice_packages", packages]] as const) fail(scope, result.error);
   const bookingIds = (bookings.data ?? []).map((row) => row.id);
@@ -47,7 +48,7 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
   const petMap = new Map((pets.data ?? []).map((row) => [row.id, row.name]));
   const groomerMap = new Map((groomers.data ?? []).map((row) => [row.id, row.name]));
   const customerRows = (customers.data ?? []).map((customer) => {
-    const customerPets = (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name }));
+    const customerPets = (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name, band: pricingBand({ species: pet.species, size: pet.size, weightKg: pet.weight_kg }) }));
     const petNames = customerPets.map((pet) => pet.name);
     const addressRow = (addresses.data ?? []).find((address) => address.customer_id === customer.id);
     const address = addressRow ? [addressRow.line1, addressRow.kecamatan, addressRow.kabupaten_kota, addressRow.province].filter(Boolean).join(", ") : "";
@@ -67,6 +68,6 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
     }),
     customers: customerRows,
     branches: branches.data ?? [], groomers: (groomers.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, name: row.name })),
-    packages: (packages.data ?? []).map((pkg) => ({ id: pkg.id, name: pkg.name, sessions: pkg.total_sessions, price: Number(pkg.price), currency: pkg.currency, perPet: pkg.per_pet, recurrenceInterval: pkg.recurrence_interval })),
+    packages: (packages.data ?? []).map((pkg) => ({ id: pkg.id, name: pkg.name, sessions: pkg.total_sessions, price: Number(pkg.price), currency: pkg.currency, perPet: pkg.per_pet, sizeBand: pkg.size_band, recurrenceInterval: pkg.recurrence_interval })),
   };
 }

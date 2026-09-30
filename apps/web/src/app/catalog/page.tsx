@@ -3,6 +3,7 @@ import { ResourceForm, ServiceForm } from "@/components/pilot-forms";
 import { EmptyState, PageHeader } from "@/components/pilot-ui";
 import { ResourceManager } from "@/components/resource-manager";
 import { ServiceManager } from "@/components/service-manager";
+import { HomepawServiceStarter } from "@/components/homepaw-service-starter";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { loadCatalogWorkspace } from "@/lib/pilot-data";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
@@ -12,6 +13,7 @@ export const metadata = { title: "Layanan & Tim" };
 export default async function CatalogPage() {
   const workspace = await requireActiveWorkspace(); const data = await loadCatalogWorkspace(workspace.supabase, workspace.activeOrganization.id);
   return <WorkspaceShell {...workspace} activePath="/catalog"><PageHeader eyebrow="Konfigurasi operasional" title="Layanan & tim" description="Atur harga per ukuran hewan, durasi layanan, dan groomer yang tersedia untuk booking." />
+    {workspace.capabilities["service.manage"] ? <HomepawServiceStarter /> : null}
     <div className="mt-7 grid gap-6 lg:grid-cols-2">{workspace.capabilities["service.manage"] ? <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="font-bold">Tambah layanan</h2><div className="mt-5"><ServiceForm /></div></section> : null}{workspace.capabilities["resource.manage"] ? <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="font-bold">Tambah groomer</h2><div className="mt-5"><ResourceForm branches={data.branches} memberships={data.memberships} /></div></section> : null}</div>
     <div className="mt-7 grid gap-6 lg:grid-cols-2">
       <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">

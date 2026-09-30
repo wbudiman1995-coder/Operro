@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Run inside a disposable PostgreSQL 16 container with this repo mounted at /workspace.
+# Run against a disposable PostgreSQL 16 database from any checkout location.
 set -euo pipefail
-cd /workspace
+cd "$(dirname "$0")/.."
 export PGUSER=postgres
 dropdb --if-exists operro_homepaw_qc
 createdb operro_homepaw_qc

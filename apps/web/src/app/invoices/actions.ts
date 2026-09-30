@@ -54,7 +54,7 @@ export async function createPackageInvoiceAction(_previous: PilotActionState, fo
     p_branch: branchId, p_customer: customerId, p_package: packageId, p_issued_at: issuedAt, p_due_at: dueAt,
     p_admin_notes: value(formData, "adminNotes", 2000) || null, p_request_key: requestKey, p_pet: petId,
   });
-  if (result.error) { console.error("create_package_invoice_failed", result.error); return failure("Invoice paket gagal dibuat. Periksa data dan coba lagi."); }
+  if (result.error) { console.error("create_package_invoice_failed", result.error); return failure(/package_size_mismatch|pet_required_for_size_package/i.test(result.error.message) ? "Ukuran hewan tidak cocok dengan paket. Periksa berat badan/ukuran atau pilih paket lain." : "Invoice paket gagal dibuat. Periksa data dan coba lagi."); }
   const row = result.data as { invoice_number?: string } | null;
   revalidatePath("/invoices/new"); revalidatePath("/finance"); revalidatePath("/programs"); revalidatePath(`/customers/${customerId}`);
   return success(`${row?.invoice_number ?? "Invoice paket"} berhasil diterbitkan dan saldo sesi dibuat.`);
