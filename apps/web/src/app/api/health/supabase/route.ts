@@ -22,6 +22,6 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    message: "Supabase staging is reachable",
+    message: "Supabase is reachable",
   });
 }
