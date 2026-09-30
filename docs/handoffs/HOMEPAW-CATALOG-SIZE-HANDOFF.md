@@ -18,6 +18,13 @@ Forward migrations: `20261017100000_homepaw_size_price_duration.sql` and `202610
 
 App checks: booking tests 14/14, batch1a 108/108, batch1b 314/314; TypeScript and production Next build pass. The old size contract test was updated for the forward XS migration while retaining its old-migration assertions.
 
+## Live release, 2026-09-30
+
+- The linked Supabase project `tekgjynseoetoxestweb` was backed up before the change. The backup, checksums and push log are in `E:\Claude\operro-release-backups\2026-09-30-before-homepaw-sizes\` outside Git. `supabase db push` applied exactly the two forward migrations above; a subsequent dry run reported the remote database up to date.
+- Git branch `fix/homepaw-catalog-breeds-durations` was pushed at SHA `ac9a44bc4848c1f7b854e7d17a75662437678b40`. Its parent is the customer/calendar fix `9d6267c`, so that prior work remains in the deployed tree.
+- Vercel preview deployment `FSfZedsNXwsXGYqSALS9o3hPfiUE` reached Ready. Promoting it built a new Production-environment deployment `4Hn9R6NfzxSeQ65D7FKprvYypk6E`, also Ready, from the same SHA. Vercel lists `https://operro-web.vercel.app/` as its assigned production domain. The public production login page loads.
+- A signed-in browser click-through of the new catalog, pet and membership screens is still outstanding. This browser has no active owner session on the production origin. Do not mistake deployment readiness or the SQL gate result for that UI proof. Preview and Production use the same Supabase project, so avoid disposable test purchases or invoices there.
+
 ## Manual owner QC
 
 1. In HomePaw, open **Layanan & Tim**. Review the starter prices/minutes, then optionally click **Tambahkan layanan yang belum ada**. Edit Basic Grooming XS and Cat prices, save, reload, and confirm the change persists.
@@ -26,4 +33,4 @@ App checks: booking tests 14/14, batch1a 108/108, batch1b 314/314; TypeScript an
 4. In Paket, choose each membership template. Confirm the name, sessions, discount reference, suggested price, size and visit gap are editable. Sell an XS tier to the XS pet; verify a wrong-size pet cannot be selected, and the invoice/sessions appear once.
 5. If that dog moves to another weight band, use a correctly sized new tier for the next term. The old tier cannot renew at the outdated size.
 
-The visit gap does not create recurring appointments automatically. Browser click-through against live HomePaw and production deployment status must be recorded separately; SQL/build success alone does not prove the production UI.
+The visit gap does not create recurring appointments automatically. The manual signed-in QC above remains necessary.
