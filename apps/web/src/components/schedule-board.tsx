@@ -95,6 +95,7 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<MutationState>(IDLE_STATE);
   const [cancelArmed, setCancelArmed] = useState(false);
+  const [selectedCity, setSelectedCity] = useState("");
 
   const pushParams = useCallback(
     (mutate: (params: URLSearchParams) => void) => {
@@ -109,7 +110,9 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
 
   // Groomer, blackout and row-limit filtering all happen in the query now, so
   // everything reaching this component is already the visible set.
-  const visibleBookings = data.bookings;
+  const cities = [...new Set(data.bookings.map((booking) => booking.kabupatenKota).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b, "id-ID"));
+  const activeCity = cities.includes(selectedCity) ? selectedCity : "";
+  const visibleBookings = activeCity ? data.bookings.filter((booking) => booking.kabupatenKota === activeCity) : data.bookings;
   const selectedResourceIds = data.appliedResourceIds;
 
   // Bounds are derived from the same filtered segments that render, so a hidden
@@ -254,6 +257,8 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
             </label>
           ) : null}
 
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">Kabupaten / kota<select value={activeCity} onChange={(event) => setSelectedCity(event.target.value)} className="h-9 max-w-44 rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700"><option value="">Semua kota</option>{cities.map((city) => <option key={city} value={city}>{city}</option>)}</select></label>
+
           <span aria-live="polite" className="ml-auto text-xs font-semibold text-slate-400">
             {pending ? "Memuat…" : `${visibleBookings.length} booking · ${data.activeBranch.timezone}`}
           </span>
@@ -369,6 +374,7 @@ export function ScheduleBoard({ data, view, anchorISO, todayISO, detail, canRead
           timeZone={data.activeBranch.timezone}
         />
       ) : null}
+      {activeCity && data.truncated ? <p className="mt-2 text-xs font-semibold text-amber-800">Filter kota hanya mencakup {SCHEDULE_ROW_LIMIT} booking yang dimuat. Persempit tanggal atau groomer untuk melihat seluruh hasil.</p> : null}
       {bookingWorkspace ? <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-3 sm:p-8" role="dialog" aria-modal="true" aria-label="Booking baru dari kalender">
         <div className="mx-auto max-w-4xl"><div className="mb-2 flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-sm font-bold text-slate-700"><span>Booking baru · {createStart.replace("T", " ")} · {data.activeBranch.name}</span><button type="button" onClick={closeCreate} aria-label="Tutup booking baru" className="rounded-lg border px-3 py-1.5">Tutup</button></div>
           <BookingWizard branches={bookingWorkspace.branches.filter((branch) => branch.id === data.activeBranch.id)} customers={bookingWorkspace.customers} pets={bookingWorkspace.pets} services={bookingWorkspace.services} resources={bookingWorkspace.resources.filter((resource) => resource.branchId === data.activeBranch.id)} addresses={bookingWorkspace.addresses} serviceAreas={bookingWorkspace.serviceAreas} nextDiscounts={bookingWorkspace.nextDiscounts} customerPackages={bookingWorkspace.customerPackages} defaultStart={createStart} preselectedCustomerId={preselectedCustomerId} initialBranchId={data.activeBranch.id} initialResourceId={createResourceId} />
@@ -500,6 +506,7 @@ function DayResourceGrid({
                         {segment.continuesBefore ? "◂ " : ""}{booking.startLabel} {booking.customerName}{segment.continuesAfter ? " ▸" : ""}
                       </p>
                       <p className="truncate text-[10px] text-emerald-700">{booking.pets.map((pet) => pet.petName).join(", ") || "Tanpa hewan"}</p>
+                      {booking.kabupatenKota ? <p className="truncate text-[10px] font-bold text-blue-700">{booking.kabupatenKota}{booking.kecamatan ? ` · ${booking.kecamatan}` : ""}</p> : null}
                       <BookingBadges booking={booking} compact />
                     </button>
                   );
@@ -617,6 +624,7 @@ function MultiDayCalendar({
                     <p className="truncate text-[10px] font-bold text-slate-500">{segment.continuesBefore ? "◂ " : ""}{booking.startLabel}–{booking.endLabel}{segment.continuesAfter ? " ▸" : ""}</p>
                     <p className="truncate text-xs font-extrabold text-slate-800">{booking.customerName}</p>
                     <p className="truncate text-[10px] text-slate-500">{booking.pets.map((pet) => pet.petName).join(", ") || "Tanpa hewan"}</p>
+                    {booking.kabupatenKota ? <p className="truncate text-[10px] font-bold text-blue-700">{booking.kabupatenKota}{booking.kecamatan ? ` · ${booking.kecamatan}` : ""}</p> : null}
                     {booking.resourceIds.length > 0 ? (
                       <p className="truncate text-[10px] font-semibold text-emerald-700">{booking.resourceIds.map((id) => resourceNames.get(id) ?? "Groomer").join(" · ")}</p>
                     ) : null}

@@ -4,16 +4,16 @@ import { useActionState, useState } from "react";
 import {
   cleanupOnboardingStorageAction,
   createOnboardingLinkAction,
-  reviewOnboardingAction,
   revokeOnboardingLinkAction,
   updateOnboardingSettingsAction,
   type OnboardingActionState,
   type OnboardingSettingsState,
   type StorageCleanupState,
 } from "@/app/customers/onboarding/actions";
+import { OnboardingReviewCard } from "@/components/onboarding-review-card";
 
 type LinkRow={id:string;status:string;source:string|null;internal_note:string|null;expires_at:string;created_at:string};
-type SubmissionRow={id:string;payload:Record<string,unknown>;created_at:string};
+type SubmissionRow={id:string;payload:Record<string,unknown>;created_at:string;updated_at:string};
 type Settings={whatsapp_template:string;reference_retention_days:number};
 const defaultTemplate="Halo kak! Isi data kamu dan pet untuk {business} melalui link ini:\n\n{link}\n\nLink berlaku dua hari.";
 const initialLink:OnboardingActionState={error:null,success:null};
@@ -65,10 +65,8 @@ export function OnboardingAdmin({
 
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
       <h2 className="font-bold">Menunggu review ({submissions.length})</h2>
-      <div className="mt-4 space-y-3">{submissions.length===0?<p className="text-sm text-slate-400">Belum ada pendaftaran baru.</p>:submissions.map(row=>{
-        const p=row.payload;const pets=Array.isArray(p.pets)?p.pets as Array<Record<string,unknown>>:[];const referenceCount=pets.reduce((sum,pet)=>sum+(Array.isArray(pet.styleReferences)?pet.styleReferences.length:0),0);const phone=String(p.phone??"");const duplicates=customers.filter(customer=>customer.phone?.replace(/\D/g,"")===phone.replace(/\D/g,""));
-        return <article key={row.id} className="rounded-2xl border border-slate-200 p-4"><div className="flex flex-wrap justify-between gap-3"><div><p className="font-bold">{String(p.customerName??"Pelanggan")}</p><p className="text-xs text-slate-500">{phone} · {String(p.kecamatan??"")}, {String(p.kabupatenKota??"")} · {pets.length} hewan{referenceCount?` · ${referenceCount} referensi gaya`:""}</p></div><span className="text-xs text-slate-400">{new Date(row.created_at).toLocaleString("id-ID")}</span></div><div className="mt-3 flex flex-wrap gap-2">{pets.map((pet,index)=><span key={index} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold">{String(pet.name??"?")} · {String(pet.breed??pet.species??"")}{Array.isArray(pet.styleReferences)&&pet.styleReferences.length?` · ${pet.styleReferences.length} foto`:""}</span>)}</div>{duplicates.length?<p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800">Nomor ini cocok dengan: {duplicates.map(d=>d.name).join(", ")}. Pilih pelanggan tersebut untuk menambahkan hewan tanpa membuat duplikat.</p>:null}<form action={reviewOnboardingAction} className="mt-4 flex flex-wrap gap-2"><input type="hidden" name="submissionId" value={row.id}/><select name="mergeCustomerId" className="h-10 rounded-xl border px-3 text-xs"><option value="">Buat pelanggan baru</option>{duplicates.map(d=><option key={d.id} value={d.id}>Gabung ke {d.name}</option>)}</select><button name="decision" value="approve" className="rounded-xl bg-emerald-700 px-4 text-xs font-bold text-white">Setujui</button><button name="decision" value="reject" className="rounded-xl border border-rose-200 px-4 text-xs font-bold text-rose-700">Tolak</button></form></article>
-      })}</div>
+      <p className="mt-1 text-xs text-slate-500">Link yang dikirim masuk ke antrean ini. Periksa dan ubah data yang kurang lengkap, simpan, baru setujui ke CRM.</p>
+      <div className="mt-4 space-y-3">{submissions.length===0?<p className="text-sm text-slate-400">Belum ada pendaftaran baru.</p>:submissions.map(row=><OnboardingReviewCard key={`${row.id}:${row.updated_at}`} row={row} customers={customers}/>)}</div>
     </section>
 
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">

@@ -3,6 +3,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { loadCapabilities } from "@/lib/authorization";
+import { canonicalRegionNames } from "@/lib/indonesia-regions";
+import { isGoogleMapsLink } from "@/lib/maps";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 
 export interface OnboardingActionState { error: string | null; success: string | null; linkPath?: string }
@@ -34,14 +36,39 @@ export async function revokeOnboardingLinkAction(formData: FormData) {
   revalidatePath("/customers/onboarding");
 }
 
-export async function reviewOnboardingAction(formData: FormData) {
-  const workspace = await requireActiveWorkspace();
-  const decision = String(formData.get("decision") ?? "");
-  const submissionId = String(formData.get("submissionId") ?? "");
-  const mergeCustomer = String(formData.get("mergeCustomerId") ?? "") || null;
-  const { error } = await workspace.supabase.schema("app").rpc("review_customer_onboarding", { p_submission: submissionId, p_decision: decision, p_merge_customer: mergeCustomer });
-  if (error) console.error("review_onboarding_failed", error);
-  revalidatePath("/customers/onboarding"); revalidatePath("/customers");
+export async function amendOnboardingAction(_previous: OnboardingActionState, formData: FormData): Promise<OnboardingActionState> {
+  try {
+    const workspace = await requireActiveWorkspace();
+    if (!workspace.capabilities["customer.manage"]) return { error: "Tidak ada izin mengubah pendaftaran.", success: null };
+    const submissionId = String(formData.get("submissionId") ?? "");
+    const expected = String(formData.get("updatedAt") ?? "");
+    const raw = String(formData.get("payload") ?? "");
+    if (raw.length > 32768) return { error: "Data terlalu besar.", success: null };
+    const payload = JSON.parse(raw) as Record<string, unknown>;
+    const region = canonicalRegionNames({ province: String(payload.province ?? ""), kabupatenKota: String(payload.kabupatenKota ?? ""), kecamatan: String(payload.kecamatan ?? "") });
+    if (!region) return { error: "Pilih wilayah resmi: provinsi, kabupaten/kota, kecamatan.", success: null };
+    if (payload.googleMapsUrl && (typeof payload.googleMapsUrl !== "string" || !isGoogleMapsLink(payload.googleMapsUrl))) return { error: "Link Google Maps tidak valid.", success: null };
+    const pets = Array.isArray(payload.pets) ? payload.pets : [];
+    if (!String(payload.customerName ?? "").trim() || !String(payload.phone ?? "").trim() || !String(payload.addressLine ?? "").trim() || pets.length < 1 || pets.length > 5) return { error: "Nama, nomor, alamat dan pet wajib lengkap.", success: null };
+    const { error } = await workspace.supabase.schema("app").rpc("amend_customer_onboarding", { p_submission: submissionId, p_payload: { ...payload, ...region }, p_expected_updated_at: expected });
+    if (error) { console.error("amend_onboarding_failed", error); return { error: /submission_changed/.test(error.message) ? "Data telah berubah. Muat ulang sebelum menyimpan." : "Perubahan belum disimpan. Periksa data lalu coba lagi.", success: null }; }
+    revalidatePath("/customers/onboarding");
+    return { error: null, success: "Perubahan disimpan. Review lagi sebelum menyetujui." };
+  } catch (error) { console.error("amend_onboarding_failed", error); return { error: "Data pendaftaran tidak valid.", success: null }; }
+}
+
+export async function reviewOnboardingAction(_previous: OnboardingActionState, formData: FormData): Promise<OnboardingActionState> {
+  try {
+    const workspace = await requireActiveWorkspace();
+    if (!workspace.capabilities["customer.manage"]) return { error: "Tidak ada izin review pendaftaran.", success: null };
+    const decision = String(formData.get("decision") ?? "");
+    const submissionId = String(formData.get("submissionId") ?? "");
+    const mergeCustomer = String(formData.get("mergeCustomerId") ?? "") || null;
+    const { error } = await workspace.supabase.schema("app").rpc("review_customer_onboarding", { p_submission: submissionId, p_decision: decision, p_merge_customer: mergeCustomer });
+    if (error) { console.error("review_onboarding_failed", error); return { error: "Review gagal. Periksa data dan coba lagi.", success: null }; }
+    revalidatePath("/customers/onboarding"); revalidatePath("/customers");
+    return { error: null, success: decision === "approve" ? "Pendaftaran disetujui dan masuk ke CRM." : "Pendaftaran ditolak." };
+  } catch (error) { console.error("review_onboarding_failed", error); return { error: "Review gagal.", success: null }; }
 }
 
 export async function updateOnboardingSettingsAction(_previous: OnboardingSettingsState, formData: FormData): Promise<OnboardingSettingsState> {

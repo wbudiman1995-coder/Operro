@@ -135,6 +135,8 @@ export interface ScheduleBooking {
   fulfillmentMode: string;
   dispatchStage: string | null;
   locationLabel: string | null;
+  kabupatenKota: string | null;
+  kecamatan: string | null;
   travelFee: number | null;
   travelMinutes: number | null;
   serviceAreaMatched: boolean | null;
@@ -388,6 +390,8 @@ export async function loadScheduleWorkspace(
           }
           return null;
         })(),
+        kabupatenKota: (() => { const address = row.address_snapshot; if (!address || typeof address !== "object") return null; const value = (address as Record<string, unknown>).kabupaten_kota ?? (address as Record<string, unknown>).kabupatenKota; return typeof value === "string" && value.trim() ? value.trim() : null; })(),
+        kecamatan: (() => { const address = row.address_snapshot; if (!address || typeof address !== "object") return null; const value = (address as Record<string, unknown>).kecamatan; return typeof value === "string" && value.trim() ? value.trim() : null; })(),
         travelFee: row.travel_fee === null || row.travel_fee === undefined ? null : Number(row.travel_fee),
         travelMinutes: typeof row.travel_minutes_snapshot === "number" ? row.travel_minutes_snapshot : null,
         serviceAreaMatched: typeof row.service_area_matched === "boolean" ? row.service_area_matched : null,

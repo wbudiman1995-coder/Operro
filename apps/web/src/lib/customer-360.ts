@@ -24,6 +24,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { CapabilityMap } from "@/lib/authorization";
+import { isGoogleMapsLink } from "@/lib/maps";
 import { ageLabelFromBirthdate, readCustomFields, readMedicalFlags, sizeBandForWeight, type GroomingSizeBand } from "@/lib/grooming-profile";
 
 function assertResult(scope: string, error: { message: string } | null) {
@@ -209,6 +210,7 @@ interface CustomerAddressRow {
   postal_code: string | null;
   landmark: string | null;
   access_notes: string | null;
+  google_maps_url: string | null;
   latitude: number | string | null;
   longitude: number | string | null;
   is_default: boolean;
@@ -223,7 +225,7 @@ function formatCustomerAddress(row: CustomerAddressRow): CustomerAddress {
   const formattedLine = [row.line1, row.line2, row.kecamatan, row.kabupaten_kota, row.province, row.postal_code]
     .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
     .join(", ");
-  const mapsUrl = hasCoordinates
+  const mapsUrl = row.google_maps_url && isGoogleMapsLink(row.google_maps_url) ? row.google_maps_url : hasCoordinates
     ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formattedLine)}`;
   return {
@@ -251,7 +253,7 @@ function formatCustomerAddress(row: CustomerAddressRow): CustomerAddress {
 }
 
 const CUSTOMER_ADDRESS_COLUMNS =
-  "id,label,recipient_name,recipient_phone,line1,line2,rt,rw,kelurahan,kecamatan,kabupaten_kota,province,postal_code,landmark,access_notes,latitude,longitude,is_default";
+  "id,label,recipient_name,recipient_phone,line1,line2,rt,rw,kelurahan,kecamatan,kabupaten_kota,province,postal_code,landmark,access_notes,latitude,longitude,google_maps_url,is_default";
 
 /** All saved addresses for one customer, default first. Used by the Addresses tab. */
 export async function loadCustomerAddresses(

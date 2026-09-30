@@ -54,3 +54,13 @@ export function isSupportedShortMapsUrl(value: string): boolean {
     || hostname === "g.co"
     || (hostname === "goo.gl" && pathname.startsWith("/maps/"));
 }
+
+export function isGoogleMapsLink(value: string): boolean {
+  const normalized = normalizeMapsUrl(value);
+  if (!normalized) return false;
+  const host = new URL(normalized).hostname.toLowerCase();
+  return host === "google.com" || host.endsWith(".google.com")
+    || host === "google.co.id" || host.endsWith(".google.co.id")
+    || host === "maps.app.goo.gl" || host === "share.google" || host === "g.co"
+    || host === "goo.gl";
+}

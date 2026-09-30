@@ -96,7 +96,7 @@ export async function createBookingAction(
     if (!draft.customerAddressId) return { error: "Pilih alamat pelanggan untuk booking home service." };
     const { data: address } = await supabase
       .from("customer_addresses")
-      .select("id,label,recipient_name,recipient_phone,line1,line2,rt,rw,kelurahan,kecamatan,kabupaten_kota,province,postal_code,landmark,access_notes,latitude,longitude")
+      .select("id,label,recipient_name,recipient_phone,line1,line2,rt,rw,kelurahan,kecamatan,kabupaten_kota,province,postal_code,landmark,access_notes,latitude,longitude,google_maps_url")
       .eq("organization_id", organizationId)
       .eq("customer_id", draft.customerId)
       .eq("id", draft.customerAddressId)

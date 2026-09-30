@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canonicalRegionNames } from "@/lib/indonesia-regions";
+import { isGoogleMapsLink } from "@/lib/maps";
 import { createClient } from "@/lib/supabase/server";
 
 type Context = { params: Promise<{ token: string }> };
@@ -31,6 +32,7 @@ export async function POST(request: Request, { params }: Context) {
       kecamatan: String(payload.kecamatan ?? ""),
     });
     if (!region) return NextResponse.json({ error: "invalid_region" }, { status: 400 });
+    if (payload.googleMapsUrl && (typeof payload.googleMapsUrl !== "string" || payload.googleMapsUrl.length > 1000 || !isGoogleMapsLink(payload.googleMapsUrl))) return NextResponse.json({ error: "invalid_submission" }, { status: 400 });
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("submit_customer_onboarding", { p_token: token, p_payload: { ...payload, ...region } });
     if (error) {

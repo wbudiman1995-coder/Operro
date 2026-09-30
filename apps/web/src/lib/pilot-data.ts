@@ -13,6 +13,7 @@
  * - loadFollowupWorkspace: finds customers whose pets are overdue for grooming.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isGoogleMapsLink } from "@/lib/maps";
 
 function assertResult(scope: string, error: { message: string } | null) {
   if (error) throw new Error(`${scope}_failed:${error.message}`);
@@ -355,7 +356,7 @@ function readAddressSnapshot(value: unknown): MyScheduleJob["address"] {
   const formattedLine = parts.join(", ");
   const latitude = typeof row.latitude === "number" ? row.latitude : null;
   const longitude = typeof row.longitude === "number" ? row.longitude : null;
-  const mapsUrl = latitude !== null && longitude !== null
+  const mapsUrl = typeof row.google_maps_url === "string" && isGoogleMapsLink(row.google_maps_url) ? row.google_maps_url : latitude !== null && longitude !== null
     ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formattedLine)}`;
   return {

@@ -1,7 +1,7 @@
 -- Minimal Supabase Auth/Extensions stubs for disposable PostgreSQL gate DBs.
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
-create or replace function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;
+create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid $$;
 -- The gate runner may have already installed pgcrypto in extensions, while
 -- older fixtures installed it in public. Do not overwrite its native digest
 -- function with a wrapper pointing at a nonexistent public.digest.
