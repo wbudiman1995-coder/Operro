@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { loadAuthContext } from "@/lib/auth-context";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
+import { createClient } from "@/lib/supabase/server";
 
 export interface StorageActionState { error: string | null; success: string | null }
 
@@ -18,14 +20,16 @@ export async function requestStorageUpgradeAction(_previous: StorageActionState,
 }
 
 export async function reviewStorageUpgradeAction(_previous: StorageActionState, formData: FormData): Promise<StorageActionState> {
-  const workspace = await requireActiveWorkspace();
-  const usage = await workspace.supabase.schema("app").rpc("storage_usage_snapshot");
-  if (usage.error || !(usage.data as Record<string, unknown> | null)?.is_platform_admin) return { error: "Hanya admin platform yang dapat meninjau permintaan.", success: null };
+  const supabase = await createClient();
+  const context = await loadAuthContext(supabase);
+  const owner = context ? await supabase.schema("app").rpc("is_operro_owner") : null;
+  if (!owner || owner.error || owner.data !== true) return { error: "Hanya pemilik Operro yang dapat meninjau permintaan.", success: null };
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(id) || !["contacted", "fulfilled", "declined"].includes(status)) return { error: "Permintaan atau status tidak valid.", success: null };
-  const { data, error } = await workspace.supabase.from("storage_upgrade_requests").update({ status, reviewed_by: workspace.userId, reviewed_at: new Date().toISOString() }).eq("id", id).in("status", ["requested", "contacted"]).select("id").maybeSingle();
+  const { data, error } = await supabase.from("storage_upgrade_requests").update({ status, reviewed_by: context!.user.id, reviewed_at: new Date().toISOString() }).eq("id", id).in("status", ["requested", "contacted"]).select("id").maybeSingle();
   if (error || !data) return { error: "Status belum tersimpan atau permintaan sudah berubah.", success: null };
   revalidatePath("/settings/storage");
+  revalidatePath("/platform");
   return { error: null, success: "Status permintaan diperbarui." };
 }

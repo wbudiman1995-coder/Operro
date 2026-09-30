@@ -106,12 +106,12 @@ test("merge preserves first-seen ordering and tolerates empty inputs", () => {
 });
 
 test("derives grooming size bands from weight", () => {
-  assert.equal(sizeBandForWeight(4), "S");
-  assert.equal(sizeBandForWeight(10), "S");
+  assert.equal(sizeBandForWeight(4), "XS");
+  assert.equal(sizeBandForWeight(10), "M");
   assert.equal(sizeBandForWeight(10.1), "M");
-  assert.equal(sizeBandForWeight(25), "M");
-  assert.equal(sizeBandForWeight(30), "L");
-  assert.equal(sizeBandForWeight(40), "L");
+  assert.equal(sizeBandForWeight(25), "L");
+  assert.equal(sizeBandForWeight(30), "XL");
+  assert.equal(sizeBandForWeight(40), "XL");
   assert.equal(sizeBandForWeight(55), "XL");
 });
 

@@ -9,7 +9,6 @@ import { NoOrganizationState } from "@/components/no-organization-state";
 import { loadAuthContext } from "@/lib/auth-context";
 import { defaultWorkspacePath, loadCapabilities } from "@/lib/authorization";
 import { loadDashboardData } from "@/lib/pilot-data";
-import { loadStorageUsage } from "@/lib/storage-usage";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Dashboard" };
@@ -35,7 +34,7 @@ export default async function DashboardPage() {
   const capabilities = await loadCapabilities(supabase);
   const landingPath = defaultWorkspacePath(capabilities);
   if (landingPath !== "/dashboard") redirect(landingPath);
-  const [data, storageUsage] = await Promise.all([loadDashboardData(supabase, activeOrganization.id), capabilities["settings.manage"] ? loadStorageUsage(supabase) : Promise.resolve(null)]);
+  const data = await loadDashboardData(supabase, activeOrganization.id);
 
   return (
     <DashboardShell
@@ -43,7 +42,6 @@ export default async function DashboardPage() {
       activeOrganization={activeOrganization}
       userEmail={context.user.email ?? "Akun Operro"}
       data={data}
-      storageUsage={storageUsage}
       capabilities={capabilities}
     />
   );

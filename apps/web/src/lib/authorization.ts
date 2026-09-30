@@ -53,6 +53,8 @@ export const CAPABILITY_KEYS = [
   "settings.manage",
   "payment.manage",
   "payment.validate",
+  "roles.manage",
+  "users.manage",
 ] as const;
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number];
 export type CapabilityMap = Record<CapabilityKey, boolean>;

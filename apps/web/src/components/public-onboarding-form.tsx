@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { IndonesiaRegionFields } from "@/components/indonesia-region-fields";
 import { BreedSelect } from "@/components/breed-select";
 import { compressPhoto } from "@/lib/image-compression";
-import { dogSizeFromWeight } from "@/lib/pet-sizing";
 import { isGoogleMapsLink, parseMapCoordinates } from "@/lib/maps";
 import { createClient } from "@/lib/supabase/client";
 
@@ -40,12 +39,13 @@ export function PublicOnboardingForm({token}:{token:string}){
     setLocationMessage("Meminta lokasi perangkat…");
     navigator.geolocation.getCurrentPosition(({coords})=>{setForm(current=>({...current,latitude:coords.latitude.toFixed(7),longitude:coords.longitude.toFixed(7)}));setMapsLink(`https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`);setLocationMessage("Lokasi terisi. Periksa titik peta sebelum mengirim.")},()=>setLocationMessage("Lokasi tidak dapat dibaca. Izinkan lokasi atau tempel link Google Maps."),{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
   }
-  function readMapsLink(){
-    if(!isGoogleMapsLink(mapsLink)){setLocationMessage("Gunakan link Google Maps resmi yang diawali https://.");return}
-    const coords=parseMapCoordinates(mapsLink);
-    if(coords){setForm(current=>({...current,latitude:coords.latitude.toFixed(7),longitude:coords.longitude.toFixed(7)}));setLocationMessage("Koordinat dari link tersimpan. Periksa titik peta sebelum mengirim.")}
-    else setLocationMessage("Link tersimpan untuk admin. Jika link pendek tidak memuat koordinat, admin akan memeriksanya.");
+  function updateMapsLink(value:string){
+    setMapsLink(value);
+    const coords=isGoogleMapsLink(value)?parseMapCoordinates(value):null;
+    setForm(current=>({...current,latitude:coords?.latitude.toFixed(7)??"",longitude:coords?.longitude.toFixed(7)??""}));
+    setLocationMessage("");
   }
+  const mapsInvalid=mapsLink.trim().length>0&&!isGoogleMapsLink(mapsLink);
 
   async function submit(){
     if(form.customerName.trim().length<2||form.phone.replace(/\D/g,"").length<7||!form.addressLine.trim()||!form.province||!form.kabupatenKota||!form.kecamatan||pets.some(p=>!p.name.trim())){setState("error");setMessage("Periksa nama, WhatsApp, alamat lengkap, wilayah, dan nama setiap pet.");return}
@@ -67,7 +67,8 @@ export function PublicOnboardingForm({token}:{token:string}){
           styleReferences.push({path,filename:photo.name.slice(0,200),mimeType:photo.type,sizeBytes:photo.size,caption:item.caption.slice(0,300)});
         }
         const weightKg=(Number(pet.kg)+Number(pet.grams)/1000).toFixed(3);
-        uploadedPets.push({clientId:pet.clientId,name:pet.name,species:pet.species,breed:pet.breed,size:pet.species==="dog"?dogSizeFromWeight(weightKg):null,age:pet.age,weightKg,color:pet.color,notes:pet.notes,styleReferences});
+        // Server-side pet trigger applies the organization's editable weight bands.
+        uploadedPets.push({clientId:pet.clientId,name:pet.name,species:pet.species,breed:pet.breed,size:null,age:pet.age,weightKg,color:pet.color,notes:pet.notes,styleReferences});
       }
       setMessage("Mengirim data ke admin…");
       const response=await fetch(`/api/onboarding/${encodeURIComponent(token)}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...form,recipientName:sameRecipient?form.customerName:form.recipientName,recipientPhone:sameRecipient?form.phone:form.recipientPhone,googleMapsUrl:mapsLink.trim().slice(0,1000),latitude:form.latitude?Number(form.latitude):null,longitude:form.longitude?Number(form.longitude):null,pets:uploadedPets})});
@@ -87,7 +88,7 @@ export function PublicOnboardingForm({token}:{token:string}){
       <div className="grid gap-3 sm:grid-cols-3">{([['rt','RT'],['rw','RW'],['kelurahan','Kelurahan/Desa']] as const).map(([key,label])=><label key={key} className="text-xs font-semibold text-slate-600">{label}<input value={form[key]} onChange={e=>patch(key,e.target.value)} className={`${field} mt-1`} /></label>)}</div>
       <IndonesiaRegionFields onChange={region=>setForm(current=>({...current,...region}))} className={field}/>
       <label className="block text-xs font-semibold text-slate-600">Catatan akses rumah (pagar, parkir, satpam)<textarea value={form.accessNotes} onChange={e=>patch('accessNotes',e.target.value)} className="mt-1 min-h-20 w-full rounded-xl border p-3 text-sm"/></label>
-      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-xs font-bold text-emerald-900">Lokasi rumah (opsional)</p><p className="mt-1 text-[11px] text-emerald-800">Bagikan lokasi saat berada di alamat ini, atau tempel link Google Maps. Foto tidak wajib.</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={useCurrentLocation} className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold">Bagikan lokasi saat ini</button><input className={`${field} min-w-48 flex-1`} value={mapsLink} onChange={e=>setMapsLink(e.target.value)} placeholder="Tempel link Google Maps" aria-label="Link Google Maps"/><button type="button" onClick={readMapsLink} disabled={!mapsLink.trim()} className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold disabled:opacity-50">Gunakan link</button></div>{locationMessage?<p className="mt-2 text-xs text-emerald-800">{locationMessage}</p>:null}{form.latitude&&form.longitude?<p className="mt-2 text-xs text-emerald-800">Titik: {form.latitude}, {form.longitude}</p>:null}</div>
+      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-xs font-bold text-emerald-900">Lokasi rumah (opsional)</p><p className="mt-1 text-[11px] text-emerald-800">Bagikan lokasi saat berada di alamat ini, atau tempel link Google Maps. Foto tidak wajib.</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={useCurrentLocation} className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold">Bagikan lokasi saat ini</button><input className={`${field} min-w-48 flex-1 ${mapsInvalid?"border-rose-500 bg-rose-50 focus:border-rose-600 focus:ring-rose-200":""}`} value={mapsLink} onChange={e=>updateMapsLink(e.target.value)} placeholder="Tempel link Google Maps" aria-label="Link Google Maps" aria-invalid={mapsInvalid} aria-describedby={mapsInvalid?"maps-error":undefined}/></div>{mapsInvalid?<p id="maps-error" role="alert" className="mt-2 rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs font-semibold text-rose-700">Link Google Maps tidak valid. Gunakan link dari Google Maps, misalnya maps.app.goo.gl/…</p>:mapsLink.trim()?<p className="mt-2 text-xs text-emerald-800">Link valid dan akan ikut dikirim ke admin.</p>:null}{locationMessage?<p className="mt-2 text-xs text-emerald-800">{locationMessage}</p>:null}{form.latitude&&form.longitude?<p className="mt-2 text-xs text-emerald-800">Titik: {form.latitude}, {form.longitude}</p>:null}</div>
       <label className="block text-xs font-semibold text-slate-600">Catatan lokasi atau preferensi<textarea value={form.customerNotes} onChange={e=>patch('customerNotes',e.target.value)} className="mt-1 min-h-20 w-full rounded-xl border p-3 text-sm"/></label>
       <h2 className="pt-3 font-bold">Pet</h2>
       {pets.map((pet,i)=><section key={pet.clientId} className="space-y-3 rounded-2xl bg-slate-50 p-4">

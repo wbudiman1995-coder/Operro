@@ -5,6 +5,7 @@
 import { BuildingIcon } from "@/components/icons";
 import { LogoutButton } from "@/components/logout-button";
 import { OperroMark } from "@/components/operro-mark";
+import Link from "next/link";
 
 export function NoOrganizationState({ email }: { email: string }) {
   return (
@@ -34,6 +35,7 @@ export function NoOrganizationState({ email }: { email: string }) {
             Operro tidak akan menampilkan data bisnis sampai akses organisasi Anda
             tervalidasi oleh database.
           </div>
+          {email.toLowerCase() === "wbudiman1995@gmail.com" ? <Link href="/platform" className="mt-5 inline-block rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white">Buka panel platform Operro</Link> : null}
         </section>
       </div>
     </main>

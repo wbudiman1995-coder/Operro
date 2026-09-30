@@ -20,9 +20,10 @@ export function ResourceManager({ resource, branches, memberships, canManageReso
   const [archiveState, archiveAction, archiving] = useActionState(archiveResourceAction, initialState);
   const [payState, payAction, paying] = useActionState(updateResourceCompensationAction, initialState);
   const schedulePath = `/schedule?branch=${resource.branchId}&groomer=${resource.id}`;
+  const groomerPath = "/my-schedule";
 
   async function copyScheduleLink() {
-    await navigator.clipboard.writeText(`${window.location.origin}${schedulePath}`);
+    await navigator.clipboard.writeText(`${window.location.origin}${groomerPath}`);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   }
@@ -41,9 +42,10 @@ export function ResourceManager({ resource, branches, memberships, canManageReso
     </div>
     <div className="mt-3 flex flex-wrap gap-2">
       <a href={schedulePath} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800">Buka jadwal</a>
-      <button type="button" onClick={copyScheduleLink} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">{copied ? "Tersalin" : "Salin link jadwal"}</button>
+      <button type="button" onClick={copyScheduleLink} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">{copied ? "Tersalin" : "Salin link groomer"}</button>
       {canManageResource ? <button type="button" onClick={() => setEditing((value) => !value)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">{editing ? "Tutup" : "Edit"}</button> : null}
     </div>
+    <p className="mt-2 text-[11px] text-slate-500">Link groomer memerlukan akun yang diundang dan terhubung ke profil ini. Foto diunggah dari Jadwal saya, bukan link publik.</p>
     {editing ? <form action={updateAction} className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4">
       <input type="hidden" name="resourceId" value={resource.id} />
       <input className={field} name="name" defaultValue={resource.name} required />

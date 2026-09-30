@@ -70,6 +70,7 @@ const managementNavigation: NavigationItemConfig[] = [
   { label: "Keluhan", href: "/complaints", icon: TasksIcon, anyPermission: ["customer.read", "task.manage", "reports.view"] },
   { label: "Pengaturan dokumen", href: "/settings/documents", icon: FinanceIcon, permission: "settings.manage" },
   { label: "Data & penyimpanan", href: "/settings/storage", icon: InventoryIcon, permission: "settings.manage" },
+  { label: "Akses tim", href: "/settings/access", icon: CustomersIcon, permission: "roles.manage" },
 ];
 
 function NavigationItem({
@@ -128,6 +129,7 @@ export function WorkspaceShell({ organizations, activeOrganization, userEmail, a
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 overflow-y-auto border-r border-white/[0.06] bg-[#0f1b2d] p-4 lg:flex lg:flex-col">
         <div className="border-b border-white/[0.08] px-2 pb-4 pt-1"><OperroMark inverse /></div>
         <WorkspaceNavigation activePath={activePath} capabilities={capabilities} />
+        {userEmail.toLowerCase() === "wbudiman1995@gmail.com" ? <Link href="/platform" className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200">Panel platform Operro</Link> : null}
         <div className="mt-auto space-y-3 pt-8">
           <div className="flex items-center gap-3 rounded-[12px] border border-white/[0.08] bg-white/[0.05] p-3">
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#0f8a72] text-xs font-bold uppercase text-white">{userEmail.slice(0, 1)}</span>

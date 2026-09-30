@@ -503,11 +503,9 @@ function DayResourceGrid({
                       className={`absolute inset-x-1 z-10 overflow-hidden rounded-lg border px-2 py-1 text-left transition ${selected ? "ring-2 ring-sky-500 ring-offset-1" : ""} ${movable ? "cursor-grab active:cursor-grabbing" : ""} ${active ? "border-emerald-500 bg-emerald-100" : booking.status === "canceled" || booking.status === "no_show" ? "border-slate-200 bg-slate-50 opacity-70" : "border-emerald-200 bg-emerald-50 hover:border-emerald-400"}`}
                     >
                       <p className="truncate text-[11px] font-bold text-emerald-900">
-                        {segment.continuesBefore ? "◂ " : ""}{booking.startLabel} {booking.customerName}{segment.continuesAfter ? " ▸" : ""}
+                        {booking.customerName}
                       </p>
-                      <p className="truncate text-[10px] text-emerald-700">{booking.pets.map((pet) => pet.petName).join(", ") || "Tanpa hewan"}</p>
-                      {booking.kabupatenKota ? <p className="truncate text-[10px] font-bold text-blue-700">{booking.kabupatenKota}{booking.kecamatan ? ` · ${booking.kecamatan}` : ""}</p> : null}
-                      <BookingBadges booking={booking} compact />
+                      {booking.kabupatenKota ? <p className="truncate text-[10px] font-bold text-blue-700">{booking.kabupatenKota}</p> : null}
                     </button>
                   );
                 })}
@@ -516,22 +514,6 @@ function DayResourceGrid({
         </div>
       </div>
     </div>
-  );
-}
-
-function BookingBadges({ booking, compact = false }: { booking: ScheduleWorkspace["bookings"][number]; compact?: boolean }) {
-  const mode = booking.fulfillmentMode === "home" ? "Home" : booking.fulfillmentMode === "pickup_delivery" ? "Antar-jemput" : "Toko";
-  const modeClass = booking.fulfillmentMode === "home" ? "bg-blue-100 text-blue-700" : booking.fulfillmentMode === "pickup_delivery" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600";
-  return (
-    <span className={`mt-1 flex flex-wrap items-center gap-1 ${compact ? "max-h-4 overflow-hidden" : ""}`}>
-      <span className={`rounded px-1 py-0.5 text-[9px] font-extrabold ${modeClass}`}>{mode}</span>
-      {booking.dispatchStage ? <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] font-extrabold text-amber-700">{booking.dispatchStage.replaceAll("_", " ")}</span> : null}
-      {booking.travelMinutes ? <span className="rounded bg-cyan-50 px-1 py-0.5 text-[9px] font-bold text-cyan-700">{booking.travelMinutes} mnt jalan</span> : null}
-      {booking.serviceAreaMatched === false ? <span className="rounded bg-rose-100 px-1 py-0.5 text-[9px] font-extrabold text-rose-700">Di luar area</span> : null}
-      {booking.sourceBadge === "subscription" ? <span className="rounded bg-fuchsia-100 px-1 py-0.5 text-[9px] font-extrabold text-fuchsia-700">Langganan</span> : null}
-      {booking.sourceBadge === "prepaid" ? <span className="rounded bg-indigo-100 px-1 py-0.5 text-[9px] font-extrabold text-indigo-700">Paket prabayar</span> : null}
-      {booking.sourceBadge === "free" ? <span className="rounded bg-lime-100 px-1 py-0.5 text-[9px] font-extrabold text-lime-800">Gratis</span> : null}
-    </span>
   );
 }
 
@@ -621,15 +603,8 @@ function MultiDayCalendar({
                     style={{ top: `${position.topPercent}%`, height: `${position.heightPercent}%` }}
                     className={`absolute inset-x-1 z-10 overflow-hidden rounded-lg border px-2 py-1 text-left shadow-sm transition ${selected ? "ring-2 ring-sky-500 ring-offset-1" : ""} ${movable ? "cursor-grab active:cursor-grabbing" : ""} ${active ? "border-emerald-500 bg-emerald-100" : booking.status === "canceled" || booking.status === "no_show" ? "border-slate-200 bg-slate-50 opacity-70" : "border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50"}`}
                   >
-                    <p className="truncate text-[10px] font-bold text-slate-500">{segment.continuesBefore ? "◂ " : ""}{booking.startLabel}–{booking.endLabel}{segment.continuesAfter ? " ▸" : ""}</p>
                     <p className="truncate text-xs font-extrabold text-slate-800">{booking.customerName}</p>
-                    <p className="truncate text-[10px] text-slate-500">{booking.pets.map((pet) => pet.petName).join(", ") || "Tanpa hewan"}</p>
-                    {booking.kabupatenKota ? <p className="truncate text-[10px] font-bold text-blue-700">{booking.kabupatenKota}{booking.kecamatan ? ` · ${booking.kecamatan}` : ""}</p> : null}
-                    {booking.resourceIds.length > 0 ? (
-                      <p className="truncate text-[10px] font-semibold text-emerald-700">{booking.resourceIds.map((id) => resourceNames.get(id) ?? "Groomer").join(" · ")}</p>
-                    ) : null}
-                    {booking.locationLabel ? <p className="truncate text-[9px] text-slate-400">{booking.locationLabel}</p> : null}
-                    <BookingBadges booking={booking} compact />
+                    {booking.kabupatenKota ? <p className="truncate text-[10px] font-bold text-blue-700">{booking.kabupatenKota}</p> : null}
                   </button>
                 );
               })}

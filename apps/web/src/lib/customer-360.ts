@@ -307,7 +307,7 @@ export async function loadCustomerOverview(
   const [petResult, paymentResult, defaultAddressResult] = await Promise.all([
     supabase
       .from("pets")
-      .select("id,name,species,breed,sex,birthdate,weight_kg,color,temperament,notes,status,medical_flags,metadata")
+      .select("id,name,species,breed,sex,birthdate,weight_kg,size,color,temperament,notes,status,medical_flags,metadata")
       .eq("organization_id", organizationId)
       .eq("customer_id", customerId)
       .is("deleted_at", null)
@@ -376,7 +376,7 @@ export async function loadCustomerOverview(
       sex: pet.sex,
       ageLabel: ageLabelFromBirthdate(pet.birthdate),
       weightKg: pet.weight_kg === null ? null : Number(pet.weight_kg),
-      sizeBand: sizeBandForWeight(pet.weight_kg === null ? null : Number(pet.weight_kg)),
+      sizeBand: ({ extra_small: "XS", small: "S", medium: "M", large: "L", extra_large: "XL" } as const)[pet.size as "extra_small" | "small" | "medium" | "large" | "extra_large"] ?? sizeBandForWeight(pet.weight_kg === null ? null : Number(pet.weight_kg)),
       color: pet.color,
       temperament: pet.temperament,
       notes: typeof pet.notes === "string" && pet.notes.length > 0 ? pet.notes : null,

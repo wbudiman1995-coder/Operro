@@ -57,6 +57,7 @@ const sections: { label: string; items: MenuItem[] }[] = [
       { label: "Leaderboard", href: "/leaderboard", icon: LeaderboardIcon, permission: "booking.read" },
       { label: "Follow-up", href: "/followups", icon: FollowupIcon, permission: "customer.read" },
       { label: "Keluhan", href: "/complaints", icon: TasksIcon, anyPermission: ["customer.read", "task.manage", "reports.view"] },
+      { label: "Akses tim", href: "/settings/access", icon: CustomersIcon, permission: "roles.manage" },
     ],
   },
 ];
@@ -111,6 +112,7 @@ export function WorkspaceMobileMenu({ activePath, userEmail, capabilities }: { a
             </div>
 
             <div className="space-y-6 py-5">
+              {userEmail.toLowerCase() === "wbudiman1995@gmail.com" ? <Link href="/platform" onClick={() => setOpen(false)} className="block rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-bold text-emerald-200">Panel platform Operro</Link> : null}
               {sections.map((section) => {
                 const visibleItems = section.items.filter((item) => isVisible(item, capabilities));
                 if (visibleItems.length === 0) return null;

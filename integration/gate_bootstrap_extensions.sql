@@ -1,6 +1,9 @@
 -- Minimal Supabase Auth/Extensions stubs for disposable PostgreSQL gate DBs.
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
+-- The isolated auth.users stub must carry the verified-email field used by
+-- account invitation claims; production Supabase already has this column.
+alter table auth.users add column if not exists email_confirmed_at timestamptz;
 create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid $$;
 -- The gate runner may have already installed pgcrypto in extensions, while
 -- older fixtures installed it in public. Do not overwrite its native digest

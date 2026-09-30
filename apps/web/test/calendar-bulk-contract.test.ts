@@ -35,15 +35,15 @@ test("server actions call only app-schema bulk RPCs and keep a confirmation toke
   assert.match(actions, /ids\.length >= 1 && ids\.length <= 50/);
 });
 
-test("calendar exposes drag, shift-selection, grouped controls and source badges", () => {
+test("calendar exposes drag, shift-selection and minimal owner/city cards", () => {
   assert.match(board, /draggable=\{movable\}/);
   assert.match(board, /event\.shiftKey/);
   assert.match(board, /resourceIds\.length <= 1/);
   assert.match(board, /Pilih beberapa/);
   assert.match(board, /bookingIds[\s\S]*selectedIds/);
-  assert.match(board, /Paket prabayar/);
-  assert.match(board, /Langganan/);
-  assert.match(board, /Gratis/);
+  assert.match(board, /booking\.customerName/);
+  assert.match(board, /booking\.kabupatenKota/);
+  assert.doesNotMatch(board, /function BookingBadges/);
 });
 
 test("source badges prefer membership, then complimentary, then package coverage", () => {

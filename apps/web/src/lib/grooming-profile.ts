@@ -15,17 +15,15 @@
  * `grooming_job_pet_services` snapshots and are never recomputed from weight.
  */
 
-export type GroomingSizeBand = "S" | "M" | "L" | "XL";
-
-const SIZE_BANDS: Array<{ maxKg: number; band: GroomingSizeBand }> = [
-  { maxKg: 10, band: "S" },
-  { maxKg: 25, band: "M" },
-  { maxKg: 40, band: "L" },
-];
+export type GroomingSizeBand = "XS" | "S" | "M" | "L" | "XL";
 
 export function sizeBandForWeight(weightKg: number | null): GroomingSizeBand | null {
   if (weightKg === null || !Number.isFinite(weightKg) || weightKg <= 0) return null;
-  return SIZE_BANDS.find((entry) => weightKg <= entry.maxKg)?.band ?? "XL";
+  if (weightKg < 5) return "XS";
+  if (weightKg < 10) return "S";
+  if (weightKg < 15) return "M";
+  if (weightKg <= 25) return "L";
+  return "XL";
 }
 
 /**
