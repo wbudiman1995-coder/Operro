@@ -22,6 +22,7 @@ Invitations store a token hash and are bound to one verified email for seven day
 ## Verification completed on the isolated branch
 
 - PostgreSQL 16 full migration lineage plus `integration/platform_access_smoke.sql` passed. This included a populated-owner bootstrap, wrong-email and replay rejection, business and support role checks, groomer-assignment RLS, resource-retirement cleanup, stale-token denial after deactivation, subscription suspension, and custom size boundaries.
+- The populated HomePaw upgrade rehearsal applied all 32 post-baseline migrations, including these two, with organization/customer/pet/booking counts unchanged (`2,6,7,6`); see `docs/handoffs/logs/INTEGRATION/populated-upgrade.log`.
 - The existing assembly, package reservation, and payroll SQL suites passed against the isolated PostgreSQL 16 database.
 - Web typecheck, lint, production build, batch1a (109/109), batch1b (314/314), and booking (14/14) passed.
 - A QC agent reviewed access boundaries and identified issues with direct writes, deactivated-user claims, and groomer visibility. These were fixed and retested. It could not complete an additional final pass because its model usage limit was reached.
