@@ -1,6 +1,6 @@
 # HomePaw → Operro parity audit (1 October 2026)
 
-This updates the stale 18 September plan against the current integration tree. **Implemented** means a real route/RPC and tests exist; it does **not** mean the owner's live workflow has passed QC. **Partial** means some working pieces exist but an important HomePaw behavior is absent. **Missing** means no usable feature surface. The count is **29 implemented, 12 partial, 3 missing**. The owner should use this as a QC map, not a claim that 29 are perfect clones.
+This updates the stale 18 September plan against the current integration tree. **Implemented** means a real route/RPC and tests exist; it does **not** mean the owner's live workflow has passed QC. **Partial** means some working pieces exist but an important HomePaw behavior is absent. **Missing** means no usable feature surface. The count is **28 implemented, 13 partial, 3 missing**. The owner should use this as a QC map, not a claim that 28 are perfect clones.
 
 | # | Capability | Status | Evidence / remaining gap |
 |---|---|---|---|
@@ -23,8 +23,8 @@ This updates the stale 18 September plan against the current integration tree. *
 | 17 | Groomer performance | Implemented | `/leaderboard/[resourceId]` drill-down and attribution. |
 | 18 | Leaderboard | Implemented | `/leaderboard` monthly ranking. |
 | 19 | Complaints | Implemented | `/complaints`, lifecycle, role guards and CSV. |
-| 20 | Service/customer invoice creation | Implemented | `/invoices/new`, booking/visit/package invoice, line snapshots, document and PDF. This is distinct from Operro's new platform billing invoice. |
-| 21 | Catalog/price | Implemented | `/catalog`, size price/duration matrix; this change adds service categories and custom pet-type pricing. |
+| 20 | Service/customer invoice creation | Implemented | `/invoices/new`, booking/manual-visit/package invoice, line snapshots, document and PDF. The finance picker now includes unbilled manual visits and searches by owner name; the live click-through still needs QC. This is distinct from Operro's platform billing invoice. |
+| 21 | Catalog/price | Partial | `/catalog` has editable XS/S/M/L/XL weight boundaries, per-size price/duration, service categories and custom pet-type pricing. Creating/deleting/renaming size bands such as XXL is not implemented: size keys remain fixed in booking pricing, package eligibility, and payroll. |
 | 22 | Discounts/charges | Implemented | Invoice/pet/service/category rules and transport fee. |
 | 23 | Package coverage | Implemented | Reservation-aware preview and server-side eligibility. |
 | 24 | Packages/memberships | Implemented | `/programs`, sale, renew and ledger. |
@@ -44,18 +44,20 @@ This updates the stale 18 September plan against the current integration tree. *
 | 38 | Export/ownership | Partial | CRM eight-sheet XLSX, payroll XLSX/CSV and complaint CSV; no organization-wide backup including files/configuration. |
 | 39 | Business configuration | Partial | Branding, banks, service areas and access controls exist; not all HomePaw business settings are exposed. |
 | 40 | Custom fields | Missing | Metadata supports extension; no owner-configurable customer/pet field builder/editor. |
-| 41 | Accounts/permissions | Partial | Platform invitations, business owner Admin checklist, groomer accounts; live invite and multi-org owner QC still required. |
+| 41 | Accounts/permissions | Partial | Platform invitations, business owner Admin checklist, groomer accounts, and platform-owner workspace switching (including suspended businesses) exist; live invite and multi-org owner QC still required. The platform owner is expressly authorized to inspect/change the checklist. |
 | 42 | Personal preferences | Missing | No per-user landing/calendar/dashboard/language preferences. |
 | 43 | Storage/maintenance | Partial | Org file meter, platform project DB and file meter, cleanup and manual capacity requests; no per-org database-byte accounting, scheduled cleanup or billing automation. |
 | 44 | Reliability/safeguards | Partial | RLS, audit, financial snapshots, migration/test gates; monitoring/recovery UI and some real-world workflows need QC. |
 
 ## Current owner QC priorities
 
-1. Claim a new `Pemilik` invitation in an independent email, then set Admin permissions in that business's Settings; verify Operro's platform owner cannot read or set that checklist.
+1. Claim a new `Pemilik` invitation in an independent email using the public production link, then set Admin permissions in that business's Settings. Verify `wbudiman1995@gmail.com` can identify the business owner, open the workspace, and inspect/change its checklist, while the business Admin cannot.
 2. Add a custom pet type and a new service category. Configure explicit price/time for the type; create a pet and calendar booking; check the stored invoice line price and duration.
 3. Submit public registration with that type, amend it in the queue, approve it, and verify species is preserved in Customer 360.
 4. Export both CRM XLSX options. Verify the complete workbook has Customers, Pets, Appointments, Invoices, Visits, Subscriptions, Tokens (package ledger), Complaints; only active-organization rows appear. Check spreadsheet cells beginning `=`, `+`, `-`, `@` remain text.
 5. Create monthly Operro billing, issue the platform invoice, download PDF and view it as that business owner; mark paid and verify amount/due cannot be rewritten. A suspended owner must still be able to open their invoice.
 6. Compare the actual HomePaw workflows for #1–4, #31, #34, and #36–44 before advertising full parity.
+
+Size-band work still required before an owner can add or delete XXL: introduce tenant-owned bands with safe historical snapshots, make service price/duration and package eligibility use those keys, update booking and payroll calculations, migrate existing XS–XL settings, and refuse deletion while a live package or booking depends on a band. A visual add/delete control alone would not change the authoritative pricing engine.
 
 The workspace file meter counts stored files including photos/documents. The platform DB meter uses `pg_database_size` and therefore includes schedules and metadata **for the whole Supabase project**, not per business. Neither meter is Vercel bandwidth/functions, Supabase egress, or an exact provider-billing quota. The provider Usage dashboards remain authoritative.
