@@ -10,6 +10,7 @@ repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 scratch=$(mktemp -d /tmp/operro-upgrade.XXXXXX)
 container="operro_upgrade_pg16_$$"
 cutoff=20260924110000
+expected_head=20261023110000
 log="$repo/docs/handoffs/logs/INTEGRATION/populated-upgrade.log"
 mkdir -p "$(dirname "$log")"
 trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
@@ -85,10 +86,11 @@ values ('019fbdd0-ee6c-7f31-861b-7a981bc599be','047f1e5c-5935-4566-b793-417df9f7
         '019fbdd0-ee52-7f57-8318-a288203c78c1','019fbdd0-ee64-7327-97e4-fe23f30dbff1','active');
 SQL
   before=$(docker exec "$container" psql -U postgres -Atc \
-    "select (select count(*) from public.organizations)||','||(select count(*) from public.customers)||','||(select count(*) from public.pets)||','||(select count(*) from public.bookings)")
-  echo "Populated baseline counts org,customer,pet,booking: $before"
+    "select (select count(*) from public.organizations)||','||(select count(*) from public.customers)||','||(select count(*) from public.pets)||','||(select count(*) from public.bookings)||','||(select count(*) from public.packages)||','||(select count(*) from public.customer_packages)||','||(select count(*) from public.invoice_lines)")
+  echo "Populated baseline counts org,customer,pet,booking,package,customer_package,invoice_line: $before"
 
   upgrade_count=0
+  last_upgrade=''
   for migration in "$scratch"/supabase/migrations/*.sql; do
     version=$(basename "$migration")
     version=${version%%_*}
@@ -96,11 +98,13 @@ SQL
     echo "UPGRADE $version"
     sql -q -f "/work/supabase/migrations/$(basename "$migration")"
     upgrade_count=$((upgrade_count + 1))
+    last_upgrade=$version
   done
   echo "Upgrade migrations applied: $upgrade_count"
+  [[ "$last_upgrade" == "$expected_head" ]] || { echo "FAIL: rehearsal stopped at $last_upgrade, expected $expected_head"; exit 1; }
   after=$(docker exec "$container" psql -U postgres -Atc \
-    "select (select count(*) from public.organizations)||','||(select count(*) from public.customers)||','||(select count(*) from public.pets)||','||(select count(*) from public.bookings)")
-  echo "After upgrade counts org,customer,pet,booking: $after"
+    "select (select count(*) from public.organizations)||','||(select count(*) from public.customers)||','||(select count(*) from public.pets)||','||(select count(*) from public.bookings)||','||(select count(*) from public.packages)||','||(select count(*) from public.customer_packages)||','||(select count(*) from public.invoice_lines)")
+  echo "After upgrade counts org,customer,pet,booking,package,customer_package,invoice_line: $after"
   [[ "$before" == "$after" ]] || { echo "FAIL: demo records changed in count"; exit 1; }
   sql <<'SQL'
 do $$

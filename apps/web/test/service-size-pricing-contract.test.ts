@@ -7,6 +7,7 @@ const root = path.join(__dirname, "../../..");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/20260924130000_service_size_pricing.sql"), "utf8");
 const householdMigration = fs.readFileSync(path.join(root, "supabase/migrations/20261016100000_homepaw_customer_intake.sql"), "utf8");
 const homepawSizeMigration = fs.readFileSync(path.join(root, "supabase/migrations/20261017100000_homepaw_size_price_duration.sql"), "utf8");
+const dynamicSizeMigration = fs.readFileSync(path.join(root, "supabase/migrations/20261023110000_dynamic_dog_size_bands.sql"), "utf8");
 const actions = fs.readFileSync(path.join(root, "apps/web/src/app/pilot-actions.ts"), "utf8");
 const pilotData = fs.readFileSync(path.join(root, "apps/web/src/lib/pilot-data.ts"), "utf8");
 const serviceManager = fs.readFileSync(path.join(root, "apps/web/src/components/service-manager.tsx"), "utf8");
@@ -104,10 +105,13 @@ test("service create/update stay organization-scoped and validate every size pri
   assert.match(actions, /function optionalPriceValue[\s\S]*Number\.isFinite\(parsed\) && parsed >= 0 \? parsed : "invalid"/);
 });
 
-test("pet size selection remains optional and supports the new XS band", () => {
-  assert.match(actions, /\["", "extra_small", "small", "medium", "large", "extra_large"\]\.includes\(pet\.size\)/);
+test("pet size selection stays optional and validates owner-defined size bands", () => {
+  assert.match(actions, /organization_dog_size_bands/);
+  assert.match(actions, /allowedDogBands\.has\(pet\.size\)/);
   assert.match(householdMigration, /v_pet->>'size' not in \('small','medium','large','extra_large'\)/);
   assert.match(homepawSizeMigration, /v_pet->>'size' not in \('extra_small','small','medium','large','extra_large'\)/);
+  assert.match(dynamicSizeMigration, /create function app\.replace_dog_size_bands/);
+  assert.match(dynamicSizeMigration, /not exists\(select 1 from public\.organization_dog_size_bands b where b\.organization_id=v_org and b\.key=v_pet->>'size'\)/);
 });
 
 test("catalog admin UI exposes size prices, additional duration and fulfillment-mode checkboxes for editing", () => {
@@ -115,6 +119,8 @@ test("catalog admin UI exposes size prices, additional duration and fulfillment-
   assert.match(serviceManager, /name="additionalDuration"/);
   assert.match(serviceManager, /name="fulfillmentModes"/);
   assert.match(serviceManager, /name="isActive"/);
+  assert.match(serviceManager, /activeSizeFields = SIZE_FIELDS\.filter/);
+  assert.match(serviceManager, /customBands = dogSizeBands\.filter/);
 });
 
 test("operations pricing data snapshots price_source per line so overridden lines are distinguishable", () => {

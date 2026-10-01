@@ -10,8 +10,22 @@ export const DOG_SIZE_BANDS = [
 export type DogSize = (typeof DOG_SIZE_BANDS)[number]["value"];
 export type PricingBand = DogSize | "cat" | (string & {});
 export type SpeciesPricing = Record<string, { price: number; duration: number }>;
+export type DogSizeBand = { key: string; label: string; upperKg: number | null };
+export type DogSizePricing = Record<string, { price?: number | null; duration?: number | null }>;
+export const DEFAULT_DOG_SIZE_BANDS: DogSizeBand[] = [
+  { key: "extra_small", label: "XS", upperKg: 5 }, { key: "small", label: "S", upperKg: 10 },
+  { key: "medium", label: "M", upperKg: 15 }, { key: "large", label: "L", upperKg: 25.01 },
+  { key: "extra_large", label: "XL", upperKg: null },
+];
 export type DogSizeBoundaries = { xs: number; s: number; m: number; l: number };
 export const DEFAULT_DOG_SIZE_BOUNDARIES: DogSizeBoundaries = { xs: 5, s: 10, m: 15, l: 25 };
+
+export function dogSizeFromBands(weight: number | string | null | undefined, bands: DogSizeBand[]): string | null {
+  if (weight === null || weight === undefined || weight === "") return null;
+  const kg = Number(weight);
+  if (!Number.isFinite(kg) || kg <= 0) return null;
+  return bands.find((band) => band.upperKg === null || kg < band.upperKg)?.key ?? null;
+}
 
 export function dogSizeFromWeight(weight: number | string | null | undefined): DogSize | null;
 export function dogSizeFromWeight(weight: number | string | null | undefined, boundaries: DogSizeBoundaries): DogSize | null;
@@ -37,6 +51,7 @@ export interface SizedService {
   durationExtraSmall?: number | null; durationSmall?: number | null; durationMedium?: number | null;
   durationLarge?: number | null; durationExtraLarge?: number | null; durationCat?: number | null;
   speciesPricing?: SpeciesPricing;
+  dogSizePricing?: DogSizePricing;
 }
 
 const priceKey = { extra_small: "priceExtraSmall", small: "priceSmall", medium: "priceMedium", large: "priceLarge", extra_large: "priceExtraLarge", cat: "priceCat" } as const;
@@ -47,7 +62,7 @@ export function pricingBand(pet: SizedPet): PricingBand | null {
   if (pet.species !== "dog") return pet.species || null;
   // pets.size is assigned by the database trigger using this organization's
   // editable boundaries. Weight-only fallback is for legacy unsized rows.
-  return DOG_SIZE_BANDS.some((band) => band.value === pet.size) ? pet.size as DogSize : dogSizeFromWeight(pet.weightKg);
+  return pet.size && /^[a-z][a-z0-9_]{1,29}$/.test(pet.size) ? pet.size : dogSizeFromWeight(pet.weightKg);
 }
 
 export function resolveServiceForPet(service: SizedService, pet: SizedPet): { price: number; duration: number; band: PricingBand | null } {
@@ -56,9 +71,10 @@ export function resolveServiceForPet(service: SizedService, pet: SizedPet): { pr
     const custom = service.speciesPricing?.[pet.species];
     return { band, price: custom?.price ?? service.basePrice, duration: custom?.duration ?? 0 };
   }
+  const dynamic = pet.species === "dog" && band ? service.dogSizePricing?.[band] : null;
   return {
     band,
-    price: band && band in priceKey ? service[priceKey[band as keyof typeof priceKey]] ?? service.basePrice : service.basePrice,
-    duration: band && band in durationKey ? service[durationKey[band as keyof typeof durationKey]] ?? service.durationMinutes : service.durationMinutes,
+    price: dynamic?.price ?? (band && band in priceKey ? service[priceKey[band as keyof typeof priceKey]] ?? service.basePrice : service.basePrice),
+    duration: dynamic?.duration ?? (band && band in durationKey ? service[durationKey[band as keyof typeof durationKey]] ?? service.durationMinutes : service.durationMinutes),
   };
 }

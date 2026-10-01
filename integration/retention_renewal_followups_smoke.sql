@@ -578,8 +578,13 @@ end $$;
 -- settings untouched.
 -- =====================================================================
 do $$ begin perform pg_temp.act_as('04000000-0000-4000-8000-0000000000c1', '04000000-0000-4000-8000-000000000001'); end $$;
+-- Platform access hardening revokes direct organization writes from authenticated.
+-- This is fixture setup for an unrelated-key preservation assertion, so seed it
+-- as the database owner and immediately return to the authenticated test role.
+reset role;
 update public.organizations set settings = settings || '{"branding": {"logo_url": "https://example.test/logo.png"}}'::jsonb
  where id = '04000000-0000-4000-8000-000000000001';
+set local role authenticated;
 do $$
 declare v_stale_updated_at timestamptz; v_result jsonb; v_branding jsonb;
 begin

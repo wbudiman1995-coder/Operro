@@ -9,7 +9,7 @@ npm WARN deprecated glob@7.2.3: Old versions of glob are not supported, and cont
 npm WARN deprecated fstream@1.0.12: This package is no longer supported.
 npm WARN deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
 
-added 501 packages, and audited 506 packages in 28s
+added 501 packages, and audited 506 packages in 25s
 
 158 packages are looking for funding
   run `npm fund` for details
@@ -29,25 +29,26 @@ typecheck exit=0
 > next build
 
 ▲ Next.js 16.3.6 (Turbopack)
-✓ Running next.config.ts took 55ms
+✓ Running next.config.ts took 331ms
 - Experiments (use with caution):
   · serverActions
 
   Creating an optimized production build ...
-✓ Compiled successfully in 25.2s
+✓ Compiled successfully in 19.1s
   Running TypeScript ...
-  Finished TypeScript in 31.8s ...
+  Finished TypeScript in 25.8s ...
   Collecting page data using 11 workers ...
-  Generating static pages using 11 workers (0/35) ...
-  Generating static pages using 11 workers (8/35) 
-  Generating static pages using 11 workers (17/35) 
-  Generating static pages using 11 workers (26/35) 
-✓ Generating static pages using 11 workers (35/35) in 1375ms
+  Generating static pages using 11 workers (0/40) ...
+  Generating static pages using 11 workers (10/40) 
+  Generating static pages using 11 workers (20/40) 
+  Generating static pages using 11 workers (30/40) 
+✓ Generating static pages using 11 workers (40/40) in 1436ms
   Finalizing page optimization ...
 
 Route (app)
 ┌ ƒ /
 ├ ○ /_not-found
+├ ƒ /accept/[token]
 ├ ƒ /api/availability/slots
 ├ ƒ /api/complaints/export
 ├ ƒ /api/health/supabase
@@ -56,11 +57,15 @@ Route (app)
 ├ ƒ /api/regions
 ├ ƒ /api/search
 ├ ƒ /attendance
+├ ƒ /billing
+├ ƒ /billing/[id]
+├ ƒ /billing/[id]/pdf
 ├ ƒ /bookings
 ├ ƒ /catalog
 ├ ƒ /complaints
 ├ ƒ /customers
 ├ ƒ /customers/[customerId]
+├ ƒ /customers/export
 ├ ƒ /customers/onboarding
 ├ ƒ /dashboard
 ├ ƒ /finance
@@ -77,11 +82,14 @@ Route (app)
 ├ ƒ /organizations
 ├ ƒ /payroll
 ├ ƒ /payroll/export
+├ ƒ /platform
 ├ ƒ /programs
 ├ ƒ /programs/memberships
 ├ ƒ /reports
 ├ ƒ /schedule
+├ ƒ /settings/access
 ├ ƒ /settings/documents
+├ ƒ /settings/storage
 ├ ƒ /tasks
 └ ƒ /visits
 
@@ -103,12 +111,12 @@ Route (app)
 > @operro/backend@0.1.0 build
 > tsc -b --force
 
--rw-r--r-- 1 dw_winston dw_winston 403 Sep 29 16:37 packages/backend/dist/index.d.ts
--rw-r--r-- 1 dw_winston dw_winston 368 Sep 29 16:37 packages/backend/dist/index.js
--rw-r--r-- 1 dw_winston dw_winston 329 Sep 29 16:37 packages/preset-grooming/dist/index.d.ts
--rw-r--r-- 1 dw_winston dw_winston 294 Sep 29 16:37 packages/preset-grooming/dist/index.js
--rw-r--r-- 1 dw_winston dw_winston 222 Sep 29 16:37 packages/sdk/dist/index.d.ts
--rw-r--r-- 1 dw_winston dw_winston 187 Sep 29 16:37 packages/sdk/dist/index.js
+-rwxr-xr-x 1 dw_winston dw_winston 403 Oct  2 00:01 packages/backend/dist/index.d.ts
+-rwxr-xr-x 1 dw_winston dw_winston 368 Oct  2 00:01 packages/backend/dist/index.js
+-rwxr-xr-x 1 dw_winston dw_winston 329 Oct  2 00:01 packages/preset-grooming/dist/index.d.ts
+-rwxr-xr-x 1 dw_winston dw_winston 294 Oct  2 00:01 packages/preset-grooming/dist/index.js
+-rwxr-xr-x 1 dw_winston dw_winston 222 Oct  2 00:01 packages/sdk/dist/index.d.ts
+-rwxr-xr-x 1 dw_winston dw_winston 187 Oct  2 00:01 packages/sdk/dist/index.js
 
 ########## GATE 3 — in-memory + preset-contract tests ##########
 PASS: 1 authorized addPet delegates to repo/RPC
@@ -203,15 +211,15 @@ DO
 psql:supabase/tests/20260721001350_test_assembly.sql:128: NOTICE:  PASS: C8b cross-branch resource rejected (not_active_or_not_in_branch)
 psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C9 reserve rejects qty<>1 line (package_requires_unit_quantity)
 psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C10 qty=1 line reserves a package session
-DO
 psql:supabase/tests/20260721001350_test_assembly.sql:145: NOTICE:  PASS: C11 set_qty rejects line with package reservation (any status)
+DO
 psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C12 availability is 2 (1 reserved of 3) before removal
 psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C13 remove_pet released the reservation; availability back to 3
 psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C14 reservation row preserved with status released
-DO
 psql:supabase/tests/20260721001350_test_assembly.sql:162: NOTICE:  PASS: C15 repeated removal cannot double-release (pet_not_found)
 DO
 psql:supabase/tests/20260721001350_test_assembly.sql:174: NOTICE:  PASS: C16 re-adding a removed pet raises stable pet_removal_is_permanent
+DO
 ROLLBACK
 
 ########## GATE 6 — package-reservation regression tests ##########
@@ -241,16 +249,16 @@ CREATE SEQUENCE
 CREATE FUNCTION
 DO
 psql:supabase/tests/20260721001350_test_reservation.sql:86: NOTICE:  PASS: R1 qty<>1 rejected (package_requires_unit_quantity)
-DO
 psql:supabase/tests/20260721001350_test_reservation.sql:93: NOTICE:  PASS: R2 qty=1 accepted
 DO
+DO
 psql:supabase/tests/20260721001350_test_reservation.sql:101: NOTICE:  PASS: R3 expired package rejected (package_expired)
+DO
 psql:supabase/tests/20260721001350_test_reservation.sql:109: NOTICE:  PASS: R4 service mismatch rejected
-DO
-DO
 psql:supabase/tests/20260721001350_test_reservation.sql:117: NOTICE:  PASS: R5 customer mismatch rejected
 DO
 psql:supabase/tests/20260721001350_test_reservation.sql:125: NOTICE:  PASS: R6 missing package rejected (package_not_found)
+DO
 psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7a exactly three reserved lifecycle rows exist
 psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7b availability is 0 before expiration processing (three stale-but-reserved holds)
 psql:supabase/tests/20260721001350_test_reservation.sql:173: NOTICE:  PASS: R7c new reservation succeeds after stale holds expired
@@ -305,7 +313,7 @@ DO
 
       issue_invoice_for_booking       
 --------------------------------------
- 01a0ec87-619a-78af-bef2-e55bd8939515
+ 01a0f86a-dac1-7b1b-973c-2482b73aacdf
 (1 row)
 
 INSERT 0 1
@@ -327,8 +335,8 @@ psql:supabase/tests/20261001100000_test_payroll_engine.sql:244: NOTICE:  PASS: A
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:244: NOTICE:  PASS: B styling = round(50000 revenue * 50%% PER-GROOMER override tier) = 25000, not the org default
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:244: NOTICE:  PASS: B transport half-share = 25000 -- A+B shares sum to exactly 50000, never exceeding the pool
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:244: NOTICE:  PASS: B perDog = 20000 (flat default, transport pet has no size)
-psql:supabase/tests/20261001100000_test_payroll_engine.sql:244: NOTICE:  PASS: exactly one completed-but-uninvoiced pet is flagged, not silently dropped
 DO
+psql:supabase/tests/20261001100000_test_payroll_engine.sql:244: NOTICE:  PASS: exactly one completed-but-uninvoiced pet is flagged, not silently dropped
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:279: NOTICE:  PASS: approve moves draft -> approved
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:279: NOTICE:  PASS: pay moves approved -> paid
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:279: NOTICE:  PASS: exactly one payroll_paid ledger entry after the first pay
@@ -339,8 +347,8 @@ psql:supabase/tests/20261001100000_test_payroll_engine.sql:279: NOTICE:  PASS: t
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:279: NOTICE:  PASS: the original payroll_items snapshot rows still exist after undo (not deleted)
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:279: NOTICE:  PASS: run metadata records exactly one correction
 DO
-DO
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:291: NOTICE:  PASS: excl_payroll_runs_no_overlap rejects an overlapping period for the same org
+DO
 DO
 DO
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:303: NOTICE:  PASS: recompute_payroll_run denies a member without payroll.manage (insufficient_privilege)
@@ -371,8 +379,8 @@ INSERT 0 1
 INSERT 0 1
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:429: NOTICE:  PASS: org1's run id resolved for the cross-tenant probe below
 psql:supabase/tests/20261001100000_test_payroll_engine.sql:429: NOTICE:  PASS: org2's owner cannot approve org1's run by id (run_not_found, not a cross-tenant read)
-psql:supabase/tests/20261001100000_test_payroll_engine.sql:429: NOTICE:  PASS: org2's owner cannot pay retention for an org1 membership id (no_hire_date_on_record -- org1's data never read)
 DO
+psql:supabase/tests/20261001100000_test_payroll_engine.sql:429: NOTICE:  PASS: org2's owner cannot pay retention for an org1 membership id (no_hire_date_on_record -- org1's data never read)
 ROLLBACK
 
 ########## GATE 7 — real authenticated-role integration (incl reserve_package_session) ##########
@@ -384,12 +392,12 @@ SET
  {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
 (1 row)
 
-psql:integration/0100_integration_client.sql:16: NOTICE:  PASS: I1 authenticated can assembly_add_pet via RPC
  ok 
 ----
  
 (1 row)
 
+psql:integration/0100_integration_client.sql:16: NOTICE:  PASS: I1 authenticated can assembly_add_pet via RPC
 COMMIT
 BEGIN
 SET
@@ -462,8 +470,8 @@ SET
  {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
 (1 row)
 
-DO
 psql:integration/invoice_parity_smoke.sql:44: NOTICE:  PASS package invoice, idempotency, package line, and 3-session balance
+DO
 COMMIT
 INSERT 0 1
 INSERT 0 1
@@ -495,8 +503,8 @@ SET
  {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
 (1 row)
 
-DO
 psql:integration/invoice_parity_smoke.sql:128: NOTICE:  PASS preview and issued total=200, discount=20, transport fee=20, manual groomer
+DO
 COMMIT
 INSERT 0 2
 INSERT 0 2
@@ -510,7 +518,7 @@ SET
 (1 row)
 
 DO
-psql:integration/invoice_parity_smoke.sql:167: NOTICE:  PASS back-to-back invoices got distinct numbers: INV-20260929-252C08D1 vs INV-20260929-572A0501
+psql:integration/invoice_parity_smoke.sql:167: NOTICE:  PASS back-to-back invoices got distinct numbers: INV-20261001-037D870B vs INV-20261001-AE1E310B
 COMMIT
 
 ########## GATE 7c — membership lifecycle and reconciliation ##########
@@ -554,20 +562,20 @@ psql:integration/package_lifecycle_smoke.sql:126: NOTICE:  PASS: S2 per-pet pack
 DO
 DO
 psql:integration/package_lifecycle_smoke.sql:141: NOTICE:  PASS: S3 coverage listing shows 3 available before any reservation
-DO
 psql:integration/package_lifecycle_smoke.sql:150: NOTICE:  PASS: S4 reconcile reports a healthy (matching) balance
 psql:integration/package_lifecycle_smoke.sql:150: NOTICE:  PASS: S5 revision reflects the purchase's own ledger-driven bump (default 1 + 1)
-UPDATE 1
 DO
+UPDATE 1
 psql:integration/package_lifecycle_smoke.sql:158: NOTICE:  PASS: S6 reconcile detects the induced mismatch
 psql:integration/package_lifecycle_smoke.sql:158: NOTICE:  PASS: S7 reconcile reports the exact cached vs ledger values
+DO
 psql:integration/package_lifecycle_smoke.sql:166: NOTICE:  PASS: S8 repair rejects a stale revision (40001 stale_repair_request)
 DO
 psql:integration/package_lifecycle_smoke.sql:176: NOTICE:  PASS: S9 repair restores the cached balance to match the ledger
 DO
 psql:integration/package_lifecycle_smoke.sql:176: NOTICE:  PASS: S10 repeating the same repair request_key is idempotent (no double-adjustment)
-DO
 psql:integration/package_lifecycle_smoke.sql:180: NOTICE:  PASS: S11 reconcile confirms the package is healthy again after repair
+DO
 INSERT 0 1
 UPDATE 1
 psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S12 renewal produces a real invoice with status issued (not paid -- an issued invoice is never proof of payment)
@@ -579,29 +587,29 @@ psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S17 renewal ext
 psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S18 renewal increments renewal_count
 psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S19 the renewal ledger row links to the renewal invoice (invoice_id)
 psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S20 repeating the same renewal request_key returns the SAME invoice (idempotent), even with a garbage terms_fingerprint -- a retry never re-checks it
-psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S21 the idempotent retry did not double-apply (renewal_count still 1)
 DO
+psql:integration/package_lifecycle_smoke.sql:219: NOTICE:  PASS: S21 the idempotent retry did not double-apply (renewal_count still 1)
 DO
 psql:integration/package_lifecycle_smoke.sql:227: NOTICE:  PASS: S22 renewal request_key reused for a different membership is rejected
 psql:integration/package_lifecycle_smoke.sql:236: NOTICE:  PASS: S23 a healthy package is not auto_repairable (nothing to repair)
+DO
 psql:integration/package_lifecycle_smoke.sql:236: NOTICE:  PASS: S24 a fully-linked, non-legacy package has zero manual_review_issues
-DO
 INSERT 0 1
-DO
 psql:integration/package_lifecycle_smoke.sql:251: NOTICE:  PASS: S25 an orphan consumption ledger row (no reservation link) is flagged for manual review
 psql:integration/package_lifecycle_smoke.sql:251: NOTICE:  PASS: S26 reservation_consumption_matches turns false once a link is broken, even though the raw counts alone would look plausible
+DO
 INSERT 0 1
+DO
 psql:integration/package_lifecycle_smoke.sql:261: NOTICE:  PASS: S27 a legacy package with no source_invoice_id is flagged missing_source_invoice, never silently treated as healthy
 DO
 DO
 psql:integration/package_lifecycle_smoke.sql:274: NOTICE:  PASS: S28 archive refuses a package with a reserved session outstanding
-DO
 UPDATE 1
 DO
 psql:integration/package_lifecycle_smoke.sql:279: NOTICE:  PASS: S29 archive succeeds once no reservation remains outstanding
 DO
-psql:integration/package_lifecycle_smoke.sql:288: NOTICE:  PASS: S30 cross-org reconcile correctly denies access (package_not_found)
 DO
+psql:integration/package_lifecycle_smoke.sql:288: NOTICE:  PASS: S30 cross-org reconcile correctly denies access (package_not_found)
 DO
 psql:integration/package_lifecycle_smoke.sql:294: NOTICE:  PASS: S31 cross-org repair correctly denies access (package_not_found)
 DO
@@ -617,12 +625,12 @@ RESET
 DO
 psql:integration/package_lifecycle_smoke.sql:330: NOTICE:  PASS: S35 read-only member is denied membership.manage even on an already-used request_key (authorization re-checked every call)
 DO
-DO
 psql:integration/package_lifecycle_smoke.sql:336: NOTICE:  PASS: S36 read-only member is denied repair (membership.manage required)
+DO
+DO
 psql:integration/package_lifecycle_smoke.sql:342: NOTICE:  PASS: S37 read-only member is denied archive (membership.manage required)
-DO
-DO
 psql:integration/package_lifecycle_smoke.sql:347: NOTICE:  PASS: S38 a read-only member CAN preview reconciliation (membership.read is sufficient for the read-only path)
+DO
 DO
 DO
 INSERT 0 1
@@ -631,27 +639,27 @@ psql:integration/package_lifecycle_smoke.sql:374: NOTICE:  PASS: S39 rollover_po
 DO
 DO
 psql:integration/package_lifecycle_smoke.sql:378: NOTICE:  PASS: S40 rollover_policy=none: the HELD (reserved) session survives the renewal untouched -- available afterward is exactly total_sessions (6 remaining - 1 reserved = 5)
-DO
 psql:integration/package_lifecycle_smoke.sql:382: NOTICE:  PASS: S41 rollover_policy=none: the compensating adjustment discards exactly the unreserved excess (4 = 5 sold - 1 held), never the held session, and is a real ledger row, not a raw cache overwrite
-psql:integration/package_lifecycle_smoke.sql:392: NOTICE:  PASS: S42 renewal invoice captures the catalog price observed at the time of the ORIGINAL call (150000)
 DO
+DO
+psql:integration/package_lifecycle_smoke.sql:392: NOTICE:  PASS: S42 renewal invoice captures the catalog price observed at the time of the ORIGINAL call (150000)
 UPDATE 1
 DO
 psql:integration/package_lifecycle_smoke.sql:400: NOTICE:  PASS: S43 a legitimate retry of the SAME request_key with IDENTICAL inputs after a catalog price change still returns the ORIGINAL invoice (review finding #1/#3 -- this used to be rejected as request_key_reused_for_different_renewal, which was the actual bug)
 psql:integration/package_lifecycle_smoke.sql:400: NOTICE:  PASS: S44 the returned invoice keeps its originally captured total (150000), unaffected by the later catalog price edit to 999999
 DO
 psql:integration/package_lifecycle_smoke.sql:411: NOTICE:  PASS: S44b renewal request_key reused with a different issued_at is rejected
-DO
 psql:integration/package_lifecycle_smoke.sql:417: NOTICE:  PASS: S44c renewal request_key reused with different admin_notes is rejected
-psql:integration/package_lifecycle_smoke.sql:426: NOTICE:  PASS: S45 renewal request_key reused at a different branch is rejected, not silently accepted
 DO
+DO
+psql:integration/package_lifecycle_smoke.sql:426: NOTICE:  PASS: S45 renewal request_key reused at a different branch is rejected, not silently accepted
 psql:integration/package_lifecycle_smoke.sql:438: NOTICE:  PASS: S46 preview_package_renewal writes nothing (revision/sessions_remaining unchanged)
 psql:integration/package_lifecycle_smoke.sql:438: NOTICE:  PASS: S47 preview exposes price/currency/sessions/expiry/pet/service scope and a terms_fingerprint
 psql:integration/package_lifecycle_smoke.sql:438: NOTICE:  PASS: S48 preview reports compatible while the catalog per_pet flag still matches the membership's actual pet scope
 DO
 DO
-psql:integration/package_lifecycle_smoke.sql:459: NOTICE:  PASS: S48b a new renewal without a terms_fingerprint is refused (renewal_preview_required)
 DO
+psql:integration/package_lifecycle_smoke.sql:459: NOTICE:  PASS: S48b a new renewal without a terms_fingerprint is refused (renewal_preview_required)
 DO
 psql:integration/package_lifecycle_smoke.sql:469: NOTICE:  PASS: S48c a stale terms_fingerprint (catalog price changed since the preview was generated) is refused, not silently accepted
 DO
@@ -663,43 +671,43 @@ psql:integration/package_lifecycle_smoke.sql:487: NOTICE:  PASS: S49 catalog per
 UPDATE 1
 DO
 UPDATE 1
+DO
 psql:integration/package_lifecycle_smoke.sql:499: NOTICE:  PASS: S50 catalog per_pet drifting from false to true for a membership that was sold with NO pet bound at all is genuinely incompatible
 psql:integration/package_lifecycle_smoke.sql:499: NOTICE:  PASS: S50b preview reports the specific blocking reason before any write is attempted
-DO
 DO
 psql:integration/package_lifecycle_smoke.sql:505: NOTICE:  PASS: S51 renewal correctly refuses to charge for a now-incompatible catalog product rather than silently topping it up
 UPDATE 1
 INSERT 0 1
 UPDATE 1
-DO
 psql:integration/package_lifecycle_smoke.sql:518: NOTICE:  PASS: S52 catalog service_id changing from the purchased service (Grooming) to a DIFFERENT specific service (Spa) is incompatible (a real held reservation is present throughout this check)
+DO
 DO
 psql:integration/package_lifecycle_smoke.sql:524: NOTICE:  PASS: S53 renewal correctly refuses a service A->B drift, not silently charging for Spa while topping up a Grooming entitlement
 UPDATE 1
+DO
 psql:integration/package_lifecycle_smoke.sql:529: NOTICE:  PASS: S54 catalog service_id broadening from a specific service to NULL ("any service") is compatible -- the purchased entitlement keeps its own specific scope regardless
+UPDATE 1
+UPDATE 1
 DO
-UPDATE 1
-UPDATE 1
 psql:integration/package_lifecycle_smoke.sql:541: NOTICE:  PASS: S55 catalog service_id narrowing from NULL to a specific service, for a membership purchased under "any service", is compatible
-DO
 DO
 psql:integration/package_lifecycle_smoke.sql:545: NOTICE:  PASS: S56 a legitimate renewal under a compatible (broadened-then-narrowed) service scope succeeds as a real RPC call, not merely a passing preview
 UPDATE 1
 DO
 INSERT 0 1
-DO
 psql:integration/package_lifecycle_smoke.sql:563: NOTICE:  PASS: S57 a renewal ledger row linked to an invoice belonging to a DIFFERENT package is flagged invalid_invoice_links -- a non-null invoice_id alone is not treated as proof of correct provenance
+DO
 INSERT 0 2
 DO
 UPDATE 1
-DO
 psql:integration/package_lifecycle_smoke.sql:583: NOTICE:  PASS: S58 a reservation released after consumption with no reversal_ledger_id is flagged missing_reversal_link
 DO
+DO
+DO
 psql:integration/package_lifecycle_smoke.sql:595: NOTICE:  PASS: S59 two reservations sharing the same consumption_ledger_id are flagged duplicate_consumption_links, not assumed impossible
-DO
 psql:integration/package_lifecycle_smoke.sql:609: NOTICE:  PASS: S60 a healthy purchase with a real, correctly-linked source invoice is not missing_source_invoice
-psql:integration/package_lifecycle_smoke.sql:609: NOTICE:  PASS: S61 a healthy purchase's source invoice validates correctly (right customer, right package, matching session snapshot)
 DO
+psql:integration/package_lifecycle_smoke.sql:609: NOTICE:  PASS: S61 a healthy purchase's source invoice validates correctly (right customer, right package, matching session snapshot)
 INSERT 0 1
 INSERT 0 1
 DO
@@ -712,8 +720,8 @@ psql:integration/package_lifecycle_smoke.sql:629: NOTICE:  PASS: S63 a historica
 DO
 UPDATE 1
 UPDATE 1
-psql:integration/package_lifecycle_smoke.sql:641: NOTICE:  PASS: S64 a historical source_invoice_id pointing at a VOID invoice (right customer/package, wrong status) is flagged invalid_source_invoice
 DO
+psql:integration/package_lifecycle_smoke.sql:641: NOTICE:  PASS: S64 a historical source_invoice_id pointing at a VOID invoice (right customer/package, wrong status) is flagged invalid_source_invoice
 DO
 UPDATE 1
 DO
@@ -724,8 +732,8 @@ INSERT 0 1
 DO
 psql:integration/package_lifecycle_smoke.sql:689: NOTICE:  PASS: S66 a renewal ledger row for the SAME membership but linked to a DIFFERENT renewal's invoice (request_key mismatch) is flagged invalid_invoice_links -- renewal_of matching alone is not sufficient proof
 INSERT 0 1
-psql:integration/package_lifecycle_smoke.sql:700: NOTICE:  PASS: S67 a legacy renewal ledger row with invoice_id NULL (predating this migration) is flagged unlinked_renewal_invoice, an explicit disclosed gap, never invented history
 DO
+psql:integration/package_lifecycle_smoke.sql:700: NOTICE:  PASS: S67 a legacy renewal ledger row with invoice_id NULL (predating this migration) is flagged unlinked_renewal_invoice, an explicit disclosed gap, never invented history
 DO
 psql:integration/package_lifecycle_smoke.sql:731: NOTICE:  PASS: S68 allowed correction updates pet_id
 psql:integration/package_lifecycle_smoke.sql:731: NOTICE:  PASS: S68b allowed correction updates service_id
@@ -763,11 +771,11 @@ DO
 psql:integration/package_lifecycle_smoke.sql:836: NOTICE:  PASS: C8 valid repair and original-revision retry have one effect
 DO
 SET
-DO
 psql:integration/package_lifecycle_smoke.sql:846: NOTICE:  PASS: C9 successful repair key cannot bypass read-only authorization
 DO
-RESET
 psql:integration/package_lifecycle_smoke.sql:852: NOTICE:  PASS: C10 read-only correction denied before revision checks
+DO
+RESET
 ROLLBACK
 
 ########## GATE 7d — retention and renewal follow-ups ##########
@@ -871,14 +879,14 @@ INSERT 0 1
 INSERT 0 1
 SET
 DO
+DO
 psql:integration/retention_renewal_followups_smoke.sql:325: NOTICE:  PASS: F01 30-day pet included
 psql:integration/retention_renewal_followups_smoke.sql:325: NOTICE:  PASS: F01 29-day pet excluded
-DO
 psql:integration/retention_renewal_followups_smoke.sql:341: NOTICE:  PASS: F02 00:30 Jakarta completion counts as exactly 1 day, got 1
 DO
 psql:integration/retention_renewal_followups_smoke.sql:358: NOTICE:  PASS: F03 completed pet visible although sibling pet on the same booking is still pending
-DO
 psql:integration/retention_renewal_followups_smoke.sql:358: NOTICE:  PASS: F03 the still-pending sibling pet does not falsely appear as overdue history
+DO
 DO
 psql:integration/retention_renewal_followups_smoke.sql:369: NOTICE:  PASS: F04 one visit with two service lines yields exactly one pet entry, got 1
 psql:integration/retention_renewal_followups_smoke.sql:389: NOTICE:  PASS: F05 overdue pet shown under default filter
@@ -892,9 +900,9 @@ DO
 psql:integration/retention_renewal_followups_smoke.sql:403: NOTICE:  PASS: F06 future-dated legacy record flagged as an anomaly, not a negative day count
 DO
 psql:integration/retention_renewal_followups_smoke.sql:403: NOTICE:  PASS: F06 a completed pet on a since-canceled booking does not count as real history
+DO
 psql:integration/retention_renewal_followups_smoke.sql:413: NOTICE:  PASS: F14 customer name preserved verbatim, got Cust F14 O'Brien & Co 🐶
 psql:integration/retention_renewal_followups_smoke.sql:413: NOTICE:  PASS: F14 malformed phone preserved verbatim (client decides validity, not the RPC)
-DO
 psql:integration/retention_renewal_followups_smoke.sql:432: NOTICE:  PASS: F13 total_groups counts past 1000 (>=1101 expected), got 1104
 psql:integration/retention_renewal_followups_smoke.sql:432: NOTICE:  PASS: F13 page 1 returns exactly page_size=100 groups, got 100
 psql:integration/retention_renewal_followups_smoke.sql:432: NOTICE:  PASS: F13 the final page is still reachable, not silently dropped
@@ -904,8 +912,8 @@ psql:integration/retention_renewal_followups_smoke.sql:447: NOTICE:  PASS: F07 a
 psql:integration/retention_renewal_followups_smoke.sql:447: NOTICE:  PASS: F07 held=2, got 2
 psql:integration/retention_renewal_followups_smoke.sql:447: NOTICE:  PASS: F07 consumed=2 from the ledger, not inferred as total-available, got 2
 psql:integration/retention_renewal_followups_smoke.sql:447: NOTICE:  PASS: F07 all_reserved=true (distinct from no_available_sessions)
-psql:integration/retention_renewal_followups_smoke.sql:447: NOTICE:  PASS: F07 no_available_sessions=false -- these sessions are held, not exhausted
 DO
+psql:integration/retention_renewal_followups_smoke.sql:447: NOTICE:  PASS: F07 no_available_sessions=false -- these sessions are held, not exhausted
 psql:integration/retention_renewal_followups_smoke.sql:481: NOTICE:  PASS: F08 null-expiry recurring membership shown as actionable
 psql:integration/retention_renewal_followups_smoke.sql:481: NOTICE:  PASS: F08 expired-but-not-archived membership still shown as actionable
 psql:integration/retention_renewal_followups_smoke.sql:481: NOTICE:  PASS: F08 archived (canceled) membership NOT shown under actionable
@@ -918,24 +926,24 @@ psql:integration/retention_renewal_followups_smoke.sql:481: NOTICE:  PASS: F08 h
 DO
 psql:integration/retention_renewal_followups_smoke.sql:481: NOTICE:  PASS: F08 with include_tokens=true the one-off token becomes visible
 psql:integration/retention_renewal_followups_smoke.sql:481: NOTICE:  PASS: F08 the token is explicitly labeled is_recurring=false, never presented as a subscription
-DO
 psql:integration/retention_renewal_followups_smoke.sql:496: NOTICE:  PASS: F09 a canceled membership's own preview reports a real blocking_reason for the UI to surface, not a fabricated amount
 DO
+DO
 psql:integration/retention_renewal_followups_smoke.sql:511: NOTICE:  PASS: F11 ReadOnly can call list_overdue_customers (membership.read-shaped module/perm gate satisfied via booking.read+crm)
+DO
 psql:integration/retention_renewal_followups_smoke.sql:511: NOTICE:  PASS: F11 ReadOnly can call list_renewal_queue (holds membership.read)
 DO
-DO
-DO
 psql:integration/retention_renewal_followups_smoke.sql:520: NOTICE:  PASS: F11 ReadOnly (membership.read, no settings.manage) denied settings write directly at the RPC
-psql:integration/retention_renewal_followups_smoke.sql:531: NOTICE:  PASS: F11 BranchRestricted denied direct p_branch access to Second P (branch it does not hold)
 DO
+psql:integration/retention_renewal_followups_smoke.sql:531: NOTICE:  PASS: F11 BranchRestricted denied direct p_branch access to Second P (branch it does not hold)
 DO
 psql:integration/retention_renewal_followups_smoke.sql:539: NOTICE:  PASS: F11 BranchRestricted still sees history recorded at its own accessible branch
 DO
 DO
-psql:integration/retention_renewal_followups_smoke.sql:548: NOTICE:  PASS: F11 NoAccess (zero permissions) denied list_overdue_customers
-psql:integration/retention_renewal_followups_smoke.sql:554: NOTICE:  PASS: F11 NoAccess denied list_renewal_queue
 DO
+psql:integration/retention_renewal_followups_smoke.sql:548: NOTICE:  PASS: F11 NoAccess (zero permissions) denied list_overdue_customers
+DO
+psql:integration/retention_renewal_followups_smoke.sql:554: NOTICE:  PASS: F11 NoAccess denied list_renewal_queue
 DO
 psql:integration/retention_renewal_followups_smoke.sql:565: NOTICE:  PASS: F11 cross-org: Org Q sees zero of Org P's overdue customers
 DO
@@ -944,16 +952,18 @@ DO
 DO
 psql:integration/retention_renewal_followups_smoke.sql:574: NOTICE:  PASS: F11 a real user authenticated for a DIFFERENT org (no membership in Org P) is denied Org P's queue, not just hidden by the UI
 DO
+RESET
 UPDATE 1
-psql:integration/retention_renewal_followups_smoke.sql:611: NOTICE:  PASS: F12 a settings write presenting a non-matching (stale) updated_at is rejected (40001), not silently overwritten
-psql:integration/retention_renewal_followups_smoke.sql:611: NOTICE:  PASS: F12 the successful editor's value (21) is what persisted, not the rejected one (45)
-psql:integration/retention_renewal_followups_smoke.sql:611: NOTICE:  PASS: F12 an unrelated settings key (branding) is untouched by the followup_retention merge
+SET
+psql:integration/retention_renewal_followups_smoke.sql:616: NOTICE:  PASS: F12 a settings write presenting a non-matching (stale) updated_at is rejected (40001), not silently overwritten
+psql:integration/retention_renewal_followups_smoke.sql:616: NOTICE:  PASS: F12 the successful editor's value (21) is what persisted, not the rejected one (45)
+psql:integration/retention_renewal_followups_smoke.sql:616: NOTICE:  PASS: F12 an unrelated settings key (branding) is untouched by the followup_retention merge
 DO
-psql:integration/retention_renewal_followups_smoke.sql:638: NOTICE:  PASS: unknown placeholder rejected with a useful message, got: unknown_placeholder:totally_unknown_token
-psql:integration/retention_renewal_followups_smoke.sql:638: NOTICE:  PASS: threshold=0 rejected
-psql:integration/retention_renewal_followups_smoke.sql:638: NOTICE:  PASS: threshold=366 rejected
+psql:integration/retention_renewal_followups_smoke.sql:643: NOTICE:  PASS: unknown placeholder rejected with a useful message, got: unknown_placeholder:totally_unknown_token
+psql:integration/retention_renewal_followups_smoke.sql:643: NOTICE:  PASS: threshold=0 rejected
+psql:integration/retention_renewal_followups_smoke.sql:643: NOTICE:  PASS: threshold=366 rejected
 DO
-psql:integration/retention_renewal_followups_smoke.sql:638: NOTICE:  PASS: null threshold rejected
+psql:integration/retention_renewal_followups_smoke.sql:643: NOTICE:  PASS: null threshold rejected
 RESET
 ROLLBACK
 
@@ -970,8 +980,8 @@ psql:supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: create_man
 psql:supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: create_invoice_from_manual_visit blocked by active manual billing
 psql:supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: second manual billing on same visit rejected
 psql:supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: manual visit soft-deleted after billing undone
-DO
 psql:supabase/tests/S27-S30/test_backend.sql:191: NOTICE:  PASS: S30: create_invoice_from_manual_visit is idempotent on request_key
+DO
 psql:supabase/tests/S27-S30/test_backend.sql:204: NOTICE:  PASS: S30: manual billing rejects non-completed booking
 DO
 psql:supabase/tests/S27-S30/test_backend.sql:204: NOTICE:  PASS: S30: manual billing recorded for completed booking with no active order
@@ -988,12 +998,12 @@ psql:supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: bank valid
 psql:supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: screenshot confirmation advances stage
 psql:supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: bank validation reaches terminal stage
 psql:supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: validated payment is immutable against direct UPDATE (blocked before the trigger even runs)
-DO
 psql:supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: freeze trigger independently blocks editing a validated payment even bypassing the privilege revoke
 psql:supabase/tests/S27-S30/test_backend.sql:298: NOTICE:  PASS: S29: direct table INSERT into payments blocked at the privilege layer
-psql:supabase/tests/S27-S30/test_backend.sql:311: NOTICE:  PASS: S29: overpayment still marks invoice paid
 DO
+psql:supabase/tests/S27-S30/test_backend.sql:311: NOTICE:  PASS: S29: overpayment still marks invoice paid
 psql:supabase/tests/S27-S30/test_backend.sql:311: NOTICE:  PASS: S29: overpaid_amount recorded without tripping tg_invoices_freeze
+DO
 DO
 DO
 psql:supabase/tests/S27-S30/test_backend.sql:322: NOTICE:  PASS: S29: a payment inserted after this migration still defaults to not_applicable unless recorded via record_payment (documents the default; app code never inserts directly any more)
@@ -1001,16 +1011,16 @@ DO
 psql:supabase/tests/S27-S30/test_backend.sql:345: NOTICE:  PASS: S29: package purchase produces an issued invoice
 psql:supabase/tests/S27-S30/test_backend.sql:345: NOTICE:  PASS: S29: package invoice creates a linked purchase ledger entry
 psql:supabase/tests/S27-S30/test_backend.sql:345: NOTICE:  PASS: S29: cash package payment recorded against the invoice
-DO
 psql:supabase/tests/S27-S30/test_backend.sql:345: NOTICE:  PASS: S29: package invoice becomes paid after cash payment
+DO
 psql:supabase/tests/S27-S30/test_backend.sql:371: NOTICE:  PASS: S27: two bank accounts stored
 psql:supabase/tests/S27-S30/test_backend.sql:371: NOTICE:  PASS: S27: bank account cap of 2 enforced
 psql:supabase/tests/S27-S30/test_backend.sql:371: NOTICE:  PASS: S27: branding tagline persisted
-DO
 psql:supabase/tests/S27-S30/test_backend.sql:371: NOTICE:  PASS: S27: customer-notes edit correctly rejected once invoice is paid
-psql:supabase/tests/S27-S30/test_backend.sql:425: NOTICE:  PASS: S28: assigned groomer can delete their own evidence upload
-psql:supabase/tests/S27-S30/test_backend.sql:425: NOTICE:  PASS: S28: unassigned groomer denied deleting evidence for a job they are not assigned to
 DO
+psql:supabase/tests/S27-S30/test_backend.sql:425: NOTICE:  PASS: S28: assigned groomer can delete their own evidence upload
+DO
+psql:supabase/tests/S27-S30/test_backend.sql:425: NOTICE:  PASS: S28: unassigned groomer denied deleting evidence for a job they are not assigned to
 psql:supabase/tests/S27-S30/test_backend.sql:440: NOTICE:  PASS: Finding 7: wildcard-provisioned Owner role (the only real new-org pattern) has both new permissions
 psql:supabase/tests/S27-S30/test_backend.sql:440: NOTICE:  PASS: Finding 7: narrow Groomer role created after this migration does NOT gain payment.validate/evidence.read_all
 DO
@@ -1020,6 +1030,315 @@ DO
  S27-S30 BACKEND TEST SUITE COMPLETE
 (1 row)
 
+ROLLBACK
+
+########## GATE 7f — HomePaw intake, per-pet size pricing, and membership tiers ##########
+NOTICE:  database "operro_homepaw_qc" does not exist, skipping
+psql:integration/gate_bootstrap_extensions.sql:2: NOTICE:  schema "extensions" already exists, skipping
+psql:integration/gate_bootstrap_extensions.sql:3: NOTICE:  extension "pgcrypto" already exists, skipping
+apply 20260721000100_extensions_and_helpers.sql
+psql:supabase/migrations/20260721000100_extensions_and_helpers.sql:47: NOTICE:  extension "pgcrypto" already exists, skipping
+apply 20260721000150_fix_uuidv7_supabase.sql
+psql:supabase/migrations/20260721000150_fix_uuidv7_supabase.sql:22: NOTICE:  extension "pgcrypto" already exists, skipping
+apply 20260721000200_identity_access.sql
+apply 20260721000300_platform_entitlements.sql
+apply 20260721000400_commercial_core.sql
+apply 20260721000500_scheduling_core.sql
+apply 20260721000600_inventory_tasks.sql
+apply 20260721000700_customer_programs.sql
+apply 20260721000800_financial_sales.sql
+apply 20260721000900_payroll_expenses.sql
+apply 20260721001000_security_rls_isolation.sql
+apply 20260721001100_security_rls_capabilities.sql
+apply 20260721001200_cross_cutting_services.sql
+apply 20260721001300_core_neutrality_grooming_lines.sql
+psql:supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql:488: NOTICE:  BACKFILL OK: all legacy grooming pet/service values mapped; no non-grooming booking carries pet_id/service_id.
+apply 20260721001350_grooming_assembly_operations.sql
+apply 20260721001400_active_organization_context.sql
+apply 20260910120000_audit_log_read_api.sql
+apply 20260916150000_customer_program_tenant_isolation.sql
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "membership_plans_org_isolation" for relation "public.membership_plans" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_memberships_org_isolation" for relation "public.customer_memberships" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "packages_org_isolation" for relation "public.packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_packages_org_isolation" for relation "public.customer_packages" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_package_ledger_org_isolation" for relation "public.customer_package_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_accounts_org_isolation" for relation "public.loyalty_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_ledger_org_isolation" for relation "public.loyalty_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_accounts_org_isolation" for relation "public.wallet_accounts" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_ledger_org_isolation" for relation "public.wallet_ledger" does not exist, skipping
+psql:supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "referrals_org_isolation" for relation "public.referrals" does not exist, skipping
+apply 20260917100000_customer_addresses.sql
+apply 20260917100100_branch_service_areas.sql
+apply 20260917100200_booking_location_snapshot.sql
+apply 20260917100300_batch_permissions.sql
+apply 20260918130000_grooming_evidence_storage.sql
+apply 20260918140000_booking_series_engine.sql
+apply 20260918150000_resource_weekly_availability.sql
+apply 20260918160000_customer_self_onboarding.sql
+apply 20260918170000_styling_references.sql
+apply 20260918180000_onboarding_styling_uploads.sql
+apply 20260919100000_onboarding_settings_cleanup.sql
+apply 20260919110000_complimentary_next_booking.sql
+apply 20260919120000_calendar_bulk_actions.sql
+apply 20260922100000_booking_package_coverage.sql
+apply 20260922110000_booking_series_controls.sql
+apply 20260922120000_branch_availability_controls.sql
+apply 20260922130000_safe_booking_archive.sql
+apply 20260922140000_attendance_tracking.sql
+apply 20260924100000_complaint_lifecycle.sql
+apply 20260924110000_complaint_rpc_only_writes.sql
+apply 20260924120000_invoice_workflow.sql
+apply 20260924130000_service_size_pricing.sql
+apply 20260924140000_invoice_discounts_charges.sql
+apply 20260925100000_package_membership_lifecycle.sql
+apply 20260926090000_membership_renewal_billing_and_reconciliation.sql
+psql:supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql:221: NOTICE:  function app.renew_customer_package(uuid,uuid,timestamptz,timestamptz,text,uuid) does not exist, skipping
+apply 20260927090000_membership_revision_null_guards.sql
+apply 20260927100000_visit_register.sql
+apply 20260928100000_payment_control_workflow.sql
+apply 20260929100000_grooming_evidence_hardening.sql
+apply 20260930100000_invoice_documents.sql
+apply 20261001100000_payment_workflow_closeout.sql
+apply 20261002090000_retention_renewal_followups.sql
+apply 20261002100000_payment_visit_register_pagination.sql
+apply 20261003100000_storage_authorization_review.sql
+apply 20261010100000_payroll_engine_s32.sql
+apply 20261010110000_payroll_engine_s32_rpcs.sql
+apply 20261010120000_payroll_export_detail_rpc.sql
+apply 20261012100000_invoice_number_random_suffix.sql
+apply 20261013100000_payroll_recompute_race_lock.sql
+apply 20261013110000_uuidv7_authenticated_defaults.sql
+apply 20261014100000_payroll_retention_ledger_idempotent.sql
+apply 20261015100000_homepaw_owner_workspace_bootstrap.sql
+apply 20261016100000_homepaw_customer_intake.sql
+apply 20261016110000_zero_time_service_addons.sql
+apply 20261017100000_homepaw_size_price_duration.sql
+apply 20261017110000_homepaw_membership_tiers.sql
+apply 20261018100000_onboarding_admin_amend.sql
+apply 20261018110000_storage_usage_requests.sql
+apply 20261018120000_onboarding_maps_link.sql
+apply 20261019100000_platform_org_access.sql
+apply 20261019110000_org_dog_size_boundaries.sql
+apply 20261020100000_legacy_org_access_roles.sql
+apply 20261020110000_platform_billing_invoices.sql
+apply 20261020120000_custom_pet_types.sql
+apply 20261022100000_platform_owner_workspace_access.sql
+apply 20261022110000_auth_hook_owner_access.sql
+apply 20261023100000_manual_visit_invoice_lines.sql
+apply 20261023110000_dynamic_dog_size_bands.sql
+all migrations applied
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 0
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+BEGIN
+SET
+DO
+psql:integration/homepaw_qc_smoke.sql:36: NOTICE:  PASS anonymous GET and two-pet POST: 01a0f86b-9e80-705d-9eac-1325915f9074
+COMMIT
+INSERT 0 1
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/homepaw_qc_smoke.sql:48: NOTICE:  PASS canonical Jakarta address matches historical service area
+DO
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/homepaw_qc_smoke.sql:60: NOTICE:  PASS authenticated household RPC returned: 01a0f86b-9e97-7a68-b31c-80fb1cae3cd9
+DO
+COMMIT
+psql:integration/homepaw_qc_smoke.sql:70: NOTICE:  PASS authenticated two-pet household and address: 01a0f86b-9e97-7a68-b31c-80fb1cae3cd9
+DO
+              set_config              
+--------------------------------------
+ 01a0f86b-9e80-705d-9eac-1325915f9074
+(1 row)
+
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+      review_customer_onboarding      
+--------------------------------------
+ 01a0f86b-9ea5-7aac-b8fb-49a25916faec
+(1 row)
+
+COMMIT
+DO
+psql:integration/homepaw_qc_smoke.sql:87: NOTICE:  PASS admin approved anonymous two-pet household
+ set_config 
+------------
+ {}
+(1 row)
+
+INSERT 0 1
+psql:integration/homepaw_qc_smoke.sql:97: NOTICE:  PASS zero-time paid service catalog row
+DO
+INSERT 0 1
+              set_config              
+--------------------------------------
+ 01a0f86b-9e99-7210-8687-10edf21e8cae
+(1 row)
+
+              set_config              
+--------------------------------------
+ 01a0f86b-9eb1-7f25-bfe7-b386a6e0a7f7
+(1 row)
+
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+DO
+COMMIT
+DO
+psql:integration/homepaw_qc_smoke.sql:120: NOTICE:  PASS paid add-on line has zero minutes and Rp 25.000 price
+BEGIN
+INSERT 0 1
+INSERT 0 6
+INSERT 0 4
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/dynamic_sizes_invoice_lines_smoke.sql:140: NOTICE:  fixture pet 01a0f86b-a006-70f7-81f0-3cbaeafaab33, service 01a0f86b-a004-7585-a216-b8715a0608ce
+psql:integration/dynamic_sizes_invoice_lines_smoke.sql:140: NOTICE:  PASS XXL weight, booking price and duration
+psql:integration/dynamic_sizes_invoice_lines_smoke.sql:140: NOTICE:  PASS safe add, rename, delete and package guard
+psql:integration/dynamic_sizes_invoice_lines_smoke.sql:140: NOTICE:  invoice subtotal 150000.00, total 150000.00, invoice lines 2, order lines 2
+psql:integration/dynamic_sizes_invoice_lines_smoke.sql:140: NOTICE:  PASS multi-line invoice, total, exact retry and immutable payload guard
+DO
+psql:integration/dynamic_sizes_invoice_lines_smoke.sql:140: NOTICE:  PASS lower-role and cross-tenant guards
+ROLLBACK
+ set_config 
+------------
+ {}
+(1 row)
+
+INSERT 0 1
+psql:integration/homepaw_size_membership_smoke.sql:23: NOTICE:  PASS authoritative pet size bands (XS, M, XL, Cat)
+DO
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/homepaw_size_membership_smoke.sql:41: NOTICE:  PASS booking lines snapshot XS/Cat/M/XL prices and minutes
+DO
+COMMIT
+INSERT 0 3
+INSERT 0 2
+INSERT 0 1
+psql:integration/homepaw_size_membership_smoke.sql:75: NOTICE:  PASS size-mismatched sale rejected and sold size locked
+DO
+              set_config              
+--------------------------------------
+ 01a0f86b-9e97-7a68-b31c-80fb1cae3cd9
+(1 row)
+
+              set_config              
+--------------------------------------
+ 01a0f86b-a1bd-74a1-a4b0-69db23b3b8ae
+(1 row)
+
+              set_config              
+--------------------------------------
+ 01a0f86b-9e9c-71b5-ab45-08993b210b9a
+(1 row)
+
+              set_config              
+--------------------------------------
+ 01a0f86b-9e99-7210-8687-10edf21e8cae
+(1 row)
+
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+DO
+psql:integration/homepaw_size_membership_smoke.sql:101: NOTICE:  PASS authenticated invoice rejects wrong-size pet and sells matching tier with ledger
+COMMIT
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/homepaw_size_membership_smoke.sql:117: NOTICE:  PASS two-week visit cadence and monthly renewal are distinct
+DO
+COMMIT
+UPDATE 1
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+DO
+psql:integration/homepaw_size_membership_smoke.sql:135: NOTICE:  PASS pet that grew to XL cannot renew the XS price
+COMMIT
+DO
+psql:integration/homepaw_size_membership_smoke.sql:142: NOTICE:  PASS refused renewal rolls back invoice
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+BEGIN
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000001"}
+(1 row)
+
+DO
+psql:integration/homepaw_review_storage_smoke.sql:43: NOTICE:  PASS authenticated amend, stale guard, approval and tenant storage/request isolation
+COMMIT
+DO
+BEGIN
+psql:integration/homepaw_review_storage_smoke.sql:54: NOTICE:  PASS approved customer uses amended payload
+SET
+                                                              set_config                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "0e000000-0000-4000-8000-0000000000c1", "role" : "authenticated", "active_org_id" : "0e000000-0000-4000-8000-000000000099"}
+(1 row)
+
+psql:integration/homepaw_review_storage_smoke.sql:73: NOTICE:  PASS cross-org amendment and usage denied
+DO
 ROLLBACK
 
 ########## GATE 8 — completion vs assembly/reservation concurrency ##########
@@ -1047,15 +1366,15 @@ psql:supabase/migrations/20260926090000_membership_renewal_billing_and_reconcili
 
 == case: complete_booking vs set_line_quantity ==
   A_RC=0 B_RC=0
-  blocking OK (causal): B saw frozen booking; A~1790674743.87 B~1790674743.88
+  blocking OK (causal): B saw frozen booking; A~1790874236.76 B~1790874236.77
   OK: complete_booking vs set_line_quantity — no deadlock, A committed, B blocked then rejected, booking=completed
 == case: complete_booking vs void_line ==
   A_RC=0 B_RC=0
-  blocking OK (causal): B saw frozen booking; A~1790674747.84 B~1790674747.85
+  blocking OK (causal): B saw frozen booking; A~1790874240.85 B~1790874240.85
   OK: complete_booking vs void_line — no deadlock, A committed, B blocked then rejected, booking=completed
 == case: complete_booking vs reserve_package_session ==
   A_RC=0 B_RC=0
-  blocking OK (causal): B saw frozen booking; A~1790674751.76 B~1790674751.77
+  blocking OK (causal): B saw frozen booking; A~1790874244.85 B~1790874244.85
   OK: complete_booking vs reserve_package_session — no deadlock, A committed, B blocked then rejected, booking=completed
 CONC PASS: all three cases serialized; no deadlock; A committed; B blocked then rejected; final state correct.
 

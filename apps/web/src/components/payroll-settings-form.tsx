@@ -56,14 +56,12 @@ function StylingTiersEditor({ name, initialTiers, hint }: { name: string; initia
   );
 }
 
-const SIZE_LABELS: Array<[string, string]> = [["small", "Kecil"], ["medium", "Sedang"], ["large", "Besar"], ["extra_large", "Extra besar"]];
-
 /** Editable per-pet-size Basic Grooming rate matrix. Blank fields are omitted from the
  *  submitted JSON (not sent as 0) so the save action can tell "not configured" apart from
  *  "deliberately set to zero". */
-function SizeMatrixEditor({ name, initial, hint }: { name: string; initial: Record<string, number>; hint: string }) {
+function SizeMatrixEditor({ name, initial, hint, dogSizeBands }: { name: string; initial: Record<string, number>; hint: string; dogSizeBands: Array<{ key: string; label: string }> }) {
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(SIZE_LABELS.map(([key]) => [key, initial[key] != null ? String(initial[key]) : ""])),
+    Object.fromEntries(dogSizeBands.map(({ key }) => [key, initial[key] != null ? String(initial[key]) : ""])),
   );
   const serialized = JSON.stringify(Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, Number(v)])));
 
@@ -72,7 +70,7 @@ function SizeMatrixEditor({ name, initial, hint }: { name: string; initial: Reco
       <p className="text-[11px] font-semibold text-slate-600">Matriks Basic Grooming per ukuran hewan</p>
       <p className="mt-0.5 text-[10px] text-slate-400">{hint}</p>
       <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {SIZE_LABELS.map(([key, label]) => (
+        {dogSizeBands.map(({ key, label }) => (
           <label key={key} className="flex flex-col gap-1 text-[10px] text-slate-500">
             {label}
             <input type="number" min={0} step={1000} value={values[key]} placeholder="mewarisi"
@@ -86,7 +84,7 @@ function SizeMatrixEditor({ name, initial, hint }: { name: string; initial: Reco
   );
 }
 
-export function PayrollCycleSettingsForm({ settings }: { settings: PayrollCycleSettings }) {
+export function PayrollCycleSettingsForm({ settings, dogSizeBands }: { settings: PayrollCycleSettings; dogSizeBands: Array<{ key: string; label: string }> }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -111,7 +109,7 @@ export function PayrollCycleSettingsForm({ settings }: { settings: PayrollCycleS
             <input name="retentionTermMonthsDefault" type="number" min={0} defaultValue={settings.retentionTermMonthsDefault} className="h-8 rounded-lg border border-slate-300 px-2 text-xs font-normal" />
           </label>
           <StylingTiersEditor name="stylingTiersJson" initialTiers={settings.stylingTiersDefault} hint="Job styling ke-N memakai tier dengan “mulai job” terbesar yang masih ≤ jumlah job styling groomer pada cycle ini. Berlaku retroaktif ke seluruh revenue styling cycle tersebut, bukan bertingkat." />
-          <SizeMatrixEditor name="perPetSizeMatrixJson" initial={settings.perPetSizeMatrixDefault} hint="Kosong = pakai nominal flat Basic Grooming per dog di atas untuk ukuran itu." />
+          <SizeMatrixEditor name="perPetSizeMatrixJson" initial={settings.perPetSizeMatrixDefault} dogSizeBands={dogSizeBands} hint="Kosong = pakai nominal flat Basic Grooming per dog di atas untuk ukuran itu." />
         </PayrollActionForm>
       ) : null}
     </div>
@@ -127,7 +125,7 @@ function Toggle({ label, name, defaultChecked }: { label: string; name: string; 
   );
 }
 
-export function StaffPayrollSettingsForm({ staff }: { staff: PayrollStaffCardData }) {
+export function StaffPayrollSettingsForm({ staff, dogSizeBands }: { staff: PayrollStaffCardData; dogSizeBands: Array<{ key: string; label: string }> }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-2">
@@ -145,7 +143,7 @@ export function StaffPayrollSettingsForm({ staff }: { staff: PayrollStaffCardDat
           <Toggle label="Uang harian" name="dailyEnabled" defaultChecked={staff.componentEnabled.daily} />
           <Toggle label="Deposit retensi" name="retentionEnabled" defaultChecked={staff.retentionEnabled} />
           <StylingTiersEditor name="stylingTiersJson" initialTiers={staff.stylingTiers ?? []} hint="Kosong = pakai tier default organisasi. Isi untuk override tier khusus groomer ini." />
-          <SizeMatrixEditor name="perPetSizeMatrixJson" initial={staff.perPetSizeMatrix ?? {}} hint="Kosong semua = pakai matriks/rate default organisasi. Isi salah satu ukuran akan menggantikan SELURUH matriks default untuk groomer ini." />
+          <SizeMatrixEditor name="perPetSizeMatrixJson" initial={staff.perPetSizeMatrix ?? {}} dogSizeBands={dogSizeBands} hint="Kosong semua = pakai matriks/rate default organisasi. Isi salah satu ukuran akan menggantikan SELURUH matriks default untuk groomer ini." />
         </PayrollActionForm>
       ) : null}
     </div>

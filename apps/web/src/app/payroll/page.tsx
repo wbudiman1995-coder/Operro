@@ -30,7 +30,11 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   }
   const params = await searchParams;
   const anchor = /^\d{4}-\d{2}-\d{2}$/.test(params.anchor ?? "") ? params.anchor! : null;
-  const data = await loadPayrollWorkspace(workspace.supabase, workspace.activeOrganization.id, anchor);
+  const [data, bandsResult] = await Promise.all([
+    loadPayrollWorkspace(workspace.supabase, workspace.activeOrganization.id, anchor),
+    workspace.supabase.from("organization_dog_size_bands").select("key,label").eq("organization_id", workspace.activeOrganization.id).order("sort_order"),
+  ]);
+  const dogSizeBands = bandsResult.data ?? [];
   const canManage = workspace.capabilities["payroll.manage"];
   const canApprove = workspace.capabilities["payroll.approve"];
   const run = data.run;
@@ -83,7 +87,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       </div>
     ) : null}
 
-    {canManage ? <div className="mt-5"><PayrollCycleSettingsForm settings={data.settings} /></div> : null}
+    {canManage ? <div className="mt-5"><PayrollCycleSettingsForm settings={data.settings} dogSizeBands={dogSizeBands} /></div> : null}
 
     {data.missing.length > 0 ? (
       <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
@@ -108,7 +112,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           {data.staff.map((staff) => (
             <div key={staff.membershipId}>
               <PayrollStaffCard staff={staff} runId={runId} runStatus={run?.status ?? null} periodStart={data.periodStart} canManage={Boolean(canManage)} canApprove={Boolean(canApprove)} />
-              {canManage ? <StaffPayrollSettingsForm staff={staff} /> : null}
+              {canManage ? <StaffPayrollSettingsForm staff={staff} dogSizeBands={dogSizeBands} /> : null}
             </div>
           ))}
         </div>

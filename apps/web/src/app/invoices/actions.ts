@@ -44,21 +44,37 @@ export async function createManualVisitInvoiceAction(_previous: PilotActionState
   if (!context.capabilities["invoice.issue"]) return failure("Peran Anda tidak diizinkan menerbitkan invoice.");
   const visitId = id(formData, "visitId");
   const requestKey = id(formData, "requestKey");
-  const amount = Number(formData.get("amount"));
   const issuedDate = value(formData, "invoiceDate", 10);
   const dueDate = value(formData, "dueDate", 10);
-  if (!visitId || !requestKey || !/^\d{4}-\d{2}-\d{2}$/.test(issuedDate) || !Number.isFinite(amount) || amount <= 0) {
-    return failure("Pilih kunjungan dan isi nominal invoice yang valid.");
-  }
-  const issuedAt = new Date(`${issuedDate}T09:00:00+07:00`).toISOString();
-  const dueAt = dueDate ? new Date(`${dueDate}T23:59:59+07:00`).toISOString() : null;
+  let lines: Array<{ name: string; quantity: number; unitPrice: number }>;
+  try {
+    const parsed: unknown = JSON.parse(value(formData, "linesJson", 20_000));
+    if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 50) throw new Error("invalid_lines");
+    lines = parsed.map((entry) => {
+      if (!entry || typeof entry !== "object") throw new Error("invalid_line");
+      const row = entry as Record<string, unknown>;
+      const name = typeof row.name === "string" ? row.name.trim() : "";
+      const quantity = Number(row.quantity); const unitPrice = Number(row.unitPrice);
+      if (name.length < 2 || name.length > 160 || !Number.isFinite(quantity) || quantity <= 0 || quantity > 10000
+        || Math.round(quantity * 1000) !== quantity * 1000 || !Number.isFinite(unitPrice) || unitPrice < 0
+        || unitPrice > 999999999 || Math.round(unitPrice * 100) !== unitPrice * 100) throw new Error("invalid_line");
+      return { name, quantity, unitPrice };
+    });
+    if (lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0) <= 0) throw new Error("empty_total");
+  } catch { return failure("Isi minimal satu baris invoice dengan deskripsi, jumlah, dan harga yang valid."); }
+  if (!visitId || !requestKey || !/^\d{4}-\d{2}-\d{2}$/.test(issuedDate)) return failure("Pilih kunjungan dan tanggal invoice yang valid.");
+  const issuedInstant = new Date(`${issuedDate}T09:00:00+07:00`);
+  const dueInstant = dueDate ? new Date(`${dueDate}T23:59:59+07:00`) : null;
+  if (Number.isNaN(issuedInstant.getTime()) || (dueInstant && Number.isNaN(dueInstant.getTime()))) return failure("Tanggal invoice atau jatuh tempo tidak valid.");
+  const issuedAt = issuedInstant.toISOString();
+  const dueAt = dueInstant?.toISOString() ?? null;
   if (dueAt && new Date(dueAt) < new Date(issuedAt)) return failure("Tanggal jatuh tempo tidak boleh sebelum tanggal invoice.");
-  const result = await context.supabase.schema("app").rpc("create_invoice_from_manual_visit", {
-    p_visit: visitId, p_issued_at: issuedAt, p_due_at: dueAt, p_amount: amount,
+  const result = await context.supabase.schema("app").rpc("create_invoice_from_manual_visit_lines", {
+    p_visit: visitId, p_issued_at: issuedAt, p_due_at: dueAt, p_lines: lines,
     p_admin_notes: value(formData, "adminNotes", 2000) || null, p_request_key: requestKey,
   });
   if (result.error) {
-    console.error("create_invoice_from_manual_visit_failed", result.error);
+    console.error("create_invoice_from_manual_visit_lines_failed", result.error);
     if (result.error.message.includes("visit_already_invoiced")) return failure("Kunjungan ini sudah memiliki invoice. Muat ulang daftar.");
     if (result.error.message.includes("visit_has_active_manual_billing")) return failure("Kunjungan ini sudah ditandai tertagih manual. Batalkan penagihan manual sebelum membuat invoice.");
     return failure("Invoice kunjungan belum dapat dibuat. Periksa izin, cabang, dan nominal.");

@@ -25,7 +25,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { CapabilityMap } from "@/lib/authorization";
 import { isGoogleMapsLink } from "@/lib/maps";
-import { ageLabelFromBirthdate, readCustomFields, readMedicalFlags, sizeBandForWeight, type GroomingSizeBand } from "@/lib/grooming-profile";
+import { ageLabelFromBirthdate, readCustomFields, readMedicalFlags } from "@/lib/grooming-profile";
+import { dogSizeFromBands, type DogSizeBand } from "@/lib/pet-sizing";
 
 function assertResult(scope: string, error: { message: string } | null) {
   if (error) throw new Error(`${scope}_failed:${error.message}`);
@@ -91,7 +92,7 @@ export interface CustomerPetProfile {
   sex: string;
   ageLabel: string | null;
   weightKg: number | null;
-  sizeBand: GroomingSizeBand | null;
+  sizeBand: string | null;
   color: string | null;
   temperament: string | null;
   notes: string | null;
@@ -304,7 +305,7 @@ export async function loadCustomerOverview(
   const customer = customerResult.data;
   if (!customer) return null;
 
-  const [petResult, paymentResult, defaultAddressResult] = await Promise.all([
+  const [petResult, paymentResult, defaultAddressResult, dogBandsResult] = await Promise.all([
     supabase
       .from("pets")
       .select("id,name,species,breed,sex,birthdate,weight_kg,size,color,temperament,notes,status,medical_flags,metadata")
@@ -331,10 +332,14 @@ export async function loadCustomerOverview(
       .eq("is_default", true)
       .is("deleted_at", null)
       .maybeSingle(),
+    supabase.from("organization_dog_size_bands").select("key,label,upper_kg")
+      .eq("organization_id", organizationId).order("sort_order"),
   ]);
   assertResult("customer_pets", petResult.error);
   assertResult("customer_payments", paymentResult.error);
   assertResult("customer_default_address", defaultAddressResult.error);
+  assertResult("customer_dog_bands", dogBandsResult.error);
+  const dogSizeBands: DogSizeBand[] = (dogBandsResult.data ?? []).map((band) => ({ key: band.key, label: band.label, upperKg: band.upper_kg === null ? null : Number(band.upper_kg) }));
 
   const paymentRows = paymentResult.data ?? [];
   const spendCapped = paymentRows.length > CUSTOMER_PAYMENT_LIMIT;
@@ -376,7 +381,7 @@ export async function loadCustomerOverview(
       sex: pet.sex,
       ageLabel: ageLabelFromBirthdate(pet.birthdate),
       weightKg: pet.weight_kg === null ? null : Number(pet.weight_kg),
-      sizeBand: ({ extra_small: "XS", small: "S", medium: "M", large: "L", extra_large: "XL" } as const)[pet.size as "extra_small" | "small" | "medium" | "large" | "extra_large"] ?? sizeBandForWeight(pet.weight_kg === null ? null : Number(pet.weight_kg)),
+      sizeBand: pet.species === "dog" ? dogSizeBands.find((band) => band.key === (pet.size ?? dogSizeFromBands(pet.weight_kg, dogSizeBands)))?.label ?? null : null,
       color: pet.color,
       temperament: pet.temperament,
       notes: typeof pet.notes === "string" && pet.notes.length > 0 ? pet.notes : null,

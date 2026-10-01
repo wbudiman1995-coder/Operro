@@ -183,13 +183,17 @@ export async function createCustomerAction(_previous: PilotActionState, formData
   try {
     pets = JSON.parse(textValue(formData, "petsJson", 20_000)) as typeof pets;
   } catch { return databaseError("Pet", "data pet tidak valid"); }
-  const petTypesResult = await context.supabase.from("organization_pet_types").select("key").eq("organization_id", context.organizationId).eq("is_active", true);
-  if (petTypesResult.error) return databaseError("Pet", "jenis pet belum dapat diperiksa");
+  const [petTypesResult, dogBandsResult] = await Promise.all([
+    context.supabase.from("organization_pet_types").select("key").eq("organization_id", context.organizationId).eq("is_active", true),
+    context.supabase.from("organization_dog_size_bands").select("key").eq("organization_id", context.organizationId),
+  ]);
+  if (petTypesResult.error || dogBandsResult.error) return databaseError("Pet", "jenis atau ukuran pet belum dapat diperiksa");
   const allowedPetTypes = new Set((petTypesResult.data ?? []).map((type) => type.key));
+  const allowedDogBands = new Set((dogBandsResult.data ?? []).map((band) => band.key));
   if (!Array.isArray(pets) || pets.length < 1 || pets.length > 5 || pets.some((pet) =>
     !pet || typeof pet.name !== "string" || !pet.name.trim() || pet.name.length > 80
     || !allowedPetTypes.has(pet.species)
-    || !["", "extra_small", "small", "medium", "large", "extra_large"].includes(pet.size)
+    || (pet.size !== "" && !allowedDogBands.has(pet.size))
     || (pet.species !== "dog" && pet.size !== "")
     || (pet.weightKg && (!Number.isFinite(Number(pet.weightKg)) || Number(pet.weightKg) <= 0))
   )) return databaseError("Pet", "isi satu hingga lima pet dengan nama dan jenis yang valid");
@@ -642,6 +646,24 @@ function optionalPriceValue(formData: FormData, key: string): number | null | "i
 
 interface ServicePriceMatrix { price_extra_small: number | null; price_small: number | null; price_medium: number | null; price_large: number | null; price_extra_large: number | null; price_cat: number | null }
 
+const LEGACY_DOG_FIELDS: Record<string, string> = { extra_small: "extraSmall", small: "small", medium: "medium", large: "large", extra_large: "extraLarge" };
+async function serviceDogSizePricing(context: { supabase: Awaited<ReturnType<typeof createClient>>; organizationId: string }, formData: FormData, zeroTime: boolean) {
+  const bands = await context.supabase.from("organization_dog_size_bands").select("key").eq("organization_id", context.organizationId);
+  if (bands.error) return { invalid: "kategori ukuran belum dapat dimuat" };
+  const matrix: Record<string, { price: number | null; duration: number | null }> = {};
+  for (const band of bands.data ?? []) {
+    const suffix = LEGACY_DOG_FIELDS[band.key] ?? `band_${band.key}`;
+    const price = optionalPriceValue(formData, `price_${suffix}`);
+    const rawDuration = String(formData.get(`duration_${suffix}`) ?? "").trim();
+    const duration = !rawDuration || zeroTime ? null : Number(rawDuration);
+    if (price === "invalid" || (duration !== null && (!Number.isInteger(duration) || duration < 15 || duration > 1440))) {
+      return { invalid: `harga atau durasi ukuran ${band.key} tidak valid` };
+    }
+    matrix[band.key] = { price, duration };
+  }
+  return { matrix };
+}
+
 function servicePriceMatrix(formData: FormData): ServicePriceMatrix | { invalid: string } {
   const matrix: Record<string, number | null> = {};
   for (const key of SERVICE_SIZE_KEYS) {
@@ -702,10 +724,12 @@ export async function createServiceAction(_previous: PilotActionState, formData:
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
   const durationMatrix = serviceDurationMatrix(formData, zeroTime);
   if ("invalid" in durationMatrix) return databaseError("Layanan", durationMatrix.invalid);
+  const dogPricing = await serviceDogSizePricing(context, formData, zeroTime);
+  if ("invalid" in dogPricing) return databaseError("Layanan", dogPricing.invalid ?? "matriks ukuran tidak valid");
   const category = serviceCategory(formData), speciesPricing = serviceSpeciesPricing(formData, zeroTime);
   if (category === "invalid") return databaseError("Layanan", "kategori layanan tidak valid");
   if ("invalid" in speciesPricing) return databaseError("Layanan", speciesPricing.invalid);
-  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), species_pricing: speciesPricing.matrix, metadata: { created_from: "homepaw_pilot" }, ...priceMatrix, ...durationMatrix.matrix });
+  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), dog_size_pricing: dogPricing.matrix, species_pricing: speciesPricing.matrix, metadata: { created_from: "homepaw_pilot" }, ...priceMatrix, ...durationMatrix.matrix });
   if (error) return databaseError("Layanan gagal dibuat", error.message);
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil ditambahkan." };
 }
@@ -721,11 +745,13 @@ export async function updateServiceAction(_previous: PilotActionState, formData:
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
   const durationMatrix = serviceDurationMatrix(formData, zeroTime);
   if ("invalid" in durationMatrix) return databaseError("Layanan", durationMatrix.invalid);
+  const dogPricing = await serviceDogSizePricing(context, formData, zeroTime);
+  if ("invalid" in dogPricing) return databaseError("Layanan", dogPricing.invalid ?? "matriks ukuran tidak valid");
   const category = serviceCategory(formData), speciesPricing = serviceSpeciesPricing(formData, zeroTime);
   if (category === "invalid") return databaseError("Layanan", "kategori layanan tidak valid");
   if ("invalid" in speciesPricing) return databaseError("Layanan", speciesPricing.invalid);
   const isActive = formData.get("isActive") === "on";
-  const { error } = await context.supabase.from("service_catalog").update({ name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), species_pricing: speciesPricing.matrix, is_active: isActive, ...priceMatrix, ...durationMatrix.matrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
+  const { error } = await context.supabase.from("service_catalog").update({ name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), dog_size_pricing: dogPricing.matrix, species_pricing: speciesPricing.matrix, is_active: isActive, ...priceMatrix, ...durationMatrix.matrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
   if (error) return databaseError("Layanan gagal diperbarui", error.message);
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil diperbarui." };
 }
@@ -1136,7 +1162,6 @@ export async function updateCustomerPackageTermsAction(_previous: PilotActionSta
 
 const RECURRENCE_INTERVALS = new Set(["none", "week", "month", "year"]);
 const ROLLOVER_POLICIES = new Set(["none", "rollover"]);
-const PACKAGE_SIZE_BANDS = new Set(["extra_small", "small", "medium", "large", "extra_large", "cat"]);
 
 interface PackagePayload {
   name: string; description: string | null; service_id: string | null; total_sessions: number; price: number;
@@ -1164,7 +1189,7 @@ function packagePayload(formData: FormData): PackagePayload | { invalid: string 
   if (validityDaysText && (validityDays === null || !Number.isInteger(validityDays) || validityDays < 1)) return { invalid: "masa berlaku tidak valid" };
   if (!RECURRENCE_INTERVALS.has(recurrenceInterval)) return { invalid: "interval perpanjangan tidak valid" };
   if (!ROLLOVER_POLICIES.has(rolloverPolicy)) return { invalid: "kebijakan rollover tidak valid" };
-  if (sizeBand && !PACKAGE_SIZE_BANDS.has(sizeBand)) return { invalid: "ukuran paket tidak valid" };
+  if (sizeBand && sizeBand !== "cat" && !/^[a-z][a-z0-9_]{1,29}$/.test(sizeBand)) return { invalid: "ukuran paket tidak valid" };
   if (sizeBand && (!perPet || !serviceId)) return { invalid: "paket per ukuran harus terikat pada satu hewan dan layanan" };
   if (discountText && (discountPercent === null || discountPercent < 0 || discountPercent > 100)) return { invalid: "diskon referensi tidak valid" };
   if (visitIntervalText && (visitIntervalDays === null || !Number.isInteger(visitIntervalDays) || visitIntervalDays < 1 || visitIntervalDays > 365)) return { invalid: "jarak antar kunjungan tidak valid" };
@@ -1185,6 +1210,10 @@ export async function createPackageAction(_previous: PilotActionState, formData:
   if (!(await loadCapabilities(context.supabase))["membership.manage"]) return databaseError("Paket", "izin membership.manage diperlukan");
   const payload = packagePayload(formData);
   if ("invalid" in payload) return databaseError("Paket", payload.invalid);
+  if (payload.size_band && payload.size_band !== "cat") {
+    const band = await context.supabase.from("organization_dog_size_bands").select("key").eq("organization_id", context.organizationId).eq("key", payload.size_band).maybeSingle();
+    if (band.error || !band.data) return databaseError("Paket", "ukuran tidak tersedia untuk bisnis ini");
+  }
   if (payload.service_id) {
     const { data: service } = await context.supabase.from("service_catalog").select("id").eq("organization_id", context.organizationId).eq("id", payload.service_id).is("deleted_at", null).maybeSingle();
     if (!service) return databaseError("Paket", "layanan tidak ditemukan");
@@ -1201,6 +1230,10 @@ export async function updatePackageAction(_previous: PilotActionState, formData:
   const packageId = idValue(formData, "packageId"); if (!packageId) return databaseError("Paket", "paket tidak valid");
   const payload = packagePayload(formData);
   if ("invalid" in payload) return databaseError("Paket", payload.invalid);
+  if (payload.size_band && payload.size_band !== "cat") {
+    const band = await context.supabase.from("organization_dog_size_bands").select("key").eq("organization_id", context.organizationId).eq("key", payload.size_band).maybeSingle();
+    if (band.error || !band.data) return databaseError("Paket", "ukuran tidak tersedia untuk bisnis ini");
+  }
   if (payload.service_id) {
     const { data: service } = await context.supabase.from("service_catalog").select("id").eq("organization_id", context.organizationId).eq("id", payload.service_id).is("deleted_at", null).maybeSingle();
     if (!service) return databaseError("Paket", "layanan tidak ditemukan");

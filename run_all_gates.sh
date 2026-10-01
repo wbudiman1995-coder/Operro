@@ -108,6 +108,8 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261020120000_custom_pet_types.sql
   supabase/migrations/20261022100000_platform_owner_workspace_access.sql
   supabase/migrations/20261022110000_auth_hook_owner_access.sql
+  supabase/migrations/20261023100000_manual_visit_invoice_lines.sql
+  supabase/migrations/20261023110000_dynamic_dog_size_bands.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -194,6 +196,7 @@ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/S27-S30/test_backend.sq
 step "GATE 7f — HomePaw intake, per-pet size pricing, and membership tiers"
 bash integration/homepaw_qc_db.sh
 psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/homepaw_qc_smoke.sql
+psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/dynamic_sizes_invoice_lines_smoke.sql
 psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/homepaw_size_membership_smoke.sql
 psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/homepaw_review_storage_smoke.sql
 

@@ -5,6 +5,7 @@ import test from "node:test";
 
 const root = path.join(__dirname, "../../..");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/20260924120000_invoice_workflow.sql"), "utf8");
+const manualLinesMigration = fs.readFileSync(path.join(root, "supabase/migrations/20261023100000_manual_visit_invoice_lines.sql"), "utf8");
 const studio = fs.readFileSync(path.join(root, "apps/web/src/components/invoice-studio.tsx"), "utf8");
 const actions = fs.readFileSync(path.join(root, "apps/web/src/app/invoices/actions.ts"), "utf8");
 
@@ -39,6 +40,18 @@ test("studio provides HomePaw invoice selection and due-date workflow", () => {
   assert.match(studio, /name="dueDate"/);
   assert.match(studio, /name="manualGroomer"/);
   assert.match(studio, /name="documentType"/);
+});
+
+test("manual visits issue multiple immutable lines and reject changed retries", () => {
+  assert.match(manualLinesMigration, /create function app\.create_invoice_from_manual_visit_lines/);
+  assert.match(manualLinesMigration, /jsonb_array_length\(p_lines\) not between 1 and 50/);
+  assert.match(manualLinesMigration, /insert into public\.invoice_lines[\s\S]*from jsonb_array_elements\(p_lines\)/);
+  assert.match(manualLinesMigration, /v_invoice\.issued_at is distinct from p_issued_at/);
+  assert.match(manualLinesMigration, /v_invoice\.due_at is distinct from p_due_at/);
+  assert.match(manualLinesMigration, /v_invoice\.admin_notes is distinct from v_admin_notes/);
+  assert.match(studio, /\+ Tambah baris/);
+  assert.match(studio, /setVisitKey\(crypto\.randomUUID\(\)\)/);
+  assert.match(actions, /rpc\("create_invoice_from_manual_visit_lines"/);
 });
 
 test("unpaid detail edits are optimistic and paid invoices are locked", () => {

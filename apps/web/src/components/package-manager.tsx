@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { updatePackageAction, type PilotActionState } from "@/app/pilot-actions";
 import type { CatalogWorkspace } from "@/lib/pilot-data";
 import { formatRupiah } from "@/lib/pilot-data";
+import type { DogSizeBand } from "@/lib/pet-sizing";
 
 const initialState: PilotActionState = { error: null, success: null };
 const field = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10";
@@ -14,18 +15,18 @@ function Message({ state }: { state: PilotActionState }) {
 }
 
 const RECURRENCE_LABEL: Record<string, string> = { none: "sekali beli", week: "mingguan", month: "bulanan", year: "tahunan" };
-const SIZE_LABEL: Record<string, string> = { extra_small: "XS", small: "S", medium: "M", large: "L", extra_large: "XL", cat: "Cat" };
 
 /** Section 24: edits a catalog package's terms. Never touches already-sold customer_packages rows (see updatePackageAction). */
-export function PackageManager({ pkg, services, canManage }: { pkg: CatalogWorkspace["packages"][number]; services: Array<{ id: string; name: string }>; canManage: boolean }) {
+export function PackageManager({ pkg, services, canManage, dogSizeBands }: { pkg: CatalogWorkspace["packages"][number]; services: Array<{ id: string; name: string }>; canManage: boolean; dogSizeBands: DogSizeBand[] }) {
   const [editing, setEditing] = useState(false);
   const [state, action, pending] = useActionState(updatePackageAction, initialState);
+  const sizeLabels: Record<string, string> = Object.fromEntries([...dogSizeBands.map((band) => [band.key, band.label]), ["cat", "Cat"]]);
 
   return <article className="p-5">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <p className="truncate font-bold">{pkg.name}{pkg.perPet ? <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700">Per hewan</span> : null}</p>
-        <p className="mt-1 text-xs text-slate-500">{pkg.sessions} sesi · {formatRupiah(pkg.price)} · {RECURRENCE_LABEL[pkg.recurrenceInterval] ?? pkg.recurrenceInterval}{pkg.sizeBand ? ` · ${SIZE_LABEL[pkg.sizeBand]}` : ""}{pkg.discountPercent !== null ? ` · diskon referensi ${pkg.discountPercent}%` : ""}</p>
+        <p className="mt-1 text-xs text-slate-500">{pkg.sessions} sesi · {formatRupiah(pkg.price)} · {RECURRENCE_LABEL[pkg.recurrenceInterval] ?? pkg.recurrenceInterval}{pkg.sizeBand ? ` · ${sizeLabels[pkg.sizeBand] ?? pkg.sizeBand}` : ""}{pkg.discountPercent !== null ? ` · diskon referensi ${pkg.discountPercent}%` : ""}</p>
         <p className="mt-1 text-[11px] text-slate-400">{pkg.validityDays ? `Berlaku ${pkg.validityDays} hari` : "Tanpa masa berlaku"} · {pkg.visitIntervalDays ? `Kunjungan tiap ${pkg.visitIntervalDays} hari · ` : ""}{services.find((service) => service.id === pkg.serviceId)?.name ?? "Semua layanan"}</p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2">
@@ -46,7 +47,7 @@ export function PackageManager({ pkg, services, canManage }: { pkg: CatalogWorks
         {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
       </select>
       <div className="grid gap-3 sm:grid-cols-2">
-        <select className={field} name="sizeBand" defaultValue={pkg.sizeBand ?? ""} aria-label="Ukuran paket"><option value="">Semua ukuran</option>{Object.entries(SIZE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select className={field} name="sizeBand" defaultValue={pkg.sizeBand ?? ""} aria-label="Ukuran paket"><option value="">Semua ukuran</option>{Object.entries(sizeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <input className={field} type="number" min="0" max="100" step="0.01" name="discountPercent" defaultValue={pkg.discountPercent ?? ""} placeholder="Diskon referensi (%)" aria-label="Diskon referensi" />
       </div>
       <input className={field} type="number" min="1" max="365" step="1" name="visitIntervalDays" defaultValue={pkg.visitIntervalDays ?? ""} placeholder="Jarak kunjungan (hari, opsional)" aria-label="Jarak antar kunjungan (hari)" />

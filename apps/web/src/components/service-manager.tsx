@@ -6,6 +6,7 @@ import { updateServiceAction, type PilotActionState } from "@/app/pilot-actions"
 import type { CatalogWorkspace } from "@/lib/pilot-data";
 import { formatRupiah } from "@/lib/pilot-data";
 import { SpeciesPricingFields, type PetTypeOption } from "@/components/species-pricing-fields";
+import type { DogSizeBand } from "@/lib/pet-sizing";
 
 const initialState: PilotActionState = { error: null, success: null };
 const field = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10";
@@ -23,11 +24,14 @@ const SIZE_FIELDS = [
   ["priceCat", "durationCat", "cat", "Cat"],
 ] as const;
 
-export function ServiceManager({ service, canManageService, petTypes }: { service: CatalogWorkspace["services"][number]; canManageService: boolean; petTypes: PetTypeOption[] }) {
+export function ServiceManager({ service, canManageService, petTypes, dogSizeBands }: { service: CatalogWorkspace["services"][number]; canManageService: boolean; petTypes: PetTypeOption[]; dogSizeBands: DogSizeBand[] }) {
   const [editing, setEditing] = useState(false);
   const [zeroTime, setZeroTime] = useState(service.duration === 0);
   const [duration, setDuration] = useState(String(service.duration || 60));
   const [state, action, pending] = useActionState(updateServiceAction, initialState);
+  const activeSizeFields = SIZE_FIELDS.filter(([, , suffix]) => suffix === "cat" || dogSizeBands.some((band) => ({ extraSmall: "extra_small", small: "small", medium: "medium", large: "large", extraLarge: "extra_large" } as Record<string, string>)[suffix] === band.key));
+  const labelFor = (suffix: string, fallback: string) => dogSizeBands.find((band) => band.key === ({ extraSmall: "extra_small", small: "small", medium: "medium", large: "large", extraLarge: "extra_large" } as Record<string, string>)[suffix])?.label ?? fallback;
+  const customBands = dogSizeBands.filter((band) => !["extra_small", "small", "medium", "large", "extra_large"].includes(band.key));
 
   return <article className="p-5">
     <div className="flex items-start justify-between gap-3">
@@ -35,7 +39,7 @@ export function ServiceManager({ service, canManageService, petTypes }: { servic
         <p className="truncate font-bold">{service.name}</p>
         <p className="mt-1 text-xs text-slate-500">{service.category ? `${service.category} · ` : ""}{service.duration === 0 ? "Tidak menambah durasi" : `${service.duration} menit`}{service.additionalDuration > 0 ? ` (+${service.additionalDuration} menit/unit tambahan)` : ""} · {formatRupiah(service.price)}</p>
         <p className="mt-1 text-[11px] text-slate-400">
-          {SIZE_FIELDS.map(([priceKey, durationKey, , label]) => `${label}: ${service[priceKey] === null ? "harga dasar" : formatRupiah(service[priceKey] as number)}, ${service[durationKey] ?? service.duration} menit`).join(" · ")}
+          {[...activeSizeFields.map(([priceKey, durationKey, suffix, label]) => `${labelFor(suffix, label)}: ${service[priceKey] === null ? "harga dasar" : formatRupiah(service[priceKey] as number)}, ${service[durationKey] ?? service.duration} menit`), ...customBands.map((band) => `${band.label}: ${service.dogSizePricing[band.key]?.price == null ? "harga dasar" : formatRupiah(Number(service.dogSizePricing[band.key]?.price))}, ${service.dogSizePricing[band.key]?.duration ?? service.duration} menit`)].join(" · ")}
         </p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2">
@@ -57,15 +61,16 @@ export function ServiceManager({ service, canManageService, petTypes }: { servic
       <div>
         <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Harga per ukuran hewan (kosongkan untuk pakai harga dasar)</p>
         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          {SIZE_FIELDS.map(([priceKey, , suffix, label]) => <input key={suffix} className={field} type="number" min="0" step="1000" name={`price_${suffix}`} defaultValue={service[priceKey] ?? ""} placeholder={label} aria-label={`Harga ${label}`} />)}
+          {activeSizeFields.map(([priceKey, , suffix, label]) => { const currentLabel = labelFor(suffix, label); return <input key={suffix} className={field} type="number" min="0" step="1000" name={`price_${suffix}`} defaultValue={service[priceKey] ?? ""} placeholder={currentLabel} aria-label={`Harga ${currentLabel}`} />; })}
         </div>
       </div>
       <div>
         <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Durasi per ukuran (kosong = durasi dasar)</p>
         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          {SIZE_FIELDS.map(([, durationKey, suffix, label]) => <input key={suffix} className={field} type="number" min="15" max="1440" step="5" name={`duration_${suffix}`} defaultValue={service[durationKey] ?? ""} placeholder={label} aria-label={`Durasi ${label}`} disabled={zeroTime} />)}
+          {activeSizeFields.map(([, durationKey, suffix, label]) => { const currentLabel = labelFor(suffix, label); return <input key={suffix} className={field} type="number" min="15" max="1440" step="5" name={`duration_${suffix}`} defaultValue={service[durationKey] ?? ""} placeholder={currentLabel} aria-label={`Durasi ${currentLabel}`} disabled={zeroTime} />; })}
         </div>
       </div>
+      {customBands.map((band) => <div key={band.key} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-2"><label className="text-xs font-semibold">Harga {band.label} (Rp)<input className={field} type="number" min="0" step="1000" name={`price_band_${band.key}`} defaultValue={service.dogSizePricing[band.key]?.price ?? ""} /></label><label className="text-xs font-semibold">Durasi {band.label} (menit)<input className={field} type="number" min="15" max="1440" step="5" name={`duration_band_${band.key}`} defaultValue={service.dogSizePricing[band.key]?.duration ?? ""} disabled={zeroTime} /></label></div>)}
       <SpeciesPricingFields petTypes={petTypes} initial={service.speciesPricing} zeroTime={zeroTime} />
       <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-700">
         {["home", "in_store"].map((mode) => <label key={mode} className="flex items-center gap-2"><input type="checkbox" name="fulfillmentModes" value={mode} defaultChecked={service.fulfillmentModes.includes(mode)} />{mode === "home" ? "Home service" : "Di toko"}</label>)}

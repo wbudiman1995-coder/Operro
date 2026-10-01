@@ -76,7 +76,7 @@ INSERT 0 1
 INSERT 0 1
 INSERT 0 1
 INSERT 0 1
-Populated baseline counts org,customer,pet,booking: 2,6,7,6
+Populated baseline counts org,customer,pet,booking,package,customer_package,invoice_line: 2,6,7,6,2,2,0
 UPGRADE 20260919120000
 UPGRADE 20260924120000
 UPGRADE 20260924130000
@@ -110,8 +110,15 @@ UPGRADE 20261018110000
 UPGRADE 20261018120000
 UPGRADE 20261019100000
 UPGRADE 20261019110000
-Upgrade migrations applied: 32
-After upgrade counts org,customer,pet,booking: 2,6,7,6
+UPGRADE 20261020100000
+UPGRADE 20261020110000
+UPGRADE 20261020120000
+UPGRADE 20261022100000
+UPGRADE 20261022110000
+UPGRADE 20261023100000
+UPGRADE 20261023110000
+Upgrade migrations applied: 39
+After upgrade counts org,customer,pet,booking,package,customer_package,invoice_line: 2,6,7,6,2,2,0
 DO
 HOMEPAW OWNER WORKSPACE PROVISION PASS
 t|t

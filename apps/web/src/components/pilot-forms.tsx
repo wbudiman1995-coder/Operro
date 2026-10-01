@@ -22,7 +22,7 @@ import { MapsCoordinateFields } from "@/components/customer-address-forms";
 import { IndonesiaRegionFields } from "@/components/indonesia-region-fields";
 import { BreedSelect } from "@/components/breed-select";
 import { SpeciesPricingFields, type PetTypeOption } from "@/components/species-pricing-fields";
-import { DOG_SIZE_BANDS, dogSizeFromWeight, type DogSizeBoundaries } from "@/lib/pet-sizing";
+import { dogSizeFromBands, type DogSizeBand } from "@/lib/pet-sizing";
 import { HOMEPAW_MEMBERSHIP_TIERS } from "@/lib/homepaw-starter";
 import type { CatalogWorkspace } from "@/lib/pilot-data";
 
@@ -36,20 +36,20 @@ function ActionMessage({ state }: { state: PilotActionState }) {
   return <p className={`rounded-xl px-3 py-2 text-xs font-semibold ${state.error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>{state.error ?? state.success}</p>;
 }
 
-export function CustomerForm({ boundaries, petTypes }: { boundaries: DogSizeBoundaries; petTypes: PetTypeOption[] }) {
+export function CustomerForm({ dogSizeBands, petTypes }: { dogSizeBands: DogSizeBand[]; petTypes: PetTypeOption[] }) {
   const [state, action, pending] = useActionState(createCustomerAction, initialPilotActionState);
   type PetDraft = { id: number; name: string; species: string; breed: string; size: string; weightKg: string; color: string; age: string; notes: string };
   const [pets, setPets] = useState<PetDraft[]>([{ id: 0, name: "", species: "dog", breed: "", size: "", weightKg: "", color: "", age: "", notes: "" }]);
   const patchPet = (id: number, key: keyof PetDraft, value: string) => setPets(current => current.map(pet => pet.id === id ? {
     ...pet, [key]: value,
-    ...(key === "species" ? { breed: "", size: value === "dog" ? dogSizeFromWeight(pet.weightKg, boundaries) ?? "" : "" } : {}),
-    ...(key === "weightKg" && pet.species === "dog" ? { size: dogSizeFromWeight(value, boundaries) ?? pet.size } : {}),
+    ...(key === "species" ? { breed: "", size: value === "dog" ? dogSizeFromBands(pet.weightKg, dogSizeBands) ?? "" : "" } : {}),
+    ...(key === "weightKg" && pet.species === "dog" ? { size: dogSizeFromBands(value, dogSizeBands) ?? pet.size } : {}),
   } : pet));
   return <form action={action} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="name" placeholder="Nama pelanggan" required /><input className={inputClass} name="phone" placeholder="WhatsApp, contoh 0812..." /></div>
     <input type="hidden" name="petsJson" value={JSON.stringify(pets.map((pet) => ({ name: pet.name, species: pet.species, breed: pet.breed, size: pet.size, weightKg: pet.weightKg, color: pet.color, age: pet.age, notes: pet.notes })))} />
     <div className="space-y-3"><p className="text-sm font-semibold text-slate-700">Pet pelanggan</p>{pets.map((pet, index) => <section key={pet.id} className="space-y-3 rounded-xl border border-slate-200 p-3">
       <div className="flex items-center justify-between"><strong className="text-xs">Pet {index + 1}</strong>{pets.length > 1 ? <button type="button" onClick={() => setPets(current => current.filter(item => item.id !== pet.id))} className="text-xs font-bold text-rose-700">Hapus</button> : null}</div>
-      <div className="grid gap-3 sm:grid-cols-4"><input className={inputClass} value={pet.name} onChange={event => patchPet(pet.id, "name", event.target.value)} placeholder="Nama pet" aria-label={`Nama pet ${index + 1}`} required /><select className={inputClass} value={pet.species} onChange={event => patchPet(pet.id, "species", event.target.value)} aria-label={`Jenis pet ${index + 1}`}>{petTypes.filter((type) => type.active).map((type) => <option key={type.key} value={type.key}>{type.label}</option>)}</select>{pet.species === "dog" || pet.species === "cat" ? <BreedSelect species={pet.species} value={pet.breed} onChange={value => patchPet(pet.id, "breed", value)} className={inputClass} label={`Ras pet ${index + 1}`} /> : <input className={inputClass} value={pet.breed} onChange={event => patchPet(pet.id, "breed", event.target.value)} placeholder="Ras (opsional)" aria-label={`Ras pet ${index + 1}`} />}<select className={inputClass} value={pet.species === "dog" ? pet.size : ""} onChange={event => patchPet(pet.id, "size", event.target.value)} aria-label={`Ukuran pet ${index + 1}`} disabled={pet.species !== "dog"}><option value="">{pet.species === "dog" ? "Ukuran (isi berat untuk otomatis)" : "Harga menurut jenis pet"}</option>{DOG_SIZE_BANDS.map(band => <option key={band.value} value={band.value}>{band.label}</option>)}</select></div>
+      <div className="grid gap-3 sm:grid-cols-4"><input className={inputClass} value={pet.name} onChange={event => patchPet(pet.id, "name", event.target.value)} placeholder="Nama pet" aria-label={`Nama pet ${index + 1}`} required /><select className={inputClass} value={pet.species} onChange={event => patchPet(pet.id, "species", event.target.value)} aria-label={`Jenis pet ${index + 1}`}>{petTypes.filter((type) => type.active).map((type) => <option key={type.key} value={type.key}>{type.label}</option>)}</select>{pet.species === "dog" || pet.species === "cat" ? <BreedSelect species={pet.species} value={pet.breed} onChange={value => patchPet(pet.id, "breed", value)} className={inputClass} label={`Ras pet ${index + 1}`} /> : <input className={inputClass} value={pet.breed} onChange={event => patchPet(pet.id, "breed", event.target.value)} placeholder="Ras (opsional)" aria-label={`Ras pet ${index + 1}`} />}<select className={inputClass} value={pet.species === "dog" ? pet.size : ""} onChange={event => patchPet(pet.id, "size", event.target.value)} aria-label={`Ukuran pet ${index + 1}`} disabled={pet.species !== "dog"}><option value="">{pet.species === "dog" ? "Ukuran (isi berat untuk otomatis)" : "Harga menurut jenis pet"}</option>{dogSizeBands.map(band => <option key={band.key} value={band.key}>{band.label}</option>)}</select></div>
       <div className="grid gap-3 sm:grid-cols-3"><input className={inputClass} value={pet.weightKg} onChange={event => patchPet(pet.id, "weightKg", event.target.value)} placeholder="Berat kg" aria-label={`Berat pet ${index + 1}`} inputMode="decimal" /><input className={inputClass} value={pet.color} onChange={event => patchPet(pet.id, "color", event.target.value)} placeholder="Warna bulu" aria-label={`Warna pet ${index + 1}`} /><input className={inputClass} value={pet.age} onChange={event => patchPet(pet.id, "age", event.target.value)} placeholder="Umur" aria-label={`Umur pet ${index + 1}`} /></div>
       <textarea className={`${inputClass} h-auto py-2`} value={pet.notes} onChange={event => patchPet(pet.id, "notes", event.target.value)} placeholder="Catatan pet untuk groomer" aria-label={`Catatan pet ${index + 1}`} rows={2} />
     </section>)}{pets.length < 5 ? <button type="button" onClick={() => setPets(current => [...current, { id: Math.max(...current.map(pet => pet.id)) + 1, name: "", species: "dog", breed: "", size: "", weightKg: "", color: "", age: "", notes: "" }])} className="w-full rounded-xl border-2 border-dashed border-emerald-300 py-3 text-sm font-bold text-emerald-700">+ Tambah pet</button> : null}</div>
@@ -86,10 +86,11 @@ const SERVICE_SIZE_FIELDS = [
   ["large", "L · 15–25 kg"], ["extraLarge", "XL · >25 kg"], ["cat", "Cat"],
 ] as const;
 
-export function ServiceForm({ petTypes }: { petTypes: PetTypeOption[] }) {
+export function ServiceForm({ petTypes, dogSizeBands = [] }: { petTypes: PetTypeOption[]; dogSizeBands?: DogSizeBand[] }) {
   const [state, action, pending] = useActionState(createServiceAction, initialPilotActionState);
   const [zeroTime, setZeroTime] = useState(false);
   const [duration, setDuration] = useState("60");
+  const legacySizeFields = SERVICE_SIZE_FIELDS.filter(([size]) => size === "cat" || dogSizeBands.some((band) => ({ extraSmall: "extra_small", small: "small", medium: "medium", large: "large", extraLarge: "extra_large" } as Record<string, string>)[size] === band.key));
   return <form action={action} className="space-y-3">
     <input className={inputClass} name="name" placeholder="Nama layanan" required />
     <input className={inputClass} name="category" list="service-category-options" maxLength={40} placeholder="Kategori layanan (boleh buat baru)" aria-label="Kategori layanan" />
@@ -103,15 +104,16 @@ export function ServiceForm({ petTypes }: { petTypes: PetTypeOption[] }) {
     <div>
       <p className="mb-2 text-xs font-semibold text-slate-500">Harga per ukuran hewan (opsional, kosongkan untuk pakai harga dasar)</p>
       <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        {SERVICE_SIZE_FIELDS.map(([size, label]) => <input key={size} className={inputClass} type="number" min="0" step="1000" name={`price_${size}`} placeholder={label} aria-label={`Harga ${label}`} />)}
+        {legacySizeFields.map(([size, label]) => { const currentLabel = dogSizeBands.find((band) => band.key === ({ extraSmall: "extra_small", small: "small", medium: "medium", large: "large", extraLarge: "extra_large" } as Record<string, string>)[size])?.label ?? label; return <input key={size} className={inputClass} type="number" min="0" step="1000" name={`price_${size}`} placeholder={currentLabel} aria-label={`Harga ${currentLabel}`} />; })}
       </div>
     </div>
     <div>
       <p className="mb-2 text-xs font-semibold text-slate-500">Durasi per ukuran (menit; kosong = durasi dasar). Booking dan baris layanan memakai durasi yang sama.</p>
       <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        {SERVICE_SIZE_FIELDS.map(([size, label]) => <input key={size} className={inputClass} type="number" min="15" max="1440" step="5" name={`duration_${size}`} placeholder={label} aria-label={`Durasi ${label}`} disabled={zeroTime} />)}
+        {legacySizeFields.map(([size, label]) => { const currentLabel = dogSizeBands.find((band) => band.key === ({ extraSmall: "extra_small", small: "small", medium: "medium", large: "large", extraLarge: "extra_large" } as Record<string, string>)[size])?.label ?? label; return <input key={size} className={inputClass} type="number" min="15" max="1440" step="5" name={`duration_${size}`} placeholder={currentLabel} aria-label={`Durasi ${currentLabel}`} disabled={zeroTime} />; })}
       </div>
     </div>
+    {dogSizeBands.filter((band) => !["extra_small", "small", "medium", "large", "extra_large"].includes(band.key)).map((band) => <div key={band.key} className="grid gap-2 sm:grid-cols-2"><label className="text-xs font-semibold">Harga {band.label} (Rp)<input className={inputClass} type="number" min="0" step="1000" name={`price_band_${band.key}`} placeholder="Harga dasar" /></label><label className="text-xs font-semibold">Durasi {band.label} (menit)<input className={inputClass} type="number" min="15" max="1440" step="5" name={`duration_band_${band.key}`} disabled={zeroTime} placeholder="Durasi dasar" /></label></div>)}
     <SpeciesPricingFields petTypes={petTypes} zeroTime={zeroTime} />
     <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-700">
       <label className="flex items-center gap-2"><input type="checkbox" name="fulfillmentModes" value="home" defaultChecked />Home service</label>
@@ -123,15 +125,16 @@ export function ServiceForm({ petTypes }: { petTypes: PetTypeOption[] }) {
 }
 
 /** Section 24: package/membership catalog terms. Governs future sales only -- see createPackageAction. */
-type PackageService = Pick<CatalogWorkspace["services"][number], "id" | "name" | "price" | "priceExtraSmall" | "priceSmall" | "priceMedium" | "priceLarge" | "priceExtraLarge" | "priceCat">;
-const PACKAGE_BANDS = [["extra_small", "XS"], ["small", "S"], ["medium", "M"], ["large", "L"], ["extra_large", "XL"], ["cat", "Cat"]] as const;
+type PackageService = Pick<CatalogWorkspace["services"][number], "id" | "name" | "price" | "priceExtraSmall" | "priceSmall" | "priceMedium" | "priceLarge" | "priceExtraLarge" | "priceCat" | "dogSizePricing">;
 function packageServicePrice(service: PackageService | undefined, band: string): number | null {
   if (!service) return null;
-  const key = ({ extra_small: "priceExtraSmall", small: "priceSmall", medium: "priceMedium", large: "priceLarge", extra_large: "priceExtraLarge", cat: "priceCat" } as const)[band as typeof PACKAGE_BANDS[number][0]];
+  if (band !== "cat" && service.dogSizePricing[band]?.price != null) return Number(service.dogSizePricing[band].price);
+  const key = ({ extra_small: "priceExtraSmall", small: "priceSmall", medium: "priceMedium", large: "priceLarge", extra_large: "priceExtraLarge", cat: "priceCat" } as const)[band as "extra_small" | "small" | "medium" | "large" | "extra_large" | "cat"];
   return key ? service[key] ?? service.price : service.price;
 }
 
-export function PackageForm({ services }: { services: PackageService[] }) {
+export function PackageForm({ services, dogSizeBands }: { services: PackageService[]; dogSizeBands: DogSizeBand[] }) {
+  const PACKAGE_BANDS = [...dogSizeBands.map((band) => [band.key, band.label] as const), ["cat", "Cat"] as const];
   const [state, action, pending] = useActionState(createPackageAction, initialPilotActionState);
   const [name, setName] = useState("");
   const [selectedTierKey, setSelectedTierKey] = useState("");
@@ -153,8 +156,8 @@ export function PackageForm({ services }: { services: PackageService[] }) {
     if (!tier) return;
     setSelectedTierKey(key);
     const nextServiceId = serviceId || services.find((service) => /basic grooming/i.test(service.name))?.id || "";
-    const nextBand = sizeBand || "extra_small";
-    setName(`${tier.name} ${PACKAGE_BANDS.find(([value]) => value === nextBand)?.[1] ?? "XS"}`);
+    const nextBand = sizeBand || dogSizeBands[0]?.key || "";
+    setName(`${tier.name}${nextBand ? ` ${PACKAGE_BANDS.find(([value]) => value === nextBand)?.[1] ?? nextBand}` : ""}`);
     setSessions(String(tier.sessions)); setDiscountPercent(String(tier.discountPercent));
     setValidityDays(String(tier.validityDays)); setVisitIntervalDays(String(tier.visitIntervalDays)); setRecurrenceInterval(tier.recurrenceInterval);
     setServiceId(nextServiceId); setSizeBand(nextBand); setPerPet(true);

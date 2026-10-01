@@ -31,7 +31,6 @@ function numberValue(formData: FormData, key: string) {
   return Number.isFinite(value) ? value : null;
 }
 
-const SIZE_KEYS = new Set(["small", "medium", "large", "extra_large"]);
 type StylingTier = { min_jobs: number; pct: number };
 type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -60,7 +59,7 @@ function parseStylingTiersJson(raw: FormDataEntryValue | null): ParseResult<Styl
   return { ok: true, value: tiers };
 }
 
-function parseSizeMatrixJson(raw: FormDataEntryValue | null): ParseResult<Record<string, number>> {
+function parseSizeMatrixJson(raw: FormDataEntryValue | null, allowedKeys: Set<string>): ParseResult<Record<string, number>> {
   const text = typeof raw === "string" ? raw.trim() : "";
   if (text.length === 0) return { ok: true, value: {} };
   let parsed: unknown;
@@ -68,7 +67,7 @@ function parseSizeMatrixJson(raw: FormDataEntryValue | null): ParseResult<Record
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { ok: false, error: "format matriks ukuran harus berupa objek" };
   const out: Record<string, number> = {};
   for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
-    if (!SIZE_KEYS.has(key)) return { ok: false, error: `ukuran tidak dikenal: ${key}` };
+    if (!allowedKeys.has(key)) return { ok: false, error: `ukuran tidak dikenal: ${key}` };
     const num = Number(val);
     if (!Number.isFinite(num) || num < 0) return { ok: false, error: `nilai untuk ukuran ${key} harus >= 0` };
     out[key] = num;
@@ -223,7 +222,9 @@ export async function saveCycleSettingsAction(_previous: PilotActionState, formD
   if (cycleStartDay === null || cycleStartDay < 1 || cycleStartDay > 28) return databaseError("Pengaturan", "tanggal mulai cycle harus 1-28");
   const tiers = parseStylingTiersJson(formData.get("stylingTiersJson"));
   if (!tiers.ok) return databaseError("Tier styling", tiers.error);
-  const matrix = parseSizeMatrixJson(formData.get("perPetSizeMatrixJson"));
+  const bands = await context.supabase.from("organization_dog_size_bands").select("key").eq("organization_id", context.organizationId);
+  if (bands.error) return databaseError("Matriks ukuran", "kategori ukuran belum dapat dimuat");
+  const matrix = parseSizeMatrixJson(formData.get("perPetSizeMatrixJson"), new Set((bands.data ?? []).map((band) => band.key)));
   if (!matrix.ok) return databaseError("Matriks ukuran per dog", matrix.error);
   const patch = {
     organization_id: context.organizationId,
@@ -255,7 +256,9 @@ export async function saveStaffSettingsAction(_previous: PilotActionState, formD
   const membershipId = idValue(formData, "membershipId"); if (!membershipId) return databaseError("Pengaturan staf", "staf tidak valid");
   const tiers = parseStylingTiersJson(formData.get("stylingTiersJson"));
   if (!tiers.ok) return databaseError("Tier styling", tiers.error);
-  const matrix = parseSizeMatrixJson(formData.get("perPetSizeMatrixJson"));
+  const bands = await context.supabase.from("organization_dog_size_bands").select("key").eq("organization_id", context.organizationId);
+  if (bands.error) return databaseError("Matriks ukuran", "kategori ukuran belum dapat dimuat");
+  const matrix = parseSizeMatrixJson(formData.get("perPetSizeMatrixJson"), new Set((bands.data ?? []).map((band) => band.key)));
   if (!matrix.ok) return databaseError("Matriks ukuran per dog", matrix.error);
   const patch = {
     organization_id: context.organizationId, membership_id: membershipId,

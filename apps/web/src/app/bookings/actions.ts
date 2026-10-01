@@ -36,7 +36,7 @@ export async function createBookingAction(
     supabase.from("branches").select("id").eq("organization_id", organizationId).eq("id", draft.branchId).eq("status", "active").is("deleted_at", null).maybeSingle(),
     supabase.from("customers").select("id").eq("organization_id", organizationId).eq("id", draft.customerId).is("deleted_at", null).maybeSingle(),
     supabase.from("pets").select("id,customer_id,species,size,weight_kg").eq("organization_id", organizationId).in("id", draft.pets.map((pet) => pet.petId)).is("deleted_at", null),
-    supabase.from("service_catalog").select("id,category,duration_minutes,base_price,duration_extra_small,duration_small,duration_medium,duration_large,duration_extra_large,duration_cat,species_pricing").eq("organization_id", organizationId).in("id", draft.pets.flatMap((pet) => pet.serviceIds)).eq("is_active", true).is("deleted_at", null),
+    supabase.from("service_catalog").select("id,category,duration_minutes,base_price,duration_extra_small,duration_small,duration_medium,duration_large,duration_extra_large,duration_cat,dog_size_pricing,species_pricing").eq("organization_id", organizationId).in("id", draft.pets.flatMap((pet) => pet.serviceIds)).eq("is_active", true).is("deleted_at", null),
     supabase.from("resources").select("id,branch_id").eq("organization_id", organizationId).in("id", draft.pets.map((pet) => pet.resourceId)).eq("status", "active").is("deleted_at", null),
   ]);
   const requestedServiceIds = new Set(draft.pets.flatMap((pet) => pet.serviceIds));
@@ -56,6 +56,7 @@ export async function createBookingAction(
     durationMinutes: service.duration_minutes, basePrice: Number(service.base_price), durationExtraSmall: service.duration_extra_small,
     durationSmall: service.duration_small, durationMedium: service.duration_medium, durationLarge: service.duration_large,
     durationExtraLarge: service.duration_extra_large, durationCat: service.duration_cat,
+    dogSizePricing: service.dog_size_pricing as Record<string, { price?: number | null; duration?: number | null }>,
     speciesPricing: service.species_pricing as Record<string, { price: number; duration: number }>,
   }]));
   const durationFor = (petId: string, serviceId: string) => {
