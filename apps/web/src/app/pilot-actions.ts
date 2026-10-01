@@ -183,10 +183,14 @@ export async function createCustomerAction(_previous: PilotActionState, formData
   try {
     pets = JSON.parse(textValue(formData, "petsJson", 20_000)) as typeof pets;
   } catch { return databaseError("Pet", "data pet tidak valid"); }
+  const petTypesResult = await context.supabase.from("organization_pet_types").select("key").eq("organization_id", context.organizationId).eq("is_active", true);
+  if (petTypesResult.error) return databaseError("Pet", "jenis pet belum dapat diperiksa");
+  const allowedPetTypes = new Set((petTypesResult.data ?? []).map((type) => type.key));
   if (!Array.isArray(pets) || pets.length < 1 || pets.length > 5 || pets.some((pet) =>
     !pet || typeof pet.name !== "string" || !pet.name.trim() || pet.name.length > 80
-    || !["dog", "cat"].includes(pet.species)
+    || !allowedPetTypes.has(pet.species)
     || !["", "extra_small", "small", "medium", "large", "extra_large"].includes(pet.size)
+    || (pet.species !== "dog" && pet.size !== "")
     || (pet.weightKg && (!Number.isFinite(Number(pet.weightKg)) || Number(pet.weightKg) <= 0))
   )) return databaseError("Pet", "isi satu hingga lima pet dengan nama dan jenis yang valid");
 
@@ -665,12 +669,27 @@ function serviceFulfillmentModes(formData: FormData): string[] {
   return modes.length ? [...new Set(modes)] : ["home", "in_store"];
 }
 
-const SERVICE_CATEGORIES = new Set(["Basic Grooming", "Styling", "Special Charges", "Other Fees"]);
-
-/** Drives the section-22 per-category invoice discount; blank/unset falls back to "Other Fees" at discount time. */
-function serviceCategory(formData: FormData): string | null {
+/** Free-text categories are tenant-defined and used by invoice discount rules. */
+function serviceCategory(formData: FormData): string | null | "invalid" {
   const value = textValue(formData, "category", 40);
-  return SERVICE_CATEGORIES.has(value) ? value : null;
+  return !value ? null : /^[\p{L}\p{N}][\p{L}\p{N} &/()+.\-]{0,39}$/u.test(value) ? value : "invalid";
+}
+
+function serviceSpeciesPricing(formData: FormData, zeroTime: boolean): { matrix: Record<string, { price: number; duration: number }> } | { invalid: string } {
+  let parsed: unknown;
+  try { parsed = JSON.parse(textValue(formData, "speciesPricingJson", 10_000) || "{}"); }
+  catch { return { invalid: "harga jenis pet tidak valid" }; }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).length > 30) return { invalid: "harga jenis pet tidak valid" };
+  const result: Record<string, { price: number; duration: number }> = {};
+  for (const [key, raw] of Object.entries(parsed)) {
+    if (!/^[a-z][a-z0-9_]{1,29}$/.test(key) || ["dog", "cat"].includes(key) || !raw || typeof raw !== "object" || Array.isArray(raw)) return { invalid: "jenis pet tidak valid" };
+    const entry = raw as Record<string, unknown>;
+    if (typeof entry.price !== "number" || (!zeroTime && typeof entry.duration !== "number")) return { invalid: `isi harga dan durasi ${key}` };
+    const price = entry.price, duration = zeroTime ? 0 : Number(entry.duration);
+    if (!Number.isFinite(price) || price < 0 || price > 999999999 || !Number.isInteger(duration) || duration < 0 || duration > 1440) return { invalid: `harga/durasi ${key} tidak valid` };
+    result[key] = { price, duration };
+  }
+  return { matrix: result };
 }
 
 export async function createServiceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
@@ -683,7 +702,10 @@ export async function createServiceAction(_previous: PilotActionState, formData:
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
   const durationMatrix = serviceDurationMatrix(formData, zeroTime);
   if ("invalid" in durationMatrix) return databaseError("Layanan", durationMatrix.invalid);
-  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), metadata: { created_from: "homepaw_pilot" }, ...priceMatrix, ...durationMatrix.matrix });
+  const category = serviceCategory(formData), speciesPricing = serviceSpeciesPricing(formData, zeroTime);
+  if (category === "invalid") return databaseError("Layanan", "kategori layanan tidak valid");
+  if ("invalid" in speciesPricing) return databaseError("Layanan", speciesPricing.invalid);
+  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), species_pricing: speciesPricing.matrix, metadata: { created_from: "homepaw_pilot" }, ...priceMatrix, ...durationMatrix.matrix });
   if (error) return databaseError("Layanan gagal dibuat", error.message);
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil ditambahkan." };
 }
@@ -699,10 +721,25 @@ export async function updateServiceAction(_previous: PilotActionState, formData:
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
   const durationMatrix = serviceDurationMatrix(formData, zeroTime);
   if ("invalid" in durationMatrix) return databaseError("Layanan", durationMatrix.invalid);
+  const category = serviceCategory(formData), speciesPricing = serviceSpeciesPricing(formData, zeroTime);
+  if (category === "invalid") return databaseError("Layanan", "kategori layanan tidak valid");
+  if ("invalid" in speciesPricing) return databaseError("Layanan", speciesPricing.invalid);
   const isActive = formData.get("isActive") === "on";
-  const { error } = await context.supabase.from("service_catalog").update({ name, category: serviceCategory(formData), duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), is_active: isActive, ...priceMatrix, ...durationMatrix.matrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
+  const { error } = await context.supabase.from("service_catalog").update({ name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), species_pricing: speciesPricing.matrix, is_active: isActive, ...priceMatrix, ...durationMatrix.matrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
   if (error) return databaseError("Layanan gagal diperbarui", error.message);
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil diperbarui." };
+}
+
+export async function addPetTypeAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
+  if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Jenis pet", "izin service.manage diperlukan");
+  const label = textValue(formData, "label", 60);
+  const key = label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30);
+  if (label.length < 2 || !/^[a-z][a-z0-9_]{1,29}$/.test(key)) return databaseError("Jenis pet", "nama harus menghasilkan kode huruf minimal dua karakter");
+  const result = await context.supabase.schema("app").rpc("set_org_pet_type", { p_org: context.organizationId, p_key: key, p_label: label, p_active: true });
+  if (result.error) return databaseError("Jenis pet", "jenis baru belum dapat disimpan");
+  revalidatePath("/catalog"); revalidatePath("/customers"); revalidatePath("/bookings");
+  return { error: null, success: `${label} siap. Atur harga dan durasi tiap layanan sebelum menerima booking.` };
 }
 
 /** Opt-in starter import: only missing names are inserted in the active tenant.

@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { updateServiceAction, type PilotActionState } from "@/app/pilot-actions";
 import type { CatalogWorkspace } from "@/lib/pilot-data";
 import { formatRupiah } from "@/lib/pilot-data";
+import { SpeciesPricingFields, type PetTypeOption } from "@/components/species-pricing-fields";
 
 const initialState: PilotActionState = { error: null, success: null };
 const field = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10";
@@ -22,7 +23,7 @@ const SIZE_FIELDS = [
   ["priceCat", "durationCat", "cat", "Cat"],
 ] as const;
 
-export function ServiceManager({ service, canManageService }: { service: CatalogWorkspace["services"][number]; canManageService: boolean }) {
+export function ServiceManager({ service, canManageService, petTypes }: { service: CatalogWorkspace["services"][number]; canManageService: boolean; petTypes: PetTypeOption[] }) {
   const [editing, setEditing] = useState(false);
   const [zeroTime, setZeroTime] = useState(service.duration === 0);
   const [duration, setDuration] = useState(String(service.duration || 60));
@@ -45,9 +46,8 @@ export function ServiceManager({ service, canManageService }: { service: Catalog
     {editing ? <form action={action} className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4">
       <input type="hidden" name="serviceId" value={service.id} />
       <input className={field} name="name" defaultValue={service.name} required />
-      <select className={field} name="category" defaultValue={service.category ?? ""} aria-label="Kategori layanan">
-        <option value="">Kategori (opsional)</option><option value="Basic Grooming">Basic Grooming</option><option value="Styling">Styling</option><option value="Special Charges">Special Charges</option><option value="Other Fees">Other Fees</option>
-      </select>
+      <input className={field} name="category" list={`service-categories-${service.id}`} maxLength={40} defaultValue={service.category ?? ""} placeholder="Kategori layanan (boleh buat baru)" aria-label="Kategori layanan" />
+      <datalist id={`service-categories-${service.id}`}><option value="Basic Grooming" /><option value="Styling" /><option value="Special Charges" /><option value="Other Fees" /><option value="Cat Grooming" /></datalist>
       <div className="grid gap-3 sm:grid-cols-2">
         <input className={field} type="number" min="15" step="5" name="duration" value={duration} onChange={(event) => setDuration(event.target.value)} disabled={zeroTime} aria-label="Durasi menit" required />
         <input className={field} type="number" min="0" step="5" name="additionalDuration" defaultValue={service.additionalDuration} disabled={zeroTime} aria-label="Durasi tambahan per unit" placeholder="Menit tambahan/unit" />
@@ -66,6 +66,7 @@ export function ServiceManager({ service, canManageService }: { service: Catalog
           {SIZE_FIELDS.map(([, durationKey, suffix, label]) => <input key={suffix} className={field} type="number" min="15" max="1440" step="5" name={`duration_${suffix}`} defaultValue={service[durationKey] ?? ""} placeholder={label} aria-label={`Durasi ${label}`} disabled={zeroTime} />)}
         </div>
       </div>
+      <SpeciesPricingFields petTypes={petTypes} initial={service.speciesPricing} zeroTime={zeroTime} />
       <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-700">
         {["home", "in_store"].map((mode) => <label key={mode} className="flex items-center gap-2"><input type="checkbox" name="fulfillmentModes" value={mode} defaultChecked={service.fulfillmentModes.includes(mode)} />{mode === "home" ? "Home service" : "Di toko"}</label>)}
         <label className="flex items-center gap-2"><input type="checkbox" name="isActive" defaultChecked={service.active} />Aktif</label>

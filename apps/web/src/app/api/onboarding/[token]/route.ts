@@ -10,10 +10,13 @@ export async function GET(_request: Request, { params }: Context) {
   const supabase = await createClient();
   // Only these token-scoped public wrappers are callable by an anonymous visitor.
   // Do not grant anonymous USAGE on the entire app schema.
-  const { data, error } = await supabase.rpc("get_customer_onboarding_link", { p_token: token });
+  const [{ data, error }, types] = await Promise.all([
+    supabase.rpc("get_customer_onboarding_link", { p_token: token }),
+    supabase.rpc("get_onboarding_pet_types", { p_token: token }),
+  ]);
   if (error) return NextResponse.json({ valid: false, status: "unavailable" }, { status: 503 });
   if (!data?.[0]) return NextResponse.json({ valid: false, status: "invalid" }, { status: 404 });
-  return NextResponse.json(data[0], { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ...data[0], petTypes: types.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request, { params }: Context) {

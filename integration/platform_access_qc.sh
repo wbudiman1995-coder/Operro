@@ -27,6 +27,19 @@ for migration in supabase/migrations/*.sql; do
     # is false before this migration runs.
     psql operro_platform_qc -v ON_ERROR_STOP=1 -q -c "insert into auth.users(id,email,email_confirmed_at) values ('a1000000-0000-4000-8000-000000000001','wbudiman1995@gmail.com',now())"
   fi
+  if [[ "$migration" == *20261020100000_legacy_org_access_roles.sql ]]; then
+    psql operro_platform_qc -v ON_ERROR_STOP=1 -q <<'SQL'
+insert into public.organizations(name,slug,status,vertical,settings)
+values('Legacy QC','legacy-qc','active','grooming','{}');
+insert into public.roles(organization_id,name,is_system)
+select id,'Owner',true from public.organizations where slug='legacy-qc';
+insert into public.memberships(user_id,organization_id,role_id,status)
+select u.id,o.id,r.id,'active' from public.users u
+join public.organizations o on o.slug='legacy-qc'
+join public.roles r on r.organization_id=o.id and r.name='Owner'
+where u.email='wbudiman1995@gmail.com';
+SQL
+  fi
   psql operro_platform_qc -v ON_ERROR_STOP=1 -q -f "$migration"
 done
 psql operro_platform_qc -v ON_ERROR_STOP=1 -f integration/platform_access_smoke.sql

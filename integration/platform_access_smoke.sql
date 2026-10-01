@@ -15,6 +15,13 @@ grant select, insert on qc_tokens to authenticated;
 create temporary table qc_org(id uuid primary key);
 grant select, insert on qc_org to authenticated;
 do $$ begin
+  if not exists(select 1 from public.organizations o join public.roles r on r.organization_id=o.id
+    where o.slug='legacy-qc' and r.name='Admin') then raise exception 'legacy Admin role not backfilled'; end if;
+  if not exists(select 1 from public.organizations o join public.roles r on r.organization_id=o.id
+    where o.slug='legacy-qc' and r.name='Pemilik') then raise exception 'legacy Pemilik role not backfilled'; end if;
+  raise notice 'PASS legacy organization invitation roles backfilled';
+end $$;
+do $$ begin
   if has_table_privilege('authenticated','public.memberships','INSERT')
     or has_table_privilege('authenticated','public.memberships','UPDATE')
     or has_table_privilege('authenticated','public.role_permissions','INSERT')
@@ -30,6 +37,17 @@ set local role authenticated;
 select set_config('request.jwt.claims',json_build_object('sub','a1000000-0000-4000-8000-000000000001','role','authenticated','app_metadata',json_build_object('is_platform_admin',true))::text,true);
 do $$ declare v_org uuid; begin
   if not app.is_operro_owner() then raise exception 'platform owner not recognized'; end if;
+  if app.is_business_owner_member((select id from public.organizations where slug='legacy-qc')) then
+    raise exception 'platform owner gained business-only checklist access'; end if;
+  if jsonb_array_length(app.list_organization_access((select id from public.organizations where slug='legacy-qc'))->'options')<>0
+    or jsonb_array_length(app.list_organization_access((select id from public.organizations where slug='legacy-qc'))->'admin_keys')<>0
+  then raise exception 'platform owner can read business Admin checklist'; end if;
+  begin
+    perform app.set_business_admin_permissions((select id from public.organizations where slug='legacy-qc'),array['booking.read']);
+    raise exception 'platform owner edited business Admin checklist';
+  exception when insufficient_privilege then null; end;
+  insert into qc_tokens values('legacy-invite@example.test',app.issue_access_invitation(
+    (select id from public.organizations where slug='legacy-qc'),'legacy-invite@example.test','Admin'));
   v_org:=app.prepare_operro_organization('QC Grooming','qc-grooming');
   insert into qc_org values(v_org);
   if not exists(select 1 from public.branches where organization_id=v_org and is_default) then raise exception 'default branch missing'; end if;
@@ -39,6 +57,15 @@ do $$ declare v_org uuid; begin
   insert into qc_tokens values('groomer@example.test',app.issue_access_invitation(v_org,'groomer@example.test','Groomer'));
   perform app.set_operro_billing_period(v_org,date '2026-09-01',250000,date '2026-09-30','awaiting_payment','QC manual invoice');
   if (app.list_operro_billing(v_org)->0->>'status') <> 'awaiting_payment' then raise exception 'billing record missing'; end if;
+  if app.issue_operro_invoice(v_org,date '2026-09-01','Langganan Operro September')
+    <> app.issue_operro_invoice(v_org,date '2026-09-01','Langganan Operro September')
+  then raise exception 'invoice retry was not idempotent'; end if;
+  begin
+    perform app.set_operro_billing_period(v_org,date '2026-09-01',300000,date '2026-09-30','awaiting_payment',null);
+    raise exception 'issued invoice amount was changed';
+  exception when check_violation then null; end;
+  if app.list_operro_billing(v_org)->0->>'invoice_number' not like 'OPR-%'
+  then raise exception 'platform invoice missing from billing list'; end if;
   raise notice 'PASS platform owner provisioned organization, branch, subscription, roles and invites';
 end $$;
 commit;
@@ -70,6 +97,10 @@ do $$ declare v_org uuid; begin
   v_org:=app.claim_access_invitation((select token from qc_tokens where email='owner@example.test'));
   perform set_config('request.jwt.claims',json_build_object('sub','a1000000-0000-4000-8000-000000000002','role','authenticated','active_org_id',v_org)::text,true);
   if not app.is_business_owner(v_org) then raise exception 'business owner missing'; end if;
+  perform app.set_org_pet_type(v_org,'rabbit','Kelinci',true);
+  if (select count(*) from jsonb_array_elements(app.list_my_operro_invoices()))<>1
+    or app.get_operro_invoice((app.list_my_operro_invoices()->0->>'id')::uuid)->>'organization_name'<>'QC Grooming'
+  then raise exception 'business owner cannot read their platform invoice'; end if;
   begin
     perform app.issue_access_invitation(v_org,'new@example.test','Admin');
     raise exception 'business owner issued forbidden invitation';
@@ -109,6 +140,8 @@ do $$ declare v_org uuid; v_member uuid; v_branch uuid; begin
   perform set_config('request.jwt.claims',json_build_object('sub','a1000000-0000-4000-8000-000000000006','role','authenticated','active_org_id',v_org)::text,true);
   if app.has_branch((select id from public.branches where organization_id=v_org and is_default)) then
     raise exception 'unlinked groomer sees whole branch'; end if;
+  if jsonb_array_length(app.list_my_operro_invoices())<>0 then
+    raise exception 'groomer can enumerate business subscription invoices'; end if;
   raise notice 'PASS groomer requires linked staff resource for branch access';
 end $$;
 commit;
@@ -141,6 +174,26 @@ select b.organization_id,b.id,p.id,r.id from public.bookings b
 join public.customers c on c.id=b.customer_id join public.pets p on p.customer_id=c.id
 join public.resources r on r.organization_id=b.organization_id and r.name='QC Groomer'
 where b.organization_id=(select id from qc_org) and c.display_name='QC Customer';
+insert into public.pets(organization_id,customer_id,name,species,status)
+select id,(select id from public.customers where organization_id=o.id and display_name='QC Customer'),
+  'QC Rabbit','rabbit','active' from public.organizations o where id=(select id from qc_org);
+insert into public.service_catalog(organization_id,name,category,duration_minutes,base_price,currency,species_pricing)
+select id,'QC Custom Species','Other Fees',60,50000,'IDR','{"rabbit":{"price":75000,"duration":45}}'::jsonb
+from public.organizations where id=(select id from qc_org);
+commit;
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims',json_build_object('sub','a1000000-0000-4000-8000-000000000002','role','authenticated','active_org_id',(select id from qc_org))::text,true);
+do $$ declare v_job_pet uuid; v_line uuid; begin
+  v_job_pet:=app.assembly_add_pet((select b.id from public.bookings b join public.customers c on c.id=b.customer_id
+    where c.organization_id=(select id from qc_org) and c.display_name='QC Customer' limit 1),
+    (select id from public.pets where organization_id=(select id from qc_org) and name='QC Rabbit'),true);
+  v_line:=app.assembly_add_line(v_job_pet,(select id from public.service_catalog where organization_id=(select id from qc_org) and name='QC Custom Species'),1);
+  if not exists(select 1 from public.grooming_job_pet_services where id=v_line and unit_price_snapshot=75000 and duration_minutes=45 and pet_size_snapshot='rabbit') then
+    raise exception 'custom pet type price/duration not snapshotted'; end if;
+  raise notice 'PASS custom pet type uses explicit species price and duration in booking assembly';
+end $$;
 commit;
 
 begin;
@@ -226,5 +279,15 @@ do $$ begin
     raise exception 'suspended org accepted public submission';
   exception when no_data_found then null; end;
   raise notice 'PASS suspension revokes live authorization even on stale JWT';
+end $$;
+rollback;
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims',json_build_object('sub','a1000000-0000-4000-8000-000000000002','role','authenticated')::text,true);
+do $$ begin
+  if jsonb_array_length(app.list_my_operro_invoices())<>1 then
+    raise exception 'suspended business owner cannot read unpaid invoice'; end if;
+  raise notice 'PASS suspended business owner retains access to Operro invoice only';
 end $$;
 rollback;

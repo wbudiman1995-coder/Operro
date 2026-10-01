@@ -21,6 +21,7 @@ import type { PilotActionState } from "@/app/pilot-actions";
 import { MapsCoordinateFields } from "@/components/customer-address-forms";
 import { IndonesiaRegionFields } from "@/components/indonesia-region-fields";
 import { BreedSelect } from "@/components/breed-select";
+import { SpeciesPricingFields, type PetTypeOption } from "@/components/species-pricing-fields";
 import { DOG_SIZE_BANDS, dogSizeFromWeight, type DogSizeBoundaries } from "@/lib/pet-sizing";
 import { HOMEPAW_MEMBERSHIP_TIERS } from "@/lib/homepaw-starter";
 import type { CatalogWorkspace } from "@/lib/pilot-data";
@@ -35,20 +36,20 @@ function ActionMessage({ state }: { state: PilotActionState }) {
   return <p className={`rounded-xl px-3 py-2 text-xs font-semibold ${state.error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>{state.error ?? state.success}</p>;
 }
 
-export function CustomerForm({ boundaries }: { boundaries: DogSizeBoundaries }) {
+export function CustomerForm({ boundaries, petTypes }: { boundaries: DogSizeBoundaries; petTypes: PetTypeOption[] }) {
   const [state, action, pending] = useActionState(createCustomerAction, initialPilotActionState);
-  type PetDraft = { id: number; name: string; species: "dog" | "cat"; breed: string; size: string; weightKg: string; color: string; age: string; notes: string };
+  type PetDraft = { id: number; name: string; species: string; breed: string; size: string; weightKg: string; color: string; age: string; notes: string };
   const [pets, setPets] = useState<PetDraft[]>([{ id: 0, name: "", species: "dog", breed: "", size: "", weightKg: "", color: "", age: "", notes: "" }]);
   const patchPet = (id: number, key: keyof PetDraft, value: string) => setPets(current => current.map(pet => pet.id === id ? {
     ...pet, [key]: value,
-    ...(key === "species" ? { breed: "", size: value === "cat" ? "" : dogSizeFromWeight(pet.weightKg, boundaries) ?? pet.size } : {}),
+    ...(key === "species" ? { breed: "", size: value === "dog" ? dogSizeFromWeight(pet.weightKg, boundaries) ?? "" : "" } : {}),
     ...(key === "weightKg" && pet.species === "dog" ? { size: dogSizeFromWeight(value, boundaries) ?? pet.size } : {}),
   } : pet));
   return <form action={action} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><input className={inputClass} name="name" placeholder="Nama pelanggan" required /><input className={inputClass} name="phone" placeholder="WhatsApp, contoh 0812..." /></div>
     <input type="hidden" name="petsJson" value={JSON.stringify(pets.map((pet) => ({ name: pet.name, species: pet.species, breed: pet.breed, size: pet.size, weightKg: pet.weightKg, color: pet.color, age: pet.age, notes: pet.notes })))} />
     <div className="space-y-3"><p className="text-sm font-semibold text-slate-700">Pet pelanggan</p>{pets.map((pet, index) => <section key={pet.id} className="space-y-3 rounded-xl border border-slate-200 p-3">
       <div className="flex items-center justify-between"><strong className="text-xs">Pet {index + 1}</strong>{pets.length > 1 ? <button type="button" onClick={() => setPets(current => current.filter(item => item.id !== pet.id))} className="text-xs font-bold text-rose-700">Hapus</button> : null}</div>
-      <div className="grid gap-3 sm:grid-cols-4"><input className={inputClass} value={pet.name} onChange={event => patchPet(pet.id, "name", event.target.value)} placeholder="Nama pet" aria-label={`Nama pet ${index + 1}`} required /><select className={inputClass} value={pet.species} onChange={event => patchPet(pet.id, "species", event.target.value)} aria-label={`Jenis pet ${index + 1}`}><option value="dog">Anjing</option><option value="cat">Kucing</option></select><BreedSelect species={pet.species} value={pet.breed} onChange={value => patchPet(pet.id, "breed", value)} className={inputClass} label={`Ras pet ${index + 1}`} /><select className={inputClass} value={pet.species === "cat" ? "" : pet.size} onChange={event => patchPet(pet.id, "size", event.target.value)} aria-label={`Ukuran pet ${index + 1}`} disabled={pet.species === "cat"}><option value="">{pet.species === "cat" ? "Kucing: harga Cat" : "Ukuran (isi berat untuk otomatis)"}</option>{DOG_SIZE_BANDS.map(band => <option key={band.value} value={band.value}>{band.label}</option>)}</select></div>
+      <div className="grid gap-3 sm:grid-cols-4"><input className={inputClass} value={pet.name} onChange={event => patchPet(pet.id, "name", event.target.value)} placeholder="Nama pet" aria-label={`Nama pet ${index + 1}`} required /><select className={inputClass} value={pet.species} onChange={event => patchPet(pet.id, "species", event.target.value)} aria-label={`Jenis pet ${index + 1}`}>{petTypes.filter((type) => type.active).map((type) => <option key={type.key} value={type.key}>{type.label}</option>)}</select>{pet.species === "dog" || pet.species === "cat" ? <BreedSelect species={pet.species} value={pet.breed} onChange={value => patchPet(pet.id, "breed", value)} className={inputClass} label={`Ras pet ${index + 1}`} /> : <input className={inputClass} value={pet.breed} onChange={event => patchPet(pet.id, "breed", event.target.value)} placeholder="Ras (opsional)" aria-label={`Ras pet ${index + 1}`} />}<select className={inputClass} value={pet.species === "dog" ? pet.size : ""} onChange={event => patchPet(pet.id, "size", event.target.value)} aria-label={`Ukuran pet ${index + 1}`} disabled={pet.species !== "dog"}><option value="">{pet.species === "dog" ? "Ukuran (isi berat untuk otomatis)" : "Harga menurut jenis pet"}</option>{DOG_SIZE_BANDS.map(band => <option key={band.value} value={band.value}>{band.label}</option>)}</select></div>
       <div className="grid gap-3 sm:grid-cols-3"><input className={inputClass} value={pet.weightKg} onChange={event => patchPet(pet.id, "weightKg", event.target.value)} placeholder="Berat kg" aria-label={`Berat pet ${index + 1}`} inputMode="decimal" /><input className={inputClass} value={pet.color} onChange={event => patchPet(pet.id, "color", event.target.value)} placeholder="Warna bulu" aria-label={`Warna pet ${index + 1}`} /><input className={inputClass} value={pet.age} onChange={event => patchPet(pet.id, "age", event.target.value)} placeholder="Umur" aria-label={`Umur pet ${index + 1}`} /></div>
       <textarea className={`${inputClass} h-auto py-2`} value={pet.notes} onChange={event => patchPet(pet.id, "notes", event.target.value)} placeholder="Catatan pet untuk groomer" aria-label={`Catatan pet ${index + 1}`} rows={2} />
     </section>)}{pets.length < 5 ? <button type="button" onClick={() => setPets(current => [...current, { id: Math.max(...current.map(pet => pet.id)) + 1, name: "", species: "dog", breed: "", size: "", weightKg: "", color: "", age: "", notes: "" }])} className="w-full rounded-xl border-2 border-dashed border-emerald-300 py-3 text-sm font-bold text-emerald-700">+ Tambah pet</button> : null}</div>
@@ -85,15 +86,14 @@ const SERVICE_SIZE_FIELDS = [
   ["large", "L · 15–25 kg"], ["extraLarge", "XL · >25 kg"], ["cat", "Cat"],
 ] as const;
 
-export function ServiceForm() {
+export function ServiceForm({ petTypes }: { petTypes: PetTypeOption[] }) {
   const [state, action, pending] = useActionState(createServiceAction, initialPilotActionState);
   const [zeroTime, setZeroTime] = useState(false);
   const [duration, setDuration] = useState("60");
   return <form action={action} className="space-y-3">
     <input className={inputClass} name="name" placeholder="Nama layanan" required />
-    <select className={inputClass} name="category" defaultValue="" aria-label="Kategori layanan">
-      <option value="">Kategori (opsional)</option><option value="Basic Grooming">Basic Grooming</option><option value="Styling">Styling</option><option value="Special Charges">Special Charges</option><option value="Other Fees">Other Fees</option>
-    </select>
+    <input className={inputClass} name="category" list="service-category-options" maxLength={40} placeholder="Kategori layanan (boleh buat baru)" aria-label="Kategori layanan" />
+    <datalist id="service-category-options"><option value="Basic Grooming" /><option value="Styling" /><option value="Special Charges" /><option value="Other Fees" /><option value="Cat Grooming" /></datalist>
     <div className="grid gap-3 sm:grid-cols-2">
       <input className={inputClass} type="number" min="15" step="5" name="duration" value={duration} onChange={(event) => setDuration(event.target.value)} disabled={zeroTime} aria-label="Durasi menit" />
       <input className={inputClass} type="number" min="0" step="1000" name="price" placeholder="Harga dasar Rp" required />
@@ -112,6 +112,7 @@ export function ServiceForm() {
         {SERVICE_SIZE_FIELDS.map(([size, label]) => <input key={size} className={inputClass} type="number" min="15" max="1440" step="5" name={`duration_${size}`} placeholder={label} aria-label={`Durasi ${label}`} disabled={zeroTime} />)}
       </div>
     </div>
+    <SpeciesPricingFields petTypes={petTypes} zeroTime={zeroTime} />
     <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-700">
       <label className="flex items-center gap-2"><input type="checkbox" name="fulfillmentModes" value="home" defaultChecked />Home service</label>
       <label className="flex items-center gap-2"><input type="checkbox" name="fulfillmentModes" value="in_store" defaultChecked />Di toko</label>

@@ -25,13 +25,14 @@ function renderInvitation(template:string,business:string,link:string){
 }
 
 export function OnboardingAdmin({
-  organizationName,settings,links,submissions,customers,
+  organizationName,settings,links,submissions,customers,petTypes,
 }:{
   organizationName:string;
   settings:Settings|null;
   links:LinkRow[];
   submissions:SubmissionRow[];
   customers:Array<{id:string;name:string;phone:string|null}>;
+  petTypes:Array<{key:string;label:string}>;
 }){
   const [state,action,pending]=useActionState(createOnboardingLinkAction,initialLink);
   const [settingsState,settingsAction,settingsPending]=useActionState(updateOnboardingSettingsAction,initialSettings);
@@ -66,7 +67,7 @@ export function OnboardingAdmin({
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
       <h2 className="font-bold">Menunggu review ({submissions.length})</h2>
       <p className="mt-1 text-xs text-slate-500">Link yang dikirim masuk ke antrean ini. Periksa dan ubah data yang kurang lengkap, simpan, baru setujui ke CRM.</p>
-      <div className="mt-4 space-y-3">{submissions.length===0?<p className="text-sm text-slate-400">Belum ada pendaftaran baru.</p>:submissions.map(row=><OnboardingReviewCard key={`${row.id}:${row.updated_at}`} row={row} customers={customers}/>)}</div>
+      <div className="mt-4 space-y-3">{submissions.length===0?<p className="text-sm text-slate-400">Belum ada pendaftaran baru.</p>:submissions.map(row=><OnboardingReviewCard key={`${row.id}:${row.updated_at}`} row={row} customers={customers} petTypes={petTypes}/>)}</div>
     </section>
 
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">

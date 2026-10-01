@@ -36,6 +36,7 @@ export function NoOrganizationState({ email }: { email: string }) {
             tervalidasi oleh database.
           </div>
           {email.toLowerCase() === "wbudiman1995@gmail.com" ? <Link href="/platform" className="mt-5 inline-block rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white">Buka panel platform Operro</Link> : null}
+          <p className="mt-5 text-sm"><Link href="/billing" className="font-bold text-emerald-800 underline">Lihat tagihan Operro untuk bisnis Anda</Link></p>
         </section>
       </div>
     </main>

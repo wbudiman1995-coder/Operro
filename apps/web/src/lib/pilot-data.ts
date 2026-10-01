@@ -13,6 +13,7 @@
  * - loadFollowupWorkspace: finds customers whose pets are overdue for grooming.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SpeciesPricing } from "@/lib/pet-sizing";
 import { isGoogleMapsLink } from "@/lib/maps";
 
 function assertResult(scope: string, error: { message: string } | null) {
@@ -185,7 +186,8 @@ export async function loadOperationsWorkspace(supabase: SupabaseClient, organiza
 
 export interface CatalogWorkspace {
   branches: Array<{ id: string; name: string }>;
-  services: Array<{ id: string; name: string; category: string | null; duration: number; additionalDuration: number; price: number; priceExtraSmall: number | null; priceSmall: number | null; priceMedium: number | null; priceLarge: number | null; priceExtraLarge: number | null; priceCat: number | null; durationExtraSmall: number | null; durationSmall: number | null; durationMedium: number | null; durationLarge: number | null; durationExtraLarge: number | null; durationCat: number | null; fulfillmentModes: string[]; active: boolean }>;
+  petTypes: Array<{ key: string; label: string; active: boolean }>;
+  services: Array<{ id: string; name: string; category: string | null; duration: number; additionalDuration: number; price: number; priceExtraSmall: number | null; priceSmall: number | null; priceMedium: number | null; priceLarge: number | null; priceExtraLarge: number | null; priceCat: number | null; durationExtraSmall: number | null; durationSmall: number | null; durationMedium: number | null; durationLarge: number | null; durationExtraLarge: number | null; durationCat: number | null; speciesPricing: SpeciesPricing; fulfillmentModes: string[]; active: boolean }>;
   memberships: Array<{ id: string; name: string }>;
   resources: Array<{
     id: string; branchId: string; membershipId: string | null; name: string; branchName: string; status: string; skills: unknown;
@@ -198,9 +200,10 @@ export interface CatalogWorkspace {
 
 export async function loadCatalogWorkspace(supabase: SupabaseClient, organizationId: string): Promise<CatalogWorkspace> {
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-  const [branches, services, resources, packages, products, levels, memberships, assignments, compensation, attendance] = await Promise.all([
+  const [branches, services, petTypes, resources, packages, products, levels, memberships, assignments, compensation, attendance] = await Promise.all([
     supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
-    supabase.from("service_catalog").select("id,name,category,duration_minutes,additional_duration_minutes,base_price,price_extra_small,price_small,price_medium,price_large,price_extra_large,price_cat,duration_extra_small,duration_small,duration_medium,duration_large,duration_extra_large,duration_cat,fulfillment_modes,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
+    supabase.from("service_catalog").select("id,name,category,duration_minutes,additional_duration_minutes,base_price,price_extra_small,price_small,price_medium,price_large,price_extra_large,price_cat,duration_extra_small,duration_small,duration_medium,duration_large,duration_extra_large,duration_cat,species_pricing,fulfillment_modes,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
+    supabase.from("organization_pet_types").select("key,label,is_active").eq("organization_id", organizationId).order("label"),
     supabase.from("resources").select("id,branch_id,membership_id,name,status,skills,settings,created_at").eq("organization_id", organizationId).eq("kind", "staff").is("deleted_at", null).order("name"),
     supabase.from("packages").select("id,name,description,service_id,total_sessions,price,currency,validity_days,visit_interval_days,rollover_policy,recurrence_interval,per_pet,size_band,discount_percent,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("product_catalog").select("id,name,sku").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
@@ -210,14 +213,14 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
     supabase.from("staff_compensation").select("membership_id,pay_type,base_amount,effective_from").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("effective_from", { ascending: false }),
     supabase.from("attendance_records").select("resource_id,classification,waived_at").eq("organization_id", organizationId).gte("scheduled_at", monthStart.toISOString()).is("deleted_at", null),
   ]);
-  for (const [scope, result] of [["catalog_branches", branches], ["catalog_services", services], ["catalog_resources", resources], ["catalog_packages", packages], ["catalog_products", products], ["catalog_levels", levels], ["catalog_memberships", memberships], ["catalog_assignments", assignments], ["catalog_compensation", compensation], ["catalog_attendance", attendance]] as const) assertResult(scope, result.error);
+  for (const [scope, result] of [["catalog_branches", branches], ["catalog_services", services], ["catalog_pet_types", petTypes], ["catalog_resources", resources], ["catalog_packages", packages], ["catalog_products", products], ["catalog_levels", levels], ["catalog_memberships", memberships], ["catalog_assignments", assignments], ["catalog_compensation", compensation], ["catalog_attendance", attendance]] as const) assertResult(scope, result.error);
   const branchMap = new Map((branches.data ?? []).map((row) => [row.id, row.name]));
   const stock = new Map<string, number>(); for (const row of levels.data ?? []) stock.set(row.product_id, (stock.get(row.product_id) ?? 0) + Number(row.quantity));
   const membershipOptions = (memberships.data ?? []).map((row) => {
     const user = relationRows(row.users)[0];
     return { id: row.id, name: String(user?.full_name ?? user?.email ?? "Staf") };
   });
-  return { branches: branches.data ?? [], memberships: membershipOptions, services: (services.data ?? []).map((row) => ({ id: row.id, name: row.name, category: row.category ?? null, duration: row.duration_minutes, additionalDuration: Number(row.additional_duration_minutes ?? 0), price: Number(row.base_price), priceExtraSmall: row.price_extra_small === null ? null : Number(row.price_extra_small), priceSmall: row.price_small === null ? null : Number(row.price_small), priceMedium: row.price_medium === null ? null : Number(row.price_medium), priceLarge: row.price_large === null ? null : Number(row.price_large), priceExtraLarge: row.price_extra_large === null ? null : Number(row.price_extra_large), priceCat: row.price_cat === null ? null : Number(row.price_cat), durationExtraSmall: row.duration_extra_small, durationSmall: row.duration_small, durationMedium: row.duration_medium, durationLarge: row.duration_large, durationExtraLarge: row.duration_extra_large, durationCat: row.duration_cat, fulfillmentModes: Array.isArray(row.fulfillment_modes) ? row.fulfillment_modes as string[] : ["home", "in_store"], active: row.is_active })), resources: (resources.data ?? []).map((row) => {
+  return { branches: branches.data ?? [], memberships: membershipOptions, petTypes: (petTypes.data ?? []).map((row) => ({ key: row.key, label: row.label, active: row.is_active })), services: (services.data ?? []).map((row) => ({ id: row.id, name: row.name, category: row.category ?? null, duration: row.duration_minutes, additionalDuration: Number(row.additional_duration_minutes ?? 0), price: Number(row.base_price), priceExtraSmall: row.price_extra_small === null ? null : Number(row.price_extra_small), priceSmall: row.price_small === null ? null : Number(row.price_small), priceMedium: row.price_medium === null ? null : Number(row.price_medium), priceLarge: row.price_large === null ? null : Number(row.price_large), priceExtraLarge: row.price_extra_large === null ? null : Number(row.price_extra_large), priceCat: row.price_cat === null ? null : Number(row.price_cat), durationExtraSmall: row.duration_extra_small, durationSmall: row.duration_small, durationMedium: row.duration_medium, durationLarge: row.duration_large, durationExtraLarge: row.duration_extra_large, durationCat: row.duration_cat, speciesPricing: row.species_pricing as SpeciesPricing, fulfillmentModes: Array.isArray(row.fulfillment_modes) ? row.fulfillment_modes as string[] : ["home", "in_store"], active: row.is_active })), resources: (resources.data ?? []).map((row) => {
     const settings = row.settings && typeof row.settings === "object" && !Array.isArray(row.settings) ? row.settings as Record<string, unknown> : {};
     const base = settings.base_location && typeof settings.base_location === "object" && !Array.isArray(settings.base_location) ? settings.base_location as Record<string, unknown> : {};
     const pay = (compensation.data ?? []).find((item) => item.membership_id === row.membership_id);

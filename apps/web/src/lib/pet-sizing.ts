@@ -8,7 +8,8 @@ export const DOG_SIZE_BANDS = [
 ] as const;
 
 export type DogSize = (typeof DOG_SIZE_BANDS)[number]["value"];
-export type PricingBand = DogSize | "cat";
+export type PricingBand = DogSize | "cat" | (string & {});
+export type SpeciesPricing = Record<string, { price: number; duration: number }>;
 export type DogSizeBoundaries = { xs: number; s: number; m: number; l: number };
 export const DEFAULT_DOG_SIZE_BOUNDARIES: DogSizeBoundaries = { xs: 5, s: 10, m: 15, l: 25 };
 
@@ -35,6 +36,7 @@ export interface SizedService {
   priceLarge?: number | null; priceExtraLarge?: number | null; priceCat?: number | null;
   durationExtraSmall?: number | null; durationSmall?: number | null; durationMedium?: number | null;
   durationLarge?: number | null; durationExtraLarge?: number | null; durationCat?: number | null;
+  speciesPricing?: SpeciesPricing;
 }
 
 const priceKey = { extra_small: "priceExtraSmall", small: "priceSmall", medium: "priceMedium", large: "priceLarge", extra_large: "priceExtraLarge", cat: "priceCat" } as const;
@@ -42,7 +44,7 @@ const durationKey = { extra_small: "durationExtraSmall", small: "durationSmall",
 
 export function pricingBand(pet: SizedPet): PricingBand | null {
   if (pet.species === "cat") return "cat";
-  if (pet.species !== "dog") return null;
+  if (pet.species !== "dog") return pet.species || null;
   // pets.size is assigned by the database trigger using this organization's
   // editable boundaries. Weight-only fallback is for legacy unsized rows.
   return DOG_SIZE_BANDS.some((band) => band.value === pet.size) ? pet.size as DogSize : dogSizeFromWeight(pet.weightKg);
@@ -50,9 +52,13 @@ export function pricingBand(pet: SizedPet): PricingBand | null {
 
 export function resolveServiceForPet(service: SizedService, pet: SizedPet): { price: number; duration: number; band: PricingBand | null } {
   const band = pricingBand(pet);
+  if (pet.species !== "dog" && pet.species !== "cat") {
+    const custom = service.speciesPricing?.[pet.species];
+    return { band, price: custom?.price ?? service.basePrice, duration: custom?.duration ?? 0 };
+  }
   return {
     band,
-    price: band ? service[priceKey[band]] ?? service.basePrice : service.basePrice,
-    duration: band ? service[durationKey[band]] ?? service.durationMinutes : service.durationMinutes,
+    price: band && band in priceKey ? service[priceKey[band as keyof typeof priceKey]] ?? service.basePrice : service.basePrice,
+    duration: band && band in durationKey ? service[durationKey[band as keyof typeof durationKey]] ?? service.durationMinutes : service.durationMinutes,
   };
 }
