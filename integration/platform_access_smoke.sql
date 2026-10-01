@@ -37,20 +37,19 @@ set local role authenticated;
 select set_config('request.jwt.claims',json_build_object('sub','a1000000-0000-4000-8000-000000000001','role','authenticated','app_metadata',json_build_object('is_platform_admin',true))::text,true);
 do $$ declare v_org uuid; begin
   if not app.is_operro_owner() then raise exception 'platform owner not recognized'; end if;
-  if app.is_business_owner_member((select id from public.organizations where slug='legacy-qc')) then
-    raise exception 'platform owner gained business-only checklist access'; end if;
-  if jsonb_array_length(app.list_organization_access((select id from public.organizations where slug='legacy-qc'))->'options')<>0
-    or jsonb_array_length(app.list_organization_access((select id from public.organizations where slug='legacy-qc'))->'admin_keys')<>0
-  then raise exception 'platform owner can read business Admin checklist'; end if;
-  begin
-    perform app.set_business_admin_permissions((select id from public.organizations where slug='legacy-qc'),array['booking.read']);
-    raise exception 'platform owner edited business Admin checklist';
-  exception when insufficient_privilege then null; end;
+  if not app.is_business_owner_member((select id from public.organizations where slug='legacy-qc')) then
+    raise exception 'platform owner cannot inspect business checklist'; end if;
+  if jsonb_array_length(app.list_organization_access((select id from public.organizations where slug='legacy-qc'))->'options')=0
+  then raise exception 'platform owner cannot read business Admin checklist'; end if;
+  perform app.set_business_admin_permissions((select id from public.organizations where slug='legacy-qc'),array['booking.read']);
   insert into qc_tokens values('legacy-invite@example.test',app.issue_access_invitation(
     (select id from public.organizations where slug='legacy-qc'),'legacy-invite@example.test','Admin'));
   v_org:=app.prepare_operro_organization('QC Grooming','qc-grooming');
   insert into qc_org values(v_org);
   if not exists(select 1 from public.branches where organization_id=v_org and is_default) then raise exception 'default branch missing'; end if;
+  if not exists(select 1 from public.memberships m where m.organization_id=v_org
+      and m.user_id='a1000000-0000-4000-8000-000000000001' and m.status='active')
+  then raise exception 'platform owner not attached to new workspace'; end if;
   insert into qc_tokens values('owner@example.test',app.issue_access_invitation(v_org,'owner@example.test','Pemilik'));
   insert into qc_tokens values('helper@example.test',app.issue_access_invitation(v_org,'helper@example.test','Bantuan Operro'));
   insert into qc_tokens values('admin@example.test',app.issue_access_invitation(v_org,'admin@example.test','Admin'));
@@ -262,7 +261,26 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claims',json_build_object('sub','a1000000-0000-4000-8000-000000000001','role','authenticated','app_metadata',json_build_object('is_platform_admin',true))::text,true);
 select app.set_operro_organization_status((select id from qc_org),'suspended','QC unpaid');
+do $$ begin
+  if public.set_active_organization((select id from qc_org)) is distinct from (select id from qc_org)
+  then raise exception 'platform owner cannot open suspended workspace'; end if;
+  raise notice 'PASS platform owner can switch to suspended workspace';
+end $$;
 commit;
+
+do $$ declare v_claims jsonb; begin
+  v_claims := public.custom_access_token_hook(jsonb_build_object(
+    'user_id','a1000000-0000-4000-8000-000000000001',
+    'claims',jsonb_build_object('sub','a1000000-0000-4000-8000-000000000001','app_metadata','{}'::jsonb)));
+  if v_claims #>> '{claims,active_org_id}' is distinct from (select id::text from qc_org)
+  then raise exception 'platform owner lost suspended organization after token refresh'; end if;
+  v_claims := public.custom_access_token_hook(jsonb_build_object(
+    'user_id','a1000000-0000-4000-8000-000000000002',
+    'claims',jsonb_build_object('sub','a1000000-0000-4000-8000-000000000002','app_metadata','{}'::jsonb)));
+  if v_claims #>> '{claims,active_org_id}' is not null
+  then raise exception 'ordinary owner retained suspended organization after token refresh'; end if;
+  raise notice 'PASS token refresh keeps suspended org only for Operro owner';
+end $$;
 
 begin;
 set local role authenticated;

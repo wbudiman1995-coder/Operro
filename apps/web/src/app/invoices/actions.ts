@@ -38,6 +38,36 @@ export async function createBookingInvoiceAction(_previous: PilotActionState, fo
   return success(`${invoice.data.invoice_number} berhasil diterbitkan.`);
 }
 
+export async function createManualVisitInvoiceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
+  const context = await invoiceContext();
+  if (!context) return failure("Sesi atau organisasi aktif tidak tersedia.");
+  if (!context.capabilities["invoice.issue"]) return failure("Peran Anda tidak diizinkan menerbitkan invoice.");
+  const visitId = id(formData, "visitId");
+  const requestKey = id(formData, "requestKey");
+  const amount = Number(formData.get("amount"));
+  const issuedDate = value(formData, "invoiceDate", 10);
+  const dueDate = value(formData, "dueDate", 10);
+  if (!visitId || !requestKey || !/^\d{4}-\d{2}-\d{2}$/.test(issuedDate) || !Number.isFinite(amount) || amount <= 0) {
+    return failure("Pilih kunjungan dan isi nominal invoice yang valid.");
+  }
+  const issuedAt = new Date(`${issuedDate}T09:00:00+07:00`).toISOString();
+  const dueAt = dueDate ? new Date(`${dueDate}T23:59:59+07:00`).toISOString() : null;
+  if (dueAt && new Date(dueAt) < new Date(issuedAt)) return failure("Tanggal jatuh tempo tidak boleh sebelum tanggal invoice.");
+  const result = await context.supabase.schema("app").rpc("create_invoice_from_manual_visit", {
+    p_visit: visitId, p_issued_at: issuedAt, p_due_at: dueAt, p_amount: amount,
+    p_admin_notes: value(formData, "adminNotes", 2000) || null, p_request_key: requestKey,
+  });
+  if (result.error) {
+    console.error("create_invoice_from_manual_visit_failed", result.error);
+    if (result.error.message.includes("visit_already_invoiced")) return failure("Kunjungan ini sudah memiliki invoice. Muat ulang daftar.");
+    if (result.error.message.includes("visit_has_active_manual_billing")) return failure("Kunjungan ini sudah ditandai tertagih manual. Batalkan penagihan manual sebelum membuat invoice.");
+    return failure("Invoice kunjungan belum dapat dibuat. Periksa izin, cabang, dan nominal.");
+  }
+  const invoice = result.data as { invoice_number?: string } | null;
+  revalidatePath("/invoices/new"); revalidatePath("/finance"); revalidatePath("/visits");
+  return success(`${invoice?.invoice_number ?? "Invoice kunjungan"} berhasil diterbitkan.`);
+}
+
 export async function createPackageInvoiceAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await invoiceContext();
   if (!context) return failure("Sesi atau organisasi aktif tidak tersedia.");

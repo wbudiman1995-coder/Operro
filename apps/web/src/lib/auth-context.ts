@@ -49,6 +49,11 @@ export const loadAuthContext = cache(async function loadAuthContext(
     return null;
   }
 
+  const metadata = claims.app_metadata;
+  const isOperroOwner = readStringClaim(claims, "email")?.toLowerCase() === "wbudiman1995@gmail.com"
+    && typeof metadata === "object" && metadata !== null
+    && (metadata as Record<string, unknown>).is_platform_admin === true;
+
   const [
     {
       data: { user },
@@ -57,7 +62,7 @@ export const loadAuthContext = cache(async function loadAuthContext(
     organizations,
   ] = await Promise.all([
     supabase.auth.getUser(),
-    loadAccessibleOrganizations(supabase, subject),
+    loadAccessibleOrganizations(supabase, subject, isOperroOwner),
   ]);
 
   if (userError || !user || user.id !== subject) {

@@ -128,7 +128,7 @@ test("pilot-actions.ts stays a valid \"use server\" module: only async functions
 });
 
 test("the catalog category select feeds the section-22 per-category discount vocabulary exactly", () => {
-  assert.match(actions, /SERVICE_CATEGORIES = new Set\(\["Basic Grooming", "Styling", "Special Charges", "Other Fees"\]\)/);
+  assert.match(actions, /for \(const \[slug, label\] of INVOICE_DISCOUNT_CATEGORIES\)/);
   assert.match(actions, /import \{ INVOICE_DISCOUNT_CATEGORIES \} from "@\/lib\/invoice-discount-categories";/);
   const categories = fs.readFileSync(path.join(root, "apps/web/src/lib/invoice-discount-categories.ts"), "utf8");
   assert.doesNotMatch(categories, /"use server"/);

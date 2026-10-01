@@ -34,7 +34,8 @@ test("duplicate visit invoices and double-click saves are protected", () => {
 test("studio provides HomePaw invoice selection and due-date workflow", () => {
   assert.match(studio, /Sesudah kunjungan/);
   assert.match(studio, /Paket \/ prepaid/);
-  assert.match(studio, /Cari pelanggan, kode, alamat, hewan, layanan, atau groomer/);
+  assert.match(studio, /Cari nama owner, kode, alamat, pet, layanan, atau groomer/);
+  assert.match(studio, /Kunjungan manual/);
   assert.match(studio, /name="dueDate"/);
   assert.match(studio, /name="manualGroomer"/);
   assert.match(studio, /name="documentType"/);

@@ -48,7 +48,7 @@ export default async function OrganizationsPage() {
           <Link href="/billing" className="mb-5 ml-3 inline-block text-sm font-bold text-emerald-800 underline">Tagihan Operro</Link>
           <p className="text-sm font-bold text-emerald-700">Pilih workspace</p>
           <h1 className="mt-3 max-w-2xl text-4xl font-bold tracking-[-0.05em] text-slate-950 sm:text-5xl">Organisasi mana yang ingin Anda buka?</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-500">Kami hanya menampilkan organisasi dengan membership aktif dan status operasional yang masih valid.</p>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-500">Akun bisnis melihat organisasi dengan akses aktif. Pemilik Operro juga dapat membuka organisasi yang ditangguhkan untuk pemeriksaan dan perbaikan.</p>
 
           <div className="mt-10">
             <OrganizationSwitcher

@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import {
   issueAccessInviteAction, issueOperroInvoiceAction, prepareOrganizationAction, setAdminPermissionsAction,
   setBillingPeriodAction, setMemberRoleAction, setOrganizationStatusAction, type AccessState,
@@ -8,6 +10,26 @@ import {
 
 const initial: AccessState = { error: null, success: null };
 type Access = { members: { email: string; role: string; status: string }[]; admin_keys: string[]; options: { key: string; description: string | null }[] };
+
+export function OpenOrganizationButton({ organizationId }: { organizationId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function open() {
+    setBusy(true); setError("");
+    try {
+      const supabase = createClient();
+      const result = await supabase.rpc("set_active_organization", { p_organization_id: organizationId });
+      if (result.error || result.data !== organizationId) throw new Error("switch_failed");
+      const refreshed = await supabase.auth.refreshSession();
+      if (refreshed.error || !refreshed.data.session) throw new Error("refresh_failed");
+      const claims = await supabase.auth.getClaims(refreshed.data.session.access_token);
+      if (claims.error || claims.data?.claims?.active_org_id !== organizationId) throw new Error("claim_mismatch");
+      router.push("/dashboard"); router.refresh();
+    } catch { setError("Workspace belum dapat dibuka. Muat ulang lalu coba lagi."); setBusy(false); }
+  }
+  return <span className="inline-flex flex-col gap-1"><button type="button" onClick={open} disabled={busy} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{busy ? "Membuka…" : "Buka workspace ini"}</button>{error ? <span role="status" className="text-xs text-rose-700">{error}</span> : null}</span>;
+}
 
 function Feedback({ state }: { state: AccessState }) { return state.error || state.success ? <p role="status" className={`mt-2 text-xs font-semibold ${state.error ? "text-rose-700" : "text-emerald-700"}`}>{state.error ?? state.success}</p> : null; }
 
@@ -19,9 +41,12 @@ export function OrganizationPreparationForm() {
 export function AccessInvitationForm({ organizationId, platform, organizationStatus }: { organizationId: string; platform: boolean; organizationStatus?: string }) {
   const [state, action, pending] = useActionState(issueAccessInviteAction, initial);
   const [copied, setCopied] = useState(false);
-  const link = state.linkPath && typeof window !== "undefined" ? `${window.location.origin}${state.linkPath}` : "";
+  const [recipient, setRecipient] = useState("");
+  const origin = typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")
+    ? "https://operro-web.vercel.app" : typeof window !== "undefined" ? window.location.origin : "";
+  const link = state.linkPath ? `${origin}${state.linkPath}` : "";
   const suspended = organizationStatus === "suspended";
-  return <form action={action} className="space-y-3 rounded-2xl border bg-white p-5"><input type="hidden" name="organizationId" value={organizationId} /><h2 className="font-bold">Link undangan akun</h2><p className="text-xs leading-5 text-slate-500">Link terikat ke email penerima, satu kali pakai dan berlaku tujuh hari. Akun yang sudah ada bisa masuk; akun baru perlu verifikasi email.</p>{suspended ? <p role="status" className="rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-900">Organisasi ini sedang ditangguhkan. Aktifkan kembali sebelum membuat undangan.</p> : null}<div className="grid gap-3 sm:grid-cols-[1fr_170px_auto]"><input name="email" type="email" required placeholder="email@bisnis.com" aria-label="Email penerima" className="h-10 min-w-0 rounded-lg border px-3 text-sm" /><select name="role" aria-label="Peran undangan" className="h-10 rounded-lg border px-2 text-xs"><option value="Admin">Admin bisnis</option><option value="Groomer">Groomer</option>{platform ? <><option value="Pemilik">Pemilik bisnis</option><option value="Bantuan Operro">Bantuan Operro (tanpa payroll)</option></> : null}</select><button disabled={pending || suspended} className="h-10 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white disabled:opacity-50">{pending ? "Membuat…" : "Buat link"}</button></div><Feedback state={state} />{link ? <div className="flex flex-wrap gap-2"><input readOnly value={link} aria-label="Link undangan" className="h-10 min-w-48 flex-1 rounded-lg border px-2 text-xs" /><button type="button" onClick={() => navigator.clipboard.writeText(link).then(() => setCopied(true)).catch(() => setCopied(false))} className="rounded-lg border px-3 text-xs font-bold">{copied ? "Tersalin" : "Salin"}</button><a href={`mailto:?subject=${encodeURIComponent("Undangan Operro")}&body=${encodeURIComponent(`Buka link undangan Operro: ${link}`)}`} className="grid place-items-center rounded-lg border px-3 text-xs font-bold">Kirim lewat email</a></div> : null}</form>;
+  return <form action={action} className="space-y-3 rounded-2xl border bg-white p-5"><input type="hidden" name="organizationId" value={organizationId} /><h2 className="font-bold">Link undangan akun</h2><p className="text-xs leading-5 text-slate-500">Link pendaftaran berlaku sekali selama tujuh hari. Setelah diterima, akses email tetap aktif tanpa tanggal kedaluwarsa sampai pemilik bisnis atau Operro menangguhkannya. Akun dibuat di Operro dengan Supabase Auth; penerima tidak perlu akun Vercel.</p>{suspended ? <p role="status" className="rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-900">Organisasi ini sedang ditangguhkan. Aktifkan kembali sebelum membuat undangan.</p> : null}<div className="grid gap-3 sm:grid-cols-[1fr_170px_auto]"><input name="email" type="email" required placeholder="email@bisnis.com" aria-label="Email penerima" value={recipient} onChange={(event) => setRecipient(event.target.value)} className="h-10 min-w-0 rounded-lg border px-3 text-sm" /><select name="role" aria-label="Peran undangan" className="h-10 rounded-lg border px-2 text-xs"><option value="Admin">Admin bisnis</option><option value="Groomer">Groomer</option>{platform ? <><option value="Pemilik">Pemilik bisnis</option><option value="Bantuan Operro">Bantuan Operro (tanpa payroll)</option></> : null}</select><button disabled={pending || suspended} className="h-10 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white disabled:opacity-50">{pending ? "Membuat…" : "Buat link"}</button></div><Feedback state={state} />{link ? <div className="flex flex-wrap gap-2"><input readOnly value={link} aria-label="Link undangan" className="h-10 min-w-48 flex-1 rounded-lg border px-2 text-xs" /><button type="button" onClick={() => navigator.clipboard.writeText(link).then(() => setCopied(true)).catch(() => setCopied(false))} className="rounded-lg border px-3 text-xs font-bold">{copied ? "Tersalin" : "Salin"}</button><a href={`mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent("Undangan Operro")}&body=${encodeURIComponent(`Buka link undangan Operro: ${link}`)}`} className="grid place-items-center rounded-lg border px-3 text-xs font-bold">Kirim lewat email</a></div> : null}</form>;
 }
 
 function MemberEditor({ organizationId, member, platform }: { organizationId: string; member: Access["members"][number]; platform: boolean }) {

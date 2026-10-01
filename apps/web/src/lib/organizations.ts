@@ -6,7 +6,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type OrganizationStatus = "trial" | "active";
+export type OrganizationStatus = "trial" | "active" | "suspended";
 
 export interface AccessibleOrganization {
   id: string;
@@ -50,7 +50,7 @@ function normalizeOrganization(value: unknown): OrganizationRow | null {
     !isString(id) ||
     !isString(name) ||
     !isString(slug) ||
-    (status !== "trial" && status !== "active") ||
+    (status !== "trial" && status !== "active" && status !== "suspended") ||
     (vertical !== null && typeof vertical !== "string") ||
     deletedAt !== null
   ) {
@@ -67,7 +67,7 @@ function normalizeOrganization(value: unknown): OrganizationRow | null {
   };
 }
 
-function normalizeMembershipRows(value: unknown): AccessibleOrganization[] {
+function normalizeMembershipRows(value: unknown, includeSuspended = false): AccessibleOrganization[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -90,7 +90,7 @@ function normalizeMembershipRows(value: unknown): AccessibleOrganization[] {
       !isString(organizationId) ||
       !isString(membershipCreatedAt) ||
       organization.id !== organizationId ||
-      !OPERATIONAL_STATUSES.has(organization.status)
+      (!includeSuspended && !OPERATIONAL_STATUSES.has(organization.status))
     ) {
       continue;
     }
@@ -112,6 +112,7 @@ function normalizeMembershipRows(value: unknown): AccessibleOrganization[] {
 export async function loadAccessibleOrganizations(
   supabase: SupabaseClient,
   userId: string,
+  includeSuspended = false,
 ): Promise<AccessibleOrganization[]> {
   const { data, error } = await supabase
     .from("memberships")
@@ -133,7 +134,7 @@ export async function loadAccessibleOrganizations(
     .eq("user_id", userId)
     .eq("status", "active")
     .is("deleted_at", null)
-    .in("organizations.status", ["trial", "active"])
+    .in("organizations.status", includeSuspended ? ["trial", "active", "suspended"] : ["trial", "active"])
     .is("organizations.deleted_at", null)
     .order("created_at", { ascending: true });
 
@@ -141,7 +142,7 @@ export async function loadAccessibleOrganizations(
     throw new Error(`organization_resolution_failed:${error.message}`);
   }
 
-  return normalizeMembershipRows(data);
+  return normalizeMembershipRows(data, includeSuspended);
 }
 
 export function findActiveOrganization(
