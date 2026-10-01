@@ -43,3 +43,4 @@ SQL
   psql operro_platform_qc -v ON_ERROR_STOP=1 -q -f "$migration"
 done
 psql operro_platform_qc -v ON_ERROR_STOP=1 -f integration/platform_access_smoke.sql
+psql operro_platform_qc -v ON_ERROR_STOP=1 -f integration/auth_hook_role_smoke.sql
