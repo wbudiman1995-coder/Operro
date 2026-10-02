@@ -108,6 +108,7 @@ export interface CurrencyTotal {
 export interface CustomerOverview {
   id: string;
   name: string;
+  code: string;
   status: string;
   phone: string | null;
   email: string | null;
@@ -295,7 +296,7 @@ export async function loadCustomerOverview(
 ): Promise<CustomerOverview | null> {
   const customerResult = await supabase
     .from("customers")
-    .select("id,display_name,status,phone,email,source,notes,address,latitude,longitude")
+    .select("id,display_name,customer_code,status,phone,email,source,notes,address,latitude,longitude")
     .eq("organization_id", organizationId)
     .eq("id", customerId)
     .is("deleted_at", null)
@@ -359,6 +360,7 @@ export async function loadCustomerOverview(
   return {
     id: customer.id,
     name: customer.display_name,
+    code: customer.customer_code,
     status: customer.status,
     phone: customer.phone,
     email: customer.email,

@@ -88,15 +88,19 @@ test("a single character is rejected before any query is built", () => {
   assert.equal(normalizeSearchTerm("%"), null);
 });
 
-test("deduplicates customers matched by both name and phone", () => {
+test("deduplicates customers matched by name, phone, or persisted code", () => {
   const byName = [{ id: "c1", title: "Budi", subtitle: "0812", href: "/customers/c1" }];
   const byPhone = [
     { id: "c1", title: "Budi", subtitle: "0812", href: "/customers/c1" },
     { id: "c2", title: "Budiman", subtitle: "0813", href: "/customers/c2" },
   ];
-  const merged = mergeHitsById(byName, byPhone);
-  assert.equal(merged.length, 2);
-  assert.deepEqual(merged.map((hit) => hit.id), ["c1", "c2"]);
+  const byCode = [
+    { id: "c2", title: "Budiman", subtitle: "CUST-002 · 0813", href: "/customers/c2" },
+    { id: "c3", title: "Citra", subtitle: "CUST-003", href: "/customers/c3" },
+  ];
+  const merged = mergeHitsById(byName, byPhone, byCode);
+  assert.equal(merged.length, 3);
+  assert.deepEqual(merged.map((hit) => hit.id), ["c1", "c2", "c3"]);
 });
 
 test("merge preserves first-seen ordering and tolerates empty inputs", () => {

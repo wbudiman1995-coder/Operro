@@ -90,6 +90,7 @@ export async function loadDashboardData(supabase: SupabaseClient, organizationId
 export interface CustomerWorkspace {
   customers: Array<{
     id: string; name: string; phone: string | null; status: string; source: string | null; notes: string | null;
+    customerCode: string;
     pets: Array<{ id: string; name: string; species: string; breed: string | null; temperament: string | null }>;
     packages: Array<{ id: string; name: string; remaining: number; expiresAt: string | null }>;
     addresses: Array<{ id: string; label: string; formattedLine: string; latitude: number | null; longitude: number | null; isDefault: boolean }>;
@@ -99,7 +100,7 @@ export interface CustomerWorkspace {
 
 export async function loadCustomerWorkspace(supabase: SupabaseClient, organizationId: string): Promise<CustomerWorkspace> {
   const [customers, pets, customerPackages, packages, addresses, nextDiscounts] = await Promise.all([
-    supabase.from("customers").select("id,display_name,phone,status,source,notes").eq("organization_id", organizationId).is("deleted_at", null).order("display_name"),
+    supabase.from("customers").select("id,display_name,phone,status,source,notes,customer_code").eq("organization_id", organizationId).is("deleted_at", null).order("display_name"),
     supabase.from("pets").select("id,customer_id,name,species,breed,temperament").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("customer_packages").select("id,customer_id,package_id,sessions_remaining,expires_at,status").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("packages").select("id,name").eq("organization_id", organizationId).is("deleted_at", null),
@@ -109,7 +110,7 @@ export async function loadCustomerWorkspace(supabase: SupabaseClient, organizati
   for (const [scope, result] of [["customers", customers], ["pets", pets], ["customer_packages", customerPackages], ["packages", packages], ["customer_addresses", addresses], ["customer_next_discounts", nextDiscounts]] as const) assertResult(scope, result.error);
   const packageMap = new Map((packages.data ?? []).map((row) => [row.id, row.name]));
   return { customers: (customers.data ?? []).map((customer) => ({
-    id: customer.id, name: customer.display_name, phone: customer.phone, status: customer.status, source: customer.source, notes: customer.notes,
+    id: customer.id, name: customer.display_name, phone: customer.phone, status: customer.status, source: customer.source, notes: customer.notes, customerCode: customer.customer_code,
     pets: (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name, species: pet.species, breed: pet.breed, temperament: pet.temperament })),
     packages: (customerPackages.data ?? []).filter((item) => item.customer_id === customer.id).map((item) => ({ id: item.id, name: packageMap.get(item.package_id) ?? "Paket", remaining: item.sessions_remaining, expiresAt: item.expires_at })),
     nextDiscount: (() => {

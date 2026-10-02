@@ -9,8 +9,8 @@
  * takes raw filter syntax, where commas separate terms and parentheses group them, so a
  * term containing `,` `(` `)` or quoting characters changes the filter's structure even
  * after LIKE metacharacters are escaped. Customer name and phone are therefore queried
- * separately with `.ilike()`, which passes the pattern as a single bound value, and the
- * two result sets are merged here.
+ * separately with `.ilike()`, which passes the pattern as a single bound value. Name,
+ * phone, and persisted customer-code result sets are merged here.
  *
  * Scaling limitation (accepted for the pilot): there is no trigram or full-text index in
  * the frozen schema, so these are `ilike '%term%'` scans, bounded by a hard per-group
@@ -105,11 +105,12 @@ export async function runGlobalSearch(
   if (!capabilities["finance.read"]) restrictedGroups.push("invoices");
 
   const customerBase = () =>
-    supabase.from("customers").select("id,display_name,phone").eq("organization_id", organizationId).is("deleted_at", null);
+    supabase.from("customers").select("id,display_name,phone,customer_code").eq("organization_id", organizationId).is("deleted_at", null);
 
-  const [customersByName, customersByPhone, pets, bookings, invoices] = await Promise.all([
+  const [customersByName, customersByPhone, customersByCode, pets, bookings, invoices] = await Promise.all([
     customerBase().ilike("display_name", pattern).order("display_name").limit(SEARCH_GROUP_LIMIT),
     customerBase().ilike("phone", pattern).order("display_name").limit(SEARCH_GROUP_LIMIT),
+    customerBase().ilike("customer_code", pattern).order("display_name").limit(SEARCH_GROUP_LIMIT),
     supabase
       .from("pets")
       .select("id,name,breed,customer_id,customers!inner(display_name)")
@@ -141,20 +142,22 @@ export async function runGlobalSearch(
 
   fail("search_customers_name", customersByName.error);
   fail("search_customers_phone", customersByPhone.error);
+  fail("search_customers_code", customersByCode.error);
   fail("search_pets", pets.error);
   fail("search_bookings", bookings.error);
   fail("search_invoices", invoices.error);
 
-  const toCustomerHit = (row: { id: string; display_name: string; phone: string | null }): SearchHit => ({
+  const toCustomerHit = (row: { id: string; display_name: string; phone: string | null; customer_code: string }): SearchHit => ({
     id: row.id,
     title: row.display_name,
-    subtitle: row.phone ?? null,
+    subtitle: [row.customer_code, row.phone].filter(Boolean).join(" · "),
     href: `/customers/${row.id}`,
   });
 
   const customerHits = mergeHitsById(
     (customersByName.data ?? []).map(toCustomerHit),
     (customersByPhone.data ?? []).map(toCustomerHit),
+    (customersByCode.data ?? []).map(toCustomerHit),
   ).slice(0, SEARCH_GROUP_LIMIT);
 
   const allGroups: SearchGroup[] = [

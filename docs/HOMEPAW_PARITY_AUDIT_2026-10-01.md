@@ -5,8 +5,8 @@ This updates the stale 18 September plan against the current integration tree. *
 | # | Capability | Status | Evidence / remaining gap |
 |---|---|---|---|
 | 1 | Dashboard analytics | Partial | `/dashboard`; period comparison, cards and acquisition ROI absent. |
-| 2 | Customer CRM | Partial | `/customers`, Customer 360, onboarding, HomePaw-style search/filter/sort and eight-sheet XLSX export; bulk edit and persistent customer code absent. Export requires live permission/data QC. |
-| 3 | Customer 360 | Partial | `/customers/[customerId]`; address, pets, history, invoices and packages present; editing and custom fields incomplete. |
+| 2 | Customer CRM | Partial | `/customers`, Customer 360, onboarding, HomePaw-style search/filter/sort, persistent tenant-scoped customer codes and eight-sheet XLSX export; bulk edit remains absent. Export requires live permission/data QC. |
+| 3 | Customer 360 | Partial | `/customers/[customerId]`; stable customer code, address, pets, history, invoices and packages present; editing and custom fields incomplete. |
 | 4 | Pet database | Partial | `pets`, multi-pet intake and size logic; full standalone pet CRUD, coat profile and wash counter absent. |
 | 5 | Styling references | Implemented | Public onboarding upload, Customer 360 and groomer evidence, private Storage and cleanup (`public-onboarding-form`, `S27-S30-HANDOFF`). |
 | 6 | Fast customer entry | Implemented | Chat import and duplicate check (`fast-customer-import`, `createCustomerAction`). |

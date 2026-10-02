@@ -107,6 +107,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261020110000_platform_billing_invoices.sql
   supabase/migrations/20261020120000_custom_pet_types.sql
   supabase/migrations/20261022100000_platform_owner_workspace_access.sql
+  supabase/migrations/20261022110000_customer_codes.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -142,6 +143,7 @@ ls -l \
 step "GATE 3 — in-memory + preset-contract tests"
 npx tsx packages/backend/test/assembly_service.inmemory.test.ts
 npx tsx packages/backend/test/preset_contract.test.ts
+npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts
 
 step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
 run_as_postgres dropdb --if-exists operro_gate
@@ -159,6 +161,31 @@ echo "assembly fns: $assembly_fns"
   echo "Expected 8 assembly functions, found $assembly_fns" >&2
   exit 1
 }
+
+step "GATE 4b — customer-code contract and authenticated RLS"
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261022110000_test_customer_code.sql
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/customer_code/rls_smoke.sql
+
+step "GATE 4c — customer-code concurrency"
+CC_TMP="$(mktemp -d /tmp/operro-customer-code.XXXXXX)"
+trap 'rm -rf "$CC_TMP"' EXIT
+cp -a supabase/tests/customer_code/. "$CC_TMP/"
+find "$CC_TMP" -type f -exec sed -i 's/\r$//' {} +
+chmod -R a+rX "$CC_TMP"
+run_as_postgres env DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/operro_gate" \
+  bash "$CC_TMP/run_customer_code_concurrency.sh"
+rm -rf "$CC_TMP"
+trap - EXIT
+
+step "GATE 4d — populated customer-code upgrade"
+CC_UPGRADE_SCRIPT="$(mktemp /tmp/operro-customer-code-upgrade.XXXXXX)"
+trap 'rm -f "$CC_UPGRADE_SCRIPT"' EXIT
+sed 's/\r$//' integration/customer_code_populated_upgrade.sh > "$CC_UPGRADE_SCRIPT"
+chmod a+rx "$CC_UPGRADE_SCRIPT"
+run_as_postgres env PGHOST="$PGHOST" PGPORT="$PGPORT" PGUSER="$PGUSER" PGPASSWORD="$PGPASSWORD" \
+  bash "$CC_UPGRADE_SCRIPT" operro_customer_code_upgrade
+rm -f "$CC_UPGRADE_SCRIPT"
+trap - EXIT
 
 step "GATE 5 — assembly RPC tests"
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20260721001350_test_assembly.sql

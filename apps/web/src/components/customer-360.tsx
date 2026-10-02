@@ -36,7 +36,8 @@ export function Customer360Header({ overview }: { overview: CustomerOverview }) 
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0f8a72]">Profil 360</p>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
+          <div className="mt-2 flex flex-wrap items-baseline gap-3">
+            <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-slate-500">{overview.code}</span>
             <h1 className="text-3xl font-bold tracking-[-0.04em]">{overview.name}</h1>
             <StatusBadge status={overview.status} />
           </div>

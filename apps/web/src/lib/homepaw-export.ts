@@ -6,7 +6,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 type Row = Record<string, unknown>;
 const s = (value: unknown) => value === null || value === undefined ? "" : String(value);
 const safe = (value: unknown) => /^\s*[=+\-@]/.test(s(value)) ? `'${s(value)}` : s(value);
-const code = (id: unknown) => `CUS-${s(id).slice(0, 8).toUpperCase()}`;
 
 async function getAll(supabase: SupabaseClient, table: string, org: string, excludeDeleted = false): Promise<Row[]> {
   const rows: Row[] = [];
@@ -42,10 +41,10 @@ export async function buildCustomerExport(supabase: SupabaseClient, org: string)
   const book = new ExcelJS.Workbook(); book.creator = "Operro";
   sheet(book,"Customers",["Customer Code","Owner Name","WhatsApp","Status","Source","Address","Kecamatan","Kota","Province","Notes"],customers.map((row) => {
     const a = address.get(s(row.id));
-    return [code(row.id),row.display_name,row.phone,row.status,row.source,a?.line1,a?.kecamatan,a?.kabupaten_kota,a?.province,row.notes];
+    return [row.customer_code,row.display_name,row.phone,row.status,row.source,a?.line1,a?.kecamatan,a?.kabupaten_kota,a?.province,row.notes];
   }));
   sheet(book,"Pets",["Pet Name","Species","Breed","Size","Weight Kg","Owner Name","Customer Code"],pets.map((row) =>
-    [row.name,row.species,row.breed,row.size,row.weight_kg,customer.get(s(row.customer_id))?.display_name,code(row.customer_id)]));
+    [row.name,row.species,row.breed,row.size,row.weight_kg,customer.get(s(row.customer_id))?.display_name,customer.get(s(row.customer_id))?.customer_code]));
   return book;
 }
 
@@ -73,11 +72,11 @@ export async function buildHomePawExport(supabase: SupabaseClient, org: string):
   const book = new ExcelJS.Workbook(); book.creator = "Operro";
   sheet(book,"Customers",["Customer Code","Owner Name","WhatsApp","Address","Kecamatan","Kota","Province","Google Maps","Source","Notes","Created At"],customers.map((r) => {
     const a = address.get(s(r.id));
-    return [code(r.id),r.display_name,r.phone,a?.line1,a?.kecamatan,a?.kabupaten_kota,a?.province,
+    return [r.customer_code,r.display_name,r.phone,a?.line1,a?.kecamatan,a?.kabupaten_kota,a?.province,
       a?.latitude !== null && a?.latitude !== undefined && a.longitude !== null ? `https://www.google.com/maps?q=${a.latitude},${a.longitude}` : "",r.source,r.notes,r.created_at];
   }));
   sheet(book,"Pets",["Pet ID","Pet Name","Species","Owner Name","Customer Code","Breed","Size","Weight Kg","Color","Notes","Created At"],pets.map((r) =>
-    [r.id,r.name,r.species,customer.get(s(r.customer_id))?.display_name,code(r.customer_id),r.breed,r.size,r.weight_kg,r.color,r.notes,r.created_at]));
+    [r.id,r.name,r.species,customer.get(s(r.customer_id))?.display_name,customer.get(s(r.customer_id))?.customer_code,r.breed,r.size,r.weight_kg,r.color,r.notes,r.created_at]));
   sheet(book,"Appointments",["Booking ID","Start","End","Owner Name","Pets","Mode","Service","Status","Notes"],bookings.map((r) =>
     [r.id,r.starts_at,r.ends_at,customer.get(s(r.customer_id))?.display_name,(bookingPets.get(s(r.id)) ?? []).join(", "),r.fulfillment_mode,r.service_name_snapshot,r.status,r.notes]));
   sheet(book,"Invoices",["Invoice Number","Issued At","Due At","Owner Name","Subtotal","Discount","Tax","Total","Currency","Status","Paid At"],invoices.map((r) =>
