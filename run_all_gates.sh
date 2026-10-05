@@ -108,6 +108,10 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261020120000_custom_pet_types.sql
   supabase/migrations/20261022100000_platform_owner_workspace_access.sql
   supabase/migrations/20261022110000_customer_codes.sql
+  supabase/migrations/20261023100000_size_band_tables.sql
+  supabase/migrations/20261023110000_size_band_shadow_sync.sql
+  supabase/migrations/20261023120000_size_band_resolver.sql
+  supabase/migrations/20261023130000_size_band_integrity.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -224,6 +228,13 @@ bash integration/homepaw_qc_db.sh
 psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/homepaw_qc_smoke.sql
 psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/homepaw_size_membership_smoke.sql
 psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/homepaw_review_storage_smoke.sql
+
+step "GATE 7g — dynamic size bands (SB-01..SB-04) behavior"
+psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/size_band_smoke.sql
+bash integration/size_band_preflight.sh
+
+step "GATE 7h — platform access, helper roles and dog-size boundaries (isolated database)"
+bash integration/platform_access_qc.sh
 
 step "GATE 8 — completion vs assembly/reservation concurrency"
 run_as_postgres dropdb --if-exists operro_cc

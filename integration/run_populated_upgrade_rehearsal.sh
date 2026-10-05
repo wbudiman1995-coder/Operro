@@ -93,6 +93,9 @@ SQL
     version=$(basename "$migration")
     version=${version%%_*}
     if [[ "$version" != "20260919120000" && ( "$version" < "$cutoff" || "$version" == "$cutoff" ) ]]; then continue; fi
+    # The dynamic size-band migrations are rehearsed separately below, on top
+    # of the extra populated fixture, with before/after row fingerprints.
+    case "$(basename "$migration")" in *_size_band_*) continue;; esac
     echo "UPGRADE $version"
     sql -q -f "/work/supabase/migrations/$(basename "$migration")"
     upgrade_count=$((upgrade_count + 1))
@@ -119,6 +122,41 @@ begin
 end $$;
 SQL
   echo "HOMEPAW OWNER WORKSPACE PROVISION PASS"
+
+  # ---- Dynamic size bands (SB-01..SB-04) on populated data -------------------
+  sql -f integration/size_band_upgrade_fixture.sql
+  fp_before=$(sql -q -f integration/size_band_upgrade_fingerprint.sql)
+  echo "Pre-size-band fingerprint lines: $(printf '%s
+' "$fp_before" | wc -l)"
+  size_band_count=0
+  for migration in "$scratch"/supabase/migrations/*_size_band_*.sql; do
+    echo "SIZE-BAND $(basename "$migration")"
+    sql -q -f "/work/supabase/migrations/$(basename "$migration")"
+    size_band_count=$((size_band_count + 1))
+  done
+  [[ "$size_band_count" == "4" ]] || { echo "FAIL: expected 4 size-band migrations, found $size_band_count"; exit 1; }
+  fp_after=$(sql -q -f integration/size_band_upgrade_fingerprint.sql)
+  if [[ "$fp_before" != "$fp_after" ]]; then
+    echo "FAIL: size-band migrations changed existing data"
+    diff <(printf '%s
+' "$fp_before") <(printf '%s
+' "$fp_after") || true
+    exit 1
+  fi
+  printf '%s
+' "$fp_after"
+  echo "SIZE BAND DATA PRESERVATION PASS (counts and row hashes of pets, snapshots, packages, entitlements, prices, durations, invoices, payroll unchanged)"
+  sql -f integration/size_band_upgrade_checks.sql
+  # U-06: the backfill steps are idempotent (re-run the data statements verbatim)
+  fp_mid=$(sql -q -f integration/size_band_upgrade_fingerprint.sql)
+  bands_before=$(sql -Atc "select count(*) from public.organization_size_bands")
+  prices_before=$(sql -Atc "select count(*) from public.service_band_prices")
+  settings_before=$(sql -Atc "select count(*) from public.organization_size_band_settings")
+  sed -n '/^-- Backfill every existing organization/,/^commit;/p' "$scratch"/supabase/migrations/20261023100000_size_band_tables.sql | sed '$d' | sql -q
+  sed -n '/^-- Backfill: one row per legacy/,/^commit;/p' "$scratch"/supabase/migrations/20261023110000_size_band_shadow_sync.sql | sed '$d' | sql -q
+  [[ "$bands_before" == "$(sql -Atc "select count(*) from public.organization_size_bands")"      && "$prices_before" == "$(sql -Atc "select count(*) from public.service_band_prices")"      && "$settings_before" == "$(sql -Atc "select count(*) from public.organization_size_band_settings")" ]]     || { echo "FAIL: backfill re-run changed row counts"; exit 1; }
+  [[ "$fp_mid" == "$(sql -q -f integration/size_band_upgrade_fingerprint.sql)" ]] || { echo "FAIL: backfill re-run changed existing data"; exit 1; }
+  echo "SIZE BAND BACKFILL IDEMPOTENCY PASS (bands=$bands_before settings=$settings_before prices=$prices_before)"
   sql -Atc "select to_regprocedure('app.list_audit_events(text,uuid,integer)') is not null as audit_rpc, to_regprocedure('app.record_payment(uuid,text,numeric,text,uuid,uuid)') is not null as payment_rpc"
   echo "POPULATED UPGRADE PASS"
 } >"$log" 2>&1 || { tail -70 "$log"; exit 1; }
