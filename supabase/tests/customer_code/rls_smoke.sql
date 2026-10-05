@@ -68,8 +68,8 @@ select set_config('request.jwt.claims',json_build_object(
 do $$
 declare v_code text; v_failed boolean := false;
 begin
-  insert into public.customers (organization_id,display_name)
-    values ('0c300000-0000-4000-8000-000000000001','A Customer')
+  insert into public.customers (id,organization_id,display_name)
+    values ('0c300000-0000-4000-8000-0000000000c1','0c300000-0000-4000-8000-000000000001','A Customer')
     returning customer_code into v_code;
   if v_code <> 'CUST-001' then raise exception 'authorized manager received %', v_code; end if;
 
@@ -111,7 +111,7 @@ select set_config('request.jwt.claims',json_build_object(
   'active_org_id','0c300000-0000-4000-8000-000000000002',
   'role','authenticated')::text,true);
 do $$
-declare v_count integer; v_code text; v_failed boolean := false;
+declare v_count integer; v_code text; v_failed boolean := false; v_updated integer;
 begin
   select count(*) into v_count from public.customers
    where organization_id='0c300000-0000-4000-8000-000000000001';
@@ -128,6 +128,12 @@ begin
   exception when insufficient_privilege then v_failed := true;
   end;
   if not v_failed then raise exception 'cross-org insert succeeded'; end if;
+
+  update public.customers
+     set status = 'inactive', source = 'cross-org-bulk'
+   where id = '0c300000-0000-4000-8000-0000000000c1';
+  get diagnostics v_updated = row_count;
+  if v_updated <> 0 then raise exception 'cross-org bulk update affected % rows', v_updated; end if;
 end $$;
 commit;
 
@@ -139,6 +145,15 @@ begin
        and display_name in ('Reader Write','Cross Write')
   ) then
     raise exception 'rejected write changed org A';
+  end if;
+  if not exists (
+    select 1 from public.customers
+     where id='0c300000-0000-4000-8000-0000000000c1'
+       and organization_id='0c300000-0000-4000-8000-000000000001'
+       and status='active'
+       and source is null
+  ) then
+    raise exception 'cross-org bulk update changed A Customer';
   end if;
   raise notice 'CUSTOMER CODE RLS PASS';
 end $$;

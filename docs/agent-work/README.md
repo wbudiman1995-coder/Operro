@@ -18,6 +18,7 @@ The first two dispatches were intentionally independent:
 
 1. **DeepSeek — persistent customer code:** completed, reviewed, and integrated as `7f12316`; its migration is `20261022110000_customer_codes.sql`.
 2. **Claude — dynamic size-band design:** completed and accepted. The response is [CLAUDE-DYNAMIC-SIZE-DESIGN-RESPONSE.md](CLAUDE-DYNAMIC-SIZE-DESIGN-RESPONSE.md).
+3. **DeepSeek — CRM bulk edit:** reviewed, corrected, integrated, and validated on `codex/parity-orchestration`; live browser QC remains.
 
 The next dispatch is **Claude — dynamic size bands, Bundle 1 DB foundation**. Use [CLAUDE-DYNAMIC-SIZE-BUNDLE-1.md](CLAUDE-DYNAMIC-SIZE-BUNDLE-1.md) and the refreshed `Operro-Claude-Dynamic-Size-Bundle-1-d4ee76d.zip`. Migration slots `20261023100000` through `20261023130000` are reserved for this bundle.
 
