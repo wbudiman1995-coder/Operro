@@ -143,7 +143,7 @@ ls -l \
 step "GATE 3 — in-memory + preset-contract tests"
 npx tsx packages/backend/test/assembly_service.inmemory.test.ts
 npx tsx packages/backend/test/preset_contract.test.ts
-npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts
+npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts
 
 step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
 run_as_postgres dropdb --if-exists operro_gate
@@ -162,9 +162,11 @@ echo "assembly fns: $assembly_fns"
   exit 1
 }
 
-step "GATE 4b — customer-code contract and authenticated RLS"
+step "GATE 4b — customer-code and access-control contracts"
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261022110000_test_customer_code.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/customer_code/rls_smoke.sql
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261021110000_test_audit_event_access.sql
 
 step "GATE 4c — customer-code concurrency"
 CC_TMP="$(mktemp -d /tmp/operro-customer-code.XXXXXX)"

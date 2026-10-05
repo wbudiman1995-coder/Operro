@@ -34,12 +34,12 @@ This updates the stale 18 September plan against the current integration tree. *
 | 28 | Grooming photos | Implemented | Before/after zones, evidence history, retention and role-limited storage. |
 | 29 | Payment control | Implemented | Screenshot/validation stages and payment register. |
 | 30 | Visit management | Implemented | `/visits`, manual billing, undo and invoice-from-visit. |
-| 31 | Financial operations | Partial | `/finance`, payment register, expenses/refunds; no complete capital/cash-on-hand and export suite. |
+| 31 | Financial operations | Partial | `/finance`, payment register, expenses/refunds and a filtered payment-register XLSX with an all-expenses sheet; no complete capital/cash-on-hand workflow or broader export suite. |
 | 32 | Payroll engine | Implemented | `/payroll`, attendance and immutable paid snapshots; see `ENGINE-3-S32-S33-HANDOFF.md`. |
 | 33 | Payroll exports | Implemented | XLSX, CSV and per-groomer PDF (`/payroll/export`). |
 | 34 | WhatsApp center | Partial | Invoice templates and follow-up drafts exist; no unified batch messaging center/delivery log. |
 | 35 | Retention/renewal | Implemented | `/followups`, renewal queue, drafts and owner settings; see `S35-HANDOFF.md`. |
-| 36 | Audit history | Partial | Generic audit/timeline exists; labels and cross-entity review UI incomplete. |
+| 36 | Audit history | Partial | Generic audit/timeline exists, and invoice detail now shows labeled actor/change history; filters and broader cross-entity review UI remain incomplete. |
 | 37 | Operational reconciliation | Missing | No unified view for visit/invoice/payroll mismatch across modules. |
 | 38 | Export/ownership | Partial | CRM eight-sheet XLSX, payroll XLSX/CSV and complaint CSV; no organization-wide backup including files/configuration. |
 | 39 | Business configuration | Partial | Branding, banks, service areas and access controls exist; not all HomePaw business settings are exposed. |

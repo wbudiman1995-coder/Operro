@@ -3,11 +3,12 @@ import "server-only";
 import ExcelJS from "exceljs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { spreadsheetSafeCell } from "@/lib/spreadsheet-safe";
+
 type Row = Record<string, unknown>;
 const s = (value: unknown) => value === null || value === undefined ? "" : String(value);
-const safe = (value: unknown) => /^\s*[=+\-@]/.test(s(value)) ? `'${s(value)}` : s(value);
 
-async function getAll(supabase: SupabaseClient, table: string, org: string, excludeDeleted = false): Promise<Row[]> {
+export async function getAll(supabase: SupabaseClient, table: string, org: string, excludeDeleted = false): Promise<Row[]> {
   const rows: Row[] = [];
   for (let offset = 0; ; offset += 500) {
     let query = supabase.from(table).select("*").eq("organization_id", org).order("id").range(offset, offset + 499);
@@ -21,10 +22,10 @@ async function getAll(supabase: SupabaseClient, table: string, org: string, excl
   return rows;
 }
 
-function sheet(book: ExcelJS.Workbook, name: string, headers: string[], rows: unknown[][]) {
+export function sheet(book: ExcelJS.Workbook, name: string, headers: string[], rows: unknown[][]) {
   const tab = book.addWorksheet(name);
   tab.addRow(headers);
-  rows.forEach((row) => tab.addRow(row.map(safe)));
+  rows.forEach((row) => tab.addRow(row.map(spreadsheetSafeCell)));
   tab.getRow(1).font = { bold: true };
   tab.columns.forEach((column) => { column.width = 23; });
   tab.views = [{ state: "frozen", ySplit: 1 }];

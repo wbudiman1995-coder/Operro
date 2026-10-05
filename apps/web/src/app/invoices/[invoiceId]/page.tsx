@@ -7,8 +7,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AuditHistoryPanel } from "@/components/audit-history-panel";
 import { InvoiceCustomerNotesEditor } from "@/components/invoice-customer-notes-editor";
 import { PrintDownloadButton, WhatsAppHandoffButton } from "@/components/invoice-document-actions";
+import { loadAuditEvents } from "@/lib/audit-events";
 import { formatRupiah } from "@/lib/pilot-data";
 import { loadInvoiceDocument } from "@/lib/invoice-document";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
@@ -20,6 +22,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
   const workspace = await requireActiveWorkspace();
   const doc = await loadInvoiceDocument(workspace.supabase, workspace.activeOrganization.id, invoiceId);
   if (!doc) notFound();
+  const auditEvents = await loadAuditEvents(workspace.supabase, "invoices", invoiceId);
 
   const isServiceReport = doc.documentType === "service_report";
   const isPackageSale = doc.billingMode === "package_sale";
@@ -110,5 +113,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
 
       {doc.status === "issued" ? <InvoiceCustomerNotesEditor invoiceId={doc.id} revision={doc.revision} initialNotes={doc.customerNotes ?? ""} internalNote={doc.internalGroomerNotes} /> : null}
     </div>
+
+    <AuditHistoryPanel events={auditEvents} />
   </div>;
 }
