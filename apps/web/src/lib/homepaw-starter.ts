@@ -21,6 +21,16 @@ export const HOMEPAW_MEMBERSHIP_TIERS = [
   { key: "biweekly", name: "Paw Essential", frequency: "1x/2 minggu", visitIntervalDays: 14, sessions: 2, discountPercent: 10, recurrenceInterval: "month", validityDays: 31 },
 ] as const;
 
+/** Dynamic-mode variant: only the base values. Per-band prices go through app.set_service_band_prices. */
+export function dynamicStarterServiceRow(organizationId: string, item: (typeof HOMEPAW_STARTER_SERVICES)[number]) {
+  const row = starterServiceRow(organizationId, item);
+  return {
+    organization_id: row.organization_id, name: row.name, category: row.category, currency: row.currency,
+    base_price: row.base_price, duration_minutes: row.duration_minutes, additional_duration_minutes: 0,
+    required_photos: row.required_photos, fulfillment_modes: row.fulfillment_modes, is_active: true, metadata: row.metadata,
+  };
+}
+
 export function starterServiceRow(organizationId: string, item: (typeof HOMEPAW_STARTER_SERVICES)[number]) {
   const [xs, s, m, l, xl, cat] = item.prices;
   const [dxs, ds, dm, dl, dxl, dcat] = item.durations;

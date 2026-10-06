@@ -5,7 +5,7 @@
  * - CustomerForm, TaskForm, ServiceForm, PackageForm, ResourceForm, InventoryForm, PaymentForm, ExpenseForm: interactive pilot forms.
  * - ActionMessage: consistent success and error feedback.
  */
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 import {
   adjustInventoryAction,
@@ -14,6 +14,7 @@ import {
   createResourceAction,
   createServiceAction,
   createTaskAction,
+  loadPackageSizeChoicesAction,
   recordExpenseAction,
   recordPaymentAction,
 } from "@/app/pilot-actions";
@@ -23,6 +24,7 @@ import { IndonesiaRegionFields } from "@/components/indonesia-region-fields";
 import { BreedSelect } from "@/components/breed-select";
 import { SpeciesPricingFields, type PetTypeOption } from "@/components/species-pricing-fields";
 import { DOG_SIZE_BANDS, dogSizeFromWeight, type DogSizeBoundaries } from "@/lib/pet-sizing";
+import { bandFieldNames, pricingColumns, type SizeBandWorkspace } from "@/lib/size-bands";
 import { HOMEPAW_MEMBERSHIP_TIERS } from "@/lib/homepaw-starter";
 import type { CatalogWorkspace } from "@/lib/pilot-data";
 
@@ -86,10 +88,12 @@ const SERVICE_SIZE_FIELDS = [
   ["large", "L · 15–25 kg"], ["extraLarge", "XL · >25 kg"], ["cat", "Cat"],
 ] as const;
 
-export function ServiceForm({ petTypes }: { petTypes: PetTypeOption[] }) {
+export function ServiceForm({ petTypes, sizeBands }: { petTypes: PetTypeOption[]; sizeBands?: SizeBandWorkspace }) {
   const [state, action, pending] = useActionState(createServiceAction, initialPilotActionState);
   const [zeroTime, setZeroTime] = useState(false);
   const [duration, setDuration] = useState("60");
+  const dynamic = sizeBands?.settings.mode === "dynamic";
+  const columns = dynamic ? pricingColumns(sizeBands.bands) : [];
   return <form action={action} className="space-y-3">
     <input className={inputClass} name="name" placeholder="Nama layanan" required />
     <input className={inputClass} name="category" list="service-category-options" maxLength={40} placeholder="Kategori layanan (boleh buat baru)" aria-label="Kategori layanan" />
@@ -100,6 +104,15 @@ export function ServiceForm({ petTypes }: { petTypes: PetTypeOption[] }) {
     </div>
     <label className="flex items-center gap-2 text-xs font-semibold text-slate-700"><input type="checkbox" name="zeroTimeAddon" checked={zeroTime} onChange={(event) => setZeroTime(event.target.checked)} />Layanan tambahan: berbayar, tidak menambah waktu booking (contoh: mandi kutu/jamur)</label>
     <input className={inputClass} type="number" min="0" step="5" name="additionalDuration" disabled={zeroTime} placeholder="Menit tambahan per unit ekstra (opsional)" />
+    {dynamic ? <div>
+      <input type="hidden" name="layoutVersion" value={sizeBands.settings.layoutVersion} />
+      <p className="mb-2 text-xs font-semibold text-slate-500">Harga dan durasi per ukuran hewan (opsional). Kosong = memakai harga dan durasi dasar; kategori baru juga begitu sampai diisi. Booking dan baris layanan memakai durasi yang sama.</p>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {columns.map((column) => { const names = bandFieldNames(column.key); return <fieldset key={column.key} className="min-w-0 rounded-xl border border-slate-200 p-2"><legend className="px-1 text-[11px] font-bold text-slate-600">{column.label}</legend>
+          <input className={inputClass} type="number" min="0" step="1000" name={names.price} placeholder="Harga Rp" aria-label={`Harga ${column.label}`} />
+          <input className={`${inputClass} mt-2`} type="number" min="15" max="1440" step="5" name={names.duration} placeholder="Menit" aria-label={`Durasi ${column.label}`} disabled={zeroTime} /></fieldset>; })}
+      </div>
+    </div> : <>
     <div>
       <p className="mb-2 text-xs font-semibold text-slate-500">Harga per ukuran hewan (opsional, kosongkan untuk pakai harga dasar)</p>
       <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
@@ -112,6 +125,7 @@ export function ServiceForm({ petTypes }: { petTypes: PetTypeOption[] }) {
         {SERVICE_SIZE_FIELDS.map(([size, label]) => <input key={size} className={inputClass} type="number" min="15" max="1440" step="5" name={`duration_${size}`} placeholder={label} aria-label={`Durasi ${label}`} disabled={zeroTime} />)}
       </div>
     </div>
+    </>}
     <SpeciesPricingFields petTypes={petTypes} zeroTime={zeroTime} />
     <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-700">
       <label className="flex items-center gap-2"><input type="checkbox" name="fulfillmentModes" value="home" defaultChecked />Home service</label>
@@ -125,8 +139,12 @@ export function ServiceForm({ petTypes }: { petTypes: PetTypeOption[] }) {
 /** Section 24: package/membership catalog terms. Governs future sales only -- see createPackageAction. */
 type PackageService = Pick<CatalogWorkspace["services"][number], "id" | "name" | "price" | "priceExtraSmall" | "priceSmall" | "priceMedium" | "priceLarge" | "priceExtraLarge" | "priceCat">;
 const PACKAGE_BANDS = [["extra_small", "XS"], ["small", "S"], ["medium", "M"], ["large", "L"], ["extra_large", "XL"], ["cat", "Cat"]] as const;
-function packageServicePrice(service: PackageService | undefined, band: string): number | null {
+type PackageSizeChoices = { dynamic: boolean; options: Array<{ value: string; label: string }>; prices: Record<string, Record<string, number | null>> };
+const LEGACY_PACKAGE_CHOICES: PackageSizeChoices = { dynamic: false, options: PACKAGE_BANDS.map(([value, label]) => ({ value, label })), prices: {} };
+
+function packageServicePrice(service: PackageService | undefined, band: string, choices: PackageSizeChoices = LEGACY_PACKAGE_CHOICES): number | null {
   if (!service) return null;
+  if (choices.dynamic) return choices.prices[service.id]?.[band] ?? service.price;
   const key = ({ extra_small: "priceExtraSmall", small: "priceSmall", medium: "priceMedium", large: "priceLarge", extra_large: "priceExtraLarge", cat: "priceCat" } as const)[band as typeof PACKAGE_BANDS[number][0]];
   return key ? service[key] ?? service.price : service.price;
 }
@@ -144,8 +162,15 @@ export function PackageForm({ services }: { services: PackageService[] }) {
   const [visitIntervalDays, setVisitIntervalDays] = useState("");
   const [recurrenceInterval, setRecurrenceInterval] = useState("none");
   const [perPet, setPerPet] = useState(false);
+  // Legacy organizations keep the fixed six options; dynamic ones load their own active bands (SQL stays authoritative).
+  const [choices, setChoices] = useState<PackageSizeChoices>(LEGACY_PACKAGE_CHOICES);
+  useEffect(() => {
+    let alive = true;
+    loadPackageSizeChoicesAction().then((result) => { if (alive && result.dynamic) setChoices(result); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
   const applyTierPrice = (nextServiceId: string, nextBand: string, nextSessions: number, nextDiscount: number) => {
-    const base = packageServicePrice(services.find((service) => service.id === nextServiceId), nextBand);
+    const base = packageServicePrice(services.find((service) => service.id === nextServiceId), nextBand, choices);
     if (base !== null) setPrice(String(Math.round(base * nextSessions * (100 - nextDiscount) / 100)));
   };
   const applyPreset = (key: string) => {
@@ -153,8 +178,8 @@ export function PackageForm({ services }: { services: PackageService[] }) {
     if (!tier) return;
     setSelectedTierKey(key);
     const nextServiceId = serviceId || services.find((service) => /basic grooming/i.test(service.name))?.id || "";
-    const nextBand = sizeBand || "extra_small";
-    setName(`${tier.name} ${PACKAGE_BANDS.find(([value]) => value === nextBand)?.[1] ?? "XS"}`);
+    const nextBand = sizeBand || choices.options[0]?.value || "extra_small";
+    setName(`${tier.name} ${choices.options.find((option) => option.value === nextBand)?.label ?? "XS"}`);
     setSessions(String(tier.sessions)); setDiscountPercent(String(tier.discountPercent));
     setValidityDays(String(tier.validityDays)); setVisitIntervalDays(String(tier.visitIntervalDays)); setRecurrenceInterval(tier.recurrenceInterval);
     setServiceId(nextServiceId); setSizeBand(nextBand); setPerPet(true);
@@ -177,7 +202,7 @@ export function PackageForm({ services }: { services: PackageService[] }) {
       {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
     </select>
     <div className="grid gap-3 sm:grid-cols-2">
-      <label className="text-xs font-semibold text-slate-700">Ukuran paket (opsional)<select className={`${inputClass} mt-1`} name="sizeBand" value={sizeBand} onChange={(event) => { const band = event.target.value; const tier = HOMEPAW_MEMBERSHIP_TIERS.find((item) => item.key === selectedTierKey); const oldLabel = PACKAGE_BANDS.find(([value]) => value === sizeBand)?.[1]; const newLabel = PACKAGE_BANDS.find(([value]) => value === band)?.[1]; if (tier && oldLabel && newLabel && name === `${tier.name} ${oldLabel}`) setName(`${tier.name} ${newLabel}`); setSizeBand(band); if (band && sessions && discountPercent) applyTierPrice(serviceId, band, Number(sessions), Number(discountPercent)); }}><option value="">Semua ukuran</option>{PACKAGE_BANDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label className="text-xs font-semibold text-slate-700">Ukuran paket (opsional)<select className={`${inputClass} mt-1`} name="sizeBand" value={sizeBand} onChange={(event) => { const band = event.target.value; const tier = HOMEPAW_MEMBERSHIP_TIERS.find((item) => item.key === selectedTierKey); const oldLabel = choices.options.find((option) => option.value === sizeBand)?.label; const newLabel = choices.options.find((option) => option.value === band)?.label; if (tier && oldLabel && newLabel && name === `${tier.name} ${oldLabel}`) setName(`${tier.name} ${newLabel}`); setSizeBand(band); if (band && sessions && discountPercent) applyTierPrice(serviceId, band, Number(sessions), Number(discountPercent)); }}><option value="">Semua ukuran</option>{choices.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
       <label className="text-xs font-semibold text-slate-700">Diskon referensi (%)<input className={`${inputClass} mt-1`} type="number" min="0" max="100" step="0.01" name="discountPercent" value={discountPercent} onChange={(event) => setDiscountPercent(event.target.value)} placeholder="Opsional" /></label>
     </div>
     <p className="text-xs text-slate-500">Harga saran dihitung dari harga layanan × sesi × diskon saat memilih template atau ukuran. Harga yang disimpan adalah angka di atas. Paket berukuran hanya bisa dibeli untuk satu hewan dengan ukuran yang cocok.</p>

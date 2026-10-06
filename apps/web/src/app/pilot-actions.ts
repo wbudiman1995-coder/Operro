@@ -30,7 +30,9 @@ import { loadAuthContext } from "@/lib/auth-context";
 import { loadCapabilities } from "@/lib/authorization";
 import { INVOICE_DISCOUNT_CATEGORIES } from "@/lib/invoice-discount-categories";
 import { canonicalRegionNames, type RegionNames } from "@/lib/indonesia-regions";
-import { HOMEPAW_STARTER_SERVICES, starterServiceRow } from "@/lib/homepaw-starter";
+import { HOMEPAW_STARTER_SERVICES, dynamicStarterServiceRow, starterServiceRow } from "@/lib/homepaw-starter";
+import { buildSizeBandWorkspace } from "@/lib/pilot-data";
+import { mapSizeBandError, parseBandPriceForm, pricingColumns, starterIndexForBand, type BandPriceItem, type SizeBandWorkspace } from "@/lib/size-bands";
 import { createClient } from "@/lib/supabase/server";
 
 export interface PilotActionState { error: string | null; success: string | null }
@@ -63,6 +65,37 @@ async function workspace() {
 
 function databaseError(scope: string, message: string) {
   return { error: `${scope}: ${message}`, success: null };
+}
+
+/** The organization's size mode and bands, read with the caller's own RLS scope. SQL re-checks everything it is asked to write. */
+async function loadSizeContext(context: NonNullable<Awaited<ReturnType<typeof workspace>>>): Promise<SizeBandWorkspace | { error: string }> {
+  const [settings, bands] = await Promise.all([
+    context.supabase.from("organization_size_band_settings").select("mode,layout_version").eq("organization_id", context.organizationId).maybeSingle(),
+    context.supabase.from("organization_size_bands").select("id,band_key,band_kind,label,sort_order,upper_kg,upper_inclusive,status").eq("organization_id", context.organizationId),
+  ]);
+  if (settings.error || bands.error) return { error: "pengaturan ukuran tidak dapat dimuat" };
+  return buildSizeBandWorkspace(settings.data, bands.data ?? [], []);
+}
+
+async function saveBandPrices(context: NonNullable<Awaited<ReturnType<typeof workspace>>>, serviceId: string, version: number, items: BandPriceItem[]) {
+  return context.supabase.schema("app").rpc("set_service_band_prices", { p_org: context.organizationId, p_service: serviceId, p_expected_version: version, p_prices: items });
+}
+
+function formLayoutVersion(formData: FormData): number | null {
+  const value = Number(formData.get("layoutVersion"));
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+/** Size choices for the package form: the fixed legacy six, or the organization's active bands in dynamic mode. */
+export async function loadPackageSizeChoicesAction(): Promise<{ dynamic: boolean; options: Array<{ value: string; label: string }>; prices: Record<string, Record<string, number | null>> }> {
+  const context = await workspace();
+  if (!context) return { dynamic: false, options: [], prices: {} };
+  const sizes = await loadSizeContext(context);
+  if ("error" in sizes || sizes.settings.mode !== "dynamic") return { dynamic: false, options: [], prices: {} };
+  const rows = await context.supabase.from("service_band_prices").select("service_id,pricing_key,price").eq("organization_id", context.organizationId);
+  const prices: Record<string, Record<string, number | null>> = {};
+  for (const row of rows.data ?? []) (prices[row.service_id] ??= {})[row.pricing_key] = row.price === null ? null : Number(row.price);
+  return { dynamic: true, options: pricingColumns(sizes.bands).map((column) => ({ value: column.key, label: column.label })), prices };
 }
 
 export async function setCustomerNextDiscountAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
@@ -698,15 +731,26 @@ export async function createServiceAction(_previous: PilotActionState, formData:
   const name = textValue(formData, "name", 100); const zeroTime = formData.get("zeroTimeAddon") === "on"; const duration = zeroTime ? 0 : numberValue(formData, "duration"); const price = numberValue(formData, "price");
   const additionalDuration = zeroTime ? 0 : numberValue(formData, "additionalDuration") ?? 0;
   if (name.length < 2 || duration === null || (!zeroTime && duration < 15) || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
+  const sizes = await loadSizeContext(context);
+  if ("error" in sizes) return databaseError("Layanan", sizes.error);
+  const dynamic = sizes.settings.mode === "dynamic";
   const priceMatrix = servicePriceMatrix(formData);
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
   const durationMatrix = serviceDurationMatrix(formData, zeroTime);
   if ("invalid" in durationMatrix) return databaseError("Layanan", durationMatrix.invalid);
+  const bandForm = dynamic ? parseBandPriceForm(formData, pricingColumns(sizes.bands), zeroTime) : null;
+  if (bandForm && "invalid" in bandForm) return databaseError("Layanan", bandForm.invalid);
   const category = serviceCategory(formData), speciesPricing = serviceSpeciesPricing(formData, zeroTime);
   if (category === "invalid") return databaseError("Layanan", "kategori layanan tidak valid");
   if ("invalid" in speciesPricing) return databaseError("Layanan", speciesPricing.invalid);
-  const { error } = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), species_pricing: speciesPricing.matrix, metadata: { created_from: "homepaw_pilot" }, ...priceMatrix, ...durationMatrix.matrix });
-  if (error) return databaseError("Layanan gagal dibuat", error.message);
+  // Dynamic organizations never write the legacy size columns; their band prices are written by SQL below.
+  const legacySizeColumns = dynamic ? {} : { ...priceMatrix, ...durationMatrix.matrix };
+  const created = await context.supabase.from("service_catalog").insert({ organization_id: context.organizationId, name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, currency: "IDR", required_photos: 2, fulfillment_modes: serviceFulfillmentModes(formData), species_pricing: speciesPricing.matrix, metadata: { created_from: "homepaw_pilot" }, ...legacySizeColumns }).select("id").single();
+  if (created.error) return databaseError("Layanan gagal dibuat", created.error.message);
+  if (bandForm && bandForm.items.length) {
+    const saved = await saveBandPrices(context, created.data.id, formLayoutVersion(formData) ?? sizes.settings.layoutVersion, bandForm.items);
+    if (saved.error) { revalidatePath("/catalog"); return databaseError("Layanan dibuat, tetapi harga per ukuran belum tersimpan", mapSizeBandError(saved.error)); }
+  }
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil ditambahkan." };
 }
 
@@ -717,16 +761,29 @@ export async function updateServiceAction(_previous: PilotActionState, formData:
   const name = textValue(formData, "name", 100); const zeroTime = formData.get("zeroTimeAddon") === "on"; const duration = zeroTime ? 0 : numberValue(formData, "duration"); const price = numberValue(formData, "price");
   const additionalDuration = zeroTime ? 0 : numberValue(formData, "additionalDuration") ?? 0;
   if (name.length < 2 || duration === null || (!zeroTime && duration < 15) || price === null || price < 0 || additionalDuration < 0) return databaseError("Layanan", "nama, durasi, atau harga tidak valid");
+  const sizes = await loadSizeContext(context);
+  if ("error" in sizes) return databaseError("Layanan", sizes.error);
+  const dynamic = sizes.settings.mode === "dynamic";
   const priceMatrix = servicePriceMatrix(formData);
   if ("invalid" in priceMatrix) return databaseError("Layanan", priceMatrix.invalid);
   const durationMatrix = serviceDurationMatrix(formData, zeroTime);
   if ("invalid" in durationMatrix) return databaseError("Layanan", durationMatrix.invalid);
+  const bandForm = dynamic ? parseBandPriceForm(formData, pricingColumns(sizes.bands), zeroTime) : null;
+  if (bandForm && "invalid" in bandForm) return databaseError("Layanan", bandForm.invalid);
+  // Prices are replaced as a set, so a form built from an older band layout must never be saved over a newer one.
+  const formVersion = formLayoutVersion(formData);
+  if (dynamic && formVersion !== sizes.settings.layoutVersion) return databaseError("Layanan", mapSizeBandError({ message: "stale_layout" }));
   const category = serviceCategory(formData), speciesPricing = serviceSpeciesPricing(formData, zeroTime);
   if (category === "invalid") return databaseError("Layanan", "kategori layanan tidak valid");
   if ("invalid" in speciesPricing) return databaseError("Layanan", speciesPricing.invalid);
   const isActive = formData.get("isActive") === "on";
-  const { error } = await context.supabase.from("service_catalog").update({ name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), species_pricing: speciesPricing.matrix, is_active: isActive, ...priceMatrix, ...durationMatrix.matrix }).eq("organization_id", context.organizationId).eq("id", serviceId);
+  const legacySizeColumns = dynamic ? {} : { ...priceMatrix, ...durationMatrix.matrix };
+  const { error } = await context.supabase.from("service_catalog").update({ name, category, duration_minutes: duration, additional_duration_minutes: additionalDuration, base_price: price, fulfillment_modes: serviceFulfillmentModes(formData), species_pricing: speciesPricing.matrix, is_active: isActive, ...legacySizeColumns }).eq("organization_id", context.organizationId).eq("id", serviceId);
   if (error) return databaseError("Layanan gagal diperbarui", error.message);
+  if (bandForm) {
+    const saved = await saveBandPrices(context, serviceId, formVersion ?? sizes.settings.layoutVersion, bandForm.items);
+    if (saved.error) { revalidatePath("/catalog"); return databaseError("Layanan diperbarui, tetapi harga per ukuran belum tersimpan", mapSizeBandError(saved.error)); }
+  }
   revalidatePath("/catalog"); revalidatePath("/bookings"); return { error: null, success: "Layanan berhasil diperbarui." };
 }
 
@@ -749,6 +806,23 @@ export async function importHomepawServicesAction(_previous: PilotActionState, _
   void _previous; void _formData;
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   if (!(await loadCapabilities(context.supabase))["service.manage"]) return databaseError("Template", "izin service.manage diperlukan");
+  const sizes = await loadSizeContext(context);
+  if ("error" in sizes) return databaseError("Template", sizes.error);
+  if (sizes.settings.mode === "dynamic") {
+    // Dynamic organizations: base rows first (new names only), then per-band prices for the bands the template knows.
+    const inserted = await context.supabase.from("service_catalog").upsert(HOMEPAW_STARTER_SERVICES.map((item) => dynamicStarterServiceRow(context.organizationId, item)), { onConflict: "organization_id,name", ignoreDuplicates: true }).select("id,name");
+    if (inserted.error) return databaseError("Template gagal ditambahkan", inserted.error.message);
+    const columns = pricingColumns(sizes.bands);
+    for (const row of inserted.data ?? []) {
+      const item = HOMEPAW_STARTER_SERVICES.find((candidate) => candidate.name === row.name);
+      if (!item) continue;
+      const items: BandPriceItem[] = columns.flatMap((column) => { const index = starterIndexForBand(column.key); return index === null ? [] : [{ band_key: column.key, price: item.prices[index], duration_minutes: item.durations[index] }]; });
+      const saved = await saveBandPrices(context, row.id, sizes.settings.layoutVersion, items);
+      if (saved.error) { revalidatePath("/catalog"); return databaseError("Template sebagian ditambahkan; harga per ukuran belum tersimpan", mapSizeBandError(saved.error)); }
+    }
+    revalidatePath("/catalog"); revalidatePath("/schedule");
+    return { error: null, success: "Template ditambahkan untuk layanan yang belum ada. Kategori tambahan yang tidak ada di template memakai harga dasar sampai Anda mengisinya." };
+  }
   const rows = HOMEPAW_STARTER_SERVICES.map((item) => starterServiceRow(context.organizationId, item));
   const { error } = await context.supabase.from("service_catalog").upsert(rows, { onConflict: "organization_id,name", ignoreDuplicates: true });
   if (error) return databaseError("Template gagal ditambahkan", error.message);
@@ -1136,7 +1210,7 @@ export async function updateCustomerPackageTermsAction(_previous: PilotActionSta
 
 const RECURRENCE_INTERVALS = new Set(["none", "week", "month", "year"]);
 const ROLLOVER_POLICIES = new Set(["none", "rollover"]);
-const PACKAGE_SIZE_BANDS = new Set(["extra_small", "small", "medium", "large", "extra_large", "cat"]);
+const LEGACY_PACKAGE_SIZE_BANDS = ["extra_small", "small", "medium", "large", "extra_large", "cat"];
 
 interface PackagePayload {
   name: string; description: string | null; service_id: string | null; total_sessions: number; price: number;
@@ -1144,7 +1218,7 @@ interface PackagePayload {
   size_band: string | null; discount_percent: number | null; visit_interval_days: number | null;
 }
 
-function packagePayload(formData: FormData): PackagePayload | { invalid: string } {
+function packagePayload(formData: FormData, allowedBands: ReadonlySet<string> = new Set(LEGACY_PACKAGE_SIZE_BANDS)): PackagePayload | { invalid: string } {
   const name = textValue(formData, "name", 100);
   const sessions = numberValue(formData, "sessions");
   const price = numberValue(formData, "price");
@@ -1164,7 +1238,7 @@ function packagePayload(formData: FormData): PackagePayload | { invalid: string 
   if (validityDaysText && (validityDays === null || !Number.isInteger(validityDays) || validityDays < 1)) return { invalid: "masa berlaku tidak valid" };
   if (!RECURRENCE_INTERVALS.has(recurrenceInterval)) return { invalid: "interval perpanjangan tidak valid" };
   if (!ROLLOVER_POLICIES.has(rolloverPolicy)) return { invalid: "kebijakan rollover tidak valid" };
-  if (sizeBand && !PACKAGE_SIZE_BANDS.has(sizeBand)) return { invalid: "ukuran paket tidak valid" };
+  if (sizeBand && !allowedBands.has(sizeBand)) return { invalid: "ukuran paket tidak valid" };
   if (sizeBand && (!perPet || !serviceId)) return { invalid: "paket per ukuran harus terikat pada satu hewan dan layanan" };
   if (discountText && (discountPercent === null || discountPercent < 0 || discountPercent > 100)) return { invalid: "diskon referensi tidak valid" };
   if (visitIntervalText && (visitIntervalDays === null || !Number.isInteger(visitIntervalDays) || visitIntervalDays < 1 || visitIntervalDays > 365)) return { invalid: "jarak antar kunjungan tidak valid" };
@@ -1183,7 +1257,9 @@ function packagePayload(formData: FormData): PackagePayload | { invalid: string 
 export async function createPackageAction(_previous: PilotActionState, formData: FormData): Promise<PilotActionState> {
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   if (!(await loadCapabilities(context.supabase))["membership.manage"]) return databaseError("Paket", "izin membership.manage diperlukan");
-  const payload = packagePayload(formData);
+  const sizes = await loadSizeContext(context);
+  const allowed = "error" in sizes ? undefined : new Set(pricingColumns(sizes.bands).map((column) => column.key));
+  const payload = packagePayload(formData, allowed);
   if ("invalid" in payload) return databaseError("Paket", payload.invalid);
   if (payload.service_id) {
     const { data: service } = await context.supabase.from("service_catalog").select("id").eq("organization_id", context.organizationId).eq("id", payload.service_id).is("deleted_at", null).maybeSingle();
@@ -1199,7 +1275,12 @@ export async function updatePackageAction(_previous: PilotActionState, formData:
   const context = await workspace(); if (!context) return databaseError("Sesi", "workspace aktif tidak tersedia");
   if (!(await loadCapabilities(context.supabase))["membership.manage"]) return databaseError("Paket", "izin membership.manage diperlukan");
   const packageId = idValue(formData, "packageId"); if (!packageId) return databaseError("Paket", "paket tidak valid");
-  const payload = packagePayload(formData);
+  const sizes = await loadSizeContext(context);
+  const allowed = "error" in sizes ? undefined : new Set(pricingColumns(sizes.bands).map((column) => column.key));
+  // An already-sold package may keep its (possibly archived) size; only a new assignment must be an active band.
+  const current = await context.supabase.from("packages").select("size_band").eq("organization_id", context.organizationId).eq("id", packageId).maybeSingle();
+  if (allowed && current.data?.size_band) allowed.add(current.data.size_band);
+  const payload = packagePayload(formData, allowed);
   if ("invalid" in payload) return databaseError("Paket", payload.invalid);
   if (payload.service_id) {
     const { data: service } = await context.supabase.from("service_catalog").select("id").eq("organization_id", context.organizationId).eq("id", payload.service_id).is("deleted_at", null).maybeSingle();

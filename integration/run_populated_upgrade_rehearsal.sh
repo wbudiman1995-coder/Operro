@@ -134,7 +134,8 @@ SQL
     sql -q -f "/work/supabase/migrations/$(basename "$migration")"
     size_band_count=$((size_band_count + 1))
   done
-  [[ "$size_band_count" == "4" ]] || { echo "FAIL: expected 4 size-band migrations, found $size_band_count"; exit 1; }
+  [[ "$size_band_count" == "5" ]] || { echo "FAIL: expected 5 size-band migrations (SB-01..SB-05), found $size_band_count"; exit 1; }
+  [[ "$(sql -Atc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app' and p.proname in ('preview_size_layout_impact','save_size_bands','archive_size_band','delete_size_band','set_service_band_prices','set_size_band_mode')")" == "6" ]]     || { echo "FAIL: SB-05 management RPCs missing after upgrade"; exit 1; }
   fp_after=$(sql -q -f integration/size_band_upgrade_fingerprint.sql)
   if [[ "$fp_before" != "$fp_after" ]]; then
     echo "FAIL: size-band migrations changed existing data"

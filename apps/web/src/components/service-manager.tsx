@@ -6,6 +6,8 @@ import { updateServiceAction, type PilotActionState } from "@/app/pilot-actions"
 import type { CatalogWorkspace } from "@/lib/pilot-data";
 import { formatRupiah } from "@/lib/pilot-data";
 import { SpeciesPricingFields, type PetTypeOption } from "@/components/species-pricing-fields";
+import { useBandValues } from "@/components/catalog-price-matrix";
+import { bandFieldNames, pricingColumns, previousColumnKey, type SizeBandWorkspace } from "@/lib/size-bands";
 
 const initialState: PilotActionState = { error: null, success: null };
 const field = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10";
@@ -23,7 +25,11 @@ const SIZE_FIELDS = [
   ["priceCat", "durationCat", "cat", "Cat"],
 ] as const;
 
-export function ServiceManager({ service, canManageService, petTypes }: { service: CatalogWorkspace["services"][number]; canManageService: boolean; petTypes: PetTypeOption[] }) {
+export function ServiceManager({ service, canManageService, petTypes, sizeBands }: { service: CatalogWorkspace["services"][number]; canManageService: boolean; petTypes: PetTypeOption[]; sizeBands?: SizeBandWorkspace }) {
+  const dynamic = sizeBands?.settings.mode === "dynamic";
+  const columns = dynamic ? pricingColumns(sizeBands.bands) : [];
+  const stored = sizeBands?.prices[service.id];
+  const bandValues = useBandValues(columns, stored);
   const [editing, setEditing] = useState(false);
   const [zeroTime, setZeroTime] = useState(service.duration === 0);
   const [duration, setDuration] = useState(String(service.duration || 60));
@@ -35,7 +41,9 @@ export function ServiceManager({ service, canManageService, petTypes }: { servic
         <p className="truncate font-bold">{service.name}</p>
         <p className="mt-1 text-xs text-slate-500">{service.category ? `${service.category} · ` : ""}{service.duration === 0 ? "Tidak menambah durasi" : `${service.duration} menit`}{service.additionalDuration > 0 ? ` (+${service.additionalDuration} menit/unit tambahan)` : ""} · {formatRupiah(service.price)}</p>
         <p className="mt-1 text-[11px] text-slate-400">
-          {SIZE_FIELDS.map(([priceKey, durationKey, , label]) => `${label}: ${service[priceKey] === null ? "harga dasar" : formatRupiah(service[priceKey] as number)}, ${service[durationKey] ?? service.duration} menit`).join(" · ")}
+          {dynamic
+            ? columns.map((column) => `${column.label}: ${stored?.[column.key]?.price == null ? "harga dasar" : formatRupiah(stored[column.key].price as number)}, ${stored?.[column.key]?.duration ?? service.duration} menit`).join(" · ")
+            : SIZE_FIELDS.map(([priceKey, durationKey, , label]) => `${label}: ${service[priceKey] === null ? "harga dasar" : formatRupiah(service[priceKey] as number)}, ${service[durationKey] ?? service.duration} menit`).join(" · ")}
         </p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2">
@@ -54,6 +62,17 @@ export function ServiceManager({ service, canManageService, petTypes }: { servic
       </div>
       <label className="flex items-center gap-2 text-xs font-semibold text-slate-700"><input type="checkbox" name="zeroTimeAddon" checked={zeroTime} onChange={(event) => setZeroTime(event.target.checked)} />Layanan tambahan berbayar, tanpa tambahan waktu booking</label>
       <input className={field} type="number" min="0" step="1000" name="price" defaultValue={service.price} placeholder="Harga dasar Rp" required />
+      {dynamic ? <div>
+        <input type="hidden" name="layoutVersion" value={sizeBands.settings.layoutVersion} />
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Harga dan durasi per ukuran (kosong = harga/durasi dasar; kategori baru juga begitu sampai diisi)</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {columns.map((column) => { const names = bandFieldNames(column.key); const previous = previousColumnKey(columns, column.key); const previousLabel = columns.find((item) => item.key === previous)?.label;
+            return <fieldset key={column.key} className="min-w-0 rounded-xl border border-slate-200 p-2"><legend className="px-1 text-[11px] font-bold text-slate-600">{column.label}</legend>
+              <input className={field} type="number" min="0" step="1000" name={names.price} value={bandValues.values[column.key].price} onChange={(event) => bandValues.set(column.key, "price", event.target.value)} placeholder="Harga Rp" aria-label={`Harga ${column.label}`} />
+              <input className={`${field} mt-2`} type="number" min="15" max="1440" step="5" name={names.duration} value={bandValues.values[column.key].duration} onChange={(event) => bandValues.set(column.key, "duration", event.target.value)} placeholder="Menit" aria-label={`Durasi ${column.label}`} disabled={zeroTime} />
+              {previous ? <button type="button" className="mt-2 text-[11px] font-bold text-emerald-800 underline" onClick={() => bandValues.copy(column.key)} aria-label={`Salin harga dan menit ${previousLabel} ke ${column.label}`}>Salin dari {previousLabel}</button> : null}</fieldset>; })}
+        </div>
+      </div> : <>
       <div>
         <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Harga per ukuran hewan (kosongkan untuk pakai harga dasar)</p>
         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
@@ -65,7 +84,7 @@ export function ServiceManager({ service, canManageService, petTypes }: { servic
         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {SIZE_FIELDS.map(([, durationKey, suffix, label]) => <input key={suffix} className={field} type="number" min="15" max="1440" step="5" name={`duration_${suffix}`} defaultValue={service[durationKey] ?? ""} placeholder={label} aria-label={`Durasi ${label}`} disabled={zeroTime} />)}
         </div>
-      </div>
+      </div></>}
       <SpeciesPricingFields petTypes={petTypes} initial={service.speciesPricing} zeroTime={zeroTime} />
       <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-700">
         {["home", "in_store"].map((mode) => <label key={mode} className="flex items-center gap-2"><input type="checkbox" name="fulfillmentModes" value={mode} defaultChecked={service.fulfillmentModes.includes(mode)} />{mode === "home" ? "Home service" : "Di toko"}</label>)}

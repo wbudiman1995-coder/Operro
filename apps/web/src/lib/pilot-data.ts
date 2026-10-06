@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SpeciesPricing } from "@/lib/pet-sizing";
 import { isGoogleMapsLink } from "@/lib/maps";
+import { packageSizeOptions, type BandPriceMap, type SizeBand, type SizeBandWorkspace } from "@/lib/size-bands";
 
 function assertResult(scope: string, error: { message: string } | null) {
   if (error) throw new Error(`${scope}_failed:${error.message}`);
@@ -195,13 +196,31 @@ export interface CatalogWorkspace {
     phone: string | null; color: string; baseLabel: string | null; latitude: number | null; longitude: number | null;
     appointmentCount: number; lateCount: number; missingPhotoCount: number; joinDate: string; baseSalary: number | null; payType: string | null;
   }>;
-  packages: Array<{ id: string; name: string; description: string | null; serviceId: string | null; sessions: number; price: number; currency: string; validityDays: number | null; visitIntervalDays: number | null; rolloverPolicy: string; recurrenceInterval: string; perPet: boolean; sizeBand: string | null; discountPercent: number | null; active: boolean }>;
+  packages: Array<{ id: string; name: string; description: string | null; serviceId: string | null; sessions: number; price: number; currency: string; validityDays: number | null; visitIntervalDays: number | null; rolloverPolicy: string; recurrenceInterval: string; perPet: boolean; sizeBand: string | null; discountPercent: number | null; active: boolean; sizeOptions: Array<{ value: string; label: string }> }>;
+  /** Tenant size bands, mode and per-service band prices (RLS-scoped to the active organization). */
+  sizeBands: SizeBandWorkspace;
   products: Array<{ id: string; name: string; sku: string | null; stock: number }>;
+}
+
+export function buildSizeBandWorkspace(
+  settings: { mode: string; layout_version: number } | null,
+  bandRows: Array<{ id: string; band_key: string; band_kind: string; label: string; sort_order: number; upper_kg: number | string | null; upper_inclusive: boolean; status: string }>,
+  priceRows: Array<{ service_id: string; pricing_key: string; price: number | string | null; duration_minutes: number | null }>,
+): SizeBandWorkspace {
+  const bands: SizeBand[] = bandRows.map((row) => ({
+    id: row.id, key: row.band_key, kind: row.band_kind === "cat" ? "cat" : "dog_weight", label: row.label, sortOrder: row.sort_order,
+    upperKg: row.upper_kg === null ? null : Number(row.upper_kg), upperInclusive: row.upper_inclusive, status: row.status === "archived" ? "archived" : "active",
+  }));
+  const prices: BandPriceMap = {};
+  for (const row of priceRows) {
+    (prices[row.service_id] ??= {})[row.pricing_key] = { price: row.price === null ? null : Number(row.price), duration: row.duration_minutes };
+  }
+  return { settings: { mode: settings?.mode === "dynamic" ? "dynamic" : "legacy", layoutVersion: settings?.layout_version ?? 1 }, bands, prices };
 }
 
 export async function loadCatalogWorkspace(supabase: SupabaseClient, organizationId: string): Promise<CatalogWorkspace> {
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-  const [branches, services, petTypes, resources, packages, products, levels, memberships, assignments, compensation, attendance] = await Promise.all([
+  const [branches, services, petTypes, resources, packages, products, levels, memberships, assignments, compensation, attendance, sizeSettings, sizeBandRows, sizePriceRows] = await Promise.all([
     supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null),
     supabase.from("service_catalog").select("id,name,category,duration_minutes,additional_duration_minutes,base_price,price_extra_small,price_small,price_medium,price_large,price_extra_large,price_cat,duration_extra_small,duration_small,duration_medium,duration_large,duration_extra_large,duration_cat,species_pricing,fulfillment_modes,is_active").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
     supabase.from("organization_pet_types").select("key,label,is_active").eq("organization_id", organizationId).order("label"),
@@ -213,8 +232,13 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
     supabase.from("booking_resources").select("resource_id,booking_id").eq("organization_id", organizationId),
     supabase.from("staff_compensation").select("membership_id,pay_type,base_amount,effective_from").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("effective_from", { ascending: false }),
     supabase.from("attendance_records").select("resource_id,classification,waived_at").eq("organization_id", organizationId).gte("scheduled_at", monthStart.toISOString()).is("deleted_at", null),
+    supabase.from("organization_size_band_settings").select("mode,layout_version").eq("organization_id", organizationId).maybeSingle(),
+    supabase.from("organization_size_bands").select("id,band_key,band_kind,label,sort_order,upper_kg,upper_inclusive,status").eq("organization_id", organizationId).order("sort_order"),
+    supabase.from("service_band_prices").select("service_id,pricing_key,price,duration_minutes").eq("organization_id", organizationId),
   ]);
-  for (const [scope, result] of [["catalog_branches", branches], ["catalog_services", services], ["catalog_pet_types", petTypes], ["catalog_resources", resources], ["catalog_packages", packages], ["catalog_products", products], ["catalog_levels", levels], ["catalog_memberships", memberships], ["catalog_assignments", assignments], ["catalog_compensation", compensation], ["catalog_attendance", attendance]] as const) assertResult(scope, result.error);
+  for (const [scope, result] of [["catalog_branches", branches], ["catalog_services", services], ["catalog_pet_types", petTypes], ["catalog_resources", resources], ["catalog_packages", packages], ["catalog_products", products], ["catalog_levels", levels], ["catalog_memberships", memberships], ["catalog_assignments", assignments], ["catalog_compensation", compensation], ["catalog_attendance", attendance], ["catalog_size_settings", sizeSettings], ["catalog_size_bands", sizeBandRows], ["catalog_size_prices", sizePriceRows]] as const) assertResult(scope, result.error);
+  const sizeBands = buildSizeBandWorkspace(sizeSettings.data, sizeBandRows.data ?? [], sizePriceRows.data ?? []);
+  const sizeOptions = packageSizeOptions(sizeBands.bands);
   const branchMap = new Map((branches.data ?? []).map((row) => [row.id, row.name]));
   const stock = new Map<string, number>(); for (const row of levels.data ?? []) stock.set(row.product_id, (stock.get(row.product_id) ?? 0) + Number(row.quantity));
   const membershipOptions = (memberships.data ?? []).map((row) => {
@@ -227,7 +251,7 @@ export async function loadCatalogWorkspace(supabase: SupabaseClient, organizatio
     const pay = (compensation.data ?? []).find((item) => item.membership_id === row.membership_id);
     const ownAttendance = (attendance.data ?? []).filter((item) => item.resource_id === row.id);
     return { id: row.id, branchId: row.branch_id, membershipId: row.membership_id, name: row.name, branchName: branchMap.get(row.branch_id) ?? "Cabang", status: row.status, skills: row.skills, phone: typeof settings.phone === "string" ? settings.phone : null, color: typeof settings.calendar_color === "string" ? settings.calendar_color : "#0f766e", baseLabel: typeof base.label === "string" ? base.label : null, latitude: base.latitude !== null && base.latitude !== undefined && Number.isFinite(Number(base.latitude)) ? Number(base.latitude) : null, longitude: base.longitude !== null && base.longitude !== undefined && Number.isFinite(Number(base.longitude)) ? Number(base.longitude) : null, appointmentCount: new Set((assignments.data ?? []).filter((item) => item.resource_id === row.id).map((item) => item.booking_id)).size, lateCount: ownAttendance.filter((item) => item.classification === "late" && !item.waived_at).length, missingPhotoCount: ownAttendance.filter((item) => item.classification === "missing_photo").length, joinDate: row.created_at, baseSalary: pay ? Number(pay.base_amount) : null, payType: pay?.pay_type ?? null };
-  }), packages: (packages.data ?? []).map((row) => ({ id: row.id, name: row.name, description: row.description, serviceId: row.service_id, sessions: row.total_sessions, price: Number(row.price), currency: row.currency, validityDays: row.validity_days, visitIntervalDays: row.visit_interval_days, rolloverPolicy: row.rollover_policy, recurrenceInterval: row.recurrence_interval, perPet: row.per_pet, sizeBand: row.size_band, discountPercent: row.discount_percent === null ? null : Number(row.discount_percent), active: row.is_active })), products: (products.data ?? []).map((row) => ({ id: row.id, name: row.name, sku: row.sku, stock: stock.get(row.id) ?? 0 })) };
+  }), packages: (packages.data ?? []).map((row) => ({ id: row.id, name: row.name, description: row.description, serviceId: row.service_id, sessions: row.total_sessions, price: Number(row.price), currency: row.currency, validityDays: row.validity_days, visitIntervalDays: row.visit_interval_days, rolloverPolicy: row.rollover_policy, recurrenceInterval: row.recurrence_interval, perPet: row.per_pet, sizeBand: row.size_band, discountPercent: row.discount_percent === null ? null : Number(row.discount_percent), active: row.is_active, sizeOptions })), sizeBands, products: (products.data ?? []).map((row) => ({ id: row.id, name: row.name, sku: row.sku, stock: stock.get(row.id) ?? 0 })) };
 }
 
 export interface FinanceWorkspace {

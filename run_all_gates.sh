@@ -112,6 +112,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261023110000_size_band_shadow_sync.sql
   supabase/migrations/20261023120000_size_band_resolver.sql
   supabase/migrations/20261023130000_size_band_integrity.sql
+  supabase/migrations/20261024100000_size_band_management_rpcs.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -147,7 +148,7 @@ ls -l \
 step "GATE 3 — in-memory + preset-contract tests"
 npx tsx packages/backend/test/assembly_service.inmemory.test.ts
 npx tsx packages/backend/test/preset_contract.test.ts
-npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts test/customer-profile-edit.test.ts
+npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts test/customer-profile-edit.test.ts test/size-bands.test.ts test/size-band-ui.test.tsx
 
 step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
 run_as_postgres dropdb --if-exists operro_gate
@@ -232,6 +233,12 @@ psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/homepaw_review_stora
 step "GATE 7g — dynamic size bands (SB-01..SB-04) behavior"
 psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/size_band_smoke.sql
 bash integration/size_band_preflight.sh
+
+step "GATE 7i — size-band management RPCs (SB-05): authority, layout, archive/delete, prices, RLS"
+psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/size_band_management_smoke.sql
+
+step "GATE 7j — size-band management concurrency (two real sessions)"
+bash integration/size_band_concurrency.sh
 
 step "GATE 7h — platform access, helper roles and dog-size boundaries (isolated database)"
 bash integration/platform_access_qc.sh
