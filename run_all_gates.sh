@@ -147,7 +147,7 @@ ls -l \
 step "GATE 3 — in-memory + preset-contract tests"
 npx tsx packages/backend/test/assembly_service.inmemory.test.ts
 npx tsx packages/backend/test/preset_contract.test.ts
-npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts
+npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts test/customer-profile-edit.test.ts
 
 step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
 run_as_postgres dropdb --if-exists operro_gate

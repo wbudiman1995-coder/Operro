@@ -116,6 +116,7 @@ export interface CustomerOverview {
   notes: string | null;
   addressLine: string | null;
   mapsUrl: string | null;
+  updatedAt: string;
   /** One entry per currency. Null when the caller lacks `finance.read`. */
   spendByCurrency: CurrencyTotal[] | null;
   spendCapped: boolean;
@@ -296,7 +297,7 @@ export async function loadCustomerOverview(
 ): Promise<CustomerOverview | null> {
   const customerResult = await supabase
     .from("customers")
-    .select("id,display_name,customer_code,status,phone,email,source,notes,address,latitude,longitude")
+    .select("id,display_name,customer_code,status,phone,email,source,notes,address,latitude,longitude,updated_at")
     .eq("organization_id", organizationId)
     .eq("id", customerId)
     .is("deleted_at", null)
@@ -368,6 +369,7 @@ export async function loadCustomerOverview(
     notes: typeof customer.notes === "string" && customer.notes.length > 0 ? customer.notes : null,
     addressLine,
     mapsUrl,
+    updatedAt: customer.updated_at,
     spendByCurrency: capabilities["finance.read"] ? groupTotalsByCurrency(countedPayments) : null,
     spendCapped,
     pets: (petResult.data ?? []).map((pet) => ({

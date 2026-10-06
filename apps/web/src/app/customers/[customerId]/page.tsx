@@ -26,6 +26,7 @@ import { notFound } from "next/navigation";
 import { Customer360Notes, Customer360Header, Customer360Tabs } from "@/components/customer-360";
 import { CustomerAddressActions, CustomerAddressForm } from "@/components/customer-address-forms";
 import { CustomerNextDiscount } from "@/components/customer-next-discount";
+import { CustomerProfileEditor } from "@/components/customer-profile-editor";
 import { EmptyState, StatusBadge } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
@@ -117,6 +118,7 @@ export default async function CustomerDetailPage({
   return (
     <WorkspaceShell {...workspace} activePath="/customers">
       <Customer360Header overview={overview} />
+      {capabilities["customer.manage"] ? <CustomerProfileEditor customerId={customerId} updatedAt={overview.updatedAt} defaults={{ displayName: overview.name, phone: overview.phone ?? "", email: overview.email ?? "", source: overview.source ?? "", notes: overview.notes ?? "" }} /> : null}
       {capabilities["customer.manage"] ? <CustomerNextDiscount customerId={customerId} offer={nextDiscount} /> : null}
       <Customer360Tabs customerId={customerId} activeTab={tab} tabs={permittedTabs} />
 
