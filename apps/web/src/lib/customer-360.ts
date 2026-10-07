@@ -64,7 +64,7 @@ export const CUSTOMER_360_TAB_CAPABILITY: Record<Customer360Tab, keyof Capabilit
   invoices: "finance.read",
   packages: "membership.read",
   notes: null,
-  history: null,
+  history: "customer.read",
 };
 
 export function parseCustomer360Tab(value: unknown): Customer360Tab {

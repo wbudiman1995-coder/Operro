@@ -114,6 +114,6 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
       {doc.status === "issued" ? <InvoiceCustomerNotesEditor invoiceId={doc.id} revision={doc.revision} initialNotes={doc.customerNotes ?? ""} internalNote={doc.internalGroomerNotes} /> : null}
     </div>
 
-    <AuditHistoryPanel events={auditEvents} />
+    <AuditHistoryPanel events={auditEvents} title="Perubahan invoice" emptyMessage="Belum ada perubahan invoice yang tercatat di log audit." />
   </div>;
 }

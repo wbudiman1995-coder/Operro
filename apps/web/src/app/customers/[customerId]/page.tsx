@@ -22,6 +22,7 @@
  */
 import { notFound } from "next/navigation";
 
+import { AuditHistoryPanel } from "@/components/audit-history-panel";
 import { Customer360Notes, Customer360Header, Customer360Tabs } from "@/components/customer-360";
 import { CustomerAddressActions, CustomerAddressForm } from "@/components/customer-address-forms";
 import { CustomerNextDiscount } from "@/components/customer-next-discount";
@@ -32,6 +33,7 @@ import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { StylingReferenceGallery, StylingReferenceUploader } from "@/components/styling-references";
 import { loadCapabilities } from "@/lib/authorization";
+import { loadAuditEvents } from "@/lib/audit-events";
 import { loadBranchTimezones } from "@/lib/branch-context";
 import {
   isCustomer360TabPermitted,
@@ -109,6 +111,9 @@ export default async function CustomerDetailPage({
     tab === "history" && tabPermitted
       ? await loadCustomerHistory(workspace.supabase, organizationId, customerId, overview.pets.map((pet) => pet.id))
       : [];
+  const auditEvents = tab === "history" && tabPermitted
+    ? await loadAuditEvents(workspace.supabase, "customers", customerId)
+    : [];
 
   const restrictionCopy: Record<string, { title: string; description: string }> = {
     bookings: {
@@ -122,6 +127,10 @@ export default async function CustomerDetailPage({
     packages: {
       title: "Tidak ada izin melihat paket",
       description: "Peran Anda tidak memiliki izin membership.read, sehingga saldo paket dan langganan pelanggan ini tidak dapat ditampilkan.",
+    },
+    history: {
+      title: "Tidak ada izin melihat riwayat pelanggan",
+      description: "Peran Anda tidak memiliki izin customer.read, sehingga timeline dan log perubahan pelanggan ini tidak dapat ditampilkan.",
     },
   };
 
@@ -341,10 +350,10 @@ export default async function CustomerDetailPage({
         {tabPermitted && tab === "notes" ? <Customer360Notes overview={overview} /> : null}
 
         {tabPermitted && tab === "history" ? (
-          history.length === 0 ? (
-            <EmptyState title="Belum ada riwayat" description="Peristiwa pelanggan dan hewan akan tercatat di sini sebagai riwayat baca-saja." />
-          ) : (
-            <>
+          <div>
+            {history.length === 0 ? (
+              <EmptyState title="Belum ada peristiwa operasional" description="Peristiwa pelanggan dan hewan akan tercatat di sini sebagai riwayat baca-saja." />
+            ) : (
               <ol className="space-y-2">
                 {history.map((event) => (
                   <li key={event.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -358,11 +367,12 @@ export default async function CustomerDetailPage({
                   </li>
                 ))}
               </ol>
-              <p className="mt-3 text-[11px] leading-5 text-slate-400">
-                Riwayat berasal dari peristiwa timeline dan ditampilkan dalam zona waktu cabang utama. Log audit tingkat basis data belum diekspos ke aplikasi.
-              </p>
-            </>
-          )
+            )}
+            <AuditHistoryPanel events={auditEvents} title="Perubahan data pelanggan" emptyMessage="Belum ada perubahan data pelanggan yang tercatat di log audit." timeZone={branchContext.defaultTimezone} />
+            <p className="mt-3 text-[11px] leading-5 text-slate-400">
+              Timeline operasional dan log perubahan basis data sama-sama baca-saja. Waktu ditampilkan dalam zona waktu cabang utama.
+            </p>
+          </div>
         ) : null}
       </div>
 

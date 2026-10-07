@@ -5,42 +5,32 @@
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard-shell";
-import { NoOrganizationState } from "@/components/no-organization-state";
-import { loadAuthContext } from "@/lib/auth-context";
-import { defaultWorkspacePath, loadCapabilities } from "@/lib/authorization";
+import { defaultWorkspacePath, loadBranchAccess } from "@/lib/authorization";
+import { loadBranchTimezones } from "@/lib/branch-context";
 import { loadDashboardData } from "@/lib/pilot-data";
-import { createClient } from "@/lib/supabase/server";
+import { requireActiveWorkspace } from "@/lib/require-workspace";
 
 export const metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const context = await loadAuthContext(supabase);
-
-  if (!context) {
-    return redirect("/login");
-  }
-
-  if (context.organizations.length === 0) {
-    return <NoOrganizationState email={context.user.email ?? "akun Operro"} />;
-  }
-
-  const activeOrganization = context.activeOrganization;
-
-  if (!activeOrganization) {
-    return redirect("/organizations");
-  }
-
-  const capabilities = await loadCapabilities(supabase);
+  const workspace = await requireActiveWorkspace();
+  const { activeOrganization, capabilities, supabase } = workspace;
   const landingPath = defaultWorkspacePath(capabilities);
   if (landingPath !== "/dashboard") redirect(landingPath);
-  const data = await loadDashboardData(supabase, activeOrganization.id);
+  const [branchAccess, branchTimezones] = await Promise.all([
+    loadBranchAccess(supabase, activeOrganization.id, activeOrganization.membershipId),
+    loadBranchTimezones(supabase, activeOrganization.id),
+  ]);
+  const dashboardTimeZone = branchAccess.all || (branchTimezones.defaultBranchId && branchAccess.ids.has(branchTimezones.defaultBranchId))
+    ? branchTimezones.defaultTimezone
+    : [...branchAccess.ids].flatMap((id) => branchTimezones.byBranchId.get(id) ?? []).sort()[0] ?? branchTimezones.defaultTimezone;
+  const data = await loadDashboardData(supabase, activeOrganization.id, capabilities, branchAccess, dashboardTimeZone);
 
   return (
     <DashboardShell
-      organizations={context.organizations}
+      organizations={workspace.organizations}
       activeOrganization={activeOrganization}
-      userEmail={context.user.email ?? "Akun Operro"}
+      userEmail={workspace.userEmail}
       data={data}
       capabilities={capabilities}
     />
