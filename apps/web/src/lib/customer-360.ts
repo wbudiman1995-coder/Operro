@@ -88,9 +88,11 @@ export interface CustomerPetProfile {
   name: string;
   species: string;
   breed: string | null;
-  sex: string;
+  sex: "male" | "female" | "unknown";
+  birthdate: string | null;
   ageLabel: string | null;
   weightKg: number | null;
+  sizeKey: string | null;
   sizeBand: string | null;
   color: string | null;
   temperament: string | null;
@@ -98,6 +100,7 @@ export interface CustomerPetProfile {
   status: string;
   medicalFlags: string[];
   customFields: Array<{ label: string; value: string }>;
+  updatedAt: string;
 }
 
 export interface CurrencyTotal {
@@ -309,7 +312,7 @@ export async function loadCustomerOverview(
   const [petResult, paymentResult, defaultAddressResult] = await Promise.all([
     supabase
       .from("pets")
-      .select("id,name,species,breed,sex,birthdate,weight_kg,size,color,temperament,notes,status,medical_flags,metadata")
+      .select("id,name,species,breed,sex,birthdate,weight_kg,size,color,temperament,notes,status,medical_flags,metadata,updated_at")
       .eq("organization_id", organizationId)
       .eq("customer_id", customerId)
       .is("deleted_at", null)
@@ -380,9 +383,11 @@ export async function loadCustomerOverview(
       name: pet.name,
       species: pet.species,
       breed: pet.breed,
-      sex: pet.sex,
+      sex: pet.sex as "male" | "female" | "unknown",
+      birthdate: pet.birthdate,
       ageLabel: ageLabelFromBirthdate(pet.birthdate),
       weightKg: pet.weight_kg === null ? null : Number(pet.weight_kg),
+      sizeKey: pet.size,
       sizeBand: petLabels.get(pet.id) ?? null,
       color: pet.color,
       temperament: pet.temperament,
@@ -390,6 +395,7 @@ export async function loadCustomerOverview(
       status: pet.status,
       medicalFlags: readMedicalFlags(pet.medical_flags),
       customFields: readCustomFields(pet.metadata),
+      updatedAt: pet.updated_at,
     })),
   };
 }

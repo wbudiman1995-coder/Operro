@@ -20,12 +20,12 @@
  *
  * There is no grooming photo surface. Evidence is Batch 2, on private storage.
  */
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Customer360Notes, Customer360Header, Customer360Tabs } from "@/components/customer-360";
 import { CustomerAddressActions, CustomerAddressForm } from "@/components/customer-address-forms";
 import { CustomerNextDiscount } from "@/components/customer-next-discount";
+import { CustomerPetEditor } from "@/components/customer-pet-editor";
 import { CustomerProfileEditor } from "@/components/customer-profile-editor";
 import { EmptyState, StatusBadge } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
@@ -82,6 +82,16 @@ export default async function CustomerDetailPage({
   // A customer outside the active organization is filtered out by RLS, so this is the
   // cross-tenant deny path as well as the genuine not-found path.
   if (!overview) notFound();
+
+  const [petTypesResult, dogBandsResult] = capabilities["customer.manage"]
+    ? await Promise.all([
+        workspace.supabase.from("organization_pet_types").select("key,label,is_active").eq("organization_id", organizationId).order("label"),
+        workspace.supabase.from("organization_size_bands").select("band_key,label,status,sort_order").eq("organization_id", organizationId).eq("band_kind", "dog_weight").order("sort_order"),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+  if (petTypesResult.error || dogBandsResult.error) throw new Error("customer_pet_edit_options_failed");
+  const petTypeOptions = (petTypesResult.data ?? []).map((type) => ({ key: type.key, label: type.label, disabled: !type.is_active }));
+  const dogBandOptions = (dogBandsResult.data ?? []).map((band) => ({ key: band.band_key, label: band.label, disabled: band.status !== "active" }));
 
   const requestedTab = parseCustomer360Tab(query.tab);
   const permittedTabs = visibleCustomer360Tabs(capabilities);
@@ -177,6 +187,26 @@ export default async function CustomerDetailPage({
                     </dl>
                   ) : null}
                   {pet.notes ? <p className="mt-3 whitespace-pre-line rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">{pet.notes}</p> : null}
+                  {capabilities["customer.manage"] ? <CustomerPetEditor
+                    customerId={customerId}
+                    petId={pet.id}
+                    updatedAt={pet.updatedAt}
+                    currentSizeLabel={pet.sizeBand}
+                    petTypes={petTypeOptions}
+                    dogBands={dogBandOptions}
+                    defaults={{
+                      name: pet.name,
+                      species: pet.species,
+                      breed: pet.breed ?? "",
+                      sex: pet.sex,
+                      birthdate: pet.birthdate ?? "",
+                      weightKg: pet.weightKg === null ? "" : String(pet.weightKg),
+                      manualSize: pet.sizeKey ?? "",
+                      color: pet.color ?? "",
+                      temperament: pet.temperament ?? "",
+                      notes: pet.notes ?? "",
+                    }}
+                  /> : null}
                 </article>
               ))}
             </div>
@@ -337,7 +367,7 @@ export default async function CustomerDetailPage({
       </div>
 
       <p className="mt-7 rounded-2xl border border-dashed border-slate-200 px-4 py-4 text-[11px] leading-5 text-slate-400">
-        Alamat dapat dikelola langsung pada tab Alamat di atas. Data pelanggan lainnya masih baca-saja — ubah pada halaman <Link href="/customers" className="font-semibold text-emerald-700 underline">Pelanggan</Link>.
+        Profil pelanggan, hewan, dan alamat dapat dikelola langsung di sini sesuai izin Anda. Data keuangan dan riwayat tetap mengikuti snapshot saat transaksi dibuat.
         Foto layanan dan referensi gaya disimpan privat dan hanya tersedia untuk anggota workspace aktif.
       </p>
     </WorkspaceShell>
