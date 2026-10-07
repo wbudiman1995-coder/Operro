@@ -1,6 +1,5 @@
 /**
  * Function index:
- * - sizeBandForWeight: derives a grooming size band from recorded weight.
  * - ageLabelFromBirthdate: renders a human age from a birthdate.
  * - readCustomFields: surfaces free-form profile fields held in pet metadata.
  *
@@ -10,21 +9,9 @@
  * not the right home for browser-side display derivations; keeping them in one named
  * module here preserves the same separation without expanding that package's scope.
  *
- * The size bands mirror the HomePaw duration table (XS/S = 60m, M = 90m, L/XL = 120m)
- * but are presentation only. Authoritative durations and prices come from the frozen
- * `grooming_job_pet_services` snapshots and are never recomputed from weight.
+ * Size labels are deliberately absent here. Tenant-owned labels and keys come
+ * from the server size-band resolver and immutable grooming-line snapshots.
  */
-
-export type GroomingSizeBand = "XS" | "S" | "M" | "L" | "XL";
-
-export function sizeBandForWeight(weightKg: number | null): GroomingSizeBand | null {
-  if (weightKg === null || !Number.isFinite(weightKg) || weightKg <= 0) return null;
-  if (weightKg < 5) return "XS";
-  if (weightKg < 10) return "S";
-  if (weightKg < 15) return "M";
-  if (weightKg <= 25) return "L";
-  return "XL";
-}
 
 /**
  * Calendar-accurate age. An average-month divisor is not usable here: it reports an

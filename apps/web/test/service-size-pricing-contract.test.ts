@@ -104,8 +104,10 @@ test("service create/update stay organization-scoped and validate every size pri
   assert.match(actions, /function optionalPriceValue[\s\S]*Number\.isFinite\(parsed\) && parsed >= 0 \? parsed : "invalid"/);
 });
 
-test("pet size selection remains optional and supports the new XS band", () => {
-  assert.match(actions, /\["", "extra_small", "small", "medium", "large", "extra_large"\]\.includes\(pet\.size\)/);
+test("pet size selection remains optional and validates against the tenant's active dog bands", () => {
+  assert.match(actions, /from\("organization_size_bands"\)[\s\S]{0,300}eq\("band_kind", "dog_weight"\)\.eq\("status", "active"\)/);
+  assert.match(actions, /const allowedDogSizes = new Set\(\["", [\s\S]*band\.band_key/);
+  assert.match(actions, /!allowedDogSizes\.has\(pet\.size\)/);
   assert.match(householdMigration, /v_pet->>'size' not in \('small','medium','large','extra_large'\)/);
   assert.match(homepawSizeMigration, /v_pet->>'size' not in \('extra_small','small','medium','large','extra_large'\)/);
 });

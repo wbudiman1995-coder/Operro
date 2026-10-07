@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ageLabelFromBirthdate, readCustomFields, readMedicalFlags, sizeBandForWeight } from "../src/lib/grooming-profile";
+import { ageLabelFromBirthdate, readCustomFields, readMedicalFlags } from "../src/lib/grooming-profile";
+import { bandForWeight } from "../src/lib/size-bands";
 import { SEARCH_MIN_TERM_LENGTH, escapeLikePattern, mergeHitsById, normalizeSearchTerm } from "../src/lib/search";
 
 test("requires a minimum term length", () => {
@@ -109,21 +110,23 @@ test("merge preserves first-seen ordering and tolerates empty inputs", () => {
   assert.deepEqual(merged.map((hit) => hit.id), ["b", "a"]);
 });
 
-test("derives grooming size bands from weight", () => {
-  assert.equal(sizeBandForWeight(4), "XS");
-  assert.equal(sizeBandForWeight(10), "M");
-  assert.equal(sizeBandForWeight(10.1), "M");
-  assert.equal(sizeBandForWeight(25), "L");
-  assert.equal(sizeBandForWeight(30), "XL");
-  assert.equal(sizeBandForWeight(40), "XL");
-  assert.equal(sizeBandForWeight(55), "XL");
+test("derives tenant size keys from the loaded layout", () => {
+  const bands = [
+    { key: "xs", sortOrder: 10, upperKg: 5, upperInclusive: false },
+    { key: "large", sortOrder: 20, upperKg: 25, upperInclusive: true },
+    { key: "xxl", sortOrder: 30, upperKg: null, upperInclusive: false },
+  ];
+  assert.equal(bandForWeight(bands, 4), "xs");
+  assert.equal(bandForWeight(bands, 25), "large");
+  assert.equal(bandForWeight(bands, 25.01), "xxl");
+  assert.equal(bandForWeight(bands, 55), "xxl");
 });
 
 test("returns no size band for missing or invalid weight", () => {
-  assert.equal(sizeBandForWeight(null), null);
-  assert.equal(sizeBandForWeight(0), null);
-  assert.equal(sizeBandForWeight(-3), null);
-  assert.equal(sizeBandForWeight(Number.NaN), null);
+  const bands = [{ key: "all", sortOrder: 1, upperKg: null, upperInclusive: false }];
+  assert.equal(bandForWeight(bands, 0), null);
+  assert.equal(bandForWeight(bands, -3), null);
+  assert.equal(bandForWeight(bands, Number.NaN), null);
 });
 
 test("renders age from a birthdate", () => {

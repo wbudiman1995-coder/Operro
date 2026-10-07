@@ -113,6 +113,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261023120000_size_band_resolver.sql
   supabase/migrations/20261023130000_size_band_integrity.sql
   supabase/migrations/20261024100000_size_band_management_rpcs.sql
+  supabase/migrations/20261025100000_size_band_booking_customer_adapters.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -239,6 +240,9 @@ psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/size_band_management
 
 step "GATE 7j — size-band management concurrency (two real sessions)"
 bash integration/size_band_concurrency.sh
+
+step "GATE 7k — size-band booking, package, invoice snapshot, and Customer 360 adapters"
+psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/size_band_adapters_smoke.sql
 
 step "GATE 7h — platform access, helper roles and dog-size boundaries (isolated database)"
 bash integration/platform_access_qc.sh

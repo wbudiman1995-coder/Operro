@@ -5,7 +5,7 @@ import test from "node:test";
 
 import {
   BAND_DURATION_PREFIX, BAND_PRICE_PREFIX, LAYOUT_ISSUE_TEXT, MAX_ACTIVE_DOG_BANDS, activeDogBands, addTopBand, archivedDogBands, bandFieldNames, copyBandValues,
-  describeImpact, draftFromBands, draftToPayload, mapSizeBandError, moveBand, packageSizeOptions, parseBandPriceForm, parseImpact, previewBandKey, previewDraftLabel,
+  bandForWeight, describeImpact, draftFromBands, draftToPayload, mapSizeBandError, moveBand, packageSizeOptions, parseBandPriceForm, parseImpact, previewBandKey, previewDraftLabel, resolveForPricingKey,
   previousColumnKey, pricingColumns, rangeLabel, starterIndexForBand, validateLayoutDraft, type LayoutDraftRow, type SizeBand,
 } from "../src/lib/size-bands";
 
@@ -40,6 +40,15 @@ test("legacy edge is preserved in the preview: exactly 25.00 kg is large, 25.01 
   assert.equal(previewBandKey(legacy.filter((item) => item.kind === "dog_weight"), 25), "large");
   assert.equal(previewBandKey(legacy.filter((item) => item.kind === "dog_weight"), 25.01), "extra_large");
   assert.equal(previewBandKey(legacy.filter((item) => item.kind === "dog_weight"), 0), null);
+});
+
+test("dynamic preview resolves a sixth band and server-loaded row prices without nearest-band fallback", () => {
+  assert.equal(bandForWeight(withXxl.filter((item) => item.kind === "dog_weight"), 40), "xxl");
+  assert.equal(bandForWeight(withXxl.filter((item) => item.kind === "dog_weight"), 35), "extra_large");
+  const service = { durationMinutes: 60, basePrice: 100_000, additionalDurationMinutes: 15, bandPrices: { xxl: { price: 400_000, duration: 150 } } };
+  assert.deepEqual(resolveForPricingKey(service, "dog", "xxl", 2), { band: "xxl", price: 400_000, duration: 165 });
+  assert.deepEqual(resolveForPricingKey(service, "dog", "extra_large"), { band: "extra_large", price: 100_000, duration: 60 });
+  assert.deepEqual(resolveForPricingKey({ ...service, durationMinutes: 0, bandPrices: { xxl: { price: 25_000, duration: 0 } } }, "dog", "xxl"), { band: "xxl", price: 25_000, duration: 0 });
 });
 
 test("pricing columns and package options follow the organization's active bands, with Cat last and archived bands hidden", () => {

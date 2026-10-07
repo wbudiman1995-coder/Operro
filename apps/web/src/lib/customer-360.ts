@@ -25,7 +25,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { CapabilityMap } from "@/lib/authorization";
 import { isGoogleMapsLink } from "@/lib/maps";
-import { ageLabelFromBirthdate, readCustomFields, readMedicalFlags, sizeBandForWeight, type GroomingSizeBand } from "@/lib/grooming-profile";
+import { ageLabelFromBirthdate, readCustomFields, readMedicalFlags } from "@/lib/grooming-profile";
 
 function assertResult(scope: string, error: { message: string } | null) {
   if (error) throw new Error(`${scope}_failed:${error.message}`);
@@ -91,7 +91,7 @@ export interface CustomerPetProfile {
   sex: string;
   ageLabel: string | null;
   weightKg: number | null;
-  sizeBand: GroomingSizeBand | null;
+  sizeBand: string | null;
   color: string | null;
   temperament: string | null;
   notes: string | null;
@@ -337,6 +337,9 @@ export async function loadCustomerOverview(
   assertResult("customer_pets", petResult.error);
   assertResult("customer_payments", paymentResult.error);
   assertResult("customer_default_address", defaultAddressResult.error);
+  const petKeysResult = await supabase.schema("app").rpc("resolve_pet_pricing_keys", { p_pet_ids: (petResult.data ?? []).map((pet) => pet.id) });
+  assertResult("customer_pet_pricing_keys", petKeysResult.error);
+  const petLabels = new Map(((petKeysResult.data ?? []) as Array<{ pet_id: string; size_label: string | null }>).map((row) => [row.pet_id, row.size_label]));
 
   const paymentRows = paymentResult.data ?? [];
   const spendCapped = paymentRows.length > CUSTOMER_PAYMENT_LIMIT;
@@ -380,7 +383,7 @@ export async function loadCustomerOverview(
       sex: pet.sex,
       ageLabel: ageLabelFromBirthdate(pet.birthdate),
       weightKg: pet.weight_kg === null ? null : Number(pet.weight_kg),
-      sizeBand: ({ extra_small: "XS", small: "S", medium: "M", large: "L", extra_large: "XL" } as const)[pet.size as "extra_small" | "small" | "medium" | "large" | "extra_large"] ?? sizeBandForWeight(pet.weight_kg === null ? null : Number(pet.weight_kg)),
+      sizeBand: petLabels.get(pet.id) ?? null,
       color: pet.color,
       temperament: pet.temperament,
       notes: typeof pet.notes === "string" && pet.notes.length > 0 ? pet.notes : null,
@@ -399,6 +402,7 @@ export interface CustomerBookingRow {
   fulfillmentMode: string;
   petNames: string[];
   serviceNames: string[];
+  sizeLabels: string[];
 }
 
 export async function loadCustomerBookings(
@@ -408,7 +412,7 @@ export async function loadCustomerBookings(
 ): Promise<CustomerBookingRow[]> {
   const result = await supabase
     .from("bookings")
-    .select("id,starts_at,branch_id,status,fulfillment_mode,grooming_jobs(grooming_job_pets(pets(name),grooming_job_pet_services(service_name_snapshot)))")
+    .select("id,starts_at,branch_id,status,fulfillment_mode,grooming_jobs(grooming_job_pets(pets(name),grooming_job_pet_services(service_name_snapshot,pet_size_label_snapshot)))")
     .eq("organization_id", organizationId)
     .eq("customer_id", customerId)
     .is("deleted_at", null)
@@ -433,6 +437,10 @@ export async function loadCustomerBookings(
             .flatMap((jobPet) => relationRows(jobPet.grooming_job_pet_services))
             .flatMap((line) => (typeof line.service_name_snapshot === "string" ? [line.service_name_snapshot] : [])),
         ),
+      ],
+      sizeLabels: [
+        ...new Set(jobPets.flatMap((jobPet) => relationRows(jobPet.grooming_job_pet_services))
+          .flatMap((line) => typeof line.pet_size_label_snapshot === "string" ? [line.pet_size_label_snapshot] : [])),
       ],
     };
   });
@@ -534,6 +542,7 @@ export interface CustomerPackageRow {
   purchasedAt: string;
   expiresAt: string | null;
   petName: string | null;
+  sizeLabel: string | null;
 }
 
 export interface CustomerNextDiscountRow {
@@ -571,7 +580,7 @@ export async function loadCustomerPackages(
   const [packagesResult, coverageResult] = await Promise.all([
     supabase
       .from("customer_packages")
-      .select("id,package_id,sessions_remaining,status,purchased_at,expires_at,packages(name),pets(name)")
+      .select("id,package_id,sessions_remaining,status,purchased_at,expires_at,size_label_snapshot,packages(name),pets(name)")
       .eq("organization_id", organizationId)
       .eq("customer_id", customerId)
       .is("deleted_at", null)
@@ -602,6 +611,7 @@ export async function loadCustomerPackages(
       purchasedAt: row.purchased_at,
       expiresAt: row.expires_at,
       petName: (() => { const name = relationRows(row.pets)[0]?.name; return typeof name === "string" ? name : null; })(),
+      sizeLabel: row.size_label_snapshot,
     };
   });
 }

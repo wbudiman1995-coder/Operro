@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SpeciesPricing } from "@/lib/pet-sizing";
+import type { BandPrice } from "@/lib/size-bands";
 
 export interface BranchOption { id: string; name: string; timezone: string }
 export interface CustomerOption { id: string; name: string; phone: string | null }
-export interface PetOption { id: string; customerId: string; name: string; breed: string | null; species: string; size: string | null; weightKg: number | null }
-export interface ServiceOption { id: string; name: string; category: string; durationMinutes: number; basePrice: number; currency: string; priceExtraSmall: number | null; priceSmall: number | null; priceMedium: number | null; priceLarge: number | null; priceExtraLarge: number | null; priceCat: number | null; durationExtraSmall: number | null; durationSmall: number | null; durationMedium: number | null; durationLarge: number | null; durationExtraLarge: number | null; durationCat: number | null; speciesPricing: SpeciesPricing }
+export interface PetOption { id: string; customerId: string; name: string; breed: string | null; species: string; size: string | null; weightKg: number | null; pricingKey: string | null; sizeLabel: string | null }
+export interface ServiceOption { id: string; name: string; category: string; durationMinutes: number; additionalDurationMinutes: number; basePrice: number; currency: string; priceExtraSmall: number | null; priceSmall: number | null; priceMedium: number | null; priceLarge: number | null; priceExtraLarge: number | null; priceCat: number | null; durationExtraSmall: number | null; durationSmall: number | null; durationMedium: number | null; durationLarge: number | null; durationExtraLarge: number | null; durationCat: number | null; speciesPricing: SpeciesPricing; bandPrices: Record<string, BandPrice> }
 export interface ResourceOption { id: string; branchId: string; name: string }
 export interface CustomerPackageOption { id: string; customerId: string; name: string; serviceId: string | null; petId: string | null; sessionsRemaining: number; reservedSessions: number; availableSessions: number; expiresAt: string | null }
 export interface AddressOption { id: string; customerId: string; label: string; formattedLine: string; kecamatan: string | null; kabupatenKota: string | null; latitude: number | null; longitude: number | null; isDefault: boolean }
@@ -55,11 +56,11 @@ export async function loadBookingWorkspace(
   from: string,
   to: string,
 ): Promise<BookingWorkspaceData> {
-  const [branchResult, customerResult, petResult, serviceResult, resourceResult, addressResult, serviceAreaResult, nextDiscountResult, packageResult, reservedResult, bookingResult] = await Promise.all([
+  const [branchResult, customerResult, petResult, serviceResult, resourceResult, addressResult, serviceAreaResult, nextDiscountResult, packageResult, reservedResult, bookingResult, bandPriceResult] = await Promise.all([
     supabase.from("branches").select("id,name,timezone").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("customers").select("id,display_name,phone").eq("organization_id", organizationId).in("status", ["lead", "active"]).is("deleted_at", null).order("display_name"),
     supabase.from("pets").select("id,customer_id,name,breed,species,size,weight_kg").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
-    supabase.from("service_catalog").select("id,name,category,duration_minutes,base_price,currency,price_extra_small,price_small,price_medium,price_large,price_extra_large,price_cat,duration_extra_small,duration_small,duration_medium,duration_large,duration_extra_large,duration_cat,species_pricing").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
+    supabase.from("service_catalog").select("id,name,category,duration_minutes,additional_duration_minutes,base_price,currency,price_extra_small,price_small,price_medium,price_large,price_extra_large,price_cat,duration_extra_small,duration_small,duration_medium,duration_large,duration_extra_large,duration_cat,species_pricing").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,name").eq("organization_id", organizationId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("customer_addresses").select("id,customer_id,label,line1,line2,kecamatan,kabupaten_kota,province,postal_code,latitude,longitude,is_default").eq("organization_id", organizationId).is("deleted_at", null).order("is_default", { ascending: false }),
     supabase.from("branch_service_areas").select("branch_id,kecamatan,kabupaten_kota,travel_fee,estimated_travel_minutes").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null),
@@ -69,21 +70,31 @@ export async function loadBookingWorkspace(
     // so the wizard can warn before a selection collides with server-side availability.
     supabase.from("package_reservations").select("customer_package_id").eq("organization_id", organizationId).eq("status", "reserved"),
     supabase.from("bookings").select("id,branch_id,customer_id,starts_at,ends_at,status,fulfillment_mode,grooming_jobs(grooming_job_pets(pets(name)))").eq("organization_id", organizationId).gte("starts_at", from).lt("starts_at", to).is("deleted_at", null).order("starts_at"),
+    supabase.from("service_band_prices").select("service_id,pricing_key,price,duration_minutes").eq("organization_id", organizationId),
   ]);
 
-  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["addresses", addressResult], ["service_areas", serviceAreaResult], ["next_discounts", nextDiscountResult], ["customer_packages", packageResult], ["package_reservations", reservedResult], ["bookings", bookingResult]] as const) {
+  for (const [scope, result] of [["branches", branchResult], ["customers", customerResult], ["pets", petResult], ["services", serviceResult], ["resources", resourceResult], ["addresses", addressResult], ["service_areas", serviceAreaResult], ["next_discounts", nextDiscountResult], ["customer_packages", packageResult], ["package_reservations", reservedResult], ["bookings", bookingResult], ["service_band_prices", bandPriceResult]] as const) {
     if (result.error) fail(scope, result.error.message);
   }
 
   const bookingRows = bookingResult.data ?? [];
   const customers = (customerResult.data ?? []).map((row) => ({ id: row.id, name: row.display_name, phone: row.phone }));
   const customerNames = new Map(customers.map((customer) => [customer.id, customer.name]));
+  const petKeysResult = await supabase.schema("app").rpc("resolve_pet_pricing_keys", { p_pet_ids: (petResult.data ?? []).map((row) => row.id) });
+  if (petKeysResult.error) fail("pet_pricing_keys", petKeysResult.error.message);
+  const petKeys = new Map(((petKeysResult.data ?? []) as Array<{ pet_id: string; pricing_key: string | null; size_label: string | null }>).map((row) => [row.pet_id, row]));
+  const bandPrices = new Map<string, Record<string, BandPrice>>();
+  for (const row of bandPriceResult.data ?? []) {
+    let servicePrices = bandPrices.get(row.service_id);
+    if (!servicePrices) { servicePrices = {}; bandPrices.set(row.service_id, servicePrices); }
+    servicePrices[row.pricing_key] = { price: row.price === null ? null : Number(row.price), duration: row.duration_minutes };
+  }
 
   return {
     branches: (branchResult.data ?? []).map((row) => ({ id: row.id, name: row.name, timezone: row.timezone })),
     customers,
-    pets: (petResult.data ?? []).map((row) => ({ id: row.id, customerId: row.customer_id, name: row.name, breed: row.breed, species: row.species, size: row.size, weightKg: row.weight_kg === null ? null : Number(row.weight_kg) })),
-    services: (serviceResult.data ?? []).map((row) => ({ id: row.id, name: row.name, category: row.category?.trim() || "Lainnya", durationMinutes: row.duration_minutes, basePrice: Number(row.base_price), currency: row.currency, priceExtraSmall: row.price_extra_small === null ? null : Number(row.price_extra_small), priceSmall: row.price_small === null ? null : Number(row.price_small), priceMedium: row.price_medium === null ? null : Number(row.price_medium), priceLarge: row.price_large === null ? null : Number(row.price_large), priceExtraLarge: row.price_extra_large === null ? null : Number(row.price_extra_large), priceCat: row.price_cat === null ? null : Number(row.price_cat), durationExtraSmall: row.duration_extra_small, durationSmall: row.duration_small, durationMedium: row.duration_medium, durationLarge: row.duration_large, durationExtraLarge: row.duration_extra_large, durationCat: row.duration_cat, speciesPricing: row.species_pricing as SpeciesPricing })),
+    pets: (petResult.data ?? []).map((row) => ({ id: row.id, customerId: row.customer_id, name: row.name, breed: row.breed, species: row.species, size: row.size, weightKg: row.weight_kg === null ? null : Number(row.weight_kg), pricingKey: petKeys.get(row.id)?.pricing_key ?? null, sizeLabel: petKeys.get(row.id)?.size_label ?? null })),
+    services: (serviceResult.data ?? []).map((row) => ({ id: row.id, name: row.name, category: row.category?.trim() || "Lainnya", durationMinutes: row.duration_minutes, additionalDurationMinutes: Number(row.additional_duration_minutes ?? 0), basePrice: Number(row.base_price), currency: row.currency, priceExtraSmall: row.price_extra_small === null ? null : Number(row.price_extra_small), priceSmall: row.price_small === null ? null : Number(row.price_small), priceMedium: row.price_medium === null ? null : Number(row.price_medium), priceLarge: row.price_large === null ? null : Number(row.price_large), priceExtraLarge: row.price_extra_large === null ? null : Number(row.price_extra_large), priceCat: row.price_cat === null ? null : Number(row.price_cat), durationExtraSmall: row.duration_extra_small, durationSmall: row.duration_small, durationMedium: row.duration_medium, durationLarge: row.duration_large, durationExtraLarge: row.duration_extra_large, durationCat: row.duration_cat, speciesPricing: row.species_pricing as SpeciesPricing, bandPrices: bandPrices.get(row.id) ?? {} })),
     resources: (resourceResult.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, name: row.name })),
     nextDiscounts: (nextDiscountResult.data ?? []).map((row) => {
       const raw = row.rules && typeof row.rules === "object" && !Array.isArray(row.rules) ? row.rules as Record<string, unknown> : {};

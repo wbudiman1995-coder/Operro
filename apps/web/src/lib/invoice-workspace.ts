@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pricingBand } from "@/lib/pet-sizing";
 
 function fail(scope: string, error: { message: string } | null) { if (error) throw new Error(`${scope}_failed:${error.message}`); }
 
@@ -17,11 +16,11 @@ export interface InvoiceStudioData {
   customers: Array<{ id: string; name: string; code: string; petNames: string[]; pets: Array<{ id: string; name: string; band: string | null }>; address: string; searchText: string }>;
   branches: Array<{ id: string; name: string }>;
   groomers: Array<{ id: string; branchId: string; name: string }>;
-  packages: Array<{ id: string; name: string; sessions: number; price: number; currency: string; perPet: boolean; sizeBand: string | null; recurrenceInterval: string }>;
+  packages: Array<{ id: string; name: string; sessions: number; price: number; currency: string; perPet: boolean; sizeBand: string | null; sizeLabel: string | null; recurrenceInterval: string }>;
 }
 
 export async function loadInvoiceStudioData(supabase: SupabaseClient, organizationId: string): Promise<InvoiceStudioData> {
-  const [bookings, manualVisits, customers, pets, addresses, branches, groomers, packages] = await Promise.all([
+  const [bookings, manualVisits, customers, pets, addresses, branches, groomers, packages, bands] = await Promise.all([
     supabase.from("bookings").select("id,branch_id,customer_id,starts_at,status").eq("organization_id", organizationId).eq("status", "completed").is("deleted_at", null).order("starts_at", { ascending: false }).limit(1000),
     supabase.from("manual_visits").select("id,branch_id,customer_id,pet_id,visit_at,description").eq("organization_id", organizationId).is("invoice_id", null).is("deleted_at", null).order("visit_at", { ascending: false }).limit(1000),
     supabase.from("customers").select("id,display_name,customer_code").eq("organization_id", organizationId).is("deleted_at", null).order("display_name"),
@@ -30,8 +29,13 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
     supabase.from("branches").select("id,name").eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("resources").select("id,branch_id,name").eq("organization_id", organizationId).eq("kind", "staff").eq("status", "active").is("deleted_at", null).order("name"),
     supabase.from("packages").select("id,name,total_sessions,price,currency,per_pet,size_band,recurrence_interval").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null).order("name"),
+    supabase.from("organization_size_bands").select("band_key,label").eq("organization_id", organizationId),
   ]);
-  for (const [scope, result] of [["invoice_bookings", bookings], ["invoice_manual_visits", manualVisits], ["invoice_customers", customers], ["invoice_pets", pets], ["invoice_addresses", addresses], ["invoice_branches", branches], ["invoice_groomers", groomers], ["invoice_packages", packages]] as const) fail(scope, result.error);
+  for (const [scope, result] of [["invoice_bookings", bookings], ["invoice_manual_visits", manualVisits], ["invoice_customers", customers], ["invoice_pets", pets], ["invoice_addresses", addresses], ["invoice_branches", branches], ["invoice_groomers", groomers], ["invoice_packages", packages], ["invoice_size_bands", bands]] as const) fail(scope, result.error);
+  const petKeysResult = await supabase.schema("app").rpc("resolve_pet_pricing_keys", { p_pet_ids: (pets.data ?? []).map((row) => row.id) });
+  fail("invoice_pet_pricing_keys", petKeysResult.error);
+  const petKeys = new Map(((petKeysResult.data ?? []) as Array<{ pet_id: string; pricing_key: string | null }>).map((row) => [row.pet_id, row.pricing_key]));
+  const bandLabels = new Map((bands.data ?? []).map((row) => [row.band_key, row.label]));
   const bookingIds = (bookings.data ?? []).map((row) => row.id);
   const [jobPets, orders, manualBilling] = await Promise.all([
     bookingIds.length ? supabase.from("grooming_job_pets").select("id,grooming_job_id,pet_id,assigned_resource_id").eq("organization_id", organizationId).in("grooming_job_id", bookingIds).is("deleted_at", null) : Promise.resolve({ data: [], error: null }),
@@ -55,7 +59,7 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
   const addressMap = new Map((addresses.data ?? []).map((row) => [row.customer_id, [row.line1, row.kecamatan, row.kabupaten_kota, row.province].filter(Boolean).join(", ")]));
   const billedManualVisits = new Set((manualBilling.data ?? []).map((row) => row.source_id));
   const customerRows = (customers.data ?? []).map((customer) => {
-    const customerPets = (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name, band: pricingBand({ species: pet.species, size: pet.size, weightKg: pet.weight_kg }) }));
+    const customerPets = (pets.data ?? []).filter((pet) => pet.customer_id === customer.id).map((pet) => ({ id: pet.id, name: pet.name, band: petKeys.get(pet.id) ?? null }));
     const petNames = customerPets.map((pet) => pet.name);
     const addressRow = (addresses.data ?? []).find((address) => address.customer_id === customer.id);
     const address = addressRow ? [addressRow.line1, addressRow.kecamatan, addressRow.kabupaten_kota, addressRow.province].filter(Boolean).join(", ") : "";
@@ -82,6 +86,6 @@ export async function loadInvoiceStudioData(supabase: SupabaseClient, organizati
     }),
     customers: customerRows,
     branches: branches.data ?? [], groomers: (groomers.data ?? []).map((row) => ({ id: row.id, branchId: row.branch_id, name: row.name })),
-    packages: (packages.data ?? []).map((pkg) => ({ id: pkg.id, name: pkg.name, sessions: pkg.total_sessions, price: Number(pkg.price), currency: pkg.currency, perPet: pkg.per_pet, sizeBand: pkg.size_band, recurrenceInterval: pkg.recurrence_interval })),
+    packages: (packages.data ?? []).map((pkg) => ({ id: pkg.id, name: pkg.name, sessions: pkg.total_sessions, price: Number(pkg.price), currency: pkg.currency, perPet: pkg.per_pet, sizeBand: pkg.size_band, sizeLabel: pkg.size_band ? bandLabels.get(pkg.size_band) ?? pkg.size_band : null, recurrenceInterval: pkg.recurrence_interval })),
   };
 }

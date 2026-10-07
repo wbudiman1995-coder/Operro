@@ -1,4 +1,6 @@
-/** HomePaw starter bands. Persisted pet sizes remain editable when weight is unknown. */
+import { resolveForPricingKey, type BandPrice } from "@/lib/size-bands";
+
+/** Legacy compatibility exports. New application paths consume tenant rows. */
 export const DOG_SIZE_BANDS = [
   { value: "extra_small", label: "XS", weight: "< 5 kg" },
   { value: "small", label: "S", weight: "5–<10 kg" },
@@ -28,7 +30,7 @@ export function dogSizeFromWeight(weight: number | string | null | undefined, bo
   return "extra_large";
 }
 
-export interface SizedPet { species: string; size: string | null; weightKg?: number | string | null }
+export interface SizedPet { species: string; size: string | null; weightKg?: number | string | null; pricingKey?: string | null }
 export interface SizedService {
   durationMinutes: number;
   basePrice: number;
@@ -37,12 +39,15 @@ export interface SizedService {
   durationExtraSmall?: number | null; durationSmall?: number | null; durationMedium?: number | null;
   durationLarge?: number | null; durationExtraLarge?: number | null; durationCat?: number | null;
   speciesPricing?: SpeciesPricing;
+  bandPrices?: Record<string, BandPrice>;
+  additionalDurationMinutes?: number;
 }
 
 const priceKey = { extra_small: "priceExtraSmall", small: "priceSmall", medium: "priceMedium", large: "priceLarge", extra_large: "priceExtraLarge", cat: "priceCat" } as const;
 const durationKey = { extra_small: "durationExtraSmall", small: "durationSmall", medium: "durationMedium", large: "durationLarge", extra_large: "durationExtraLarge", cat: "durationCat" } as const;
 
 export function pricingBand(pet: SizedPet): PricingBand | null {
+  if (Object.hasOwn(pet, "pricingKey")) return pet.pricingKey ?? null;
   if (pet.species === "cat") return "cat";
   if (pet.species !== "dog") return pet.species || null;
   // pets.size is assigned by the database trigger using this organization's
@@ -52,6 +57,7 @@ export function pricingBand(pet: SizedPet): PricingBand | null {
 
 export function resolveServiceForPet(service: SizedService, pet: SizedPet): { price: number; duration: number; band: PricingBand | null } {
   const band = pricingBand(pet);
+  if (service.bandPrices) return resolveForPricingKey(service, pet.species, band);
   if (pet.species !== "dog" && pet.species !== "cat") {
     const custom = service.speciesPricing?.[pet.species];
     return { band, price: custom?.price ?? service.basePrice, duration: custom?.duration ?? 0 };

@@ -1,7 +1,6 @@
 "use server";
 
 import { correctedMembershipExpiry } from "@/lib/membership-correction";
-import { pricingBand } from "@/lib/pet-sizing";
 
 /**
  * Function index:
@@ -216,13 +215,17 @@ export async function createCustomerAction(_previous: PilotActionState, formData
   try {
     pets = JSON.parse(textValue(formData, "petsJson", 20_000)) as typeof pets;
   } catch { return databaseError("Pet", "data pet tidak valid"); }
-  const petTypesResult = await context.supabase.from("organization_pet_types").select("key").eq("organization_id", context.organizationId).eq("is_active", true);
-  if (petTypesResult.error) return databaseError("Pet", "jenis pet belum dapat diperiksa");
+  const [petTypesResult, sizeBandsResult] = await Promise.all([
+    context.supabase.from("organization_pet_types").select("key").eq("organization_id", context.organizationId).eq("is_active", true),
+    context.supabase.from("organization_size_bands").select("band_key").eq("organization_id", context.organizationId).eq("band_kind", "dog_weight").eq("status", "active"),
+  ]);
+  if (petTypesResult.error || sizeBandsResult.error) return databaseError("Pet", "jenis atau ukuran pet belum dapat diperiksa");
   const allowedPetTypes = new Set((petTypesResult.data ?? []).map((type) => type.key));
+  const allowedDogSizes = new Set(["", ...(sizeBandsResult.data ?? []).map((band) => band.band_key)]);
   if (!Array.isArray(pets) || pets.length < 1 || pets.length > 5 || pets.some((pet) =>
     !pet || typeof pet.name !== "string" || !pet.name.trim() || pet.name.length > 80
     || !allowedPetTypes.has(pet.species)
-    || !["", "extra_small", "small", "medium", "large", "extra_large"].includes(pet.size)
+    || !allowedDogSizes.has(pet.size)
     || (pet.species !== "dog" && pet.size !== "")
     || (pet.weightKg && (!Number.isFinite(Number(pet.weightKg)) || Number(pet.weightKg) <= 0))
   )) return databaseError("Pet", "isi satu hingga lima pet dengan nama dan jenis yang valid");
@@ -1115,14 +1118,7 @@ export async function previewPackageRenewalAction(customerPackageId: string): Pr
   const result = await context.supabase.schema("app").rpc("preview_package_renewal", { p_customer_package: customerPackageId });
   if (result.error) return { error: result.error.message, preview: null };
   const data = result.data as Record<string, unknown>;
-  let sizeMismatch = false;
-  if (data.pet_id && data.package_id) {
-    const [catalog, pet] = await Promise.all([
-      context.supabase.from("packages").select("size_band").eq("organization_id", context.organizationId).eq("id", String(data.package_id)).maybeSingle(),
-      context.supabase.from("pets").select("species,size,weight_kg").eq("organization_id", context.organizationId).eq("id", String(data.pet_id)).maybeSingle(),
-    ]);
-    if (catalog.data?.size_band && pet.data) sizeMismatch = pricingBand({ species: pet.data.species, size: pet.data.size, weightKg: pet.data.weight_kg }) !== catalog.data.size_band;
-  }
+  const sizeMismatch = Boolean(data.size_incompatible);
   return {
     error: null,
     preview: {
@@ -1134,7 +1130,7 @@ export async function previewPackageRenewalAction(customerPackageId: string): Pr
       resultingAvailable: Number(data.resulting_available), currentExpiresAt: data.current_expires_at ? String(data.current_expires_at) : null,
       resultingExpiresAt: String(data.resulting_expires_at), catalogActive: Boolean(data.catalog_active), membershipStatus: String(data.membership_status),
       petScopeIncompatible: Boolean(data.pet_scope_incompatible), serviceScopeIncompatible: Boolean(data.service_scope_incompatible),
-      incompatible: Boolean(data.incompatible) || sizeMismatch, blockingReason: sizeMismatch ? "Ukuran pet sudah berubah; jual paket ukuran baru untuk periode berikutnya." : data.blocking_reason ? String(data.blocking_reason) : null,
+      incompatible: Boolean(data.incompatible), blockingReason: sizeMismatch ? "Ukuran pet sudah berubah; jual paket ukuran baru untuk periode berikutnya." : data.blocking_reason ? String(data.blocking_reason) : null,
       termsFingerprint: String(data.terms_fingerprint), generatedAt: String(data.generated_at),
     },
   };

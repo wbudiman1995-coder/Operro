@@ -7,7 +7,6 @@ import { loadAuthContext } from "@/lib/auth-context";
 import { parseBookingDraft } from "@/lib/booking-validation";
 import { createClient } from "@/lib/supabase/server";
 import { zonedDayISO } from "@/lib/timezone";
-import { resolveServiceForPet } from "@/lib/pet-sizing";
 
 export interface CreateBookingState { error: string | null }
 
@@ -35,33 +34,25 @@ export async function createBookingAction(
   const [{ data: branch }, { data: customer }, { data: pets }, { data: services }, { data: resources }] = await Promise.all([
     supabase.from("branches").select("id").eq("organization_id", organizationId).eq("id", draft.branchId).eq("status", "active").is("deleted_at", null).maybeSingle(),
     supabase.from("customers").select("id").eq("organization_id", organizationId).eq("id", draft.customerId).is("deleted_at", null).maybeSingle(),
-    supabase.from("pets").select("id,customer_id,species,size,weight_kg").eq("organization_id", organizationId).in("id", draft.pets.map((pet) => pet.petId)).is("deleted_at", null),
-    supabase.from("service_catalog").select("id,category,duration_minutes,base_price,duration_extra_small,duration_small,duration_medium,duration_large,duration_extra_large,duration_cat,species_pricing").eq("organization_id", organizationId).in("id", draft.pets.flatMap((pet) => pet.serviceIds)).eq("is_active", true).is("deleted_at", null),
+    supabase.from("pets").select("id,customer_id").eq("organization_id", organizationId).in("id", draft.pets.map((pet) => pet.petId)).is("deleted_at", null),
+    supabase.from("service_catalog").select("id,category").eq("organization_id", organizationId).in("id", draft.pets.flatMap((pet) => pet.serviceIds)).eq("is_active", true).is("deleted_at", null),
     supabase.from("resources").select("id,branch_id").eq("organization_id", organizationId).in("id", draft.pets.map((pet) => pet.resourceId)).eq("status", "active").is("deleted_at", null),
   ]);
   const requestedServiceIds = new Set(draft.pets.flatMap((pet) => pet.serviceIds));
   if (!branch || !customer || pets?.length !== draft.pets.length || pets.some((pet) => pet.customer_id !== draft.customerId) || services?.length !== requestedServiceIds.size || resources?.some((resource) => resource.branch_id !== draft.branchId) || new Set(resources?.map((resource) => resource.id)).size !== new Set(draft.pets.map((pet) => pet.resourceId)).size) {
     return { error: "Pilihan booking berubah atau tidak dapat diakses. Muat ulang halaman lalu coba lagi." };
   }
-  const petById = new Map((pets ?? []).map((pet) => [pet.id, { species: pet.species, size: pet.size, weightKg: pet.weight_kg }]));
-  const selectedServices = new Map((services ?? []).map((service) => [service.id, service]));
-  if (draft.pets.some((selection) => {
-    const pet = petById.get(selection.petId);
-    return pet && !["dog", "cat"].includes(pet.species) && selection.serviceIds.some((id) => {
-      const pricing = selectedServices.get(id)?.species_pricing as Record<string, unknown> | undefined;
-      return !pricing?.[pet.species];
-    });
-  })) return { error: "Harga dan durasi untuk jenis pet ini belum diatur pada layanan yang dipilih." };
-  const serviceById = new Map((services ?? []).map((service) => [service.id, {
-    durationMinutes: service.duration_minutes, basePrice: Number(service.base_price), durationExtraSmall: service.duration_extra_small,
-    durationSmall: service.duration_small, durationMedium: service.duration_medium, durationLarge: service.duration_large,
-    durationExtraLarge: service.duration_extra_large, durationCat: service.duration_cat,
-    speciesPricing: service.species_pricing as Record<string, { price: number; duration: number }>,
-  }]));
-  const durationFor = (petId: string, serviceId: string) => {
-    const pet = petById.get(petId); const service = serviceById.get(serviceId);
-    return pet && service ? resolveServiceForPet(service, pet).duration : 0;
-  };
+  const resolutionResult = await app.rpc("preview_booking_resolution", {
+    p_items: draft.pets.flatMap((pet) => pet.serviceIds.map((serviceId) => ({ pet_id: pet.petId, service_id: serviceId, quantity: 1 }))),
+  });
+  if (resolutionResult.error) {
+    return { error: /species_price_not_configured/i.test(resolutionResult.error.message)
+      ? "Harga dan durasi untuk jenis pet ini belum diatur pada layanan yang dipilih."
+      : `Resolusi layanan gagal: ${resolutionResult.error.message}` };
+  }
+  const resolutions = resolutionResult.data as Array<{ pet_id: string; service_id: string; duration_minutes: number }>;
+  const durationBySelection = new Map(resolutions.map((row) => [`${row.pet_id}:${row.service_id}`, Number(row.duration_minutes)]));
+  const durationFor = (petId: string, serviceId: string) => durationBySelection.get(`${petId}:${serviceId}`) ?? 0;
   if (draft.pets.some((pet) => !pet.serviceIds.some((id) => durationFor(pet.petId, id) > 0))) {
     return { error: "Setiap pet harus memiliki layanan utama berdurasi. Layanan tambahan tanpa durasi tidak bisa dipesan sendiri." };
   }

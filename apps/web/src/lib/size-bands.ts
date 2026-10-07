@@ -189,6 +189,30 @@ export function previewBandKey(bands: readonly Pick<SizeBand, "key" | "upperKg" 
   return null;
 }
 
+/** Pure mirror used only for UI previews/tests; persisted decisions always use the SQL resolver. */
+export function bandForWeight(bands: readonly Pick<SizeBand, "key" | "upperKg" | "upperInclusive" | "sortOrder">[], weightKg: number): string | null {
+  return previewBandKey([...bands].sort((left, right) => left.sortOrder - right.sortOrder), weightKg);
+}
+
+export interface PreviewService {
+  durationMinutes: number;
+  basePrice: number;
+  additionalDurationMinutes?: number;
+  bandPrices?: Record<string, BandPrice>;
+  speciesPricing?: Record<string, { price: number; duration: number }>;
+}
+
+/** Mirrors resolve_service_line over server-loaded keys/rows. Never accepts a client-submitted key. */
+export function resolveForPricingKey(service: PreviewService, species: string, pricingKey: string | null, quantity = 1): { price: number; duration: number; band: string | null } {
+  const extra = (service.additionalDurationMinutes ?? 0) * Math.max(0, quantity - 1);
+  if (species !== "dog" && species !== "cat") {
+    const custom = service.speciesPricing?.[species];
+    return { band: pricingKey, price: custom?.price ?? service.basePrice, duration: (custom?.duration ?? 0) + extra };
+  }
+  const row = pricingKey ? service.bandPrices?.[pricingKey] : undefined;
+  return { band: pricingKey, price: row?.price ?? service.basePrice, duration: (row?.duration ?? service.durationMinutes) + extra };
+}
+
 // ------------------------------------------------------------ impact / errors
 
 export interface LayoutImpact {

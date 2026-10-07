@@ -6,7 +6,7 @@ import { createBookingAction, type CreateBookingState } from "@/app/bookings/act
 import type { AddressOption, BranchOption, CustomerOption, CustomerPackageOption, NextDiscountOption, PetOption, ResourceOption, ServiceAreaOption, ServiceOption } from "@/lib/bookings";
 import type { FulfillmentMode } from "@/lib/booking-validation";
 import { addWallMinutes, toBranchInstant } from "@/lib/booking-wall-time";
-import { pricingBand, resolveServiceForPet } from "@/lib/pet-sizing";
+import { resolveServiceForPet } from "@/lib/pet-sizing";
 
 interface Props {
   branches: BranchOption[];
@@ -194,7 +194,7 @@ export function BookingWizard({ branches, customers, pets, services, resources, 
           {selectedPets.map((selection) => {
             const pet = pets.find((item) => item.id === selection.petId);
             return <section key={selection.petId} className="rounded-2xl border border-slate-200 p-4 sm:p-5">
-              <h3 className="font-bold">{pet?.name} <span className="text-xs font-medium text-slate-500">· {pet ? pricingBand(pet)?.toUpperCase() ?? "Ukuran belum diisi" : ""}</span></h3>
+              <h3 className="font-bold">{pet?.name} <span className="text-xs font-medium text-slate-500">· {pet ? pet.sizeLabel ?? pet.pricingKey ?? "Ukuran belum diisi" : ""}</span></h3>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">{services.map((service) => {
                 const checked = selection.serviceIds.includes(service.id);
                 const resolved = pet ? resolveServiceForPet(service, pet) : { price: service.basePrice, duration: service.durationMinutes, band: null };

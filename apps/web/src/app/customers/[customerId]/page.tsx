@@ -235,7 +235,7 @@ export default async function CustomerDetailPage({
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-slate-800">{formatZonedDateTime(booking.startsAt, zoneFor(booking.branchId))}</p>
                     <p className="mt-0.5 truncate text-xs text-slate-500">
-                      {booking.petNames.join(", ") || "Tanpa hewan"}{booking.serviceNames.length > 0 ? ` · ${booking.serviceNames.join(", ")}` : ""}
+                      {booking.petNames.join(", ") || "Tanpa hewan"}{booking.sizeLabels.length > 0 ? ` · ukuran ${booking.sizeLabels.join(", ")}` : ""}{booking.serviceNames.length > 0 ? ` · ${booking.serviceNames.join(", ")}` : ""}
                     </p>
                   </div>
                   <StatusBadge status={booking.status} />
@@ -292,7 +292,7 @@ export default async function CustomerDetailPage({
               {packages.map((item) => (
                 <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-800">{item.packageName}{item.petName ? ` · ${item.petName}` : ""}</p>
+                    <p className="truncate text-sm font-bold text-slate-800">{item.packageName}{item.petName ? ` · ${item.petName}` : ""}{item.sizeLabel ? ` · ${item.sizeLabel}` : ""}</p>
                     <p className="mt-0.5 text-xs text-slate-500">
                       Dibeli {formatZonedDate(item.purchasedAt, branchContext.defaultTimezone)}
                       {item.expiresAt ? ` · berlaku sampai ${formatZonedDate(item.expiresAt, branchContext.defaultTimezone)}` : ""}
