@@ -1,0 +1,548 @@
+From b5ef95d484c3eaed427e176fe7a0d5351482e24d Mon Sep 17 00:00:00 2001
+From: wbudiman1995-coder <wbudiman1995@gmail.com>
+Date: Thu, 1 Oct 2026 14:00:05 +0700
+Subject: [PATCH] Add finance export, audit-history labels, and verify #41
+ admin-checklist isolation
+
+Two HomePaw-parity quick wins: a filtered finance XLSX export (#31, reusing
+the existing payment-register RPC and expenses table) and a labeled
+audit-history panel on invoices (#36, wiring the previously-unused
+app.list_audit_events RPC). Also verifies, with a new SQL test matching this
+repo's role/RLS test style, that the business Admin-permission checklist is
+already correctly owner-only at the server layer (no fix needed). Remaining
+assigned sections (#34, #37, #38, #39, #43, #44) are documented in
+docs/handoffs/PARITY-OPS-QUICKWINS.md with HomePaw-grounded evidence and, for
+anything deferred, exact data sources and acceptance tests.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ apps/web/src/app/finance/export/route.ts      |  35 +++++
+ apps/web/src/app/finance/page.tsx             |   2 +-
+ .../web/src/app/invoices/[invoiceId]/page.tsx |   5 +
+ .../src/components/audit-history-panel.tsx    |  18 +++
+ apps/web/src/lib/audit-diff.ts                |   7 +
+ apps/web/src/lib/audit-events.ts              |  58 ++++++++
+ apps/web/src/lib/finance-export.ts            |  47 +++++++
+ apps/web/src/lib/homepaw-export.ts            |   6 +-
+ apps/web/test/audit-diff.test.ts              |  19 +++
+ docs/handoffs/PARITY-OPS-QUICKWINS.md         | 124 ++++++++++++++++++
+ ...est_business_admin_checklist_isolation.sql |  80 +++++++++++
+ 11 files changed, 397 insertions(+), 4 deletions(-)
+ create mode 100644 apps/web/src/app/finance/export/route.ts
+ create mode 100644 apps/web/src/components/audit-history-panel.tsx
+ create mode 100644 apps/web/src/lib/audit-diff.ts
+ create mode 100644 apps/web/src/lib/audit-events.ts
+ create mode 100644 apps/web/src/lib/finance-export.ts
+ create mode 100644 apps/web/test/audit-diff.test.ts
+ create mode 100644 docs/handoffs/PARITY-OPS-QUICKWINS.md
+ create mode 100644 supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql
+
+diff --git a/apps/web/src/app/finance/export/route.ts b/apps/web/src/app/finance/export/route.ts
+new file mode 100644
+index 0000000..91107a9
+--- /dev/null
++++ b/apps/web/src/app/finance/export/route.ts
+@@ -0,0 +1,35 @@
++/**
++ * Finance export (section 31): ?stage&month&q mirror the on-screen register
++ * filters on /finance. Enforced server-side with finance.read, same
++ * permission key the Finance page itself checks before showing numbers.
++ */
++import "server-only";
++
++import { NextResponse } from "next/server";
++
++import { buildFinanceExport } from "@/lib/finance-export";
++import { PAYMENT_STAGES, type PaymentStage } from "@/lib/payment-register";
++import { sanitizeExportFilename } from "@/lib/payroll-export";
++import { requireActiveWorkspace } from "@/lib/require-workspace";
++
++export async function GET(request: Request) {
++  const workspace = await requireActiveWorkspace();
++  if (!workspace.capabilities["finance.read"]) {
++    return NextResponse.json({ error: "izin finance.read diperlukan" }, { status: 403 });
++  }
++
++  const url = new URL(request.url);
++  const stageParam = url.searchParams.get("stage");
++  const stage = stageParam && (PAYMENT_STAGES as string[]).includes(stageParam) ? (stageParam as PaymentStage) : undefined;
++  const filters = { stage, serviceMonth: url.searchParams.get("month") || undefined, search: url.searchParams.get("q") || undefined };
++
++  const book = await buildFinanceExport(workspace.supabase, workspace.activeOrganization.id, filters);
++  const buffer = await book.xlsx.writeBuffer();
++  const org = sanitizeExportFilename(workspace.activeOrganization.name);
++  return new NextResponse(new Uint8Array(buffer), {
++    headers: {
++      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
++      "Content-Disposition": `attachment; filename="${org}_Keuangan.xlsx"`,
++    },
++  });
++}
+diff --git a/apps/web/src/app/finance/page.tsx b/apps/web/src/app/finance/page.tsx
+index 0f9d263..25fc007 100644
+--- a/apps/web/src/app/finance/page.tsx
++++ b/apps/web/src/app/finance/page.tsx
+@@ -38,7 +38,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
+     <section className="mt-7 rounded-3xl border border-slate-200 bg-white shadow-sm"><div className="border-b p-5"><h2 className="font-bold">Invoice</h2></div><div className="divide-y">{data.invoices.map((invoice) => <div key={invoice.id} className="p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><Link href={`/invoices/${invoice.id}`} className="font-bold underline-offset-2 hover:underline">{invoice.number}</Link><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${invoice.billingMode === "package_sale" ? "bg-amber-100 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>{invoice.billingMode === "package_sale" ? "Paket" : invoice.documentType === "service_report" ? "Laporan prepaid" : "Kunjungan"}</span></div><p className="mt-1 text-xs text-slate-500">{invoice.customerName} · {new Date(invoice.issuedAt).toLocaleDateString("id-ID")}{invoice.dueAt ? ` · jatuh tempo ${new Date(invoice.dueAt).toLocaleDateString("id-ID")}` : ""}</p>{invoice.groomerName ? <p className="mt-1 text-xs font-semibold text-slate-600">Groomer: {invoice.groomerName}</p> : null}</div><div className="text-right"><p className="font-bold">{formatRupiah(invoice.total)}</p><StatusBadge status={invoice.status} /></div></div>{invoice.canEdit ? <InvoiceDetailsEditor invoice={invoice} groomers={catalog.resources} /> : invoice.status !== "issued" ? <p className="mt-3 text-xs font-semibold text-slate-400">Invoice final dikunci.</p> : <p className="mt-3 text-xs font-semibold text-slate-400">Detail dikunci karena pembayaran sudah tercatat.</p>}</div>)}</div></section>
+ 
+     <section className="mt-7">
+-      <h2 className="mb-4 font-bold">Kontrol pembayaran</h2>
++      <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="font-bold">Kontrol pembayaran</h2>{workspace.capabilities["finance.read"] ? <a href={`/finance/export?${new URLSearchParams({ ...(stage ? { stage } : {}), ...(params.month ? { month: params.month } : {}), ...(params.q ? { q: params.q } : {}) }).toString()}`} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">Export Excel</a> : null}</div>
+       <PaymentRegister page={paymentRegister} filters={{ stage: stage ?? "all", month: params.month ?? "", search: params.q ?? "" }} canManage={workspace.capabilities["payment.manage"]} canValidate={workspace.capabilities["payment.validate"]} />
+     </section>
+   </WorkspaceShell>;
+diff --git a/apps/web/src/app/invoices/[invoiceId]/page.tsx b/apps/web/src/app/invoices/[invoiceId]/page.tsx
+index 9627d09..897dd28 100644
+--- a/apps/web/src/app/invoices/[invoiceId]/page.tsx
++++ b/apps/web/src/app/invoices/[invoiceId]/page.tsx
+@@ -7,8 +7,10 @@
+ import Link from "next/link";
+ import { notFound } from "next/navigation";
+ 
++import { AuditHistoryPanel } from "@/components/audit-history-panel";
+ import { InvoiceCustomerNotesEditor } from "@/components/invoice-customer-notes-editor";
+ import { PrintDownloadButton, WhatsAppHandoffButton } from "@/components/invoice-document-actions";
++import { loadAuditEvents } from "@/lib/audit-events";
+ import { formatRupiah } from "@/lib/pilot-data";
+ import { loadInvoiceDocument } from "@/lib/invoice-document";
+ import { requireActiveWorkspace } from "@/lib/require-workspace";
+@@ -20,6 +22,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
+   const workspace = await requireActiveWorkspace();
+   const doc = await loadInvoiceDocument(workspace.supabase, workspace.activeOrganization.id, invoiceId);
+   if (!doc) notFound();
++  const auditEvents = await loadAuditEvents(workspace.supabase, "invoices", invoiceId);
+ 
+   const isServiceReport = doc.documentType === "service_report";
+   const isPackageSale = doc.billingMode === "package_sale";
+@@ -110,5 +113,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
+ 
+       {doc.status === "issued" ? <InvoiceCustomerNotesEditor invoiceId={doc.id} revision={doc.revision} initialNotes={doc.customerNotes ?? ""} internalNote={doc.internalGroomerNotes} /> : null}
+     </div>
++
++    <AuditHistoryPanel events={auditEvents} />
+   </div>;
+ }
+diff --git a/apps/web/src/components/audit-history-panel.tsx b/apps/web/src/components/audit-history-panel.tsx
+new file mode 100644
+index 0000000..16b458b
+--- /dev/null
++++ b/apps/web/src/components/audit-history-panel.tsx
+@@ -0,0 +1,18 @@
++import type { AuditEvent } from "@/lib/audit-events";
++
++export function AuditHistoryPanel({ events }: { events: AuditEvent[] }) {
++  if (events.length === 0) return null;
++  return (
++    <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm print:hidden">
++      <h2 className="text-xs font-bold uppercase text-slate-400">Riwayat perubahan</h2>
++      <ul className="mt-3 space-y-2">
++        {events.map((event) => (
++          <li key={event.id} className="border-b border-slate-100 pb-2 text-xs text-slate-600 last:border-0">
++            <span className="font-bold text-slate-800">{event.actionLabel}</span> oleh {event.actorName} &middot; {new Date(event.occurredAt).toLocaleString("id-ID")}
++            {event.changedFields.length > 0 ? <span className="mt-0.5 block text-slate-400">Kolom: {event.changedFields.join(", ")}</span> : null}
++          </li>
++        ))}
++      </ul>
++    </section>
++  );
++}
+diff --git a/apps/web/src/lib/audit-diff.ts b/apps/web/src/lib/audit-diff.ts
+new file mode 100644
+index 0000000..58d6402
+--- /dev/null
++++ b/apps/web/src/lib/audit-diff.ts
+@@ -0,0 +1,7 @@
++/** Pure diff helper for audit-events.ts, split out (no "server-only") so test/audit-diff.test.ts can import it directly. */
++export type AuditAction = "INSERT" | "UPDATE" | "DELETE";
++
++export function computeChangedFields(action: AuditAction, previous: Record<string, unknown>, next: Record<string, unknown>): string[] {
++  if (action !== "UPDATE") return [];
++  return Object.keys(next).filter((key) => key !== "updated_at" && JSON.stringify(previous[key]) !== JSON.stringify(next[key]));
++}
+diff --git a/apps/web/src/lib/audit-events.ts b/apps/web/src/lib/audit-events.ts
+new file mode 100644
+index 0000000..9e91001
+--- /dev/null
++++ b/apps/web/src/lib/audit-events.ts
+@@ -0,0 +1,58 @@
++/**
++ * Section 36 — cross-entity audit history, with clearer labels. Reads the
++ * existing app.list_audit_events RPC (20260910120000_audit_log_read_api.sql,
++ * previously unused by the frontend) which already scopes rows to the
++ * caller's active org and one entity. This adds actor-name resolution and
++ * an Indonesian action label on top -- no new audit storage or RPC.
++ */
++import "server-only";
++
++import type { SupabaseClient } from "@supabase/supabase-js";
++
++import { computeChangedFields, type AuditAction } from "@/lib/audit-diff";
++
++export type { AuditAction };
++
++const ACTION_LABEL: Record<AuditAction, string> = { INSERT: "Dibuat", UPDATE: "Diperbarui", DELETE: "Dihapus" };
++
++export interface AuditEvent {
++  id: string;
++  action: AuditAction;
++  actionLabel: string;
++  occurredAt: string;
++  actorName: string;
++  changedFields: string[];
++}
++
++interface AuditEventRpcRow {
++  id: string;
++  actor_id: string | null;
++  action: AuditAction;
++  diff: { old?: Record<string, unknown>; new?: Record<string, unknown> } | null;
++  occurred_at: string;
++}
++
++export async function loadAuditEvents(supabase: SupabaseClient, entityTable: string, entityId: string, limit = 20): Promise<AuditEvent[]> {
++  const result = await supabase.schema("app").rpc("list_audit_events", { p_entity_table: entityTable, p_entity_id: entityId, p_limit: limit });
++  if (result.error) throw new Error(`audit_events_failed:${result.error.message}`);
++  const rows = (result.data ?? []) as AuditEventRpcRow[];
++
++  const actorIds = Array.from(new Set(rows.map((r) => r.actor_id).filter((v): v is string => Boolean(v))));
++  const actors = actorIds.length
++    ? await supabase.from("users").select("id,full_name,email").in("id", actorIds)
++    : { data: [] as Array<{ id: string; full_name: string | null; email: string | null }>, error: null };
++  if (actors.error) throw new Error(`audit_events_failed:${actors.error.message}`);
++  const actorName = new Map((actors.data ?? []).map((u) => [u.id, u.full_name || u.email || "Pengguna"]));
++
++  return rows.map((row) => {
++    const changedFields = computeChangedFields(row.action, row.diff?.old ?? {}, row.diff?.new ?? {});
++    return {
++      id: row.id,
++      action: row.action,
++      actionLabel: ACTION_LABEL[row.action] ?? row.action,
++      occurredAt: row.occurred_at,
++      actorName: row.actor_id ? (actorName.get(row.actor_id) ?? "Pengguna") : "Sistem",
++      changedFields,
++    };
++  });
++}
+diff --git a/apps/web/src/lib/finance-export.ts b/apps/web/src/lib/finance-export.ts
+new file mode 100644
+index 0000000..0e1e83b
+--- /dev/null
++++ b/apps/web/src/lib/finance-export.ts
+@@ -0,0 +1,47 @@
++/**
++ * Section 31 finance export (HomePaw parity gap): the payment register —
++ * same filters as the on-screen /finance register — plus operational
++ * expenses, as one workbook. Reuses loadPaymentRegister (the SAME
++ * RPC-backed loader the register itself renders) and getAll/sheet from
++ * homepaw-export.ts. No second, independent read or calculation path.
++ */
++import "server-only";
++
++import ExcelJS from "exceljs";
++import type { SupabaseClient } from "@supabase/supabase-js";
++
++import { getAll, sheet } from "@/lib/homepaw-export";
++import { loadPaymentRegister, type PaymentRegisterFilters } from "@/lib/payment-register";
++
++export type FinanceExportFilters = Omit<PaymentRegisterFilters, "cursor" | "pageSize">;
++
++// 100 pages * 200 rows/page = 20,000 payments per export — same bounded-cap
++// style as homepaw-export.ts's getAll (49,500 rows), sized down because this
++// loop pays one round trip per page instead of one per 500 rows.
++const MAX_PAGES = 100;
++
++async function loadAllPaymentRegisterRows(supabase: SupabaseClient, organizationId: string, filters: FinanceExportFilters) {
++  const rows = [];
++  let cursor: PaymentRegisterFilters["cursor"];
++  for (let page = 0; page < MAX_PAGES; page++) {
++    const result = await loadPaymentRegister(supabase, organizationId, { ...filters, cursor, pageSize: 200 });
++    rows.push(...result.rows);
++    if (!result.hasMore || !result.nextCursor) break;
++    cursor = result.nextCursor;
++  }
++  return rows;
++}
++
++export async function buildFinanceExport(supabase: SupabaseClient, organizationId: string, filters: FinanceExportFilters): Promise<ExcelJS.Workbook> {
++  const [paymentRows, expenses] = await Promise.all([
++    loadAllPaymentRegisterRows(supabase, organizationId, filters),
++    getAll(supabase, "expenses", organizationId, true),
++  ]);
++  const book = new ExcelJS.Workbook();
++  book.creator = "Operro";
++  sheet(book, "Pembayaran", ["Invoice", "Pelanggan", "Metode", "Jumlah", "Status", "Tahap Review", "Bulan Layanan", "Dibayar Pada", "Dikonfirmasi Oleh", "Divalidasi Oleh"],
++    paymentRows.map((r) => [r.invoiceNumber, r.customerName, r.method, r.amount, r.status, r.stage, r.serviceMonth, r.paidAt, r.screenshotConfirmedBy, r.bankValidatedBy]));
++  sheet(book, "Pengeluaran", ["Deskripsi", "Kategori", "Jumlah", "Status", "Terjadi Pada"],
++    expenses.map((r) => [r.description, r.category, r.amount, r.status, r.incurred_at]));
++  return book;
++}
+diff --git a/apps/web/src/lib/homepaw-export.ts b/apps/web/src/lib/homepaw-export.ts
+index e1c34ae..8791d79 100644
+--- a/apps/web/src/lib/homepaw-export.ts
++++ b/apps/web/src/lib/homepaw-export.ts
+@@ -5,10 +5,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
+ 
+ type Row = Record<string, unknown>;
+ const s = (value: unknown) => value === null || value === undefined ? "" : String(value);
+-const safe = (value: unknown) => /^\s*[=+\-@]/.test(s(value)) ? `'${s(value)}` : s(value);
++export const safe = (value: unknown) => /^\s*[=+\-@]/.test(s(value)) ? `'${s(value)}` : s(value);
+ const code = (id: unknown) => `CUS-${s(id).slice(0, 8).toUpperCase()}`;
+ 
+-async function getAll(supabase: SupabaseClient, table: string, org: string, excludeDeleted = false): Promise<Row[]> {
++export async function getAll(supabase: SupabaseClient, table: string, org: string, excludeDeleted = false): Promise<Row[]> {
+   const rows: Row[] = [];
+   for (let offset = 0; ; offset += 500) {
+     let query = supabase.from(table).select("*").eq("organization_id", org).order("id").range(offset, offset + 499);
+@@ -22,7 +22,7 @@ async function getAll(supabase: SupabaseClient, table: string, org: string, excl
+   return rows;
+ }
+ 
+-function sheet(book: ExcelJS.Workbook, name: string, headers: string[], rows: unknown[][]) {
++export function sheet(book: ExcelJS.Workbook, name: string, headers: string[], rows: unknown[][]) {
+   const tab = book.addWorksheet(name);
+   tab.addRow(headers);
+   rows.forEach((row) => tab.addRow(row.map(safe)));
+diff --git a/apps/web/test/audit-diff.test.ts b/apps/web/test/audit-diff.test.ts
+new file mode 100644
+index 0000000..83688f8
+--- /dev/null
++++ b/apps/web/test/audit-diff.test.ts
+@@ -0,0 +1,19 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++
++import { computeChangedFields } from "../src/lib/audit-diff";
++
++test("UPDATE reports only the fields whose value actually changed", () => {
++  const fields = computeChangedFields("UPDATE", { status: "issued", total: 100 }, { status: "paid", total: 100 });
++  assert.deepEqual(fields, ["status"]);
++});
++
++test("UPDATE ignores updated_at even when it changed", () => {
++  const fields = computeChangedFields("UPDATE", { status: "issued", updated_at: "t0" }, { status: "issued", updated_at: "t1" });
++  assert.deepEqual(fields, []);
++});
++
++test("INSERT and DELETE report no changed fields", () => {
++  assert.deepEqual(computeChangedFields("INSERT", {}, { status: "issued" }), []);
++  assert.deepEqual(computeChangedFields("DELETE", { status: "issued" }, {}), []);
++});
+diff --git a/docs/handoffs/PARITY-OPS-QUICKWINS.md b/docs/handoffs/PARITY-OPS-QUICKWINS.md
+new file mode 100644
+index 0000000..d93dcfc
+--- /dev/null
++++ b/docs/handoffs/PARITY-OPS-QUICKWINS.md
+@@ -0,0 +1,124 @@
++# Operro ↔ HomePaw parity — operational/platform quick-wins
++
++Branch `claude/parity-ops-quickwins`, from `b69f8a2` in an isolated worktree. Assigned sections: #31 finance, #34 WhatsApp center, #36 audit history, #37 operational reconciliation, #38 export/ownership, #39 business configuration, #41 accounts/permissions, #43 storage/maintenance, #44 reliability.
++
++## Method
++
++Read `apps/web/AGENTS.md` (boilerplate, no action), `docs/HOMEPAW_PARITY_AUDIT_2026-10-01.md` (the gap table), the relevant Operro routes/RPCs for each section, and bounded excerpts of `C:\Users\DW_wi\Downloads\index (2).html` (HomePaw reference) by grepping for each feature (capital/kas, blast/broadcast, audit_log, rekonsiliasi, backup/export, konfigurasi, admin access, storage/database size) and reading only the matching regions. No full-file read of either side.
++
++## Nine-row gap table
++
++| # | Section | Existing Operro behavior | HomePaw comparison (from index(2).html) | Risk | Estimate |
++|---|---|---|---|---|---|
++| 31 | Finance | `/finance`: paginated payment register (`app.search_payment_register`) + expenses; **now has an XLSX export** of the same filtered register + expenses | HomePaw has no capital/cash-on-hand dashboard either (no match for "capital/modal/kas"). Its gap was narrower than the audit implied: no export existed at all for finance. Closed for payment register + expenses this pass. | Low | **SMALL — done** |
++| 34 | WhatsApp center | Invoice/follow-up/reminder `wa.me` deep links with editable templates in Settings | HomePaw has the identical architecture: every WA send is a per-record `wa.me`/`api.whatsapp.com` link built from an editable template (`cfg-wa-done`, `cfg-wa-invoice`, `cfg-wa-followup`, `cfg-wa-renewal`, `cfg-wa-onboarding`). No `blast`/`broadcast` code anywhere, no delivery log, no batch send — confirmed by grep, zero matches. A "unified batch messaging center" would exceed HomePaw itself, not match it. | Low | **LARGE if ever pursued — explicitly not attempted; see "Deferred work"** |
++| 36 | Audit history | `public.timeline_events` (narrative) for Customer 360; `app.list_audit_events` RPC existed since `20260910120000_audit_log_read_api.sql` with **zero call sites** anywhere in `apps/web/src` | HomePaw's own audit view is a flat admin-only table dump of `audit_log` rows with raw JSON diff and a manual "delete audit rows older than N months" control — no per-action labels, no actor resolution shown in that list. **Now wired** into the invoice detail page: translated action labels (Dibuat/Diperbarui/Dihapus), resolved actor name, and a list of just the fields that actually changed. | Low | **SMALL — done** |
++| 37 | Operational reconciliation | Package/session reconciliation only (`openSubsReconcile`, review-then-apply, never auto-writes) | HomePaw has the exact same narrow scope — only subscription/session reconciliation, no visit/invoice/payroll cross-check. A real unified reconciliation engine is net-new for **both** products, not a parity gap. | Medium if built wrong (financial correctness) | **LARGE — not attempted.** Acceptance test if pursued later: for a fixed org + month, a reconciliation view must list every `visits` row with `status='completed'` lacking a matching non-void `invoices` row, every `invoices` row with `status='issued'` and no matching `payments` summing to its `total`, and every published `payroll_items` row whose source `bookings`/`manual_visits` row no longer exists or was voided after publish — sourced directly from those four tables, not recomputed derived figures. |
++| 38 | Export/ownership | 8-sheet CRM XLSX (`homepaw-export.ts`), payroll XLSX/CSV, complaint CSV, **now finance XLSX** | HomePaw's "Export Semua" (`exportAllSheets`) is also just a flat all-tables-to-XLSX dump — no Storage files, no `business_settings`/config, no bucket contents. A true organization-wide backup (files + configuration) is new ground for both products. | Medium (data-loss exposure if promised but not delivered) | **LARGE — not attempted.** Acceptance test if pursued: a backup job must produce one archive containing (a) every `*_export*`-style table dump already covered by existing exporters, (b) every object under the org's Storage buckets (`grooming-photos`, `attachments`, style refs) by real key listing, not an estimate, and (c) a serialized `business_settings`/`organizations` config row — restorable by re-running the forward migrations against an empty project and replaying the archive, proven once end-to-end on a disposable Supabase project. |
++| 39 | Business configuration | Branding, banks, service areas, access controls (confirmed existing) | HomePaw's single Settings screen additionally exposes: dashboard-card visibility toggles, toast-notification duration, an auto-log-visit checkbox, and five directly-editable WA templates (done/invoice/followup/renewal/onboarding) with token legends shown inline. Operro's equivalents are scattered or partially present; not all are in one exposed settings surface. | Low per item | **SMALL per item, but bundling is a separate pass — not attempted this round** (budget was two improvements; #31 and #36 were chosen as higher-value). |
++| 41 | Accounts/permissions | Owner-settable, granular Admin permission checklist (`app.set_business_admin_permissions` / `app.list_organization_access`), gated by `app.is_business_owner_member` which explicitly excludes the Operro platform owner (`20261020100000_legacy_org_access_roles.sql`, superseding the broader `is_business_owner` gate in `20261019100000_platform_org_access.sql`) | HomePaw has only a **binary** `owner`/`admin` role — no granular per-permission checklist exists there at all (`setRole`, "Jadikan OWNER (akses penuh)" vs plain "admin"). Operro already exceeds HomePaw here; this was a verification task, not a feature gap. | Low | **SMALL — server-layer behavior confirmed by code tracing + a new SQL test (see Validation below); the test was NOT executed in this environment — disclosed, not claimed as passing.** |
++| 43 | Storage/maintenance | Org file meter, platform-wide `pg_database_size` meter, cleanup + manual capacity requests (confirmed existing) | HomePaw's own DB/storage "meter" is a **cruder, single-tenant** heuristic (~2KB/appointment, ~3KB/invoice, etc., counted against the one Supabase project HomePaw owns) — it has no multi-tenant concept at all, because HomePaw is deployed one-business-per-project. Real per-org database-byte accounting has no HomePaw equivalent to copy against; it's a new multi-tenant capability for Operro specifically. | Medium (billing/cost accuracy if ever exposed to tenants) | **LARGE — not attempted.** Data source if pursued: `pg_total_relation_size` summed per table scoped by `organization_id` via a `SECURITY DEFINER` RPC (no existing per-tenant byte accounting exists to reuse), since `pg_database_size` is necessarily whole-project. |
++| 44 | Reliability/safeguards | RLS, audit trail, financial snapshots, migration/test gates (confirmed existing, per prior engines' handoffs) | No code gap found in this pass; the audit doc's remaining item is live QC of real-world workflows and monitoring UI, not a missing capability. No change made. | Low | **N/A — reviewed only, no HomePaw comparison gap identified.** |
++
++## Implemented this pass (exactly two)
++
++### 1. Finance export (#31)
++- [finance-export.ts](../../apps/web/src/lib/finance-export.ts): `buildFinanceExport` — loops the **existing** `loadPaymentRegister` (same RPC-backed loader the on-screen register uses) across pages until exhausted, plus `getAll(..., "expenses", ...)` reused from `homepaw-export.ts`. Two sheets: *Pembayaran*, *Pengeluaran*.
++- [homepaw-export.ts](../../apps/web/src/lib/homepaw-export.ts): exported `getAll` and `sheet` (were module-private) so `finance-export.ts` could reuse them instead of duplicating the ExcelJS/formula-injection-guard pattern a third time.
++- [finance/export/route.ts](../../apps/web/src/app/finance/export/route.ts): `GET` route, `?stage&month&q` mirror the on-screen filters, gated by `workspace.capabilities["finance.read"]` (server-side — this is the real check; the UI link is just a convenience).
++- [finance/page.tsx](../../apps/web/src/app/finance/page.tsx): added an "Export Excel" link next to "Kontrol pembayaran" carrying the current `stage`/`month`/`q` as query params, shown only when `finance.read` is true.
++
++No new table, no new RPC, no new migration — reuses the exact data path already on screen.
++
++### 2. Audit history labels (#36)
++- [audit-diff.ts](../../apps/web/src/lib/audit-diff.ts): pure `computeChangedFields(action, old, new)` — isolated (no `"server-only"`) so it's directly unit-testable.
++- [audit-events.ts](../../apps/web/src/lib/audit-events.ts): `loadAuditEvents` calls the **existing, previously-unused** `app.list_audit_events` RPC, resolves actor names via one bulk `public.users` query, and maps `INSERT/UPDATE/DELETE` to Indonesian labels.
++- [audit-history-panel.tsx](../../apps/web/src/components/audit-history-panel.tsx): small presentational list, `print:hidden` so it never appears on the printed/PDF invoice.
++- [invoices/[invoiceId]/page.tsx](../../apps/web/src/app/invoices/%5BinvoiceId%5D/page.tsx): wired in, scoped to `entity_table='invoices'` for that one invoice. The RPC enforces its own org/membership scoping (`app.has_membership()` + `app.fn_active_organization()`); no extra permission check was added beyond `requireActiveWorkspace`, matching how Customer 360's existing history is gated.
++
++No new table, no new RPC, no new migration — this surfaces an RPC that was already fully built and granted, just never called.
++
++## Section #41 verification (no code change — confirmed already correct)
++
++Traced the full current (latest-migration) authorization chain:
++- `app.is_business_owner(p_org)` (broad: owner-or-platform) still correctly gates only genuinely platform-appropriate things: member list visibility inside `list_organization_access`, and `set_organization_member_role` (role/status management, where platform provisioning access is intentional — it explicitly branches on `is_operro_owner()` for granting `Pemilik`/`Bantuan Operro`).
++- `app.is_business_owner_member(p_org)` (narrow: **excludes** the platform owner, added in `20261020100000_legacy_org_access_roles.sql`) correctly gates `set_business_admin_permissions` (raises `not_business_owner`/`42501` otherwise) and redacts `admin_keys`/`options` to `[]` inside `list_organization_access` for anyone who isn't the real owner-member — including the platform owner even when they also hold a legacy `Owner` membership.
++- "Platform support must not see tenant payroll" is enforced at the **role-grant** level: the `Bantuan Operro` role's `role_permissions` explicitly exclude `payroll.%`, `finance.read`, `reports.view`, `roles.manage`, `users.manage` (`20261020100000_legacy_org_access_roles.sql`, lines 37–44). The separate `app.is_platform_admin()` RLS-bypass is a different, pre-existing, frozen architectural concept (scoped to the one real platform-owner account) used throughout the schema as a universal superuser escape hatch — not the tenant-scoped "platform support" role the task's constraint is about.
++
++**An initial read of only the first migration (`20261019100000_platform_org_access.sql`) looked like a confirmed bug** (both RPCs gated by the broad `is_business_owner`). Re-checking for later `create or replace` definitions of the same function names found `20261020100000_legacy_org_access_roles.sql` (applied after it) fully supersedes both with the narrow gate. No fix was needed or made.
++
++Wrote [supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql](../../supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql): real role/RLS assertions (not UI) via `pg_temp.act_as` JWT-claim impersonation, matching this repo's existing test house style (`pg_temp.ok`/`pg_temp.act_as` from `supabase/tests/20261001100000_test_payroll_engine.sql`). It asserts, against real RPC calls in one fixture org with an owner member, an Admin member, and a simulated platform-owner identity (`wbudiman1995@gmail.com` + `is_platform_admin`):
++1. The owner can call `set_business_admin_permissions` and then see the real `admin_keys` it just set.
++2. An org Admin gets `42501` calling `set_business_admin_permissions`, and sees `admin_keys: []` (redacted) from `list_organization_access`.
++3. The simulated platform owner also gets `42501` on `set_business_admin_permissions` and `admin_keys: []` on read — but still sees the member list (the legitimate provisioning use), proving the redaction is specific to the checklist, not a blanket lockout.
++
++No real production invitations or invoices were created or needed — the test is entirely self-contained, transactional (`begin; ... rollback;`), and creates its own disposable org/users/memberships.
++
++## Validation — raw results
++
++```
++$ npm ci                                   # apps/web deps were not installed in this fresh worktree
++added 489 packages, and audited 494 packages in 47s
++2 moderate severity vulnerabilities (pre-existing, unrelated to this change — not investigated)
++
++$ npm run typecheck   (apps/web)
++> tsc --noEmit
++(no output — clean)
++
++$ npm run lint        (apps/web)
++> eslint
++(no output — clean)
++
++$ npx tsx --test test/audit-diff.test.ts
++✔ UPDATE reports only the fields whose value actually changed (5.6ms)
++✔ UPDATE ignores updated_at even when it changed (0.4ms)
++✔ INSERT and DELETE report no changed fields (0.4ms)
++tests 3, pass 3, fail 0
++
++$ npm run build       (apps/web, run once, at the end)
++✓ Compiled successfully in 17.5s
++✓ TypeScript finished in 19.9s
++✓ Generating static pages (41/41)
++Route list includes ƒ /finance/export (new) and all previously-existing routes; no route lost, no error.
++```
++
++**SQL test #41 — written, NOT executed.** This sandbox has no local `psql`, no Docker, and no PostgreSQL installed inside its WSL distro, and installing one would require interactive `sudo` (blocked — no password prompt available in this environment). I did not fabricate a passing run. The server-side authorization logic was verified by full code tracing (above) across every `create or replace` of the relevant functions, cross-checked against the live call sites in `platform/page.tsx`, `platform/actions.ts`, `settings/access/page.tsx`, and `access-management.tsx`. The test file matches this repo's established `pg_temp.ok`/`pg_temp.act_as` house style exactly and is ready to run with:
++```bash
++psql <fresh_pg16_db> -v ON_ERROR_STOP=1 -f <each file in supabase/migrations, in order>
++psql <fresh_pg16_db> -v ON_ERROR_STOP=1 -f supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql
++```
++**This is the next smallest useful task for whoever has a PG16 instance available** (see below) — run this one file and report PASS/FAIL per line; it needs no other setup.
++
++**No migration was added or changed** — #41 required no schema/RPC change (already correct), and #31/#36 reused existing RPCs and tables, so the "fresh + populated-upgrade PG16 migration test" requirement does not apply to this pass; nothing new was added to `supabase/migrations/`.
++
++**Browser-tested: NO.** Nothing in this pass was opened in a browser or clicked through. The finance export route and the audit panel are verified by typecheck + lint + a successful production build only — which proves the code compiles and the route exists, **not** that clicking "Export Excel" produces a correct `.xlsx` file a spreadsheet app opens cleanly, or that the audit panel renders real rows against a database with actual audit history. Do not treat either as QC'd from this pass alone.
++
++## Deferred work (documented, not built — per instructions)
++
++| Item | Why deferred | Exact data source if pursued | Acceptance test if pursued |
++|---|---|---|---|
++| Unified WhatsApp delivery platform (#34) | Explicitly out of scope; HomePaw itself has no equivalent (see table) | N/A — would be new for both products | N/A — not recommended without a separate scoping pass |
++| Full organization backup incl. files/config (#38) | Explicitly out of scope; HomePaw's own export is table-data-only | `public.*` tables already covered by existing exporters + real Storage bucket listings (`grooming-photos`, `attachments`, style-ref bucket) + `business_settings`/`organizations` config rows | Restore the archive into an empty, freshly-migrated project and diff row-for-row and file-for-file against the source org |
++| Unified operational reconciliation engine (#37) | Explicitly out of scope; HomePaw itself only reconciles subscription sessions | `visits`, `invoices`, `payments`, `payroll_items`/`bookings`/`manual_visits` — direct table reads, not derived aggregates | See acceptance test in the gap table row above |
++| Per-org database-byte accounting (#43) | Explicitly out of scope; no HomePaw equivalent exists (HomePaw is single-tenant) | `pg_total_relation_size` per table filtered by `organization_id`, via a new `SECURITY DEFINER` RPC | A seeded org's reported bytes must track a manually-computed `SELECT pg_total_relation_size(...)` sum within a documented tolerance |
++| Business-configuration consolidation (#39) | Small per item, but bundling (dashboard-card toggles, toast duration, auto-log toggle, all 5+ WA templates in one screen) is its own pass, not a single quick win | Existing `business_settings`/organization config tables; mostly UI exposure of settings that likely already have a column, needs per-field confirmation | Each toggle changes real behavior observed on the dashboard/relevant screen, not just a settings-page checkbox |
++
++## Files changed
++
++```
++ M apps/web/src/app/finance/page.tsx
++ M apps/web/src/app/invoices/[invoiceId]/page.tsx
++ M apps/web/src/lib/homepaw-export.ts
++?? apps/web/src/app/finance/export/route.ts
++?? apps/web/src/components/audit-history-panel.tsx
++?? apps/web/src/lib/audit-diff.ts
++?? apps/web/src/lib/audit-events.ts
++?? apps/web/src/lib/finance-export.ts
++?? apps/web/test/audit-diff.test.ts
++?? supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql
++?? docs/handoffs/PARITY-OPS-QUICKWINS.md
++```
++
++## Next smallest useful task
++
++Run `supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql` against a real fresh PostgreSQL 16 instance with this repo's full migration lineage applied, and report the three `pg_temp.ok` PASS/FAIL lines back into this doc. That closes the one piece of this pass that was written but not executed, with no further code changes expected if the trace above is correct.
+diff --git a/supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql b/supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql
+new file mode 100644
+index 0000000..d5998bc
+--- /dev/null
++++ b/supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql
+@@ -0,0 +1,80 @@
++-- TEST — #41 accounts/permissions: the business Admin-permission checklist
++-- must be settable and readable ONLY by that business's real owner member —
++-- never by an org Admin, and never by the Operro platform owner (even though
++-- the platform owner legitimately provisions/invites/bills, per
++-- app.is_business_owner vs app.is_business_owner_member in
++-- 20261019100000_platform_org_access.sql / 20261020100000_legacy_org_access_roles.sql).
++-- This verifies the SERVER-SIDE RPC checks, not UI button visibility.
++-- Run: apply the full migration lineage, then
++--   psql -v ON_ERROR_STOP=1 -f supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql
++\set ON_ERROR_STOP on
++create or replace function pg_temp.ok(cond boolean, label text)
++returns void language plpgsql as $$
++begin if cond then raise notice 'PASS: %', label; else raise exception 'FAIL: %', label; end if; end $$;
++create or replace function pg_temp.act_as(u text, o text) returns void language plpgsql as $$
++begin perform set_config('request.jwt.claims', json_build_object('sub', u, 'active_org_id', o)::text, true); end $$;
++
++begin;
++
++insert into public.organizations (id, name, slug, status) values
++  ('0f410000-0000-4000-8000-000000000001', 'QC Checklist Org', 'qc-checklist-org', 'active');
++insert into public.subscriptions (organization_id, status, current_period_start, current_period_end) values
++  ('0f410000-0000-4000-8000-000000000001', 'active', now() - interval '1 day', now() + interval '1 year');
++insert into public.organization_modules (organization_id, module_id, enabled, source)
++  select '0f410000-0000-4000-8000-000000000001', id, true, 'override' from public.modules;
++
++insert into public.roles (id, organization_id, name, is_system) values
++  ('0f410000-0000-4000-8000-000000000011', '0f410000-0000-4000-8000-000000000001', 'Pemilik', true),
++  ('0f410000-0000-4000-8000-000000000012', '0f410000-0000-4000-8000-000000000001', 'Admin', true);
++insert into public.role_permissions (organization_id, role_id, permission_id)
++  select '0f410000-0000-4000-8000-000000000001', '0f410000-0000-4000-8000-000000000011', id from public.permissions;
++
++insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
++values
++  ('00000000-0000-0000-0000-000000000000', '0f410000-0000-4000-8000-000000000021', 'authenticated', 'authenticated', 'owner@qc-checklist.test', crypt('x', gen_salt('bf')), now(), '{}', '{}', false, now(), now(), '', '', '', ''),
++  ('00000000-0000-0000-0000-000000000000', '0f410000-0000-4000-8000-000000000022', 'authenticated', 'authenticated', 'admin@qc-checklist.test', crypt('x', gen_salt('bf')), now(), '{}', '{}', false, now(), now(), '', '', '', ''),
++  ('00000000-0000-0000-0000-000000000000', '0f410000-0000-4000-8000-000000000023', 'authenticated', 'authenticated', 'wbudiman1995@gmail.com', crypt('x', gen_salt('bf')), now(), '{}', '{}', false, now(), now(), '', '', '', '')
++on conflict (id) do nothing;
++update public.users set is_platform_admin = true, status = 'active' where id = '0f410000-0000-4000-8000-000000000023';
++update public.users set status = 'active' where id in ('0f410000-0000-4000-8000-000000000021','0f410000-0000-4000-8000-000000000022');
++
++insert into public.memberships (user_id, organization_id, role_id, status) values
++  ('0f410000-0000-4000-8000-000000000021', '0f410000-0000-4000-8000-000000000001', '0f410000-0000-4000-8000-000000000011', 'active'),
++  ('0f410000-0000-4000-8000-000000000022', '0f410000-0000-4000-8000-000000000001', '0f410000-0000-4000-8000-000000000012', 'active');
++
++do $$
++declare v_result jsonb; v_failed boolean;
++begin
++  -- 1. The real business owner CAN read and set the checklist.
++  perform pg_temp.act_as('0f410000-0000-4000-8000-000000000021', '0f410000-0000-4000-8000-000000000001');
++  perform app.set_business_admin_permissions('0f410000-0000-4000-8000-000000000001', array['booking.read','customer.read']);
++  v_result := app.list_organization_access('0f410000-0000-4000-8000-000000000001');
++  perform pg_temp.ok((v_result->'admin_keys')::jsonb @> '["booking.read","customer.read"]'::jsonb, 'owner reads the real admin_keys it just set');
++
++  -- 2. An org Admin (not the owner) cannot set or read the real checklist.
++  perform pg_temp.act_as('0f410000-0000-4000-8000-000000000022', '0f410000-0000-4000-8000-000000000001');
++  v_failed := false;
++  begin
++    perform app.set_business_admin_permissions('0f410000-0000-4000-8000-000000000001', array['booking.read']);
++  exception when sqlstate '42501' then v_failed := true;
++  end;
++  perform pg_temp.ok(v_failed, 'an org Admin cannot call set_business_admin_permissions');
++  v_result := app.list_organization_access('0f410000-0000-4000-8000-000000000001');
++  perform pg_temp.ok(v_result->'admin_keys' = '[]'::jsonb, 'an org Admin sees redacted (empty) admin_keys, not the real checklist');
++
++  -- 3. The Operro platform owner cannot set or read the real checklist either,
++  --    even though they legitimately provision/invite/bill this same org.
++  perform pg_temp.act_as('0f410000-0000-4000-8000-000000000023', '0f410000-0000-4000-8000-000000000001');
++  perform pg_temp.ok(app.is_operro_owner(), 'sanity: the impersonated user really is the Operro platform owner');
++  v_failed := false;
++  begin
++    perform app.set_business_admin_permissions('0f410000-0000-4000-8000-000000000001', array['booking.read']);
++  exception when sqlstate '42501' then v_failed := true;
++  end;
++  perform pg_temp.ok(v_failed, 'the Operro platform owner cannot call set_business_admin_permissions');
++  v_result := app.list_organization_access('0f410000-0000-4000-8000-000000000001');
++  perform pg_temp.ok(v_result->'admin_keys' = '[]'::jsonb, 'the Operro platform owner sees redacted (empty) admin_keys, never the real checklist');
++  perform pg_temp.ok(jsonb_array_length(v_result->'members') = 2, 'the platform owner still sees the member list (legitimate provisioning use), just not the checklist');
++end $$;
++
++rollback;
+-- 
+2.55.0.windows.4
+

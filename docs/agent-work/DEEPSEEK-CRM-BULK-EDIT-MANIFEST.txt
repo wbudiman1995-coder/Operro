@@ -1,0 +1,23 @@
+# Curated sources for the bounded CRM bulk-edit task.
+apps/web/AGENTS.md
+apps/web/package.json
+apps/web/src/app/customers/page.tsx
+apps/web/src/app/customers/onboarding/actions.ts
+apps/web/src/components/customer-database.tsx
+apps/web/src/components/pilot-forms.tsx
+apps/web/src/lib/authorization.ts
+apps/web/src/lib/pilot-data.ts
+apps/web/src/lib/require-workspace.ts
+apps/web/test/authorization.test.ts
+apps/web/test/customer-code-contract.test.ts
+apps/web/test/mutation-safety.test.ts
+apps/web/test/search-and-profile.test.ts
+docs/HOMEPAW_PARITY_AUDIT_2026-10-01.md
+docs/handoffs/PARITY-CUSTOMER-QUICKWINS.md
+run_all_gates.sh
+supabase/migrations/20260721000400_commercial_core.sql
+supabase/migrations/20260721001000_security_rls_isolation.sql
+supabase/migrations/20260721001100_security_rls_capabilities.sql
+supabase/migrations/20261022110000_customer_codes.sql
+supabase/tests/customer_code/rls_smoke.sql
+

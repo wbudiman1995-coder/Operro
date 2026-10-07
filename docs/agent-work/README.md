@@ -1,6 +1,6 @@
 # Cost-controlled parity execution
 
-Base branch: `codex/parity-orchestration` at `d4ee76d4882ca4b4c73524c4fea175f9a669f81b`.
+Base branch: `codex/parity-orchestration` at `5d454fe`.
 
 This directory is the dispatch and integration contract for external coding agents. The current repository is not yet delegated to an external account: these documents make the work small, reviewable, and safe to dispatch when the chosen DeepSeek or Claude chat is available.
 
@@ -19,10 +19,13 @@ The first two dispatches were intentionally independent:
 1. **DeepSeek — persistent customer code:** completed, reviewed, and integrated as `7f12316`; its migration is `20261022110000_customer_codes.sql`.
 2. **Claude — dynamic size-band design:** completed and accepted. The response is [CLAUDE-DYNAMIC-SIZE-DESIGN-RESPONSE.md](CLAUDE-DYNAMIC-SIZE-DESIGN-RESPONSE.md).
 3. **DeepSeek — CRM bulk edit:** reviewed, corrected, integrated, and validated on `codex/parity-orchestration`; live browser QC remains.
+4. **Claude — dynamic size bands, Bundle 1 DB foundation:** reviewed, validated, and integrated as `8758cff`.
 
-The next dispatch is **Claude — dynamic size bands, Bundle 1 DB foundation**. Use [CLAUDE-DYNAMIC-SIZE-BUNDLE-1.md](CLAUDE-DYNAMIC-SIZE-BUNDLE-1.md) and the refreshed `Operro-Claude-Dynamic-Size-Bundle-1-d4ee76d.zip`. Migration slots `20261023100000` through `20261023130000` are reserved for this bundle.
+The next dispatch is **Claude — dynamic size bands, Bundle 2 management RPCs and catalog UI**. Use [CLAUDE-DYNAMIC-SIZE-BUNDLE-2.md](CLAUDE-DYNAMIC-SIZE-BUNDLE-2.md) and `Operro-Claude-Dynamic-Size-Bundle-2-5d454fe.zip`. Migration slot `20261024100000` is reserved for this bundle.
 
-Do not begin Bundle 2 until Codex has reviewed and integrated Bundle 1 from its exact returned branch.
+Safe parallel dispatch: **DeepSeek — guarded Customer 360 profile editing (customer fields only)** has been reviewed and integrated in the working tree; focused tests, typecheck, lint, and build pass. Authenticated browser QC remains. Pet editing is still deferred until the dynamic-size adapters are stable.
+
+Do not begin Bundle 3 until Codex has reviewed and integrated Bundle 2 from its exact returned branch.
 
 ## Ordered delivery queue
 

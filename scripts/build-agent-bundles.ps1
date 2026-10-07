@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet("deepseek-customer-code", "claude-dynamic-size-design", "claude-dynamic-size-bundle-1")]
+  [ValidateSet("deepseek-customer-code", "deepseek-crm-bulk-edit", "deepseek-customer-360-edit", "claude-dynamic-size-design", "claude-dynamic-size-bundle-1", "claude-dynamic-size-bundle-2")]
   [string]$Task
 )
 
@@ -13,6 +13,22 @@ $spec = switch ($Task) {
       Manifest = "docs/agent-work/DEEPSEEK-CUSTOMER-CODE-MANIFEST.txt"
       Assignment = "docs/agent-work/DEEPSEEK-CUSTOMER-CODE.md"
       Output = "Operro-DeepSeek-Customer-Code-8bef156.zip"
+    }
+  }
+  "deepseek-crm-bulk-edit" {
+    @{
+      Manifest = "docs/agent-work/DEEPSEEK-CRM-BULK-EDIT-MANIFEST.txt"
+      Assignment = "docs/agent-work/DEEPSEEK-CRM-BULK-EDIT.md"
+      Output = "Operro-DeepSeek-CRM-Bulk-Edit-e6736b0.zip"
+      BaseCommit = "e6736b045db801e5c62aaee96bdcc6162a04e2f1"
+    }
+  }
+  "deepseek-customer-360-edit" {
+    @{
+      Manifest = "docs/agent-work/DEEPSEEK-CUSTOMER-360-EDIT-MANIFEST.txt"
+      Assignment = "docs/agent-work/DEEPSEEK-CUSTOMER-360-EDIT.md"
+      Output = "Operro-DeepSeek-Customer-360-Edit-5d454fe.zip"
+      BaseCommit = "5d454fe"
     }
   }
   "claude-dynamic-size-design" {
@@ -29,6 +45,14 @@ $spec = switch ($Task) {
       Assignment = "docs/agent-work/CLAUDE-DYNAMIC-SIZE-BUNDLE-1.md"
       Output = "Operro-Claude-Dynamic-Size-Bundle-1-d4ee76d.zip"
       BaseCommit = "d4ee76d4882ca4b4c73524c4fea175f9a669f81b"
+    }
+  }
+  "claude-dynamic-size-bundle-2" {
+    @{
+      Manifest = "docs/agent-work/CLAUDE-DYNAMIC-SIZE-BUNDLE-2-MANIFEST.txt"
+      Assignment = "docs/agent-work/CLAUDE-DYNAMIC-SIZE-BUNDLE-2.md"
+      Output = "Operro-Claude-Dynamic-Size-Bundle-2-5d454fe.zip"
+      BaseCommit = "5d454fe"
     }
   }
 }

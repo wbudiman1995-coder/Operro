@@ -110,9 +110,84 @@ UPGRADE 20261018110000
 UPGRADE 20261018120000
 UPGRADE 20261019100000
 UPGRADE 20261019110000
-Upgrade migrations applied: 32
+UPGRADE 20261020100000
+UPGRADE 20261020110000
+UPGRADE 20261020120000
+UPGRADE 20261022100000
+UPGRADE 20261022110000
+Upgrade migrations applied: 37
 After upgrade counts org,customer,pet,booking: 2,6,7,6
 DO
 HOMEPAW OWNER WORKSPACE PROVISION PASS
+INSERT 0 3
+INSERT 0 2
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 12
+INSERT 0 10
+UPDATE 1
+INSERT 0 4
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 4
+INSERT 0 4
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+Pre-size-band fingerprint lines: 23
+SIZE-BAND 20261023100000_size_band_tables.sql
+SIZE-BAND 20261023110000_size_band_shadow_sync.sql
+SIZE-BAND 20261023120000_size_band_resolver.sql
+SIZE-BAND 20261023130000_size_band_integrity.sql
+SIZE-BAND 20261024100000_size_band_management_rpcs.sql
+SIZE-BAND 20261025100000_size_band_booking_customer_adapters.sql
+bookings|7|00fa29407e3ef4144d734e462f4e414a
+customer_package_ledger|5|132fc3ff3ea71714c98699983cf3db8f
+customer_packages|5|f035d3092f5e56109c0ab9f1d0c7b317
+customers|9|6caafce917e246ca638d0dd0e804f7b8
+grooming_job_pets|10|ad48685b225215ddf6f50134d33327bb
+grooming_job_pet_services|11|d6dfeb464009c8aea010976a5f340cc5
+grooming_jobs|7|27f4f54afdd157930e71ac7bc432884d
+invoice_lines|0|-
+invoices|4|c7fae752012df0cd85142a314da7319f
+organization_dog_size_boundaries|2|d7d40039fe8f101c0222fd4449327af6
+organization_pet_types|12|316e2c4bca55bd40e0de1b60e9c8257d
+organizations|5|843e155c370b05141996ca1be39972b5
+package band distribution|cat=1,extra_small=1,large=1,<null>=3
+packages|6|3eb9bc209b76e057bf03ad53893e8948
+payments|1|eff04a7efcdf6a281194a44c4989fc66
+payroll_cycle_settings|0|-
+payroll_items|1|b0edd8f8c17966c2c0ea85bb430dbc50
+payroll_runs|1|e7c158b0db9739c3af25fecccf6cab28
+pets|29|7423b9fdc1b35696701df1feeb5a41fa
+pets.size distribution|extra_large=5,extra_small=3,large=5,medium=3,<null>=11,small=2
+service_catalog|8|512a548b49662af35d93735bcad1220e
+snapshot distribution|cat=1,large=2,<null>=7,rabbit=1
+staff_payroll_settings|0|-
+SIZE BAND DATA PRESERVATION PASS (counts and row hashes of pets, snapshots, packages, entitlements, prices, durations, invoices, payroll unchanged)
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+psql:integration/size_band_upgrade_checks.sql:26: NOTICE:  PASS U-03/U-04 5 organizations (incl. soft-deleted, custom-boundary and no-row) backfilled with five legacy bands + cat, legacy mode, boundaries copied verbatim
+DO
+psql:integration/size_band_upgrade_checks.sql:54: NOTICE:  PASS U-01/U-03 resolver parity on populated data: 63 pet x service combinations; every measured dog equals the old function
+DO
+psql:integration/size_band_upgrade_checks.sql:76: NOTICE:  PASS U-03 service_band_prices backfill equals the legacy price/duration columns (NULL stays no row)
+psql:integration/size_band_upgrade_checks.sql:97: NOTICE:  PASS U-01 migrated packages still enforce the size band on sale; history snapshots stay NULL
+DO
+SIZE BAND BACKFILL IDEMPOTENCY PASS (bands=30 settings=5 prices=8)
 t|t
 POPULATED UPGRADE PASS

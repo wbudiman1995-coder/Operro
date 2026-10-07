@@ -8,3 +8,7 @@ node_modules/
 .claude/
 supabase/.branches/
 supabase/.temp/
+
+# Local agent bundle extractions and registered Git worktrees.
+agent-bundles/*/
+worktrees/
