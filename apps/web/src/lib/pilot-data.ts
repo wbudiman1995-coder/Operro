@@ -14,7 +14,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BranchAccess, CapabilityMap } from "@/lib/authorization";
-import { buildDashboardReadPlan, dashboardDayRanges, sumRecordedAmounts } from "@/lib/dashboard-read-model";
+import { buildDashboardReadPlan, DASHBOARD_CARD_DEFAULTS, dashboardDayRanges, readDashboardCardSettings, sumRecordedAmounts, type DashboardCardVisibility } from "@/lib/dashboard-read-model";
 import type { SpeciesPricing } from "@/lib/pet-sizing";
 import { isGoogleMapsLink } from "@/lib/maps";
 import { packageSizeOptions, type BandPriceMap, type SizeBand, type SizeBandWorkspace } from "@/lib/size-bands";
@@ -63,9 +63,10 @@ export async function loadDashboardData(
   capabilities: CapabilityMap,
   branchAccess: BranchAccess,
   timeZone: string,
+  cardVisibility: DashboardCardVisibility = DASHBOARD_CARD_DEFAULTS,
   now = new Date(),
 ): Promise<DashboardData> {
-  const plan = buildDashboardReadPlan(capabilities, branchAccess);
+  const plan = buildDashboardReadPlan(capabilities, branchAccess, cardVisibility);
   const ranges = dashboardDayRanges(now, timeZone);
   const hasReadableBranch = plan.branchIds === null || plan.branchIds.length > 0;
   const emptyCount = { data: null, error: null, count: 0 };
@@ -93,49 +94,55 @@ export async function loadDashboardData(
   }
 
   const [bookingCount, bookingPreviousCount, customerCount, taskCount, paymentRows, previousPaymentRows, manualBillingRows, previousManualBillingRows, bookingRows] = await Promise.all([
-    plan.bookings && hasReadableBranch ? bookingCurrentQuery : Promise.resolve(emptyCount),
-    plan.bookings && hasReadableBranch ? bookingPreviousQuery : Promise.resolve(emptyCount),
-    plan.customers ? supabase.from("customers").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null) : Promise.resolve(emptyCount),
-    plan.tasks && hasReadableBranch ? taskQuery : Promise.resolve(emptyCount),
-    plan.revenue && hasReadableBranch ? paymentCurrentQuery : Promise.resolve(emptyRows),
-    plan.revenue && hasReadableBranch ? paymentPreviousQuery : Promise.resolve(emptyRows),
-    plan.revenue && hasReadableBranch ? manualCurrentQuery : Promise.resolve(emptyRows),
-    plan.revenue && hasReadableBranch ? manualPreviousQuery : Promise.resolve(emptyRows),
-    plan.bookings && hasReadableBranch ? upcomingQuery : Promise.resolve(emptyBookings),
+    plan.bookingMetrics && hasReadableBranch ? bookingCurrentQuery : Promise.resolve(emptyCount),
+    plan.bookingMetrics && hasReadableBranch ? bookingPreviousQuery : Promise.resolve(emptyCount),
+    plan.customerMetrics ? supabase.from("customers").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("status", "active").is("deleted_at", null) : Promise.resolve(emptyCount),
+    plan.taskMetrics && hasReadableBranch ? taskQuery : Promise.resolve(emptyCount),
+    plan.revenueMetrics && hasReadableBranch ? paymentCurrentQuery : Promise.resolve(emptyRows),
+    plan.revenueMetrics && hasReadableBranch ? paymentPreviousQuery : Promise.resolve(emptyRows),
+    plan.revenueMetrics && hasReadableBranch ? manualCurrentQuery : Promise.resolve(emptyRows),
+    plan.revenueMetrics && hasReadableBranch ? manualPreviousQuery : Promise.resolve(emptyRows),
+    plan.upcomingBookings && hasReadableBranch ? upcomingQuery : Promise.resolve(emptyBookings),
   ]);
   // Preview can run against a database that has not received the visit-register
   // migration yet. Only that missing relation is optional; permission and other
   // database errors must still fail closed rather than display misleading KPIs.
-  const manualBillingUnavailable = plan.revenue && [manualBillingRows, previousManualBillingRows].some((result) => Boolean(
+  const manualBillingUnavailable = plan.revenueMetrics && [manualBillingRows, previousManualBillingRows].some((result) => Boolean(
     result.error &&
     (result.error.code === "PGRST205" || result.error.code === "42P01") &&
     result.error.message.includes("visit_manual_billing"),
   ));
   for (const [enabled, scope, result] of [
-    [plan.bookings && hasReadableBranch, "dashboard_bookings", bookingCount],
-    [plan.bookings && hasReadableBranch, "dashboard_previous_bookings", bookingPreviousCount],
-    [plan.customers, "dashboard_customers", customerCount],
-    [plan.tasks && hasReadableBranch, "dashboard_tasks", taskCount],
-    [plan.revenue && hasReadableBranch, "dashboard_payments", paymentRows],
-    [plan.revenue && hasReadableBranch, "dashboard_previous_payments", previousPaymentRows],
-    [plan.bookings && hasReadableBranch, "dashboard_upcoming", bookingRows],
+    [plan.bookingMetrics && hasReadableBranch, "dashboard_bookings", bookingCount],
+    [plan.bookingMetrics && hasReadableBranch, "dashboard_previous_bookings", bookingPreviousCount],
+    [plan.customerMetrics, "dashboard_customers", customerCount],
+    [plan.taskMetrics && hasReadableBranch, "dashboard_tasks", taskCount],
+    [plan.revenueMetrics && hasReadableBranch, "dashboard_payments", paymentRows],
+    [plan.revenueMetrics && hasReadableBranch, "dashboard_previous_payments", previousPaymentRows],
+    [plan.upcomingBookings && hasReadableBranch, "dashboard_upcoming", bookingRows],
   ] as const) if (enabled) assertResult(scope, result.error);
-  if (plan.revenue && hasReadableBranch && !manualBillingUnavailable) {
+  if (plan.revenueMetrics && hasReadableBranch && !manualBillingUnavailable) {
     assertResult("dashboard_manual_billing", manualBillingRows.error);
     assertResult("dashboard_previous_manual_billing", previousManualBillingRows.error);
   }
   return {
-    bookingToday: plan.bookings && hasReadableBranch ? bookingCount.count ?? 0 : null,
-    bookingPreviousDay: plan.bookings && hasReadableBranch ? bookingPreviousCount.count ?? 0 : null,
-    revenueToday: plan.revenue && hasReadableBranch ? sumRecordedAmounts(paymentRows.data ?? []) + sumRecordedAmounts(manualBillingRows.data ?? []) : null,
-    revenuePreviousDay: plan.revenue && hasReadableBranch ? sumRecordedAmounts(previousPaymentRows.data ?? []) + sumRecordedAmounts(previousManualBillingRows.data ?? []) : null,
+    bookingToday: plan.bookingMetrics && hasReadableBranch ? bookingCount.count ?? 0 : null,
+    bookingPreviousDay: plan.bookingMetrics && hasReadableBranch ? bookingPreviousCount.count ?? 0 : null,
+    revenueToday: plan.revenueMetrics && hasReadableBranch ? sumRecordedAmounts(paymentRows.data ?? []) + sumRecordedAmounts(manualBillingRows.data ?? []) : null,
+    revenuePreviousDay: plan.revenueMetrics && hasReadableBranch ? sumRecordedAmounts(previousPaymentRows.data ?? []) + sumRecordedAmounts(previousManualBillingRows.data ?? []) : null,
     revenueIncomplete: manualBillingUnavailable,
-    activeCustomers: plan.customers ? customerCount.count ?? 0 : null,
-    openTasks: plan.tasks && hasReadableBranch ? taskCount.count ?? 0 : null,
+    activeCustomers: plan.customerMetrics ? customerCount.count ?? 0 : null,
+    openTasks: plan.taskMetrics && hasReadableBranch ? taskCount.count ?? 0 : null,
     hasAccessibleBranch: hasReadableBranch,
     timeZone,
     upcoming: (bookingRows.data ?? []).map((row) => ({ id: row.id, startsAt: row.starts_at, status: row.status, customerName: embeddedCustomerName(row.customers), petNames: embeddedPetNames(row.grooming_jobs) })),
   };
+}
+
+export async function loadDashboardCardSettings(supabase: SupabaseClient, organizationId: string): Promise<DashboardCardVisibility> {
+  const result = await supabase.from("organizations").select("settings").eq("id", organizationId).single();
+  assertResult("dashboard_card_settings", result.error);
+  return readDashboardCardSettings(result.data?.settings);
 }
 
 export interface CustomerWorkspace {

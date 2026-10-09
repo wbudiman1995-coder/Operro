@@ -1,12 +1,46 @@
 import type { BranchAccess, CapabilityMap } from "@/lib/authorization";
 import { addDaysISO, zonedDateTimeToUtc, zonedDayISO } from "@/lib/timezone";
 
+export const DASHBOARD_CARD_KEYS = ["booking_today", "revenue_today", "active_customers", "open_tasks"] as const;
+export type DashboardCardKey = (typeof DASHBOARD_CARD_KEYS)[number];
+export type DashboardCardVisibility = Record<DashboardCardKey, boolean>;
+
+export const DASHBOARD_CARD_LABELS: Record<DashboardCardKey, string> = {
+  booking_today: "Booking hari ini",
+  revenue_today: "Pendapatan tercatat",
+  active_customers: "Pelanggan aktif",
+  open_tasks: "Tugas tertunda",
+};
+
+export const DASHBOARD_CARD_DEFAULTS: DashboardCardVisibility = {
+  booking_today: true,
+  revenue_today: true,
+  active_customers: true,
+  open_tasks: true,
+};
+
+/** Invalid or absent entries retain the legacy all-visible behavior. */
+export function readDashboardCardSettings(settings: unknown): DashboardCardVisibility {
+  const result = { ...DASHBOARD_CARD_DEFAULTS };
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) return result;
+  const dashboard = (settings as Record<string, unknown>).dashboard;
+  if (!dashboard || typeof dashboard !== "object" || Array.isArray(dashboard)) return result;
+  const cards = (dashboard as Record<string, unknown>).cards;
+  if (!cards || typeof cards !== "object" || Array.isArray(cards)) return result;
+  for (const key of DASHBOARD_CARD_KEYS) {
+    const value = (cards as Record<string, unknown>)[key];
+    if (typeof value === "boolean") result[key] = value;
+  }
+  return result;
+}
+
 /** Read domains that the dashboard may query for the current caller. */
 export interface DashboardReadPlan {
-  bookings: boolean;
-  revenue: boolean;
-  customers: boolean;
-  tasks: boolean;
+  bookingMetrics: boolean;
+  upcomingBookings: boolean;
+  revenueMetrics: boolean;
+  customerMetrics: boolean;
+  taskMetrics: boolean;
   /** null means every branch; an array is the exact server-resolved grant set. */
   branchIds: string[] | null;
 }
@@ -14,12 +48,14 @@ export interface DashboardReadPlan {
 export function buildDashboardReadPlan(
   capabilities: CapabilityMap,
   branchAccess: BranchAccess,
+  visibility: DashboardCardVisibility = DASHBOARD_CARD_DEFAULTS,
 ): DashboardReadPlan {
   return {
-    bookings: capabilities["booking.read"],
-    revenue: capabilities["finance.read"],
-    customers: capabilities["customer.read"] || capabilities["customer.manage"],
-    tasks: capabilities["task.manage"],
+    bookingMetrics: capabilities["booking.read"] && visibility.booking_today,
+    upcomingBookings: capabilities["booking.read"],
+    revenueMetrics: capabilities["finance.read"] && visibility.revenue_today,
+    customerMetrics: (capabilities["customer.read"] || capabilities["customer.manage"]) && visibility.active_customers,
+    taskMetrics: capabilities["task.manage"] && visibility.open_tasks,
     branchIds: branchAccess.all ? null : [...branchAccess.ids].sort(),
   };
 }

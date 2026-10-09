@@ -5,10 +5,11 @@
 import Link from "next/link";
 
 import { ArrowIcon, CalendarIcon } from "@/components/icons";
+import { DashboardSettingsForm } from "@/components/dashboard-settings-form";
 import { EmptyState, PageHeader, StatCard, StatusBadge } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import type { CapabilityMap } from "@/lib/authorization";
-import { comparisonDirection } from "@/lib/dashboard-read-model";
+import { comparisonDirection, DASHBOARD_CARD_KEYS, type DashboardCardVisibility } from "@/lib/dashboard-read-model";
 import type { AccessibleOrganization } from "@/lib/organizations";
 import { formatRupiah, type DashboardData } from "@/lib/pilot-data";
 import { formatZonedDateTime } from "@/lib/timezone";
@@ -19,6 +20,7 @@ interface DashboardShellProps {
   userEmail: string;
   data: DashboardData;
   capabilities: CapabilityMap;
+  dashboardCards: DashboardCardVisibility;
 }
 
 function countComparison(current: number, previous: number, unit: string): string {
@@ -45,7 +47,7 @@ function UnavailableMetric({ label, title, description }: { label: string; title
   );
 }
 
-export function DashboardShell({ organizations, activeOrganization, userEmail, data, capabilities }: DashboardShellProps) {
+export function DashboardShell({ organizations, activeOrganization, userEmail, data, capabilities, dashboardCards }: DashboardShellProps) {
   const quickActions = [
     capabilities["booking.create"] ? { label: "Buat booking baru", href: "/schedule?create=1" } : null,
     capabilities["customer.read"] || capabilities["customer.manage"] ? { label: "Buka pelanggan", href: "/customers" } : null,
@@ -53,6 +55,7 @@ export function DashboardShell({ organizations, activeOrganization, userEmail, d
     capabilities["task.manage"] ? { label: "Lihat tugas", href: "/tasks" } : null,
     capabilities["booking.read"] ? { label: "Buka operasional", href: "/operations" } : null,
   ].filter((item): item is { label: string; href: string } => item !== null);
+  const anyCardVisible = DASHBOARD_CARD_KEYS.some((key) => dashboardCards[key]);
 
   return (
     <WorkspaceShell organizations={organizations} activeOrganization={activeOrganization} userEmail={userEmail} activePath="/dashboard" capabilities={capabilities}>
@@ -63,28 +66,36 @@ export function DashboardShell({ organizations, activeOrganization, userEmail, d
         action={capabilities["booking.create"] ? <Link href="/schedule?create=1" className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#0f8a72] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#0b6e5a]">+ Booking baru</Link> : undefined}
       />
 
-      {data.revenueIncomplete ? <p role="status" className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Data tagihan manual belum tersedia. Angka pendapatan dan perbandingannya hanya mencakup pembayaran berhasil yang tercatat; Operro tidak menaksir nilai yang hilang.</p> : null}
+      {dashboardCards.revenue_today && data.revenueIncomplete ? <p role="status" className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Data tagihan manual belum tersedia. Angka pendapatan dan perbandingannya hanya mencakup pembayaran berhasil yang tercatat; Operro tidak menaksir nilai yang hilang.</p> : null}
 
-      <section aria-label="Metrik utama" className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {anyCardVisible ? <section aria-label="Metrik utama" className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {dashboardCards.booking_today ? <>
         {!capabilities["booking.read"]
           ? <UnavailableMetric label="Booking hari ini" title="Akses dibatasi" description="Peran ini tidak memiliki booking.read; nilainya tidak dimuat." />
           : !data.hasAccessibleBranch || data.bookingToday === null || data.bookingPreviousDay === null
             ? <UnavailableMetric label="Booking hari ini" title="Belum ada akses cabang" description="Tidak ada cabang yang diberikan kepada peran ini." />
           : <StatCard label="Booking hari ini" value={String(data.bookingToday)} helper={countComparison(data.bookingToday, data.bookingPreviousDay, "booking")} />}
+        </> : null}
+        {dashboardCards.revenue_today ? <>
         {!capabilities["finance.read"]
           ? <UnavailableMetric label="Pendapatan tercatat" title="Akses dibatasi" description="Peran ini tidak memiliki finance.read; nilainya tidak dimuat." />
           : !data.hasAccessibleBranch || data.revenueToday === null || data.revenuePreviousDay === null
             ? <UnavailableMetric label="Pendapatan tercatat" title="Belum ada akses cabang" description="Tidak ada cabang yang diberikan kepada peran ini." />
           : <StatCard label="Pendapatan tercatat" value={formatRupiah(data.revenueToday)} helper={moneyComparison(data.revenueToday, data.revenuePreviousDay)} tone="success" />}
+        </> : null}
+        {dashboardCards.active_customers ? <>
         {data.activeCustomers === null
           ? <UnavailableMetric label="Pelanggan aktif" title="Akses dibatasi" description="Peran ini tidak memiliki customer.read atau customer.manage; nilainya tidak dimuat." />
           : <StatCard label="Pelanggan aktif" value={String(data.activeCustomers)} helper="Profil aktif di workspace; metrik organisasi, bukan per cabang." />}
+        </> : null}
+        {dashboardCards.open_tasks ? <>
         {!capabilities["task.manage"]
           ? <UnavailableMetric label="Tugas tertunda" title="Akses dibatasi" description="Peran ini tidak memiliki task.manage; nilainya tidak dimuat." />
           : !data.hasAccessibleBranch || data.openTasks === null
             ? <UnavailableMetric label="Tugas tertunda" title="Belum ada akses cabang" description="Tidak ada cabang yang diberikan kepada peran ini." />
           : <StatCard label="Tugas tertunda" value={String(data.openTasks)} helper="Todo atau sedang berjalan pada cabang yang diizinkan." tone={data.openTasks ? "warning" : "success"} />}
-      </section>
+        </> : null}
+      </section> : null}
 
       {userEmail.toLowerCase() === "wbudiman1995@gmail.com" ? <Link href="/platform" className="mt-6 block rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">Buka panel platform Operro → organisasi, undangan, pemakaian proyek, dan permintaan kapasitas</Link> : null}
 
@@ -119,6 +130,7 @@ export function DashboardShell({ organizations, activeOrganization, userEmail, d
           </div>
         </section>
       </div>
+      {capabilities["settings.manage"] ? <DashboardSettingsForm key={activeOrganization.id} organizationId={activeOrganization.id} visibility={dashboardCards} /> : null}
     </WorkspaceShell>
   );
 }
