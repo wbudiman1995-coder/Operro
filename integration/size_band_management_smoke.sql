@@ -576,7 +576,10 @@ begin
   values (pg_temp.u(125),pg_temp.u(11),pg_temp.u(111),pg_temp.u(70),'D Basic',60,1,1,'IDR','band_x','base',now());
   perform pg_temp.expect_d('owner_d',pg_temp.u(11),format('select app.delete_size_band(%L,%s,%L)',pg_temp.u(11),v_ver,v_bx),'23503','size_band_in_use','{"lines":1,"entitlements":0}','voided line snapshot');
   update public.grooming_job_pet_services set pet_size_snapshot=null where id=pg_temp.u(125);
-  -- 5) payroll matrices (org default and per-staff)
+  -- 5) payroll matrices (org default and per-staff). SB-06 refuses NEW matrix entries for an archived band, so the
+  --    pre-validation rows this guard exists for are reproduced with the matrix trigger off (legacy data).
+  alter table public.payroll_cycle_settings disable trigger trg_pcs_validate_size_matrix;
+  alter table public.staff_payroll_settings disable trigger trg_sps_validate_size_matrix;
   insert into public.payroll_cycle_settings(organization_id,cycle_start_day,botak_amount_default,per_pet_amount_default,per_pet_size_matrix_default,styling_tiers_default)
   values (pg_temp.u(11),26,10000,20000,'{"band_x":1000}'::jsonb,'[]'::jsonb);
   perform pg_temp.expect_d('owner_d',pg_temp.u(11),format('select app.delete_size_band(%L,%s,%L)',pg_temp.u(11),v_ver,v_bx),'23503','size_band_in_use','{"payroll":1,"lines":0}','org payroll matrix');
@@ -585,6 +588,8 @@ begin
   select pg_temp.u(11),m.id,true,'{"band_x":5}'::jsonb from public.memberships m where m.organization_id=pg_temp.u(11) and m.user_id=pg_temp.u(34);
   perform pg_temp.expect_d('owner_d',pg_temp.u(11),format('select app.delete_size_band(%L,%s,%L)',pg_temp.u(11),v_ver,v_bx),'23503','size_band_in_use','{"payroll":1}','staff payroll matrix');
   update public.staff_payroll_settings set per_pet_size_matrix=null where organization_id=pg_temp.u(11);
+  alter table public.payroll_cycle_settings enable trigger trg_pcs_validate_size_matrix;
+  alter table public.staff_payroll_settings enable trigger trg_sps_validate_size_matrix;
   -- 6) a non-empty service price row (an empty row never blocks)
   insert into public.service_band_prices(organization_id,service_id,pricing_key,price) values (pg_temp.u(11),pg_temp.u(70),'band_x',5);
   perform pg_temp.expect_d('owner_d',pg_temp.u(11),format('select app.delete_size_band(%L,%s,%L)',pg_temp.u(11),v_ver,v_bx),'23503','size_band_in_use','{"prices":1,"payroll":0}','service price row');

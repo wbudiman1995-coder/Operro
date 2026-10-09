@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
-import { mapSizeBandError, parseImpact, type LayoutImpact, type LayoutPayloadBand } from "@/lib/size-bands";
+import { isValidLayoutPayload, mapSizeBandError, parseImpact, type LayoutImpact, type LayoutPayloadBand } from "@/lib/size-bands";
 
 export type SizeBoundaryState = { error: string | null; success: string | null };
 
@@ -32,16 +32,6 @@ export type SizeBandActionResult =
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const INVALID: SizeBandActionResult = { ok: false, error: "Permintaan tidak valid. Muat ulang halaman lalu coba lagi." };
 
-function validPayload(bands: unknown): bands is LayoutPayloadBand[] {
-  return Array.isArray(bands) && bands.length >= 1 && bands.length <= 12 && bands.every((band) => {
-    if (!band || typeof band !== "object") return false;
-    const item = band as Record<string, unknown>;
-    return typeof item.label === "string" && item.label.length <= 80
-      && (item.upper_kg === null || (typeof item.upper_kg === "number" && Number.isFinite(item.upper_kg)))
-      && typeof item.upper_inclusive === "boolean" && (item.id === undefined || (typeof item.id === "string" && UUID.test(item.id)));
-  });
-}
-
 function validVersion(value: unknown): value is number { return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 2_000_000_000; }
 
 function refreshAfterLayoutChange() {
@@ -57,7 +47,7 @@ function layoutResult(data: unknown, message: string): SizeBandActionResult {
 /** Read-only impact of a draft layout; the same SQL plan that save uses. Writes nothing. */
 export async function previewSizeLayoutAction(input: { bands: LayoutPayloadBand[] }): Promise<SizeBandActionResult> {
   const workspace = await requireActiveWorkspace();
-  if (!input || !validPayload(input.bands)) return INVALID;
+  if (!input || !isValidLayoutPayload(input.bands)) return INVALID;
   const result = await workspace.supabase.schema("app").rpc("preview_size_layout_impact", { p_org: workspace.activeOrganization.id, p_bands: input.bands });
   if (result.error) return { ok: false, error: mapSizeBandError(result.error) };
   return layoutResult(result.data, "Pratinjau dihitung. Tidak ada data yang diubah.");
@@ -65,7 +55,7 @@ export async function previewSizeLayoutAction(input: { bands: LayoutPayloadBand[
 
 export async function saveSizeBandsAction(input: { version: number; bands: LayoutPayloadBand[] }): Promise<SizeBandActionResult> {
   const workspace = await requireActiveWorkspace();
-  if (!input || !validVersion(input.version) || !validPayload(input.bands)) return INVALID;
+  if (!input || !validVersion(input.version) || !isValidLayoutPayload(input.bands)) return INVALID;
   const result = await workspace.supabase.schema("app").rpc("save_size_bands", { p_org: workspace.activeOrganization.id, p_expected_version: input.version, p_bands: input.bands });
   if (result.error) return { ok: false, error: mapSizeBandError(result.error) };
   refreshAfterLayoutChange();

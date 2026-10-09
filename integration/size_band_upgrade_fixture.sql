@@ -88,9 +88,22 @@ insert into public.customer_packages(id,organization_id,customer_id,package_id,p
 insert into public.customer_package_ledger(id,organization_id,customer_package_id,delta,reason)
 values ('5c000000-0000-4000-8000-000000000811','5c000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-000000000801',1,'adjustment');
 
+-- a staff resource + order so the booking's completed pets are payroll-eligible (payroll exports have real rows)
+insert into public.resources(id,organization_id,branch_id,kind,name,capacity,status,membership_id,hired_at)
+values ('5c000000-0000-4000-8000-0000000000e1','5c000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-0000000000b1','staff','Upgrade X Groomer',1,'active','5c000000-0000-4000-8000-0000000000a3','2020-01-01');
+update public.grooming_job_pets set assigned_resource_id='5c000000-0000-4000-8000-0000000000e1' where id='5c000000-0000-4000-8000-000000000501';
+insert into public.orders(id,organization_id,branch_id,customer_id,booking_id,status,currency,subtotal,total)
+values ('5c000000-0000-4000-8000-0000000000d1','5c000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-0000000000b1','5c000000-0000-4000-8000-0000000000c1','5c000000-0000-4000-8000-000000000401','fulfilled','IDR',255000,255000);
+
 -- invoice with a line, and a paid/published payroll run carrying a frozen breakdown (X)
-insert into public.invoices(id,organization_id,branch_id,customer_id,invoice_number,status,currency,subtotal,discount_total,tax_total,total,issued_at,due_at,metadata)
-values ('5c000000-0000-4000-8000-000000000901','5c000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-0000000000b1','5c000000-0000-4000-8000-0000000000c1','UPG-X-001','paid','IDR',255000,0,0,255000,now()-interval '1 day',now()-interval '1 day','{}');
+insert into public.invoices(id,organization_id,branch_id,customer_id,order_id,invoice_number,status,currency,subtotal,discount_total,tax_total,total,issued_at,due_at,metadata)
+values ('5c000000-0000-4000-8000-000000000901','5c000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-0000000000b1','5c000000-0000-4000-8000-0000000000c1','5c000000-0000-4000-8000-0000000000d1','UPG-X-001','paid','IDR',255000,0,0,255000,now()-interval '1 day',now()-interval '1 day','{}');
+-- payroll configuration written before any matrix validation existed: legacy keys, a key no band will ever own,
+-- a deliberate null entry, and a staff matrix (whole-object override)
+insert into public.payroll_cycle_settings(organization_id,cycle_start_day,per_pet_amount_default,per_pet_size_matrix_default)
+values ('5c000000-0000-4000-8000-000000000001',26,20000,'{"small":15000,"extra_small":20000,"large":30000,"medium":null,"ancient_junk":1}'::jsonb);
+insert into public.staff_payroll_settings(organization_id,membership_id,per_pet_size_matrix)
+values ('5c000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-0000000000a3','{"small":16000}'::jsonb);
 insert into public.payroll_runs(id,organization_id,period_start,period_end,status,currency)
 values ('5c000000-0000-4000-8000-000000000a01','5c000000-0000-4000-8000-000000000001',current_date-30,current_date-1,'draft','IDR');
 insert into public.payroll_items(id,organization_id,payroll_run_id,membership_id,base_pay,commission_total,gross_pay,net_pay,breakdown)

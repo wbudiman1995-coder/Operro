@@ -115,6 +115,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261024100000_size_band_management_rpcs.sql
   supabase/migrations/20261025100000_size_band_booking_customer_adapters.sql
   supabase/migrations/20261026100000_customer_pet_edit.sql
+  supabase/migrations/20261027100000_size_band_payroll.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -150,7 +151,7 @@ ls -l \
 step "GATE 3 — in-memory + preset-contract tests"
 npx tsx packages/backend/test/assembly_service.inmemory.test.ts
 npx tsx packages/backend/test/preset_contract.test.ts
-npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts test/customer-profile-edit.test.ts test/customer-pet-edit.test.ts test/size-bands.test.ts test/size-band-ui.test.tsx
+npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts test/customer-profile-edit.test.ts test/customer-pet-edit.test.ts test/size-bands.test.ts test/size-band-ui.test.tsx test/payroll-dynamic-size.test.ts
 
 step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
 run_as_postgres dropdb --if-exists operro_gate
@@ -247,6 +248,9 @@ psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/size_band_adapters_s
 
 step "GATE 7l — authorized Customer 360 pet editing and snapshot immutability"
 psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/customer_pet_edit_smoke.sql
+
+step "GATE 7m — dynamic size-band payroll (SB-06): tenant keys/labels, live re-banding, frozen runs, roles, tenants, anon"
+psql_db operro_homepaw_qc -v ON_ERROR_STOP=1 -f integration/size_band_payroll_smoke.sql
 
 step "GATE 7h — platform access, helper roles and dog-size boundaries (isolated database)"
 bash integration/platform_access_qc.sh

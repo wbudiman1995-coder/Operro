@@ -94,6 +94,20 @@ export function rangeLabel(bands: readonly SizeBand[], key: string): string {
 export interface LayoutDraftRow { id: string | null; label: string; upper: string; inclusive: boolean }
 export interface LayoutPayloadBand { id?: string; label: string; upper_kg: number | null; upper_inclusive: boolean }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Early request-shape validation for the catalog actions; SQL remains authoritative. */
+export function isValidLayoutPayload(bands: unknown): bands is LayoutPayloadBand[] {
+  return Array.isArray(bands) && bands.length >= 1 && bands.length <= 12 && bands.every((band) => {
+    if (!band || typeof band !== "object") return false;
+    const item = band as Record<string, unknown>;
+    return typeof item.label === "string" && item.label.trim().length >= 1 && item.label.trim().length <= 40
+      && (item.upper_kg === null || (typeof item.upper_kg === "number" && Number.isFinite(item.upper_kg)))
+      && typeof item.upper_inclusive === "boolean"
+      && (item.id === undefined || (typeof item.id === "string" && UUID.test(item.id)));
+  });
+}
+
 export function draftFromBands(bands: readonly SizeBand[]): LayoutDraftRow[] {
   return activeDogBands(bands).map((band) => ({ id: band.id, label: band.label, upper: band.upperKg === null ? "" : kg(band.upperKg), inclusive: band.upperInclusive }));
 }

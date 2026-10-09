@@ -12,6 +12,8 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 
 import { loadAuthContext } from "@/lib/auth-context";
+import { loadPayrollSizeBands } from "@/lib/payroll-data";
+import { parseSizeMatrix, type SizeMatrix } from "@/lib/payroll-size-matrix";
 import { createClient } from "@/lib/supabase/server";
 
 export interface PilotActionState { error: string | null; success: string | null }
@@ -31,7 +33,6 @@ function numberValue(formData: FormData, key: string) {
   return Number.isFinite(value) ? value : null;
 }
 
-const SIZE_KEYS = new Set(["small", "medium", "large", "extra_large"]);
 type StylingTier = { min_jobs: number; pct: number };
 type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -60,22 +61,6 @@ function parseStylingTiersJson(raw: FormDataEntryValue | null): ParseResult<Styl
   return { ok: true, value: tiers };
 }
 
-function parseSizeMatrixJson(raw: FormDataEntryValue | null): ParseResult<Record<string, number>> {
-  const text = typeof raw === "string" ? raw.trim() : "";
-  if (text.length === 0) return { ok: true, value: {} };
-  let parsed: unknown;
-  try { parsed = JSON.parse(text); } catch { return { ok: false, error: "format matriks ukuran tidak valid (JSON rusak)" }; }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { ok: false, error: "format matriks ukuran harus berupa objek" };
-  const out: Record<string, number> = {};
-  for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
-    if (!SIZE_KEYS.has(key)) return { ok: false, error: `ukuran tidak dikenal: ${key}` };
-    const num = Number(val);
-    if (!Number.isFinite(num) || num < 0) return { ok: false, error: `nilai untuk ukuran ${key} harus >= 0` };
-    out[key] = num;
-  }
-  return { ok: true, value: out };
-}
-
 async function workspace() {
   const supabase = await createClient();
   const context = await loadAuthContext(supabase);
@@ -85,6 +70,19 @@ async function workspace() {
 
 function databaseError(scope: string, message: string) {
   return { error: `${scope}: ${message}`, success: null };
+}
+
+/** The matrix keys are the ACTIVE organization's own dog size bands (RLS-scoped read under the caller's session);
+ *  the database trigger re-validates the same rule, so a stale form or crafted key cannot slip through either. */
+async function parseMatrixForOrg(context: { supabase: Awaited<ReturnType<typeof createClient>>; organizationId: string }, raw: FormDataEntryValue | null, stored: SizeMatrix | null) {
+  const bands = await loadPayrollSizeBands(context.supabase, context.organizationId);
+  return parseSizeMatrix(raw, bands, stored);
+}
+
+function friendlySettingsError(message: string) {
+  if (/payroll_size_key_invalid/.test(message)) return "ukuran hewan tidak dikenal atau sudah diarsipkan; muat ulang halaman lalu isi ulang matriks";
+  if (/payroll_size_rate_invalid|payroll_size_matrix_invalid/.test(message)) return "nilai matriks ukuran tidak valid";
+  return message;
 }
 function ok(success: string) {
   return { error: null, success };
@@ -223,7 +221,9 @@ export async function saveCycleSettingsAction(_previous: PilotActionState, formD
   if (cycleStartDay === null || cycleStartDay < 1 || cycleStartDay > 28) return databaseError("Pengaturan", "tanggal mulai cycle harus 1-28");
   const tiers = parseStylingTiersJson(formData.get("stylingTiersJson"));
   if (!tiers.ok) return databaseError("Tier styling", tiers.error);
-  const matrix = parseSizeMatrixJson(formData.get("perPetSizeMatrixJson"));
+  const storedResult = await context.supabase.from("payroll_cycle_settings").select("per_pet_size_matrix_default").eq("organization_id", context.organizationId).maybeSingle();
+  if (storedResult.error) return databaseError("Pengaturan gagal disimpan", storedResult.error.message);
+  const matrix = await parseMatrixForOrg(context, formData.get("perPetSizeMatrixJson"), (storedResult.data?.per_pet_size_matrix_default as SizeMatrix | null | undefined) ?? null);
   if (!matrix.ok) return databaseError("Matriks ukuran per dog", matrix.error);
   const patch = {
     organization_id: context.organizationId,
@@ -245,7 +245,7 @@ export async function saveCycleSettingsAction(_previous: PilotActionState, formD
   };
   const result = await context.supabase.from("payroll_cycle_settings")
     .upsert(patch, { onConflict: "organization_id" });
-  if (result.error) return databaseError("Pengaturan gagal disimpan", result.error.message);
+  if (result.error) return databaseError("Pengaturan gagal disimpan", friendlySettingsError(result.error.message));
   revalidatePath("/payroll");
   return ok("Pengaturan payroll tersimpan.");
 }
@@ -255,7 +255,9 @@ export async function saveStaffSettingsAction(_previous: PilotActionState, formD
   const membershipId = idValue(formData, "membershipId"); if (!membershipId) return databaseError("Pengaturan staf", "staf tidak valid");
   const tiers = parseStylingTiersJson(formData.get("stylingTiersJson"));
   if (!tiers.ok) return databaseError("Tier styling", tiers.error);
-  const matrix = parseSizeMatrixJson(formData.get("perPetSizeMatrixJson"));
+  const storedResult = await context.supabase.from("staff_payroll_settings").select("per_pet_size_matrix").eq("organization_id", context.organizationId).eq("membership_id", membershipId).maybeSingle();
+  if (storedResult.error) return databaseError("Pengaturan staf gagal disimpan", storedResult.error.message);
+  const matrix = await parseMatrixForOrg(context, formData.get("perPetSizeMatrixJson"), (storedResult.data?.per_pet_size_matrix as SizeMatrix | null | undefined) ?? null);
   if (!matrix.ok) return databaseError("Matriks ukuran per dog", matrix.error);
   const patch = {
     organization_id: context.organizationId, membership_id: membershipId,
@@ -278,7 +280,7 @@ export async function saveStaffSettingsAction(_previous: PilotActionState, formD
   };
   const result = await context.supabase.from("staff_payroll_settings")
     .upsert(patch, { onConflict: "organization_id,membership_id" });
-  if (result.error) return databaseError("Pengaturan staf gagal disimpan", result.error.message);
+  if (result.error) return databaseError("Pengaturan staf gagal disimpan", friendlySettingsError(result.error.message));
   revalidatePath("/payroll");
   return ok("Pengaturan staf tersimpan.");
 }

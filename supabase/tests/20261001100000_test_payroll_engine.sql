@@ -428,4 +428,378 @@ begin
   perform pg_temp.act_as('0f200000-0000-4000-8000-0000000000c1', '0f200000-0000-4000-8000-000000000001');
 end $$;
 
+-- =======================================================================
+-- SB-06 (dynamic size bands): payroll rate matrices follow the tenant's own
+-- dog size bands. Expected values are computed BY HAND from the matrices
+-- below, never by calling the function under test. Order of scenarios:
+--   A  legacy XS-XL parity + unmeasured/non-dog flat fallback (legacy mode)
+--   B  matrix key validation (unknown / cat / negative / non-object / cross-tenant)
+--   C  dynamic mode: sixth band, tenant label, staff whole-object override
+--   D  re-banding follows an UNPAID run on recompute
+--   E  approved/paid run is byte-identical after re-band, rename and layout edit
+--   F  export detail: live payroll size vs immutable booking-line snapshot
+--   G  archived band: no leaked rate, grandfathered key, new archived key refused
+--   H  authorization, restricted-role denial, grants
+-- =======================================================================
+create or replace function pg_temp.sb6(n integer) returns uuid language sql immutable as
+$$ select ('0f200000-0000-4000-8000-' || lpad(to_hex(n), 12, '0'))::uuid $$;
+
+-- expect a statement to fail with a SQLSTATE and a message prefix
+create or replace function pg_temp.sb6_expect(p_sql text, p_state text, p_msg text, p_label text) returns void
+language plpgsql as $$
+begin
+  begin
+    execute p_sql;
+  exception when others then
+    if sqlstate <> p_state or sqlerrm not like p_msg then
+      raise exception 'FAIL %: expected [%] %, got [%] %', p_label, p_state, p_msg, sqlstate, sqlerrm; end if;
+    perform pg_temp.ok(true, p_label);
+    return;
+  end;
+  raise exception 'FAIL %: statement was accepted', p_label;
+end $$;
+
+-- one completed, invoiced in-store booking; p_items = [{"pet": uuid, "res": uuid}, ...]
+create or replace function pg_temp.sb6_job(p_booking uuid, p_start timestamptz, p_items jsonb) returns void
+language plpgsql as $$
+declare it jsonb; v_pet uuid;
+begin
+  insert into public.bookings (id, organization_id, branch_id, customer_id, booking_type, status, starts_at, ends_at, fulfillment_mode)
+  values (p_booking, '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-0000000000a1',
+          '0f200000-0000-4000-8000-00000000c101', 'grooming', 'confirmed', p_start, p_start + interval '4 hours', 'in_store');
+  for it in select value from jsonb_array_elements(p_items) loop
+    v_pet := app.assembly_add_pet(p_booking, (it->>'pet')::uuid, true);
+    perform app.assembly_add_line(v_pet, '0f200000-0000-4000-8000-000000005001', 1);
+    perform app.assembly_assign_pet_resource(v_pet, (it->>'res')::uuid);
+    update public.grooming_job_pets set status = 'complete' where id = v_pet;
+  end loop;
+  perform app.complete_booking(p_booking);
+  perform app.issue_invoice_for_booking(p_booking, p_document_type := 'invoice');
+end $$;
+
+create or replace function pg_temp.sb6_item(p_run uuid, p_membership uuid) returns jsonb language sql stable as $$
+  select breakdown from public.payroll_items
+  where organization_id = '0f200000-0000-4000-8000-000000000001' and payroll_run_id = p_run and membership_id = p_membership $$;
+create or replace function pg_temp.sb6_run(p_start date, p_end date) returns uuid language sql stable as $$
+  select id from public.payroll_runs where organization_id = '0f200000-0000-4000-8000-000000000001'
+    and period_start = p_start and period_end = p_end $$;
+-- fingerprint of every frozen payroll value of a run
+create or replace function pg_temp.sb6_fp(p_run uuid) returns text language sql stable as $$
+  select (select r.status||'|'||r.total_gross||'|'||r.total_net||'|'||r.revision from public.payroll_runs r where r.id = p_run)
+    ||'|'|| coalesce((select md5(string_agg(i.id::text||i.membership_id::text||i.base_pay||i.commission_total||i.gross_pay||i.net_pay||i.breakdown::text, '~' order by i.id))
+                      from public.payroll_items i where i.payroll_run_id = p_run), '-') $$;
+create or replace function pg_temp.sb6_ver() returns integer language sql stable as $$
+  select layout_version from public.organization_size_band_settings where organization_id = '0f200000-0000-4000-8000-000000000001' $$;
+create or replace function pg_temp.sb6_band(p_key text) returns uuid language sql stable as $$
+  select id from public.organization_size_bands where organization_id = '0f200000-0000-4000-8000-000000000001' and band_key = p_key $$;
+-- active dog layout of org1 as a save_size_bands payload, with optional per-key overrides
+create or replace function pg_temp.sb6_layout(p_label_overrides jsonb, p_upper_overrides jsonb, p_xxl boolean) returns jsonb language sql stable as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', b.id,
+           'label', coalesce(p_label_overrides ->> b.band_key, b.label),
+           'upper_kg', case when p_upper_overrides ? b.band_key then (p_upper_overrides -> b.band_key -> 0) else to_jsonb(b.upper_kg) end,
+           'upper_inclusive', case when p_upper_overrides ? b.band_key then (p_upper_overrides -> b.band_key -> 1) else to_jsonb(b.upper_inclusive) end) order by b.sort_order), '[]'::jsonb)
+         || case when p_xxl then '[{"label":"XXL","upper_kg":null,"upper_inclusive":false}]'::jsonb else '[]'::jsonb end
+  from public.organization_size_bands b
+  where b.organization_id = '0f200000-0000-4000-8000-000000000001' and b.band_kind = 'dog_weight' and b.status = 'active' $$;
+
+do $$ begin perform pg_temp.act_as('0f200000-0000-4000-8000-0000000000c1', '0f200000-0000-4000-8000-000000000001'); end $$;
+
+-- ===== A: legacy parity. The org starts in legacy mode with XS/S/M/L/XL. =====
+do $$
+begin
+  perform pg_temp.ok((select mode from public.organization_size_band_settings where organization_id = '0f200000-0000-4000-8000-000000000001') = 'legacy',
+    'SB-06 fixture org is in legacy mode with the five seeded legacy bands');
+  -- every legacy key is accepted (XS was unreachable from the old four-key UI/validation)
+  update public.payroll_cycle_settings
+     set per_pet_size_matrix_default = '{"extra_small":11000,"small":12000,"medium":13000,"large":14000,"extra_large":15000}'::jsonb
+   where organization_id = '0f200000-0000-4000-8000-000000000001';
+  perform pg_temp.ok(true, 'A all five legacy keys incl. extra_small are accepted in the organization matrix');
+end $$;
+
+insert into public.organization_pet_types (organization_id, key, label)
+values ('0f200000-0000-4000-8000-000000000001', 'rabbit', 'Kelinci');
+update public.service_catalog set species_pricing = '{"rabbit":{"price":80000,"duration":40}}'::jsonb
+ where id = '0f200000-0000-4000-8000-000000005001';
+insert into public.pets (id, organization_id, customer_id, name, species, weight_kg, size) values
+  (pg_temp.sb6(610001), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'L XS 3kg',     'dog', 3,     null),
+  (pg_temp.sb6(610002), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'L S 7kg',      'dog', 7,     null),
+  (pg_temp.sb6(610003), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'L M 12kg',     'dog', 12,    null),
+  (pg_temp.sb6(610004), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'L L 25.00kg',  'dog', 25.00, null),
+  (pg_temp.sb6(610005), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'L XL 25.01kg', 'dog', 25.01, null),
+  (pg_temp.sb6(610006), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'L Cat',        'cat', null,  null),
+  (pg_temp.sb6(610007), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'L Unmeasured', 'dog', null,  null),
+  (pg_temp.sb6(610008), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'L Rabbit',     'rabbit', null, null);
+select pg_temp.sb6_job(pg_temp.sb6(620001), '2026-04-01 09:00:00+07', (
+  select jsonb_agg(jsonb_build_object('pet', pg_temp.sb6(610000 + n), 'res', '0f200000-0000-4000-8000-00000000e501') order by n)
+  from generate_series(1, 8) n));
+
+do $$
+declare v_run uuid; v_a jsonb; v_b jsonb; v_d jsonb;
+begin
+  v_run := app.recompute_payroll_run('2026-03-26'::date, '2026-04-26'::date, null);
+  v_a := pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d2');
+  v_b := pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d3');
+  v_d := v_a -> 'perDogDetail';
+  -- 11000+12000+13000+14000+15000 (XS..XL, 25.00 kg is L, 25.01 kg is XL) + 3 x 20000 flat (cat, unmeasured dog, rabbit)
+  perform pg_temp.ok((v_a->>'perDog')::numeric = 125000, 'A legacy XS-XL parity: perDog = 65000 by size + 60000 flat (cat, unmeasured dog, custom species) = 125000');
+  perform pg_temp.ok((v_a->>'basic')::numeric = 1000000 and (v_a->'meta'->>'basicCount')::int = 8, 'A non-size components are unchanged (basic salary, 8 basic jobs)');
+  perform pg_temp.ok(jsonb_array_length(v_d) = 6, 'A perDogDetail has five size groups plus one unsized group');
+  perform pg_temp.ok((select string_agg((e->>'key')||'='||(e->>'label')||':'||(e->>'count')||'@'||trim_scale((e->>'rate')::numeric)::text, ',' order by o)
+                        from jsonb_array_elements(v_d) with ordinality t(e, o) where e->>'key' is not null)
+                     = 'extra_small=XS:1@11000,small=S:1@12000,medium=M:1@13000,large=L:1@14000,extra_large=XL:1@15000',
+                     'A perDogDetail carries the resolved tenant key, label, count and rate per size');
+  perform pg_temp.ok((v_d -> 5 ->> 'key') is null and (v_d -> 5 ->> 'label') is null and (v_d -> 5 ->> 'count')::int = 3 and (v_d -> 5 ->> 'rate')::numeric = 20000,
+    'A cat, unmeasured dog and custom species share the unsized group at the flat rate');
+  perform pg_temp.ok((select sum((e->>'amount')::numeric) from jsonb_array_elements(v_d) e) = (v_a->>'perDog')::numeric, 'A perDogDetail amounts add up to perDog');
+  perform pg_temp.ok((v_b->>'perDog')::numeric = 0 and jsonb_array_length(v_b->'perDogDetail') = 0, 'A groomer with no pets has perDog 0 and an empty perDogDetail');
+end $$;
+
+-- ===== B: validation of matrix keys on both settings tables =====
+do $$
+declare v_other uuid := '0f200000-0000-4000-8000-000000000002';
+begin
+  perform pg_temp.sb6_expect($q$update public.payroll_cycle_settings set per_pet_size_matrix_default = '{"giant":1000}'
+    where organization_id = '0f200000-0000-4000-8000-000000000001'$q$, '22023', 'payroll_size_key_invalid:giant', 'B unknown key refused on the organization matrix');
+  perform pg_temp.sb6_expect($q$update public.staff_payroll_settings set per_pet_size_matrix = '{"giant":1000}'
+    where organization_id = '0f200000-0000-4000-8000-000000000001' and membership_id = '0f200000-0000-4000-8000-0000000000d3'$q$, '22023', 'payroll_size_key_invalid:giant', 'B unknown key refused on the staff matrix');
+  perform pg_temp.sb6_expect($q$update public.payroll_cycle_settings set per_pet_size_matrix_default = '{"cat":1000}'
+    where organization_id = '0f200000-0000-4000-8000-000000000001'$q$, '22023', 'payroll_size_key_invalid:cat', 'B the cat band is not a payroll size key');
+  perform pg_temp.sb6_expect($q$update public.payroll_cycle_settings set per_pet_size_matrix_default = '{"small":-1}'
+    where organization_id = '0f200000-0000-4000-8000-000000000001'$q$, '22023', 'payroll_size_rate_invalid:small', 'B negative rate refused');
+  perform pg_temp.sb6_expect($q$update public.payroll_cycle_settings set per_pet_size_matrix_default = '{"small":"abc"}'
+    where organization_id = '0f200000-0000-4000-8000-000000000001'$q$, '22023', 'payroll_size_rate_invalid:small', 'B non-numeric rate refused');
+  perform pg_temp.sb6_expect($q$update public.payroll_cycle_settings set per_pet_size_matrix_default = '[1]'::jsonb
+    where organization_id = '0f200000-0000-4000-8000-000000000001'$q$, '22023', 'payroll_size_matrix_invalid', 'B a non-object matrix is refused');
+  -- the upsert path (INSERT ... ON CONFLICT DO UPDATE) is validated too
+  perform pg_temp.sb6_expect($q$insert into public.payroll_cycle_settings (organization_id, per_pet_size_matrix_default)
+    values ('0f200000-0000-4000-8000-000000000001', '{"giant":1}') on conflict (organization_id) do update set per_pet_size_matrix_default = excluded.per_pet_size_matrix_default$q$,
+    '22023', 'payroll_size_key_invalid:giant', 'B upsert of an unknown key is refused');
+  -- a deliberate NULL entry stays valid (falls back to the flat rate) and an empty matrix is valid
+  update public.payroll_cycle_settings set per_pet_size_matrix_default = '{"small":null,"extra_small":11000,"medium":13000,"large":14000,"extra_large":15000}'::jsonb
+   where organization_id = '0f200000-0000-4000-8000-000000000001';
+  update public.payroll_cycle_settings set per_pet_size_matrix_default = '{"extra_small":11000,"small":12000,"medium":13000,"large":14000,"extra_large":15000}'::jsonb
+   where organization_id = '0f200000-0000-4000-8000-000000000001';
+  perform pg_temp.ok(true, 'B explicit null rate and a restored full matrix are accepted');
+  -- the matrix the refused statements tried to replace is untouched
+  perform pg_temp.ok((select per_pet_size_matrix_default from public.payroll_cycle_settings where organization_id = '0f200000-0000-4000-8000-000000000001')
+    = '{"extra_small":11000,"small":12000,"medium":13000,"large":14000,"extra_large":15000}'::jsonb, 'B refused writes left the stored matrix untouched');
+  -- tenant keys never cross organizations: the second org only has its own bands
+  perform pg_temp.sb6_expect($q$insert into public.payroll_cycle_settings (organization_id, per_pet_size_matrix_default)
+    values ('0f200000-0000-4000-8000-000000000002', '{"giant":1}')$q$, '22023', 'payroll_size_key_invalid:giant', 'B other organization refuses a key it does not own');
+  insert into public.payroll_cycle_settings (organization_id, per_pet_size_matrix_default)
+  values (v_other, '{"extra_small":9000}'::jsonb);
+  perform pg_temp.ok(true, 'B other organization accepts its own legacy key');
+end $$;
+
+-- ===== C: dynamic mode with a sixth band, a renamed band and a staff override =====
+update public.organization_size_band_settings set mode = 'dynamic', layout_version = layout_version + 1
+ where organization_id = '0f200000-0000-4000-8000-000000000001';
+do $$
+declare v_res jsonb;
+begin
+  -- XL closes at 35 kg (inclusive), XS is renamed "Mini", XXL is a new open band
+  v_res := app.save_size_bands('0f200000-0000-4000-8000-000000000001', pg_temp.sb6_ver(),
+    pg_temp.sb6_layout('{"extra_small":"Mini"}'::jsonb, '{"extra_large":[35,true]}'::jsonb, true));
+  perform pg_temp.ok((select count(*) from public.organization_size_bands where organization_id = '0f200000-0000-4000-8000-000000000001' and band_key = 'xxl' and status = 'active') = 1,
+    'C owner added a sixth band with a server-generated key');
+  perform pg_temp.sb6_expect($q$update public.payroll_cycle_settings set per_pet_size_matrix_default = '{"xxl":1000}'
+    where organization_id = '0f200000-0000-4000-8000-000000000002'$q$, '22023', 'payroll_size_key_invalid:xxl', 'C another tenant''s custom key is refused (no cross-tenant leakage)');
+  update public.payroll_cycle_settings
+     set per_pet_size_matrix_default = '{"extra_small":11000,"small":12000,"medium":13000,"large":14000,"extra_large":15000,"xxl":22000}'::jsonb
+   where organization_id = '0f200000-0000-4000-8000-000000000001';
+  update public.staff_payroll_settings set per_pet_size_matrix = '{"extra_small":9000}'::jsonb
+   where organization_id = '0f200000-0000-4000-8000-000000000001' and membership_id = '0f200000-0000-4000-8000-0000000000d3';
+  perform pg_temp.ok(true, 'C the sixth band key is accepted in both matrices');
+  perform pg_temp.ok((select label from public.organization_size_bands where organization_id = '0f200000-0000-4000-8000-000000000001' and band_key = 'extra_small') = 'Mini'
+                     and (select label from public.organization_size_bands where organization_id = '0f200000-0000-4000-8000-000000000002' and band_key = 'extra_small') = 'XS',
+    'C labels are tenant-owned: org1 renamed XS to Mini while org2 still shows XS');
+end $$;
+
+insert into public.pets (id, organization_id, customer_id, name, species, weight_kg, size) values
+  (pg_temp.sb6(610011), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'D A XXL 40kg', 'dog', 40, null),
+  (pg_temp.sb6(610012), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'D A XS 3kg',   'dog', 3,  null),
+  (pg_temp.sb6(610013), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'D B XS 3kg',   'dog', 3,  null),
+  (pg_temp.sb6(610014), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'D B XXL 40kg', 'dog', 40, null);
+select pg_temp.sb6_job(pg_temp.sb6(620002), '2026-05-01 09:00:00+07', jsonb_build_array(
+  jsonb_build_object('pet', pg_temp.sb6(610011), 'res', '0f200000-0000-4000-8000-00000000e501'),
+  jsonb_build_object('pet', pg_temp.sb6(610012), 'res', '0f200000-0000-4000-8000-00000000e501'),
+  jsonb_build_object('pet', pg_temp.sb6(610013), 'res', '0f200000-0000-4000-8000-00000000e502'),
+  jsonb_build_object('pet', pg_temp.sb6(610014), 'res', '0f200000-0000-4000-8000-00000000e502')));
+
+do $$
+declare v_run uuid; v_a jsonb; v_b jsonb;
+begin
+  perform pg_temp.ok((select size from public.pets where id = pg_temp.sb6(610011)) = 'xxl'
+                     and (select size from public.pets where id = pg_temp.sb6(610004)) = 'large'
+                     and (select size from public.pets where id = pg_temp.sb6(610005)) = 'extra_large',
+    'C the live pet sizing path banded the 40 kg dog as xxl and kept the legacy 25.00/25.01 kg edge');
+  v_run := app.recompute_payroll_run('2026-04-26'::date, '2026-05-26'::date, null);
+  v_a := pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d2');
+  v_b := pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d3');
+  -- A inherits the org matrix: xxl 22000 + extra_small 11000
+  perform pg_temp.ok((v_a->>'perDog')::numeric = 33000, 'C A (inherits org matrix) is paid the XXL rate 22000 + XS rate 11000 = 33000');
+  perform pg_temp.ok((select string_agg((e->>'key')||'='||(e->>'label')||'@'||trim_scale((e->>'rate')::numeric)::text, ',' order by o) from jsonb_array_elements(v_a->'perDogDetail') with ordinality t(e, o))
+                     = 'extra_small=Mini@11000,xxl=XXL@22000', 'C A perDogDetail shows the tenant label Mini and the sixth band XXL, in layout order');
+  -- B's staff matrix replaces the org matrix as a whole: XS 9000, XXL has no entry -> flat 20000
+  perform pg_temp.ok((v_b->>'perDog')::numeric = 29000, 'C B (staff matrix {extra_small:9000}) = 9000 for XS + flat 20000 for XXL (base/inherited fallback) = 29000');
+  perform pg_temp.ok((select string_agg((e->>'key')||'@'||trim_scale((e->>'rate')::numeric)::text, ',' order by o) from jsonb_array_elements(v_b->'perDogDetail') with ordinality t(e, o))
+                     = 'extra_small@9000,xxl@20000', 'C B perDogDetail records the matrix rate and the flat fallback rate');
+end $$;
+
+-- ===== D: re-banding follows an UNPAID run when it is recomputed =====
+do $$
+declare v_run uuid := pg_temp.sb6_run('2026-04-26', '2026-05-26'); v_a jsonb; v_before text;
+begin
+  perform pg_temp.ok((select status from public.payroll_runs where id = v_run) = 'draft', 'D the run is still an unpaid draft');
+  update public.pets set weight_kg = 8 where id = pg_temp.sb6(610011);   -- 40 kg -> 8 kg: xxl -> small
+  perform app.recompute_payroll_run('2026-04-26'::date, '2026-05-26'::date, null);
+  v_a := pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d2');
+  perform pg_temp.ok((v_a->>'perDog')::numeric = 23000, 'D re-banded dog is paid the live small rate on recompute: 12000 + 11000 = 23000');
+  update public.pets set weight_kg = 40 where id = pg_temp.sb6(610011);
+  perform app.recompute_payroll_run('2026-04-26'::date, '2026-05-26'::date, null);
+  perform pg_temp.ok((pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d2')->>'perDog')::numeric = 33000, 'D restoring the weight restores the XXL rate on the next recompute');
+  -- a stale draft is not changed by a re-band until somebody recomputes it
+  v_before := pg_temp.sb6_fp(v_run);
+  update public.pets set weight_kg = 8 where id = pg_temp.sb6(610011);
+  perform pg_temp.ok(pg_temp.sb6_fp(v_run) = v_before, 'D a re-band alone never rewrites stored payroll rows');
+  update public.pets set weight_kg = 40 where id = pg_temp.sb6(610011);
+end $$;
+
+-- ===== E: approved and paid runs never change =====
+do $$
+declare v_run uuid := pg_temp.sb6_run('2026-04-26', '2026-05-26'); v_fp text; v_frozen jsonb; v_blocked boolean;
+begin
+  v_frozen := pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d2');
+  perform app.approve_payroll_run(v_run);
+  v_fp := pg_temp.sb6_fp(v_run);
+  -- re-band (40 kg -> 8 kg), then rename XXL and widen XL so the 40 kg weight no longer lands in XXL
+  update public.pets set weight_kg = 8 where id = pg_temp.sb6(610011);
+  perform app.save_size_bands('0f200000-0000-4000-8000-000000000001', pg_temp.sb6_ver(),
+    pg_temp.sb6_layout('{"xxl":"XXL Besar"}'::jsonb, '{"extra_large":[45,true]}'::jsonb, false));
+  perform pg_temp.ok(pg_temp.sb6_fp(v_run) = v_fp, 'E approved run is byte-identical after a re-band, a rename and a layout edit');
+  begin
+    perform app.recompute_payroll_run('2026-04-26'::date, '2026-05-26'::date, null);
+    perform pg_temp.ok(false, 'E an approved run must not be recomputable');
+  exception when check_violation then
+    perform pg_temp.ok(sqlerrm like 'run_not_editable:approved%', 'E recompute of an approved run is refused (run_not_editable)');
+  end;
+  perform app.pay_payroll_run(v_run);
+  perform pg_temp.ok((select status from public.payroll_runs where id = v_run) = 'paid', 'E run is paid');
+  v_fp := pg_temp.sb6_fp(v_run);
+  update public.pets set weight_kg = 40 where id = pg_temp.sb6(610011);
+  perform app.save_size_bands('0f200000-0000-4000-8000-000000000001', pg_temp.sb6_ver(),
+    pg_temp.sb6_layout('{"extra_small":"Tiny","xxl":"XXL Baru"}'::jsonb, '{"extra_large":[35,true]}'::jsonb, false));
+  perform pg_temp.ok(pg_temp.sb6_fp(v_run) = v_fp, 'E paid run is byte-identical after another re-band and rename');
+  perform pg_temp.ok(pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d2') = v_frozen
+                     and (pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d2') #>> '{perDogDetail,1,label}') = 'XXL'
+                     and (pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d2') #>> '{perDogDetail,0,label}') = 'Mini',
+    'E the frozen breakdown still shows the labels (Mini, XXL) it was calculated with');
+  v_blocked := false;
+  begin
+    update public.payroll_items set gross_pay = gross_pay + 1 where payroll_run_id = v_run;
+  exception when others then
+    v_blocked := true;
+  end;
+  perform pg_temp.ok(v_blocked, 'E direct update of a paid payroll item is refused by the existing guard');
+end $$;
+
+-- ===== F: export detail = live payroll size + immutable booking-line snapshot =====
+do $$
+declare r record;
+begin
+  select * into r from app.payroll_export_detail_rows('0f200000-0000-4000-8000-000000000001', '2026-04-26', '2026-05-26') x
+   where x.pet_name = 'D A XXL 40kg';
+  perform pg_temp.ok(r.pet_size = 'xxl' and r.pet_size_label = 'XXL Baru', 'F export detail reports the live payroll key and CURRENT tenant label');
+  perform pg_temp.ok(r.service_size_key = 'xxl' and r.service_size_label = 'XXL', 'F export detail also carries the size recorded on the booking line when it was priced (label at that time)');
+  update public.pets set weight_kg = 8 where id = pg_temp.sb6(610011);
+  select * into r from app.payroll_export_detail_rows('0f200000-0000-4000-8000-000000000001', '2026-04-26', '2026-05-26') x
+   where x.pet_name = 'D A XXL 40kg';
+  perform pg_temp.ok(r.pet_size = 'small' and r.service_size_key = 'xxl' and r.service_size_label = 'XXL',
+    'F after a re-band the live size changes but the booking-line snapshot is not rewritten');
+  update public.pets set weight_kg = 40 where id = pg_temp.sb6(610011);
+  select * into r from app.payroll_export_detail_rows('0f200000-0000-4000-8000-000000000001', '2026-03-26', '2026-04-26') x
+   where x.pet_name = 'L Cat';
+  perform pg_temp.ok(r.pet_size is null and r.pet_size_label is null, 'F a cat has no payroll size in the export detail');
+  select * into r from app.payroll_export_detail_rows('0f200000-0000-4000-8000-000000000001', '2026-03-26', '2026-04-26') x
+   where x.pet_name = 'L XS 3kg';
+  perform pg_temp.ok(r.pet_size = 'extra_small' and r.pet_size_label = 'Tiny' and r.service_size_key = 'extra_small' and r.service_size_label = 'XS',
+    'F legacy-mode booking snapshot keeps its original label XS while the tenant label is now Tiny');
+end $$;
+
+-- ===== G: archived band =====
+do $$
+begin
+  perform app.archive_size_band('0f200000-0000-4000-8000-000000000001', pg_temp.sb6_ver(), pg_temp.sb6_band('xxl'));
+  perform pg_temp.ok((select status from public.organization_size_bands where organization_id = '0f200000-0000-4000-8000-000000000001' and band_key = 'xxl') = 'archived'
+                     and (select size from public.pets where id = pg_temp.sb6(610011)) = 'extra_large',
+    'G archiving XXL re-bands the 40 kg dog into the new open top band (XL)');
+  -- the stored matrix still holds the archived key: unchanged is grandfathered, changed/new is refused
+  update public.payroll_cycle_settings set per_pet_size_matrix_default = per_pet_size_matrix_default
+   where organization_id = '0f200000-0000-4000-8000-000000000001';
+  update public.payroll_cycle_settings set botak_amount_default = botak_amount_default + 0
+   where organization_id = '0f200000-0000-4000-8000-000000000001';
+  perform pg_temp.ok(true, 'G a matrix that still holds an archived key can be re-saved unchanged (existing data is never invalidated)');
+  perform pg_temp.sb6_expect($q$update public.payroll_cycle_settings set per_pet_size_matrix_default = per_pet_size_matrix_default || '{"xxl":23000}'
+    where organization_id = '0f200000-0000-4000-8000-000000000001'$q$, '22023', 'payroll_size_key_invalid:xxl', 'G changing the rate of an archived key is refused');
+  perform pg_temp.sb6_expect($q$update public.staff_payroll_settings set per_pet_size_matrix = '{"xxl":5000}'
+    where organization_id = '0f200000-0000-4000-8000-000000000001' and membership_id = '0f200000-0000-4000-8000-0000000000d2'$q$, '22023', 'payroll_size_key_invalid:xxl', 'G adding an archived key to another matrix is refused');
+  perform pg_temp.sb6_expect(format($q$select app.delete_size_band('0f200000-0000-4000-8000-000000000001', %s, %L)$q$, pg_temp.sb6_ver(), pg_temp.sb6_band('xxl')),
+    '23503', 'size_band_in_use', 'G an archived band that payroll matrices still reference cannot be deleted');
+end $$;
+insert into public.pets (id, organization_id, customer_id, name, species, weight_kg, size) values
+  (pg_temp.sb6(610021), '0f200000-0000-4000-8000-000000000001', '0f200000-0000-4000-8000-00000000c101', 'G 40kg', 'dog', 40, null);
+select pg_temp.sb6_job(pg_temp.sb6(620003), '2026-06-01 09:00:00+07', jsonb_build_array(
+  jsonb_build_object('pet', pg_temp.sb6(610021), 'res', '0f200000-0000-4000-8000-00000000e501')));
+do $$
+declare v_run uuid; v_a jsonb;
+begin
+  v_run := app.recompute_payroll_run('2026-05-26'::date, '2026-06-26'::date, null);
+  v_a := pg_temp.sb6_item(v_run, '0f200000-0000-4000-8000-0000000000d2');
+  perform pg_temp.ok((v_a->>'perDog')::numeric = 15000 and (v_a #>> '{perDogDetail,0,key}') = 'extra_large',
+    'G a draft after archiving pays the dog by the live band (XL 15000) and never the archived XXL rate 22000');
+  -- the owner may clear the archived key (explicit removal) and then it is gone for good
+  update public.payroll_cycle_settings
+     set per_pet_size_matrix_default = per_pet_size_matrix_default - 'xxl' where organization_id = '0f200000-0000-4000-8000-000000000001';
+  perform pg_temp.ok(not (select per_pet_size_matrix_default ? 'xxl' from public.payroll_cycle_settings where organization_id = '0f200000-0000-4000-8000-000000000001'),
+    'G the owner can remove an archived key from the matrix');
+end $$;
+
+-- ===== H: authorization and grants =====
+do $$
+declare v_fn text;
+begin
+  -- a member without payroll.read cannot read export detail rows
+  perform pg_temp.act_as('0f200000-0000-4000-8000-0000000000c9', '0f200000-0000-4000-8000-000000000001');
+  perform pg_temp.sb6_expect($q$select * from app.payroll_export_detail_rows('0f200000-0000-4000-8000-000000000001', '2026-04-26', '2026-05-26')$q$,
+    '42501', 'not_authorized', 'H a member without payroll.read is denied the export detail');
+  -- another organization's owner cannot name this organization
+  perform pg_temp.act_as('0f200000-0000-4000-8000-0000000000c8', '0f200000-0000-4000-8000-000000000002');
+  perform pg_temp.sb6_expect($q$select * from app.payroll_export_detail_rows('0f200000-0000-4000-8000-000000000001', '2026-04-26', '2026-05-26')$q$,
+    '42501', 'not_authorized', 'H another tenant''s owner is denied by the organization check');
+  perform pg_temp.sb6_expect($q$select * from app.payroll_export_detail_rows(null, '2026-04-26', '2026-05-26')$q$,
+    '42501', 'not_authorized', 'H a null organization is denied');
+  -- a matrix write for this org by the other tenant's session still validates against the ROW's organization
+  perform pg_temp.act_as('0f200000-0000-4000-8000-0000000000c1', '0f200000-0000-4000-8000-000000000001');
+  perform pg_temp.ok((select count(*) from app.payroll_export_detail_rows('0f200000-0000-4000-8000-000000000001', '2026-04-26', '2026-05-26')) > 0,
+    'H the authorized owner reads the export detail');
+
+  -- no anon / PUBLIC execute anywhere in the payroll size path; internals not client-callable
+  foreach v_fn in array array[
+    'app.payroll_export_detail_rows(uuid,date,date)', 'app.compute_payroll_item(uuid,uuid,date,date)',
+    'app.payroll_eligible_pets(uuid,date,date)', 'app.payroll_transport_shares(uuid,date,date)',
+    'app.payroll_pet_size_key(uuid,text,numeric,text)', 'app.tg_validate_payroll_size_matrix()'] loop
+    perform pg_temp.ok(not has_function_privilege('anon', to_regprocedure(v_fn), 'execute'), 'H anon cannot execute ' || v_fn);
+    perform pg_temp.ok(not exists (select 1 from pg_proc p where p.oid = to_regprocedure(v_fn)
+        and (p.proacl is null or exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0))), 'H PUBLIC cannot execute ' || v_fn);
+    if v_fn <> 'app.payroll_export_detail_rows(uuid,date,date)' then
+      perform pg_temp.ok(not has_function_privilege('authenticated', to_regprocedure(v_fn), 'execute'), 'H authenticated cannot call internal ' || v_fn);
+    end if;
+  end loop;
+  perform pg_temp.ok(has_function_privilege('authenticated', 'app.payroll_export_detail_rows(uuid,date,date)'::regprocedure, 'execute'), 'H authenticated keeps execute on the export RPC (it checks the caller itself)');
+  perform pg_temp.ok((select bool_and(p.prosecdef and p.proconfig is not null and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%'))
+      from pg_proc p where p.oid in ('app.payroll_export_detail_rows(uuid,date,date)'::regprocedure, 'app.compute_payroll_item(uuid,uuid,date,date)'::regprocedure,
+        'app.payroll_pet_size_key(uuid,text,numeric,text)'::regprocedure, 'app.tg_validate_payroll_size_matrix()'::regprocedure)),
+    'H every changed payroll function is security definer with a pinned search_path');
+end $$;
+
 rollback;

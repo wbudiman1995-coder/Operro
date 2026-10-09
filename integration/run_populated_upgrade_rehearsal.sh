@@ -125,6 +125,13 @@ SQL
 
   # ---- Dynamic size bands (foundation, management, and Bundle 3 adapters) ----
   sql -f integration/size_band_upgrade_fixture.sql
+  # Payroll export detail rows as the PRE-SB-06 function returns them (old columns only), to prove the
+  # migrated function still returns exactly the same data for the same period.
+  export_cols="booking_id,membership_id,starts_at,customer_name,pet_name,pet_size,services,service_revenue,invoice_number,invoice_id,invoice_status"
+  export_probe="select count(*)||'|'||coalesce(md5(string_agg(concat_ws('~',$export_cols), '|' order by booking_id, membership_id, pet_name)),'-') from app.payroll_export_detail_rows('5c000000-0000-4000-8000-000000000001', current_date-30, current_date-1)"
+  export_before=$(sql -Atc "$export_probe")
+  [[ "${export_before%%|*}" != 0 ]] || { echo "FAIL: upgrade fixture has no payroll export rows"; exit 1; }
+  echo "Pre-SB-06 payroll export detail rows|hash: $export_before"
   fp_before=$(sql -q -f integration/size_band_upgrade_fingerprint.sql)
   echo "Pre-size-band fingerprint lines: $(printf '%s
 ' "$fp_before" | wc -l)"
@@ -134,7 +141,7 @@ SQL
     sql -q -f "/work/supabase/migrations/$(basename "$migration")"
     size_band_count=$((size_band_count + 1))
   done
-  [[ "$size_band_count" == "6" ]] || { echo "FAIL: expected 6 size-band migrations through Bundle 3, found $size_band_count"; exit 1; }
+  [[ "$size_band_count" == "7" ]] || { echo "FAIL: expected 7 size-band migrations through Bundle 4, found $size_band_count"; exit 1; }
   [[ "$(sql -Atc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app' and p.proname in ('preview_size_layout_impact','save_size_bands','archive_size_band','delete_size_band','set_service_band_prices','set_size_band_mode')")" == "6" ]]     || { echo "FAIL: SB-05 management RPCs missing after upgrade"; exit 1; }
   [[ "$(sql -Atc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app' and p.proname in ('resolve_pet_pricing_keys','preview_booking_resolution')")" == "2" ]] || { echo "FAIL: Bundle 3 adapter RPCs missing after upgrade"; exit 1; }
   fp_after=$(sql -q -f integration/size_band_upgrade_fingerprint.sql)
@@ -149,6 +156,21 @@ SQL
 ' "$fp_after"
   echo "SIZE BAND DATA PRESERVATION PASS (counts and row hashes of pets, snapshots, packages, entitlements, prices, durations, invoices, payroll unchanged)"
   sql -f integration/size_band_upgrade_checks.sql
+  # the migrated export RPC authorizes the caller, so probe it as the fixture owner inside a rolled-back transaction
+  export_after=$(sql -q -At <<SQL | tail -1
+begin;
+insert into public.role_permissions(organization_id,role_id,permission_id)
+  select '5c000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-0000000000a2',p.id from public.permissions p where p.key='payroll.read' on conflict do nothing;
+insert into public.organization_modules(organization_id,module_id,enabled)
+  select '5c000000-0000-4000-8000-000000000001',m.id,true from public.modules m where m.key='payroll' on conflict (organization_id,module_id) do update set enabled=true;
+insert into public.subscriptions(organization_id,status) values ('5c000000-0000-4000-8000-000000000001','active') on conflict do nothing;
+select set_config('request.jwt.claims','{"sub":"5c000000-0000-4000-8000-0000000000a1","active_org_id":"5c000000-0000-4000-8000-000000000001"}',true) \gset
+$export_probe;
+rollback;
+SQL
+)
+  [[ "$export_before" == "$export_after" ]] || { echo "FAIL: payroll export detail rows changed across SB-06 ($export_before vs $export_after)"; exit 1; }
+  echo "PAYROLL EXPORT PRESERVATION PASS (rows|hash $export_after identical before and after SB-06)"
   # U-06: the backfill steps are idempotent (re-run the data statements verbatim)
   fp_mid=$(sql -q -f integration/size_band_upgrade_fingerprint.sql)
   bands_before=$(sql -Atc "select count(*) from public.organization_size_bands")

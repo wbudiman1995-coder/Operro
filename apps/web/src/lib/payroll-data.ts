@@ -11,6 +11,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { PayrollSizeBand, PerDogDetailEntry } from "@/lib/payroll-size-matrix";
+
 function assertResult(scope: string, error: { message: string } | null) {
   if (error) throw new Error(`${scope}_failed:${error.message}`);
 }
@@ -29,6 +31,8 @@ function embeddedStaffName(value: unknown) {
 export interface PayrollBreakdown {
   basic: number; weekly: number; noLate: number; noSick: number; styling: number;
   botak: number; transport: number; perDog: number; daily: number;
+  /** Per-size breakdown of perDog, frozen with the item. Absent on breakdowns calculated before SB-06. */
+  perDogDetail?: PerDogDetailEntry[];
   meta: {
     stylingCount: number; stylingRevenue: number; stylingAppliedPct: number; botakCount: number;
     basicCount: number; lateCount: number; sickDays: number; scheduledDays: number; workedDays: number;
@@ -88,6 +92,8 @@ export interface PayrollWorkspace {
   staff: PayrollStaffCard[];
   settings: PayrollCycleSettings;
   missing: PayrollMissingItem[];
+  /** The active organization's dog size bands (labels come from here, never from the browser). */
+  sizeBands: PayrollSizeBand[];
 }
 
 const DEFAULT_SETTINGS: PayrollCycleSettings = {
@@ -105,6 +111,17 @@ function tenureMonths(hiredAt: string | null): number | null {
   return Math.max(0, months);
 }
 
+/** Dog size bands of ONE organization, read under the caller's own session (RLS scopes it to the active tenant). */
+export async function loadPayrollSizeBands(supabase: SupabaseClient, organizationId: string): Promise<PayrollSizeBand[]> {
+  const result = await supabase.from("organization_size_bands")
+    .select("band_key,label,status,sort_order").eq("organization_id", organizationId).eq("band_kind", "dog_weight").order("sort_order");
+  assertResult("payroll_size_bands", result.error);
+  return (result.data ?? []).map((row) => ({
+    key: row.band_key as string, label: row.label as string,
+    status: row.status === "archived" ? "archived" : "active", sortOrder: Number(row.sort_order),
+  }));
+}
+
 export async function loadPayrollWorkspace(
   supabase: SupabaseClient, organizationId: string, anchor: string | null,
 ): Promise<PayrollWorkspace> {
@@ -114,7 +131,8 @@ export async function loadPayrollWorkspace(
   if (!row) throw new Error("payroll_cycle_bounds_empty");
   const periodStart = row.period_start; const periodEnd = row.period_end;
 
-  const [settingsResult, staffResult, runResult, resourcesResult] = await Promise.all([
+  const [sizeBands, settingsResult, staffResult, runResult, resourcesResult] = await Promise.all([
+    loadPayrollSizeBands(supabase, organizationId),
     supabase.from("payroll_cycle_settings").select("*").eq("organization_id", organizationId).maybeSingle(),
     supabase.from("staff_compensation").select("membership_id,memberships(users(email,full_name))").eq("organization_id", organizationId).eq("is_active", true).is("deleted_at", null),
     supabase.from("payroll_runs").select("id,status,total_gross,total_net,revision,metadata").eq("organization_id", organizationId).is("branch_id", null).eq("period_start", periodStart).eq("period_end", periodEnd).maybeSingle(),
@@ -221,7 +239,7 @@ export async function loadPayrollWorkspace(
       totalNet: Number(runResult.data.total_net), revision: runResult.data.revision,
       correctionCount: Number((runResult.data.metadata as Record<string, unknown> | null)?.correction_count ?? 0),
     } : null,
-    staff, settings, missing,
+    staff, settings, missing, sizeBands,
   };
 }
 
@@ -229,6 +247,10 @@ export interface PayrollExportDetailRow {
   bookingId: string; membershipId: string; staffName: string; startsAt: string;
   customerName: string; petName: string; petSize: string | null; services: string;
   serviceRevenue: number; invoiceNumber: string | null; invoiceStatus: string | null;
+  /** Server-derived: the size payroll uses today (key + the tenant's current label). */
+  petSizeLabel: string | null;
+  /** The size recorded on the booking line when it was priced (immutable snapshot; null for older history). */
+  serviceSizeKey: string | null; serviceSizeLabel: string | null;
 }
 
 export async function loadPayrollExportDetail(
@@ -236,11 +258,12 @@ export async function loadPayrollExportDetail(
 ): Promise<PayrollExportDetailRow[]> {
   const result = await supabase.schema("app").rpc("payroll_export_detail_rows", { p_org: organizationId, p_period_start: periodStart, p_period_end: periodEnd });
   assertResult("payroll_export_detail", result.error);
-  type Row = { booking_id: string; membership_id: string; starts_at: string; customer_name: string; pet_name: string; pet_size: string | null; services: string; service_revenue: number; invoice_number: string | null; invoice_id: string | null; invoice_status: string | null };
+  type Row = { booking_id: string; membership_id: string; starts_at: string; customer_name: string; pet_name: string; pet_size: string | null; services: string; service_revenue: number; invoice_number: string | null; invoice_id: string | null; invoice_status: string | null; pet_size_label: string | null; service_size_key: string | null; service_size_label: string | null };
   return ((result.data ?? []) as Row[]).map((r) => ({
     bookingId: r.booking_id, membershipId: r.membership_id, staffName: staffByMembership.get(r.membership_id) ?? "Staf",
     startsAt: r.starts_at, customerName: r.customer_name, petName: r.pet_name, petSize: r.pet_size,
     services: r.services, serviceRevenue: Number(r.service_revenue), invoiceNumber: r.invoice_number, invoiceStatus: r.invoice_status,
+    petSizeLabel: r.pet_size_label ?? null, serviceSizeKey: r.service_size_key ?? null, serviceSizeLabel: r.service_size_label ?? null,
   }));
 }
 

@@ -20,6 +20,7 @@ export interface PayrollExportDetailRow {
   bookingId: string; membershipId: string; staffName: string; startsAt: string;
   customerName: string; petName: string; petSize: string | null; services: string;
   serviceRevenue: number; invoiceNumber: string | null; invoiceStatus: string | null;
+  petSizeLabel: string | null; serviceSizeKey: string | null; serviceSizeLabel: string | null;
 }
 
 export interface PayrollExportData {
@@ -83,6 +84,11 @@ function summaryRows(data: PayrollExportData) {
   });
 }
 
+/** "Ukuran" = the size payroll uses (server-derived label); the booking-line snapshot is its own column. */
+export function detailSizeText(row: Pick<PayrollExportDetailRow, "petSize" | "petSizeLabel">): string {
+  return row.petSizeLabel ?? row.petSize ?? "";
+}
+
 export async function buildPayrollWorkbook(data: PayrollExportData): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Operro";
@@ -101,18 +107,20 @@ export async function buildPayrollWorkbook(data: PayrollExportData): Promise<Buf
     { header: "Groomer", key: "staff", width: 20 },
     { header: "Owner", key: "customer", width: 20 },
     { header: "Hewan", key: "pet", width: 16 },
-    { header: "Ukuran", key: "size", width: 10 },
+    { header: "Ukuran", key: "size", width: 14 },
     { header: "Layanan", key: "services", width: 30 },
     { header: "Nilai layanan", key: "revenue", width: 16 },
     { header: "Invoice #", key: "invoiceNumber", width: 16 },
     { header: "Status invoice", key: "invoiceStatus", width: 14 },
+    { header: "Ukuran saat layanan", key: "serviceSize", width: 20 },
   ];
   if (data.detail.length > 0) {
     for (const row of data.detail) {
       ws2.addRow({
         date: new Date(row.startsAt), staff: row.staffName, customer: row.customerName, pet: row.petName,
-        size: row.petSize ?? "", services: row.services, revenue: row.serviceRevenue,
+        size: detailSizeText(row), services: row.services, revenue: row.serviceRevenue,
         invoiceNumber: row.invoiceNumber ?? "", invoiceStatus: row.invoiceStatus ?? "",
+        serviceSize: row.serviceSizeLabel ?? row.serviceSizeKey ?? "",
       });
     }
   } else {

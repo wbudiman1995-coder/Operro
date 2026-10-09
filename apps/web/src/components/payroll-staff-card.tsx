@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { PayrollActionForm } from "@/components/payroll-action-form";
 import { formatRupiah } from "@/lib/pilot-data";
+import { perDogDetailRows, UNSIZED_LABEL } from "@/lib/payroll-size-matrix";
 import type { PayrollBreakdown, PayrollCustomRow, PayrollOverride, PayrollStaffCard as PayrollStaffCardData } from "@/lib/payroll-data";
 import {
   clearPayrollOverrideAction, deletePayrollCustomRowAction, payRetentionDepositAction,
@@ -46,6 +47,22 @@ function ComponentRow({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Per-size rows frozen with the calculation (key + label as they were then); absent on older results. */
+function PerDogDetail({ detail }: { detail: PayrollBreakdown["perDogDetail"] }) {
+  const rows = perDogDetailRows(detail);
+  if (rows.length === 0) return null;
+  return (
+    <ul aria-label="Rincian Basic Grooming per ukuran" className="mb-1 ml-3 border-l border-slate-200 pl-2 text-[10px] text-slate-500">
+      {rows.map((row) => (
+        <li key={row.key ?? "unsized"} className="flex justify-between gap-2 py-0.5">
+          <span>{row.label ?? UNSIZED_LABEL} × {row.count} @ {formatRupiah(row.rate)}</span>
+          <span className="font-semibold">{formatRupiah(row.amount)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -100,6 +117,7 @@ export function PayrollStaffCard({ staff, runId, runStatus, periodStart, canMana
           {LINES.map(([key, label]) => (
             <ComponentRow key={key} runId={runId ?? ""} membershipId={staff.membershipId} componentKey={key} label={label} computedValue={(staff.breakdown as PayrollBreakdown)[key as keyof PayrollBreakdown] as number} override={overrideByComponent.get(key)} editable={editable} />
           ))}
+          <PerDogDetail detail={staff.breakdown.perDogDetail} />
           {staff.breakdown.meta.lateCount > 0 || staff.breakdown.meta.sickDays > 0 ? (
             <p className="mt-1 text-[11px] font-semibold text-amber-700">{staff.breakdown.meta.lateCount} keterlambatan · {staff.breakdown.meta.sickDays} hari sakit tercatat cycle ini</p>
           ) : null}

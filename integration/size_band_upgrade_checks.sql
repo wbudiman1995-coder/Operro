@@ -95,3 +95,87 @@ begin
     raise exception 'FAIL new entitlement snapshot'; end if;
   raise notice 'PASS U-01 migrated packages still enforce the size band on sale; history snapshots stay NULL';
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- SB-06 payroll: pre-existing payroll settings, the paid run and its exports
+-- survive; the new validation never invalidates stored data; calculation parity.
+-- Everything below runs in a transaction that is rolled back.
+-- ---------------------------------------------------------------------------
+begin;
+do $$
+declare
+  v_org constant uuid := '5c000000-0000-4000-8000-000000000001';
+  v_member constant uuid := '5c000000-0000-4000-8000-0000000000a3';
+  v_run constant uuid := '5c000000-0000-4000-8000-000000000a01';
+  v_b jsonb; v_fp text;
+begin
+  -- stored matrices are byte-identical to what the fixture wrote (incl. the junk key and the null entry)
+  if (select per_pet_size_matrix_default from public.payroll_cycle_settings where organization_id=v_org)
+       is distinct from '{"small":15000,"extra_small":20000,"large":30000,"medium":null,"ancient_junk":1}'::jsonb
+     or (select per_pet_size_matrix from public.staff_payroll_settings where organization_id=v_org and membership_id=v_member)
+       is distinct from '{"small":16000}'::jsonb then
+    raise exception 'FAIL SB-06 payroll matrices changed by the migration'; end if;
+  if (select status from public.payroll_runs where id=v_run) <> 'paid' or (select count(*) from public.payroll_items where payroll_run_id=v_run) <> 1 then
+    raise exception 'FAIL SB-06 paid run/items changed'; end if;
+
+  -- grandfathering: an unrelated save and an unchanged matrix re-save are accepted although the matrix holds a key no band owns
+  update public.payroll_cycle_settings set cycle_start_day=cycle_start_day where organization_id=v_org;
+  update public.payroll_cycle_settings set per_pet_size_matrix_default=per_pet_size_matrix_default where organization_id=v_org;
+  -- ...but a new key or a changed rate is validated against the organization's bands
+  begin
+    update public.payroll_cycle_settings set per_pet_size_matrix_default=per_pet_size_matrix_default||'{"ancient_junk":2}' where organization_id=v_org;
+    raise exception 'FAIL SB-06 accepted a changed rate for a key no band owns';
+  exception when sqlstate '22023' then
+    if sqlerrm <> 'payroll_size_key_invalid:ancient_junk' then raise; end if;
+  end;
+  update public.payroll_cycle_settings set per_pet_size_matrix_default=per_pet_size_matrix_default-'ancient_junk' where organization_id=v_org;
+  update public.payroll_cycle_settings set per_pet_size_matrix_default=per_pet_size_matrix_default||'{"extra_large":31000}' where organization_id=v_org;
+
+  -- calculation parity on the migrated data: legacy keys keep their rates (X pet 12: 20 kg = large under 6/11/16/26)
+  v_b := app.compute_payroll_item(v_org, v_member, (current_date-30), (current_date-1));
+  if (v_b->>'perDog')::numeric <> 20000 or (v_b #>> '{perDogDetail,0,key}') <> 'large' or (v_b #>> '{perDogDetail,0,label}') <> 'L' then
+    raise exception 'FAIL SB-06 staff-matrix replacement (large missing -> flat) : %', v_b; end if;
+  update public.staff_payroll_settings set per_pet_size_matrix=null where organization_id=v_org and membership_id=v_member;
+  v_b := app.compute_payroll_item(v_org, v_member, (current_date-30), (current_date-1));
+  if (v_b->>'perDog')::numeric <> 30000 or (v_b->'meta'->>'basicCount')::int <> 1 then
+    raise exception 'FAIL SB-06 inherited org matrix: %', v_b; end if;
+  raise notice 'PASS SB-06 stored payroll matrices untouched; existing data re-saves unchanged; changed unknown keys refused; compute parity (large = 30000 inherited, flat when a staff matrix omits it)';
+
+  -- the paid run cannot be recomputed, even by an authorized owner, and nothing about it moves
+  insert into public.role_permissions(organization_id,role_id,permission_id)
+  select v_org,'5c000000-0000-4000-8000-0000000000a2',p.id from public.permissions p where p.key in ('payroll.read','payroll.manage','payroll.approve') on conflict do nothing;
+  insert into public.organization_modules(organization_id,module_id,enabled)
+  select v_org,m.id,true from public.modules m where m.key='payroll' on conflict (organization_id,module_id) do update set enabled=true;
+  insert into public.subscriptions(organization_id,status) values (v_org,'active') on conflict do nothing;
+  perform set_config('request.jwt.claims', jsonb_build_object('sub','5c000000-0000-4000-8000-0000000000a1','active_org_id',v_org)::text, true);
+  select md5(string_agg(i.id::text||i.gross_pay||i.breakdown::text,'~' order by i.id)) into v_fp from public.payroll_items i where i.payroll_run_id=v_run;
+  begin
+    perform app.recompute_payroll_run((current_date-30), (current_date-1), null);
+    raise exception 'FAIL SB-06 recompute of a paid run was accepted';
+  exception when check_violation then
+    if sqlerrm not like 'run_not_editable:paid%' then raise; end if;
+  end;
+  if v_fp is distinct from (select md5(string_agg(i.id::text||i.gross_pay||i.breakdown::text,'~' order by i.id)) from public.payroll_items i where i.payroll_run_id=v_run) then
+    raise exception 'FAIL SB-06 paid items moved'; end if;
+  if not exists (select 1 from app.payroll_export_detail_rows(v_org,(current_date-30),(current_date-1)) x where x.pet_size='large' and x.pet_size_label='L'
+                 and x.service_size_key='large' and x.service_size_label is not distinct from 'L') then
+    raise exception 'FAIL SB-06 export detail on migrated data'; end if;
+  raise notice 'PASS SB-06 paid run refuses recompute and stays byte-identical; export detail works on migrated data (live L + untouched snapshot)';
+end $$;
+rollback;
+
+-- grants of the payroll size path after upgrade: nothing for anon/PUBLIC, internals closed to clients
+do $$
+declare v_fn text;
+begin
+  foreach v_fn in array array['app.payroll_export_detail_rows(uuid,date,date)','app.compute_payroll_item(uuid,uuid,date,date)',
+    'app.payroll_eligible_pets(uuid,date,date)','app.payroll_transport_shares(uuid,date,date)','app.payroll_pet_size_key(uuid,text,numeric,text)'] loop
+    if has_function_privilege('anon', to_regprocedure(v_fn), 'execute')
+       or exists (select 1 from pg_proc p where p.oid=to_regprocedure(v_fn) and (p.proacl is null or exists (select 1 from aclexplode(p.proacl) a where a.grantee=0))) then
+      raise exception 'FAIL SB-06 % is executable by anon/PUBLIC', v_fn; end if;
+  end loop;
+  if has_function_privilege('authenticated', 'app.compute_payroll_item(uuid,uuid,date,date)'::regprocedure, 'execute')
+     or not has_function_privilege('authenticated', 'app.payroll_export_detail_rows(uuid,date,date)'::regprocedure, 'execute') then
+    raise exception 'FAIL SB-06 authenticated grants'; end if;
+  raise notice 'PASS SB-06 grants after upgrade: no anon/PUBLIC execute; internals closed; export RPC authenticated-only';
+end $$;
