@@ -79,7 +79,7 @@ do $$
 declare h jsonb;
 begin
   h := app.health_summary();
-  perform pg_temp.ok(h ->> 'schema_version' = '20261029170000' and app.schema_version() = '20261029170000', 'schema version reported');
+  perform pg_temp.ok(h ->> 'schema_version' = app.schema_version() and app.schema_version() ~ '^[0-9]{14}$', 'schema version reported');
   perform pg_temp.ok((h #>> '{exports,failed_30d}')::int = 1 and (h #>> '{exports,stale_running}')::int = 1, 'failed and stale-running exports are counted for this tenant only');
   perform pg_temp.ok(h #>> '{exports,last_completed_at}' is not null, 'last completed export is reported');
   perform pg_temp.ok((h #>> '{cleanup,problem_runs_30d}')::int = 1 and (h #>> '{cleanup,stale_running}')::int = 1 and (h #>> '{cleanup,pending_objects}')::int = 2, 'partial cleanup run, lapsed lease and pending objects are surfaced');

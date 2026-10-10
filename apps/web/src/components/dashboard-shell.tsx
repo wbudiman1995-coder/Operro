@@ -9,7 +9,10 @@ import { DashboardSettingsForm } from "@/components/dashboard-settings-form";
 import { EmptyState, PageHeader, StatCard, StatusBadge } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import type { CapabilityMap } from "@/lib/authorization";
-import { comparisonDirection, DASHBOARD_CARD_KEYS, type DashboardCardVisibility } from "@/lib/dashboard-read-model";
+import { PerformanceDashboard } from "@/components/performance-dashboard";
+import type { DashboardPerformance } from "@/lib/dashboard-performance";
+import type { DashboardPeriod } from "@/lib/dashboard-period";
+import { comparisonDirection, DASHBOARD_METRIC_CARD_KEYS, type DashboardCardVisibility } from "@/lib/dashboard-read-model";
 import type { AccessibleOrganization } from "@/lib/organizations";
 import { formatRupiah, type DashboardData } from "@/lib/pilot-data";
 import { formatZonedDateTime } from "@/lib/timezone";
@@ -21,6 +24,9 @@ interface DashboardShellProps {
   data: DashboardData;
   capabilities: CapabilityMap;
   dashboardCards: DashboardCardVisibility;
+  period: DashboardPeriod;
+  periodError: string | null;
+  performance: DashboardPerformance;
 }
 
 function countComparison(current: number, previous: number, unit: string): string {
@@ -47,7 +53,7 @@ function UnavailableMetric({ label, title, description }: { label: string; title
   );
 }
 
-export function DashboardShell({ organizations, activeOrganization, userEmail, data, capabilities, dashboardCards }: DashboardShellProps) {
+export function DashboardShell({ organizations, activeOrganization, userEmail, data, capabilities, dashboardCards, period, periodError, performance }: DashboardShellProps) {
   const quickActions = [
     capabilities["booking.create"] ? { label: "Buat booking baru", href: "/schedule?create=1" } : null,
     capabilities["customer.read"] || capabilities["customer.manage"] ? { label: "Buka pelanggan", href: "/customers" } : null,
@@ -55,7 +61,7 @@ export function DashboardShell({ organizations, activeOrganization, userEmail, d
     capabilities["task.manage"] ? { label: "Lihat tugas", href: "/tasks" } : null,
     capabilities["booking.read"] ? { label: "Buka operasional", href: "/operations" } : null,
   ].filter((item): item is { label: string; href: string } => item !== null);
-  const anyCardVisible = DASHBOARD_CARD_KEYS.some((key) => dashboardCards[key]);
+  const anyCardVisible = DASHBOARD_METRIC_CARD_KEYS.some((key) => dashboardCards[key]);
 
   return (
     <WorkspaceShell organizations={organizations} activeOrganization={activeOrganization} userEmail={userEmail} activePath="/dashboard" capabilities={capabilities}>
@@ -96,6 +102,8 @@ export function DashboardShell({ organizations, activeOrganization, userEmail, d
           : <StatCard label="Tugas tertunda" value={String(data.openTasks)} helper="Todo atau sedang berjalan pada cabang yang diizinkan." tone={data.openTasks ? "warning" : "success"} />}
         </> : null}
       </section> : null}
+
+      <PerformanceDashboard period={period} periodError={periodError} performance={performance} timeZone={data.timeZone} />
 
       {userEmail.toLowerCase() === "wbudiman1995@gmail.com" ? <Link href="/platform" className="mt-6 block rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">Buka panel platform Operro → organisasi, undangan, pemakaian proyek, dan permintaan kapasitas</Link> : null}
 

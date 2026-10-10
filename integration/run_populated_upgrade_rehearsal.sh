@@ -224,6 +224,10 @@ SQL
   probe_out=$(sql -q -f integration/remaining_nine_upgrade_probe.sql 2>&1) || { echo "$probe_out"; echo "FAIL: remaining-nine populated probe"; exit 1; }
   printf '%s\n' "$probe_out"
   grep -q 'REMAINING NINE POPULATED PROBE PASS' <<<"$probe_out" || { echo "FAIL: remaining-nine populated probe did not reach its pass marker"; exit 1; }
+  # Performance dashboard migration on the same populated workspace.
+  perf_out=$(sql -q -f integration/performance_dashboard_upgrade_probe.sql 2>&1) || { echo "$perf_out"; echo "FAIL: performance dashboard populated probe"; exit 1; }
+  printf '%s\n' "$perf_out"
+  grep -q 'PERFORMANCE DASHBOARD POPULATED PROBE PASS' <<<"$perf_out" || { echo "FAIL: performance dashboard populated probe did not reach its pass marker"; exit 1; }
   sql -Atc "select to_regprocedure('app.list_audit_events(text,uuid,integer)') is not null as audit_rpc, to_regprocedure('app.record_payment(uuid,text,numeric,text,uuid,uuid)') is not null as payment_rpc"
   echo "POPULATED UPGRADE PASS"
 } >"$log" 2>&1 || { tail -70 "$log"; exit 1; }

@@ -5,7 +5,7 @@ import test from "node:test";
 
 import { CAPABILITY_KEYS, type CapabilityMap } from "../src/lib/authorization";
 import { loadDashboardData } from "../src/lib/pilot-data";
-import { buildDashboardReadPlan, DASHBOARD_CARD_DEFAULTS, DASHBOARD_CARD_KEYS, dashboardDayRanges, readDashboardCardSettings, sumRecordedAmounts } from "../src/lib/dashboard-read-model";
+import { buildDashboardReadPlan, DASHBOARD_CARD_DEFAULTS, DASHBOARD_CARD_KEYS, DASHBOARD_METRIC_CARD_KEYS, dashboardDayRanges, readDashboardCardSettings, sumRecordedAmounts } from "../src/lib/dashboard-read-model";
 
 const root = path.resolve(import.meta.dirname, "../../..");
 const pilotData = fs.readFileSync(path.join(root, "apps/web/src/lib/pilot-data.ts"), "utf8");
@@ -56,7 +56,7 @@ test("card settings default safely and accept only known booleans", () => {
 test("hidden booking KPI does not suppress upcoming bookings or widen access", () => {
   const caps = capabilities("booking.read", "finance.read", "customer.read", "task.manage");
   const plan = buildDashboardReadPlan(caps, { all: false, ids: new Set(["branch-b", "branch-a"]) }, {
-    booking_today: false, revenue_today: false, active_customers: false, open_tasks: false,
+    ...DASHBOARD_CARD_DEFAULTS, booking_today: false, revenue_today: false, active_customers: false, open_tasks: false,
   });
   assert.deepEqual(plan, {
     bookingMetrics: false, upcomingBookings: true, revenueMetrics: false, customerMetrics: false, taskMetrics: false,
@@ -125,7 +125,11 @@ test("dashboard settings write: session org equality check, settings.manage, com
   assert.match(migration, /set search_path = ''/);
   assert.match(migration, /has_permission\('settings\.manage'\)/);
   assert.match(migration, /revoke all on function app\.update_dashboard_card_settings\(jsonb\) from public, anon, authenticated/);
-  for (const key of DASHBOARD_CARD_KEYS) assert.ok(migration.includes(`'${key}'`), key);
+  for (const key of DASHBOARD_METRIC_CARD_KEYS) assert.ok(migration.includes(`'${key}'`), key);
+  const latest = fs.readFileSync(path.join(root, "supabase/migrations/20261030100000_performance_dashboard.sql"), "utf8");
+  for (const key of DASHBOARD_CARD_KEYS) assert.ok(latest.includes(`'${key}'`), `${key} must be in the replacement allowlist`);
+  assert.match(latest, /set search_path = ''/);
+  assert.match(latest, /revoke all on function app\.update_dashboard_card_settings\(jsonb\) from public, anon, authenticated/);
 });
 
 /** Query builders are lazy: a table is "read" only when its builder is awaited. Record exactly those. */
@@ -142,7 +146,7 @@ const allBranches = { all: true, ids: new Set<string>() };
 
 test("hidden cards do not execute their underlying queries (behavioral, via a recording client)", async () => {
   const caps = capabilities("booking.read", "finance.read", "customer.read", "task.manage");
-  const allHidden = { booking_today: false, revenue_today: false, active_customers: false, open_tasks: false };
+  const allHidden = { ...DASHBOARD_CARD_DEFAULTS, booking_today: false, revenue_today: false, active_customers: false, open_tasks: false };
 
   const none = recordingClient();
   const hidden = await loadDashboardData(none.client, "org", caps, allBranches, "Asia/Jakarta", allHidden);

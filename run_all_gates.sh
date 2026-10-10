@@ -126,6 +126,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261029150000_audit_reconciliation.sql
   supabase/migrations/20261029160000_storage_cleanup_foundation.sql
   supabase/migrations/20261029170000_health_recovery.sql
+  supabase/migrations/20261030100000_performance_dashboard.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -161,7 +162,7 @@ ls -l \
 step "GATE 3 — in-memory + preset-contract tests"
 npx tsx packages/backend/test/assembly_service.inmemory.test.ts
 npx tsx packages/backend/test/preset_contract.test.ts
-npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts test/customer-profile-edit.test.ts test/customer-pet-edit.test.ts test/size-bands.test.ts test/size-band-ui.test.tsx test/payroll-dynamic-size.test.ts test/dashboard-read-model.test.ts test/org-export-contract.test.ts test/catalog-actions-validation.test.ts test/control-plane-ui.test.tsx test/custom-fields.test.ts test/preferences.test.ts test/finance-cash.test.ts test/whatsapp-drafts.test.ts test/audit-reconciliation.test.ts test/storage-cleanup.test.ts test/health-recovery.test.ts test/remaining-nine-ui.test.tsx
+npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts test/customer-profile-edit.test.ts test/customer-pet-edit.test.ts test/size-bands.test.ts test/size-band-ui.test.tsx test/payroll-dynamic-size.test.ts test/dashboard-read-model.test.ts test/org-export-contract.test.ts test/catalog-actions-validation.test.ts test/control-plane-ui.test.tsx test/custom-fields.test.ts test/preferences.test.ts test/finance-cash.test.ts test/whatsapp-drafts.test.ts test/audit-reconciliation.test.ts test/storage-cleanup.test.ts test/health-recovery.test.ts test/remaining-nine-ui.test.tsx test/dashboard-period.test.ts test/dashboard-performance.test.tsx
 
 step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
 run_as_postgres dropdb --if-exists operro_gate
@@ -196,6 +197,7 @@ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029150000_test_aud
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029155000_test_access_policy_regression.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029160000_test_storage_cleanup.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029170000_test_health_recovery.sql
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261030100000_test_performance_dashboard.sql
 
 step "GATE 4c — customer-code concurrency"
 CC_TMP="$(mktemp -d /tmp/operro-customer-code.XXXXXX)"

@@ -1,7 +1,11 @@
 import type { BranchAccess, CapabilityMap } from "@/lib/authorization";
 import { addDaysISO, zonedDateTimeToUtc, zonedDayISO } from "@/lib/timezone";
 
-export const DASHBOARD_CARD_KEYS = ["booking_today", "revenue_today", "active_customers", "open_tasks"] as const;
+/** The four "today" metric cards. */
+export const DASHBOARD_METRIC_CARD_KEYS = ["booking_today", "revenue_today", "active_customers", "open_tasks"] as const;
+/** The three period-based performance sections. Must stay identical to app.update_dashboard_card_settings. */
+export const DASHBOARD_PERFORMANCE_CARD_KEYS = ["performance_operations", "performance_finance", "performance_sources"] as const;
+export const DASHBOARD_CARD_KEYS = [...DASHBOARD_METRIC_CARD_KEYS, ...DASHBOARD_PERFORMANCE_CARD_KEYS] as const;
 export type DashboardCardKey = (typeof DASHBOARD_CARD_KEYS)[number];
 export type DashboardCardVisibility = Record<DashboardCardKey, boolean>;
 
@@ -10,6 +14,9 @@ export const DASHBOARD_CARD_LABELS: Record<DashboardCardKey, string> = {
   revenue_today: "Pendapatan tercatat",
   active_customers: "Pelanggan aktif",
   open_tasks: "Tugas tertunda",
+  performance_operations: "Performa operasional",
+  performance_finance: "Performa keuangan",
+  performance_sources: "Performa sumber pelanggan",
 };
 
 export const DASHBOARD_CARD_DEFAULTS: DashboardCardVisibility = {
@@ -17,6 +24,9 @@ export const DASHBOARD_CARD_DEFAULTS: DashboardCardVisibility = {
   revenue_today: true,
   active_customers: true,
   open_tasks: true,
+  performance_operations: true,
+  performance_finance: true,
+  performance_sources: true,
 };
 
 /** Invalid or absent entries retain the legacy all-visible behavior. */
@@ -57,6 +67,35 @@ export function buildDashboardReadPlan(
     customerMetrics: (capabilities["customer.read"] || capabilities["customer.manage"]) && visibility.active_customers,
     taskMetrics: capabilities["task.manage"] && visibility.open_tasks,
     branchIds: branchAccess.all ? null : [...branchAccess.ids].sort(),
+  };
+}
+
+/** Which period-based performance reads may run for the current caller. A false entry means NO query is issued. */
+export interface PerformanceReadPlan {
+  operations: boolean;
+  finance: boolean;
+  sources: boolean;
+  /** Source breakdown columns that depend on a second capability (otherwise unavailable, never zero). */
+  sourcesBooking: boolean;
+  sourcesFinance: boolean;
+}
+
+/**
+ * Customers carry no branch, so a source breakdown is only faithful for a caller who can see every branch.
+ * Operations and finance rely on branch row-level security inside the database and need at least one branch grant.
+ */
+export function buildPerformanceReadPlan(
+  capabilities: CapabilityMap,
+  branchAccess: BranchAccess,
+  visibility: DashboardCardVisibility = DASHBOARD_CARD_DEFAULTS,
+): PerformanceReadPlan {
+  const hasBranch = branchAccess.all || branchAccess.ids.size > 0;
+  return {
+    operations: capabilities["booking.read"] && hasBranch && visibility.performance_operations,
+    finance: capabilities["finance.read"] && hasBranch && visibility.performance_finance,
+    sources: (capabilities["customer.read"] || capabilities["customer.manage"]) && branchAccess.all && visibility.performance_sources,
+    sourcesBooking: capabilities["booking.read"],
+    sourcesFinance: capabilities["finance.read"],
   };
 }
 
