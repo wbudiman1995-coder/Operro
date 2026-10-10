@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { loadAuthContext } from "@/lib/auth-context";
+import { EVIDENCE_RETENTION_MAX, EVIDENCE_RETENTION_MIN, parseEvidenceRetentionDays } from "@/lib/preferences";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,4 +33,26 @@ export async function reviewStorageUpgradeAction(_previous: StorageActionState, 
   revalidatePath("/settings/storage");
   revalidatePath("/platform");
   return { error: null, success: "Status permintaan diperbarui." };
+}
+
+/** Organization-owned setting (business owner only; the RPC re-checks). Affects evidence uploaded afterwards. */
+export async function saveEvidenceRetentionAction(_previous: StorageActionState, formData: FormData): Promise<StorageActionState> {
+  try {
+    const workspace = await requireActiveWorkspace();
+    const values = formData.getAll("days");
+    const days = values.length === 1 ? parseEvidenceRetentionDays(values[0]) : undefined;
+    if (days === undefined) return { error: `Isi bilangan bulat ${EVIDENCE_RETENTION_MIN}–${EVIDENCE_RETENTION_MAX} hari.`, success: null };
+    const { error } = await workspace.supabase.schema("app").rpc("set_evidence_retention_days", { p_days: days });
+    if (error) {
+      console.error("evidence_retention_save_failed", error);
+      if (error.code === "42501") return { error: "Hanya pemilik bisnis yang dapat mengubah masa simpan foto.", success: null };
+      if (error.code === "22023") return { error: `Isi bilangan bulat ${EVIDENCE_RETENTION_MIN}–${EVIDENCE_RETENTION_MAX} hari.`, success: null };
+      return { error: "Pengaturan belum tersimpan. Coba lagi.", success: null };
+    }
+    revalidatePath("/settings/storage");
+    return { error: null, success: "Masa simpan foto disimpan. Berlaku untuk foto yang diunggah setelah ini." };
+  } catch (error) {
+    console.error("evidence_retention_save_unexpected", error);
+    return { error: "Pengaturan belum tersimpan. Coba lagi.", success: null };
+  }
 }

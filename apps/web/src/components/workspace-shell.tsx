@@ -67,10 +67,16 @@ const managementNavigation: NavigationItemConfig[] = [
   { label: "Laporan", href: "/reports", icon: ReportsIcon, permission: "reports.view" },
   { label: "Leaderboard", href: "/leaderboard", icon: LeaderboardIcon, permission: "booking.read" },
   { label: "Follow-up", href: "/followups", icon: FollowupIcon, permission: "customer.read" },
+  { label: "Pusat WhatsApp", href: "/whatsapp", icon: FollowupIcon, anyPermission: ["finance.read", "customer.read", "membership.read"] },
+  { label: "Riwayat perubahan", href: "/audit", icon: ReportsIcon, permission: "reports.view" },
+  { label: "Rekonsiliasi", href: "/reconciliation", icon: FinanceIcon, anyPermission: ["finance.read", "payroll.read"] },
   { label: "Keluhan", href: "/complaints", icon: TasksIcon, anyPermission: ["customer.read", "task.manage", "reports.view"] },
   { label: "Pengaturan dokumen", href: "/settings/documents", icon: FinanceIcon, permission: "settings.manage" },
+  { label: "Isian tambahan", href: "/settings/custom-fields", icon: CustomersIcon, permission: "settings.manage" },
   { label: "Data & penyimpanan", href: "/settings/storage", icon: InventoryIcon, permission: "settings.manage" },
+  { label: "Kesehatan & pemulihan", href: "/settings/health", icon: ReportsIcon, permission: "settings.manage" },
   { label: "Akses tim", href: "/settings/access", icon: CustomersIcon, permission: "roles.manage" },
+  { label: "Preferensi saya", href: "/settings/preferences", icon: DashboardIcon },
 ];
 
 function NavigationItem({

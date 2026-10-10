@@ -3,6 +3,12 @@ export const PET_BREED_MAX = 100;
 export const PET_COLOR_MAX = 80;
 export const PET_TEMPERAMENT_MAX = 120;
 export const PET_NOTES_MAX = 1000;
+export const PET_SKIN_HISTORY_MAX = 1000;
+
+/** Coat options from the HomePaw dog form. Colour is the existing `color` field. */
+export const PET_COAT_TYPES = ["short", "long", "curly", "double_coat"] as const;
+export type PetCoatType = (typeof PET_COAT_TYPES)[number];
+export const PET_COAT_LABELS: Record<PetCoatType, string> = { short: "Pendek", long: "Panjang", curly: "Keriting", double_coat: "Double coat" };
 
 export interface CustomerPetUpdate {
   name: string;
@@ -15,6 +21,8 @@ export interface CustomerPetUpdate {
   color: string | null;
   temperament: string | null;
   notes: string | null;
+  coatType: PetCoatType | null;
+  skinHistory: string | null;
 }
 
 export type CustomerPetParseResult =
@@ -42,7 +50,7 @@ function validDate(value: string): boolean {
 }
 
 export function parseCustomerPetForm(formData: FormData): CustomerPetParseResult {
-  const fields = ["name", "species", "breed", "sex", "birthdate", "weightKg", "manualSize", "color", "temperament", "notes"] as const;
+  const fields = ["name", "species", "breed", "sex", "birthdate", "weightKg", "manualSize", "color", "temperament", "notes", "coatType", "skinHistory"] as const;
   const raw = Object.fromEntries(fields.map((key) => [key, readSingle(formData, key)])) as Record<(typeof fields)[number], string | null>;
   if (fields.some((key) => raw[key] === null)) return { ok: false, message: "Data hewan tidak lengkap atau dikirim berulang." };
 
@@ -56,11 +64,15 @@ export function parseCustomerPetForm(formData: FormData): CustomerPetParseResult
   const color = optionalText(raw.color!, PET_COLOR_MAX);
   const temperament = optionalText(raw.temperament!, PET_TEMPERAMENT_MAX);
   const notes = optionalText(raw.notes!, PET_NOTES_MAX);
+  const coatText = raw.coatType!.trim();
+  const skinHistory = optionalText(raw.skinHistory!, PET_SKIN_HISTORY_MAX);
 
   if (!name || Array.from(name).length > PET_NAME_MAX) return { ok: false, message: `Nama hewan wajib diisi dan maksimal ${PET_NAME_MAX} karakter.` };
   if (!KEY_PATTERN.test(species)) return { ok: false, message: "Jenis hewan tidak valid." };
   if (sex !== "male" && sex !== "female" && sex !== "unknown") return { ok: false, message: "Jenis kelamin hewan tidak valid." };
   if (birthdateText && !validDate(birthdateText)) return { ok: false, message: "Tanggal lahir hewan tidak valid." };
+  if (coatText && !(PET_COAT_TYPES as readonly string[]).includes(coatText)) return { ok: false, message: "Jenis bulu tidak valid." };
+  if (skinHistory === undefined) return { ok: false, message: `Riwayat kulit maksimal ${PET_SKIN_HISTORY_MAX} karakter.` };
   if (breed === undefined || color === undefined || temperament === undefined || notes === undefined) return { ok: false, message: "Salah satu kolom hewan terlalu panjang." };
 
   let weightKg: number | null = null;
@@ -86,6 +98,8 @@ export function parseCustomerPetForm(formData: FormData): CustomerPetParseResult
       color,
       temperament,
       notes,
+      coatType: (coatText || null) as PetCoatType | null,
+      skinHistory,
     },
   };
 }

@@ -83,6 +83,12 @@ export function isCustomer360TabPermitted(tab: Customer360Tab, capabilities: Cap
   return required === null || capabilities[required];
 }
 
+export interface PetVisitStats {
+  completedJobs: number;
+  manualVisits: number;
+  lastVisitAt: string | null;
+}
+
 export interface CustomerPetProfile {
   id: string;
   name: string;
@@ -100,6 +106,11 @@ export interface CustomerPetProfile {
   status: string;
   medicalFlags: string[];
   customFields: Array<{ label: string; value: string }>;
+  /** Grooming profile (E1.3). */
+  coatType: "short" | "long" | "curly" | "double_coat" | null;
+  skinHistory: string | null;
+  /** Derived from completed work, never stored. Null when the caller lacks customer.read (restricted, not zero). */
+  visitStats: PetVisitStats | null;
   updatedAt: string;
 }
 
@@ -312,7 +323,7 @@ export async function loadCustomerOverview(
   const [petResult, paymentResult, defaultAddressResult] = await Promise.all([
     supabase
       .from("pets")
-      .select("id,name,species,breed,sex,birthdate,weight_kg,size,color,temperament,notes,status,medical_flags,metadata,updated_at")
+      .select("id,name,species,breed,sex,birthdate,weight_kg,size,color,temperament,notes,status,medical_flags,metadata,coat_type,skin_history,updated_at")
       .eq("organization_id", organizationId)
       .eq("customer_id", customerId)
       .is("deleted_at", null)
@@ -343,6 +354,23 @@ export async function loadCustomerOverview(
   const petKeysResult = await supabase.schema("app").rpc("resolve_pet_pricing_keys", { p_pet_ids: (petResult.data ?? []).map((pet) => pet.id) });
   assertResult("customer_pet_pricing_keys", petKeysResult.error);
   const petLabels = new Map(((petKeysResult.data ?? []) as Array<{ pet_id: string; size_label: string | null }>).map((row) => [row.pet_id, row.size_label]));
+
+  // Derived visit counts (E1.3): aggregates over completed work, available to customer.read only.
+  const statsByPet = new Map<string, PetVisitStats>();
+  let statsUnavailable = false;
+  if (capabilities["customer.read"] && (petResult.data ?? []).length > 0) {
+    const statsResult = await supabase.schema("app").rpc("pet_visit_stats", { p_pet_ids: (petResult.data ?? []).slice(0, 100).map((pet) => pet.id) });
+    if (statsResult.error) {
+      // The derived count is a convenience: if it cannot be read (for example the CRM module is off) the profile still
+      // loads and the count is shown as unavailable rather than as a misleading zero.
+      console.error("customer_pet_visit_stats_failed", statsResult.error.code);
+      statsUnavailable = true;
+    } else {
+      for (const row of (statsResult.data ?? []) as Array<{ pet_id: string; completed_jobs: number; manual_visits: number; last_visit_at: string | null }>) {
+        statsByPet.set(row.pet_id, { completedJobs: row.completed_jobs, manualVisits: row.manual_visits, lastVisitAt: row.last_visit_at });
+      }
+    }
+  }
 
   const paymentRows = paymentResult.data ?? [];
   const spendCapped = paymentRows.length > CUSTOMER_PAYMENT_LIMIT;
@@ -395,6 +423,9 @@ export async function loadCustomerOverview(
       status: pet.status,
       medicalFlags: readMedicalFlags(pet.medical_flags),
       customFields: readCustomFields(pet.metadata),
+      coatType: (pet.coat_type as CustomerPetProfile["coatType"]) ?? null,
+      skinHistory: typeof pet.skin_history === "string" && pet.skin_history.length > 0 ? pet.skin_history : null,
+      visitStats: capabilities["customer.read"] && !statsUnavailable ? (statsByPet.get(pet.id) ?? { completedJobs: 0, manualVisits: 0, lastVisitAt: null }) : null,
       updatedAt: pet.updated_at,
     })),
   };

@@ -6,6 +6,7 @@ import { loadCapabilities } from "@/lib/authorization";
 import { canonicalRegionNames } from "@/lib/indonesia-regions";
 import { isGoogleMapsLink } from "@/lib/maps";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
+import { onboardingDraftMessage } from "@/lib/whatsapp-drafts";
 
 export interface OnboardingActionState { error: string | null; success: string | null; linkPath?: string }
 export interface OnboardingSettingsState { error: string | null; success: string | null }
@@ -20,9 +21,16 @@ export async function createOnboardingLinkAction(_previous: OnboardingActionStat
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const source = String(formData.get("source") ?? "").trim().slice(0, 80) || null;
     const note = String(formData.get("note") ?? "").trim().slice(0, 500) || null;
-    const { error } = await workspace.supabase.from("customer_onboarding_links").insert({ organization_id: workspace.activeOrganization.id, token_hash: tokenHash, source, internal_note: note });
+    const { data: created, error } = await workspace.supabase.from("customer_onboarding_links").insert({ organization_id: workspace.activeOrganization.id, token_hash: tokenHash, source, internal_note: note }).select("id").single();
     if (error) throw error;
+    // Best effort: log the invitation in the WhatsApp draft center WITHOUT the one-time link (never persisted).
+    try {
+      const settings = await workspace.supabase.from("customer_onboarding_settings").select("whatsapp_template").eq("organization_id", workspace.activeOrganization.id).maybeSingle();
+      const text = onboardingDraftMessage(settings.data?.whatsapp_template ?? "Halo! Isi data kamu dan anabul untuk {business} melalui link ini:\n\n{link}", workspace.activeOrganization.name);
+      if (text && created?.id) await workspace.supabase.schema("app").rpc("create_whatsapp_draft", { p_source_type: "onboarding", p_source_id: created.id, p_message: text });
+    } catch (draftError) { console.error("onboarding_whatsapp_draft_failed", draftError); }
     revalidatePath("/customers/onboarding");
+    revalidatePath("/whatsapp");
     return { error: null, success: "Link aktif selama dua hari. Salin sekarang; token mentah tidak disimpan.", linkPath: `/join/${token}` };
   } catch (error) { console.error("create_onboarding_link_failed", error); return { error: "Link tidak dapat dibuat.", success: null }; }
 }

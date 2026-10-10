@@ -241,6 +241,7 @@ create function app.org_export_record_chunk(p_job uuid, p_table text, p_index in
   p_sha256 text, p_first_id uuid, p_last_id uuid, p_storage_path text) returns void
 language plpgsql security definer set search_path = '' as $$
 declare v_org uuid := app.fn_active_organization(); v_state public.organization_export_table_state; v_prefix text; v_expected text;
+  v_page_count bigint; v_page_first uuid; v_page_last uuid;
 begin
   if not app.org_export_authorized() then raise exception 'not_authorized' using errcode='42501'; end if;
   select s.* into v_state from public.organization_export_table_state s join public.organization_export_jobs j on j.id=s.job_id
@@ -256,6 +257,13 @@ begin
   end if;
   if p_index <> v_state.next_chunk_index then raise exception 'invalid_chunk_index' using errcode='22023'; end if;
   if v_state.last_id is not null and p_first_id <= v_state.last_id then raise exception 'invalid_chunk' using errcode='22023'; end if;
+  -- The claimed count and id range must be exactly the next bounded page the server itself resolves after the
+  -- stored cursor: a skipped, shifted, shortened-to-hide or fabricated range cannot be recorded.
+  execute format('select count(*), (array_agg(id order by id))[1], (array_agg(id order by id desc))[1] from (select id from public.%I where organization_id=$1 and ($2 is null or id > $2) order by id limit $3) page', p_table)
+    into v_page_count, v_page_first, v_page_last using v_org, v_state.last_id, p_row_count;
+  if v_page_count <> p_row_count or v_page_first is distinct from p_first_id or v_page_last is distinct from p_last_id then
+    raise exception 'invalid_chunk' using errcode='22023';
+  end if;
   select storage_prefix into v_prefix from public.organization_export_jobs where id=p_job;
   v_expected := v_prefix || '/tables/' || p_table || '/chunk-' || lpad(p_index::text, 5, '0') || '.jsonl';
   if p_storage_path is distinct from v_expected then raise exception 'invalid_storage_path' using errcode='22023'; end if;
@@ -266,14 +274,17 @@ end $$;
 
 create function app.org_export_finish_table(p_job uuid, p_table text, p_after_id uuid) returns void
 language plpgsql security definer set search_path = '' as $$
-declare v_org uuid := app.fn_active_organization();
+declare v_org uuid := app.fn_active_organization(); v_state public.organization_export_table_state; v_remaining boolean;
 begin
   if not app.org_export_authorized() then raise exception 'not_authorized' using errcode='42501'; end if;
-  update public.organization_export_table_state s set completed=true
-  from public.organization_export_jobs j
-  where s.job_id=p_job and s.table_name=p_table and s.last_id is not distinct from p_after_id
-    and not s.completed and j.id=s.job_id and j.organization_id=v_org and j.status='running';
-  if not found then raise exception 'invalid_export_work' using errcode='22023'; end if;
+  select s.* into v_state from public.organization_export_table_state s join public.organization_export_jobs j on j.id=s.job_id
+   where s.job_id=p_job and s.table_name=p_table and not s.completed and j.organization_id=v_org and j.status='running' for update of s;
+  if not found or v_state.last_id is distinct from p_after_id then raise exception 'invalid_export_work' using errcode='22023'; end if;
+  -- A table is complete only when the source has nothing left after the cursor this job recorded.
+  execute format('select exists (select 1 from public.%I where organization_id=$1 and ($2 is null or id > $2))', p_table)
+    into v_remaining using v_org, v_state.last_id;
+  if v_remaining then raise exception 'export_incomplete' using errcode='22023'; end if;
+  update public.organization_export_table_state set completed=true where job_id=p_job and table_name=p_table;
 end $$;
 
 -- Workspace configuration. Explicit columns and an explicit settings-key allowlist, so a

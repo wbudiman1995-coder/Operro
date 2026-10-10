@@ -578,8 +578,12 @@ end $$;
 -- settings untouched.
 -- =====================================================================
 do $$ begin perform pg_temp.act_as('04000000-0000-4000-8000-0000000000c1', '04000000-0000-4000-8000-000000000001'); end $$;
+-- 20261019100000 revoked direct INSERT/UPDATE/DELETE on public.organizations from authenticated, so this fixture
+-- write (an unrelated settings key that F12 must leave untouched) runs as the table owner, then the role is restored.
+reset role;
 update public.organizations set settings = settings || '{"branding": {"logo_url": "https://example.test/logo.png"}}'::jsonb
  where id = '04000000-0000-4000-8000-000000000001';
+set local role authenticated;
 do $$
 declare v_stale_updated_at timestamptz; v_result jsonb; v_branding jsonb;
 begin

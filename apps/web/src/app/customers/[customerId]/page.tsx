@@ -26,7 +26,10 @@ import { AuditHistoryPanel } from "@/components/audit-history-panel";
 import { Customer360Notes, Customer360Header, Customer360Tabs } from "@/components/customer-360";
 import { CustomerAddressActions, CustomerAddressForm } from "@/components/customer-address-forms";
 import { CustomerNextDiscount } from "@/components/customer-next-discount";
+import { CustomFieldEditor } from "@/components/custom-field-editor";
+import { CustomFieldValues } from "@/components/custom-field-values";
 import { CustomerPetEditor } from "@/components/customer-pet-editor";
+import { PET_COAT_LABELS } from "@/lib/customer-pet-edit";
 import { CustomerProfileEditor } from "@/components/customer-profile-editor";
 import { EmptyState, StatusBadge } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
@@ -34,6 +37,7 @@ import { WorkspaceShell } from "@/components/workspace-shell";
 import { StylingReferenceGallery, StylingReferenceUploader } from "@/components/styling-references";
 import { loadCapabilities } from "@/lib/authorization";
 import { loadAuditEvents } from "@/lib/audit-events";
+import { customFieldFormValue, loadCustomFieldDefinitions, loadCustomFieldValues } from "@/lib/custom-fields";
 import { loadBranchTimezones } from "@/lib/branch-context";
 import {
   isCustomer360TabPermitted,
@@ -95,6 +99,20 @@ export default async function CustomerDetailPage({
   const petTypeOptions = (petTypesResult.data ?? []).map((type) => ({ key: type.key, label: type.label, disabled: !type.is_active }));
   const dogBandOptions = (dogBandsResult.data ?? []).map((band) => ({ key: band.band_key, label: band.label, disabled: band.status !== "active" }));
 
+  const [customerFieldDefinitions, petFieldDefinitions] = capabilities["customer.read"]
+    ? await Promise.all([
+        loadCustomFieldDefinitions(workspace.supabase, organizationId, "customer"),
+        loadCustomFieldDefinitions(workspace.supabase, organizationId, "pet"),
+      ])
+    : [[], []];
+  const [customerFieldValues, petFieldValues] = await Promise.all([
+    customerFieldDefinitions.length > 0 ? loadCustomFieldValues(workspace.supabase, organizationId, "customer", [customerId]) : [],
+    petFieldDefinitions.length > 0 ? loadCustomFieldValues(workspace.supabase, organizationId, "pet", overview.pets.map((pet) => pet.id)) : [],
+  ]);
+  const formValues = (definitions: typeof customerFieldDefinitions, values: typeof customerFieldValues) => Object.fromEntries(
+    definitions.map((definition) => [definition.id, customFieldFormValue(definition, values.find((value) => value.definitionId === definition.id))]),
+  );
+
   const requestedTab = parseCustomer360Tab(query.tab);
   const permittedTabs = visibleCustomer360Tabs(capabilities);
   const tabPermitted = isCustomer360TabPermitted(requestedTab, capabilities);
@@ -138,6 +156,8 @@ export default async function CustomerDetailPage({
     <WorkspaceShell {...workspace} activePath="/customers">
       <Customer360Header overview={overview} />
       {capabilities["customer.manage"] ? <CustomerProfileEditor customerId={customerId} updatedAt={overview.updatedAt} defaults={{ displayName: overview.name, phone: overview.phone ?? "", email: overview.email ?? "", source: overview.source ?? "", notes: overview.notes ?? "" }} /> : null}
+      <CustomFieldValues definitions={customerFieldDefinitions} values={customerFieldValues} className="mt-3 rounded-2xl border border-slate-200 bg-white p-4" />
+      {capabilities["customer.manage"] ? <CustomFieldEditor key={`customer-${customerFieldValues.length}`} entityType="customer" entityId={customerId} customerId={customerId} definitions={customerFieldDefinitions} initial={formValues(customerFieldDefinitions, customerFieldValues)} /> : null}
       {capabilities["customer.manage"] ? <CustomerNextDiscount customerId={customerId} offer={nextDiscount} /> : null}
       <Customer360Tabs customerId={customerId} activeTab={tab} tabs={permittedTabs} />
 
@@ -170,7 +190,10 @@ export default async function CustomerDetailPage({
                       ["Usia", pet.ageLabel],
                       ["Berat", pet.weightKg !== null ? `${pet.weightKg} kg${pet.sizeBand ? ` · ukuran ${pet.sizeBand}` : ""}` : null],
                       ["Warna", pet.color],
+                      ["Jenis bulu", pet.coatType ? PET_COAT_LABELS[pet.coatType] : null],
                       ["Temperamen", pet.temperament],
+                      ["Kunjungan selesai", pet.visitStats ? `${pet.visitStats.completedJobs}${pet.visitStats.manualVisits > 0 ? ` (+${pet.visitStats.manualVisits} manual)` : ""}` : null],
+                      ["Terakhir dikunjungi", pet.visitStats?.lastVisitAt ? formatZonedDate(pet.visitStats.lastVisitAt, branchContext.defaultTimezone) : null],
                     ].flatMap(([label, value]) =>
                       value ? [
                         <div key={String(label)} className="rounded-xl bg-slate-50 p-3">
@@ -195,6 +218,8 @@ export default async function CustomerDetailPage({
                       ))}
                     </dl>
                   ) : null}
+                  <CustomFieldValues definitions={petFieldDefinitions} values={petFieldValues.filter((value) => value.petId === pet.id)} className="mt-3 border-t border-slate-100 pt-3" />
+                  {pet.skinHistory ? <p className="mt-3 whitespace-pre-line rounded-xl bg-rose-50 p-3 text-xs leading-5 text-rose-900"><span className="font-bold">Riwayat kulit: </span>{pet.skinHistory}</p> : null}
                   {pet.notes ? <p className="mt-3 whitespace-pre-line rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">{pet.notes}</p> : null}
                   {capabilities["customer.manage"] ? <CustomerPetEditor
                     customerId={customerId}
@@ -214,8 +239,11 @@ export default async function CustomerDetailPage({
                       color: pet.color ?? "",
                       temperament: pet.temperament ?? "",
                       notes: pet.notes ?? "",
+                      coatType: pet.coatType ?? "",
+                      skinHistory: pet.skinHistory ?? "",
                     }}
                   /> : null}
+                  {capabilities["customer.manage"] ? <CustomFieldEditor key={`pet-${pet.id}-${petFieldValues.filter((value) => value.petId === pet.id).length}`} entityType="pet" entityId={pet.id} customerId={customerId} definitions={petFieldDefinitions} initial={formValues(petFieldDefinitions, petFieldValues.filter((value) => value.petId === pet.id))} /> : null}
                 </article>
               ))}
             </div>

@@ -3,6 +3,7 @@
 import { useActionState, useState, type ChangeEvent } from "react";
 import { editCustomerPetAction, type CustomerPetEditState } from "@/app/customers/[customerId]/actions";
 import { BreedSelect } from "@/components/breed-select";
+import { PET_COAT_LABELS, PET_COAT_TYPES } from "@/lib/customer-pet-edit";
 
 const initialState: CustomerPetEditState = { error: null, success: null };
 const inputClass = "mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 disabled:bg-slate-100 disabled:text-slate-400";
@@ -19,6 +20,8 @@ export interface CustomerPetDefaults {
   color: string;
   temperament: string;
   notes: string;
+  coatType: string;
+  skinHistory: string;
 }
 
 interface Option { key: string; label: string; disabled?: boolean }
@@ -90,6 +93,10 @@ export function CustomerPetEditor({
         <label className={labelClass}>Warna<input className={inputClass} name="color" value={values.color} onChange={update("color")} maxLength={80} /></label>
         <label className={labelClass}>Temperamen<input className={inputClass} name="temperament" value={values.temperament} onChange={update("temperament")} maxLength={120} /></label>
       </div>
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <label className={labelClass}>Jenis bulu<select className={inputClass} name="coatType" value={values.coatType} onChange={update("coatType")}><option value="">Belum diisi</option>{PET_COAT_TYPES.map((coat) => <option key={coat} value={coat}>{PET_COAT_LABELS[coat]}</option>)}</select></label>
+      </div>
+      <label className={`${labelClass} block`}>Riwayat kulit<textarea className={`${inputClass} h-auto py-2`} name="skinHistory" rows={2} value={values.skinHistory} onChange={update("skinHistory")} maxLength={1000} placeholder="Contoh: 12 Mei — kutu di belakang telinga, sudah diobati." /></label>
       <label className={`${labelClass} block`}>Catatan<textarea className={`${inputClass} h-auto py-2`} name="notes" rows={3} value={values.notes} onChange={update("notes")} maxLength={1000} /></label>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p aria-live="polite" role="status" className="text-xs font-semibold">{state.error ? <span className="text-rose-700">{state.error}</span> : state.success ? <span className="text-emerald-700">{state.success}</span> : null}</p>

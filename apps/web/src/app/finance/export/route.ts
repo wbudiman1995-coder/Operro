@@ -7,6 +7,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { parseCashPeriod } from "@/lib/cash-position";
+import { loadBranchTimezones } from "@/lib/branch-context";
 import { buildFinanceExport } from "@/lib/finance-export";
 import { PAYMENT_STAGES, type PaymentStage } from "@/lib/payment-register";
 import { sanitizeExportFilename } from "@/lib/payroll-export";
@@ -30,7 +32,11 @@ export async function GET(request: Request) {
   }
   const filters = { stage, serviceMonth: monthParam || undefined, search: url.searchParams.get("q") || undefined };
 
-  const book = await buildFinanceExport(workspace.supabase, workspace.activeOrganization.id, filters);
+  const { defaultTimezone } = await loadBranchTimezones(workspace.supabase, workspace.activeOrganization.id);
+  const period = parseCashPeriod(url.searchParams.get("from"), url.searchParams.get("to"), new Date(), defaultTimezone);
+  if (!period.ok) return NextResponse.json({ error: period.message }, { status: 400 });
+
+  const book = await buildFinanceExport(workspace.supabase, workspace.activeOrganization.id, filters, { period: period.period, timeZone: defaultTimezone });
   const buffer = await book.xlsx.writeBuffer();
   const org = sanitizeExportFilename(workspace.activeOrganization.name);
   return new NextResponse(new Uint8Array(buffer), {

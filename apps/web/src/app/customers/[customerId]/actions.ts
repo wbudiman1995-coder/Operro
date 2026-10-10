@@ -94,6 +94,8 @@ export async function editCustomerPetAction(
       p_color: parsed.update.color,
       p_temperament: parsed.update.temperament,
       p_notes: parsed.update.notes,
+      p_coat_type: parsed.update.coatType,
+      p_skin_history: parsed.update.skinHistory,
     });
 
     if (error) {

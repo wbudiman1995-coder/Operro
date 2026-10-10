@@ -181,6 +181,49 @@ SQL
   [[ "$bands_before" == "$(sql -Atc "select count(*) from public.organization_size_bands")"      && "$prices_before" == "$(sql -Atc "select count(*) from public.service_band_prices")"      && "$settings_before" == "$(sql -Atc "select count(*) from public.organization_size_band_settings")" ]]     || { echo "FAIL: backfill re-run changed row counts"; exit 1; }
   [[ "$fp_mid" == "$(sql -q -f integration/size_band_upgrade_fingerprint.sql)" ]] || { echo "FAIL: backfill re-run changed existing data"; exit 1; }
   echo "SIZE BAND BACKFILL IDEMPOTENCY PASS (bands=$bands_before settings=$settings_before prices=$prices_before)"
+  # Organization export on the populated, upgraded HomePaw workspace: the owner can page every allowlisted
+  # table to completion and each table's exported row count equals that organization's own row count.
+  sql -q <<'SQL'
+begin;
+select set_config('request.jwt.claims','{"sub":"047f1e5c-5935-4566-b793-417df9f7cc9c","active_org_id":"019fbdd0-ee52-7f57-8318-a288203c78c1"}',true);
+do $$
+declare
+  v_org constant uuid := '019fbdd0-ee52-7f57-8318-a288203c78c1';
+  v_job uuid; v_work jsonb; v_rows jsonb; v_count integer; v_steps integer := 0; v_src bigint; v_got bigint; v_all bigint := 0; r record;
+begin
+  create temp table exp_counts(t text, n bigint) on commit drop;
+  v_job := (app.org_export_start(true) ->> 'job_id')::uuid;
+  loop
+    v_work := app.org_export_next_work(v_job);
+    exit when (v_work ->> 'done')::boolean;
+    v_steps := v_steps + 1; if v_steps > 5000 then raise exception 'FAIL export did not terminate'; end if;
+    v_rows := app.org_export_table_page(v_job, v_work ->> 'table_name', nullif(v_work ->> 'after_id','')::uuid, 200);
+    v_count := jsonb_array_length(v_rows);
+    if v_count = 0 then
+      perform app.org_export_finish_table(v_job, v_work ->> 'table_name', nullif(v_work ->> 'after_id','')::uuid);
+    else
+      perform app.org_export_record_chunk(v_job, v_work ->> 'table_name', (v_work ->> 'chunk_index')::int, v_count, repeat('c', 64),
+        (v_rows -> 0 ->> 'id')::uuid, (v_rows -> (v_count - 1) ->> 'id')::uuid,
+        (v_work ->> 'storage_prefix') || '/tables/' || (v_work ->> 'table_name') || '/chunk-' || lpad(v_work ->> 'chunk_index', 5, '0') || '.jsonl');
+      insert into exp_counts values (v_work ->> 'table_name', v_count);
+    end if;
+  end loop;
+  for r in select table_name from app.organization_export_table_specs loop
+    execute format('select count(*) from public.%I where organization_id = $1', r.table_name) into v_src using v_org;
+    select coalesce(sum(n), 0) into v_got from exp_counts where t = r.table_name;
+    if v_src <> v_got then raise exception 'FAIL export of % returned % rows, organization owns %', r.table_name, v_got, v_src; end if;
+    v_all := v_all + v_got;
+  end loop;
+  if v_all = 0 then raise exception 'FAIL populated export exported no rows'; end if;
+  if app.org_export_configuration() ->> 'id' <> v_org::text then raise exception 'FAIL export configuration organization'; end if;
+  raise notice 'ORGANIZATION EXPORT POPULATED PASS (% rows across % allowlisted tables, every count equals the organization''s own)', v_all, (select count(*) from app.organization_export_table_specs);
+end $$;
+rollback;
+SQL
+  # Remaining-nine migrations (custom fields ... health/recovery) on the populated, upgraded HomePaw workspace.
+  probe_out=$(sql -q -f integration/remaining_nine_upgrade_probe.sql 2>&1) || { echo "$probe_out"; echo "FAIL: remaining-nine populated probe"; exit 1; }
+  printf '%s\n' "$probe_out"
+  grep -q 'REMAINING NINE POPULATED PROBE PASS' <<<"$probe_out" || { echo "FAIL: remaining-nine populated probe did not reach its pass marker"; exit 1; }
   sql -Atc "select to_regprocedure('app.list_audit_events(text,uuid,integer)') is not null as audit_rpc, to_regprocedure('app.record_payment(uuid,text,numeric,text,uuid,uuid)') is not null as payment_rpc"
   echo "POPULATED UPGRADE PASS"
 } >"$log" 2>&1 || { tail -70 "$log"; exit 1; }

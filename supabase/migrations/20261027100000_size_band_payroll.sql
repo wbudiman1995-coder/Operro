@@ -97,11 +97,12 @@ comment on column public.staff_payroll_settings.per_pet_size_matrix is
 -- ---------------------------------------------------------------------------
 -- compute_payroll_item: identical to 20261010110000 except the per-dog matrix
 -- loop, which groups by the resolved band key (not the raw pets.size column) and
--- records perDogDetail. Same signature, stability, definer and search_path.
+-- records perDogDetail, and an empty search_path (every reference is already
+-- schema-qualified). Same signature and stability.
 -- ---------------------------------------------------------------------------
 create or replace function app.compute_payroll_item(p_org uuid, p_membership uuid, p_period_start date, p_period_end date)
 returns jsonb
-security definer set search_path = app, public
+security definer set search_path = ''
 language plpgsql stable as $$
 declare
   v_org_settings public.payroll_cycle_settings%rowtype;
@@ -243,7 +244,7 @@ returns table(
   service_revenue numeric, invoice_number text, invoice_id uuid, invoice_status text,
   pet_size_label text, service_size_key text, service_size_label text
 )
-security definer set search_path = app, public
+security definer set search_path = ''
 language plpgsql stable as $$
 #variable_conflict use_column
 begin

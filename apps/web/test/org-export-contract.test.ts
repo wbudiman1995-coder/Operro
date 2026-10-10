@@ -108,3 +108,12 @@ test("every RPC the web layer calls exists in the migration with exactly those p
     assert.ok(sent.length >= defined.get(name)!.length - (name === "org_export_table_page" || name === "org_export_start" || name === "org_export_cancel" ? 1 : 0), `${name} omits required parameters: sent ${sent}, defined ${defined.get(name)}`);
   }
 });
+
+test("export completeness is enforced in SQL, not trusted from the client", () => {
+  const finish = migration.slice(migration.indexOf("create function app.org_export_finish_table"), migration.indexOf("-- Workspace configuration."));
+  assert.match(finish, /export_incomplete/);
+  assert.match(finish, /id > \$2/);
+  const record = migration.slice(migration.indexOf("create function app.org_export_record_chunk"), migration.indexOf("create function app.org_export_finish_table"));
+  assert.match(record, /select count\(\*\), \(array_agg\(id order by id\)\)\[1\], \(array_agg\(id order by id desc\)\)\[1\] from \(select id from public\.%I/);
+  assert.match(record, /v_page_first is distinct from p_first_id/);
+});

@@ -8,6 +8,7 @@ import {
   PET_COLOR_MAX,
   PET_NAME_MAX,
   PET_NOTES_MAX,
+  PET_SKIN_HISTORY_MAX,
   PET_TEMPERAMENT_MAX,
   parseCustomerPetForm,
 } from "../src/lib/customer-pet-edit";
@@ -19,12 +20,13 @@ const actionSource = actions.slice(actions.indexOf("export async function editCu
 const editorSource = read("apps/web/src/components/customer-pet-editor.tsx");
 const pageSource = read("apps/web/src/app/customers/[customerId]/page.tsx");
 const migration = read("supabase/migrations/20261026100000_customer_pet_edit.sql");
+const coatMigration = read("supabase/migrations/20261029110000_pet_coat_profile.sql");
 const gates = read("run_all_gates.sh");
 
 function form(overrides: Record<string, string | Blob | string[]> = {}): FormData {
   const values: Record<string, string | Blob | string[]> = {
     name: " Moka ", species: "dog", breed: " Poodle ", sex: "female", birthdate: "2022-05-03",
-    weightKg: "7.25", manualSize: "small", color: " Apricot ", temperament: "Tenang", notes: "Suka snack", ...overrides,
+    weightKg: "7.25", manualSize: "small", color: " Apricot ", temperament: "Tenang", notes: "Suka snack", coatType: "curly", skinHistory: " 12 Mei: kutu ", ...overrides,
   };
   const result = new FormData();
   for (const [key, value] of Object.entries(values)) {
@@ -41,14 +43,41 @@ test("parses editable pet facts without derived or tenant fields", () => {
   assert.deepEqual(parsed.update, {
     name: "Moka", species: "dog", breed: "Poodle", sex: "female", birthdate: "2022-05-03",
     weightKg: 7.25, manualSize: "small", color: "Apricot", temperament: "Tenang", notes: "Suka snack",
+    coatType: "curly", skinHistory: "12 Mei: kutu",
   });
-  assert.deepEqual(Object.keys(parsed.update).sort(), ["birthdate", "breed", "color", "manualSize", "name", "notes", "sex", "species", "temperament", "weightKg"]);
+  assert.deepEqual(Object.keys(parsed.update).sort(), ["birthdate", "breed", "coatType", "color", "manualSize", "name", "notes", "sex", "skinHistory", "species", "temperament", "weightKg"]);
 });
 
 test("normalizes blank optional values and permits a weightless dog band", () => {
   const parsed = parseCustomerPetForm(form({ breed: " ", birthdate: "", weightKg: "", manualSize: "xxl", color: "", temperament: "", notes: "" }));
   assert.equal(parsed.ok, true);
-  if (parsed.ok) assert.deepEqual(parsed.update, { name: "Moka", species: "dog", breed: null, sex: "female", birthdate: null, weightKg: null, manualSize: "xxl", color: null, temperament: null, notes: null });
+  if (parsed.ok) assert.deepEqual(parsed.update, { name: "Moka", species: "dog", breed: null, sex: "female", birthdate: null, weightKg: null, manualSize: "xxl", color: null, temperament: null, notes: null, coatType: "curly", skinHistory: "12 Mei: kutu" });
+});
+
+test("coat type and skin history: blank clears, unknown coat or overlong history is rejected, no stored counter is accepted", () => {
+  const cleared = parseCustomerPetForm(form({ coatType: "", skinHistory: "  " }));
+  assert.equal(cleared.ok, true);
+  if (cleared.ok) assert.deepEqual([cleared.update.coatType, cleared.update.skinHistory], [null, null]);
+  for (const coat of ["short", "long", "curly", "double_coat"]) assert.equal(parseCustomerPetForm(form({ coatType: coat })).ok, true, coat);
+  assert.equal(parseCustomerPetForm(form({ coatType: "wavy" })).ok, false);
+  assert.equal(parseCustomerPetForm(form({ coatType: "Short" })).ok, false);
+  assert.equal(parseCustomerPetForm(form({ skinHistory: "s".repeat(PET_SKIN_HISTORY_MAX + 1) })).ok, false);
+  const withCounter = form();
+  withCounter.append("washCount", "99");
+  const parsed = parseCustomerPetForm(withCounter);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) assert.equal("washCount" in parsed.update, false, "a submitted counter is ignored, never stored");
+  assert.match(coatMigration, /pet_visit_stats/);
+  assert.doesNotMatch(coatMigration, /add column[^;]*(wash|visit)[a-z_]*count/i);
+});
+
+test("visit stats are derived from completed work only and the editor/page surface them read-only", () => {
+  assert.match(coatMigration, /b\.status = 'completed' and b\.deleted_at is null/);
+  assert.match(coatMigration, /g\.deleted_at is null and g\.status <> 'skipped'/);
+  assert.match(coatMigration, /security definer\s+set search_path = ''/);
+  assert.doesNotMatch(editorSource, /name="(?:completedJobs|washCount|visitCount)"/);
+  assert.match(pageSource, /Kunjungan selesai/);
+  assert.match(actionSource, /p_coat_type: parsed\.update\.coatType/);
 });
 
 test("rejects malformed species, size, weight, date, duplicates, and non-dog manual size", () => {

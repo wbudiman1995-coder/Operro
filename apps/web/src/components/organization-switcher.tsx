@@ -103,7 +103,7 @@ export function OrganizationSwitcher({
         return;
       }
 
-      router.replace("/dashboard");
+      router.replace("/start");
       router.refresh();
     } catch {
       setError("Koneksi ke Operro gagal. Periksa jaringan lalu coba lagi.");

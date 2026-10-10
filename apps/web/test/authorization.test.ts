@@ -66,19 +66,20 @@ test("each permission-bearing tab declares its required capability", () => {
   assert.equal(CUSTOMER_360_TAB_CAPABILITY.style, null);
   assert.equal(CUSTOMER_360_TAB_CAPABILITY.addresses, null);
   assert.equal(CUSTOMER_360_TAB_CAPABILITY.notes, null);
-  assert.equal(CUSTOMER_360_TAB_CAPABILITY.history, null);
+  assert.equal(CUSTOMER_360_TAB_CAPABILITY.history, "customer.read");
 });
 
 test("unauthorized tabs are not offered", () => {
   const visible = visibleCustomer360Tabs(capabilities());
-  assert.deepEqual(visible, ["pets", "style", "addresses", "notes", "history"]);
+  assert.deepEqual(visible, ["pets", "style", "addresses", "notes"]);
   assert.equal(visible.includes("invoices"), false);
 });
 
 test("granting a capability reveals exactly its tab", () => {
-  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "finance.read": true })), ["pets", "style", "addresses", "invoices", "notes", "history"]);
-  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "booking.read": true })), ["pets", "style", "addresses", "bookings", "notes", "history"]);
-  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "membership.read": true })), ["pets", "style", "addresses", "packages", "notes", "history"]);
+  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "finance.read": true })), ["pets", "style", "addresses", "invoices", "notes"]);
+  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "booking.read": true })), ["pets", "style", "addresses", "bookings", "notes"]);
+  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "membership.read": true })), ["pets", "style", "addresses", "packages", "notes"]);
+  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "customer.read": true })), ["pets", "style", "addresses", "notes", "history"]);
 });
 
 test("a tab reached by editing the query string is still denied", () => {

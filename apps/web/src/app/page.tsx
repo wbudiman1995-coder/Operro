@@ -17,7 +17,7 @@ export default async function HomePage() {
   if (context) {
     redirect(
       context.organizations.length === 1 && context.activeOrganization
-        ? "/dashboard"
+        ? "/start"
         : "/organizations",
     );
   }
