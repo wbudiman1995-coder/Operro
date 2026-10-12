@@ -123,7 +123,7 @@ create index if not exists idx_customers_org_created_at on public.customers (org
 -- Both ranges are inclusive local calendar dates; the previous range must be the equal-length range that ends the
 -- day before the current one starts. At most 366 days. Pure validation: touches no table other than the catalog.
 -- ---------------------------------------------------------------------------------------------------------------
-create function app.dashboard_check_periods(p_from date, p_to date, p_prev_from date, p_prev_to date, p_timezone text default 'Asia/Jakarta')
+create or replace function app.dashboard_check_periods(p_from date, p_to date, p_prev_from date, p_prev_to date, p_timezone text default 'Asia/Jakarta')
 returns void language plpgsql stable security invoker set search_path = '' as $$
 begin
   if p_from is null or p_to is null or p_prev_from is null or p_prev_to is null
