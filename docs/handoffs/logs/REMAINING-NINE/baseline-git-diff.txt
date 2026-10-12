@@ -1,0 +1,211 @@
+$ git diff -- apps/web supabase integration run_all_gates.sh   (reconstructed from the tree as found, before this session's edits)
+
+--- a/apps/web/test/authorization.test.ts
++++ b/apps/web/test/authorization.test.ts
+@@ -66,19 +66,20 @@
+   assert.equal(CUSTOMER_360_TAB_CAPABILITY.style, null);
+   assert.equal(CUSTOMER_360_TAB_CAPABILITY.addresses, null);
+   assert.equal(CUSTOMER_360_TAB_CAPABILITY.notes, null);
+-  assert.equal(CUSTOMER_360_TAB_CAPABILITY.history, null);
++  assert.equal(CUSTOMER_360_TAB_CAPABILITY.history, "customer.read");
+ });
+ 
+ test("unauthorized tabs are not offered", () => {
+   const visible = visibleCustomer360Tabs(capabilities());
+-  assert.deepEqual(visible, ["pets", "style", "addresses", "notes", "history"]);
++  assert.deepEqual(visible, ["pets", "style", "addresses", "notes"]);
+   assert.equal(visible.includes("invoices"), false);
+ });
+ 
+ test("granting a capability reveals exactly its tab", () => {
+-  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "finance.read": true })), ["pets", "style", "addresses", "invoices", "notes", "history"]);
+-  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "booking.read": true })), ["pets", "style", "addresses", "bookings", "notes", "history"]);
+-  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "membership.read": true })), ["pets", "style", "addresses", "packages", "notes", "history"]);
++  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "finance.read": true })), ["pets", "style", "addresses", "invoices", "notes"]);
++  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "booking.read": true })), ["pets", "style", "addresses", "bookings", "notes"]);
++  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "membership.read": true })), ["pets", "style", "addresses", "packages", "notes"]);
++  assert.deepEqual(visibleCustomer360Tabs(capabilities({ "customer.read": true })), ["pets", "style", "addresses", "notes", "history"]);
+ });
+ 
+ test("a tab reached by editing the query string is still denied", () => {
+--- a/apps/web/test/org-export-contract.test.ts
++++ b/apps/web/test/org-export-contract.test.ts
+@@ -109,3 +109,12 @@
+   }
+ });
+ 
++test("export completeness is enforced in SQL, not trusted from the client", () => {
++  const finish = migration.slice(migration.indexOf("create function app.org_export_finish_table"), migration.indexOf("-- Workspace configuration."));
++  assert.match(finish, /export_incomplete/);
++  assert.match(finish, /id > \$2/);
++  const record = migration.slice(migration.indexOf("create function app.org_export_record_chunk"), migration.indexOf("create function app.org_export_finish_table"));
++  assert.match(record, /select count\(\*\), \(array_agg\(id order by id\)\)\[1\], \(array_agg\(id order by id desc\)\)\[1\] from \(select id from public\.%I/);
++  assert.match(record, /v_page_first is distinct from p_first_id/);
++});
++
+--- a/integration/retention_renewal_followups_smoke.sql
++++ b/integration/retention_renewal_followups_smoke.sql
+@@ -578,8 +578,12 @@
+ -- settings untouched.
+ -- =====================================================================
+ do $$ begin perform pg_temp.act_as('04000000-0000-4000-8000-0000000000c1', '04000000-0000-4000-8000-000000000001'); end $$;
++-- 20261019100000 revoked direct INSERT/UPDATE/DELETE on public.organizations from authenticated, so this fixture
++-- write (an unrelated settings key that F12 must leave untouched) runs as the table owner, then the role is restored.
++reset role;
+ update public.organizations set settings = settings || '{"branding": {"logo_url": "https://example.test/logo.png"}}'::jsonb
+  where id = '04000000-0000-4000-8000-000000000001';
++set local role authenticated;
+ do $$
+ declare v_stale_updated_at timestamptz; v_result jsonb; v_branding jsonb;
+ begin
+--- a/integration/run_populated_upgrade_rehearsal.sh
++++ b/integration/run_populated_upgrade_rehearsal.sh
+@@ -181,6 +181,45 @@
+   [[ "$bands_before" == "$(sql -Atc "select count(*) from public.organization_size_bands")"      && "$prices_before" == "$(sql -Atc "select count(*) from public.service_band_prices")"      && "$settings_before" == "$(sql -Atc "select count(*) from public.organization_size_band_settings")" ]]     || { echo "FAIL: backfill re-run changed row counts"; exit 1; }
+   [[ "$fp_mid" == "$(sql -q -f integration/size_band_upgrade_fingerprint.sql)" ]] || { echo "FAIL: backfill re-run changed existing data"; exit 1; }
+   echo "SIZE BAND BACKFILL IDEMPOTENCY PASS (bands=$bands_before settings=$settings_before prices=$prices_before)"
++  # Organization export on the populated, upgraded HomePaw workspace: the owner can page every allowlisted
++  # table to completion and each table's exported row count equals that organization's own row count.
++  sql -q <<'SQL'
++begin;
++select set_config('request.jwt.claims','{"sub":"047f1e5c-5935-4566-b793-417df9f7cc9c","active_org_id":"019fbdd0-ee52-7f57-8318-a288203c78c1"}',true);
++do $$
++declare
++  v_org constant uuid := '019fbdd0-ee52-7f57-8318-a288203c78c1';
++  v_job uuid; v_work jsonb; v_rows jsonb; v_count integer; v_steps integer := 0; v_src bigint; v_got bigint; v_all bigint := 0; r record;
++begin
++  create temp table exp_counts(t text, n bigint) on commit drop;
++  v_job := (app.org_export_start(true) ->> 'job_id')::uuid;
++  loop
++    v_work := app.org_export_next_work(v_job);
++    exit when (v_work ->> 'done')::boolean;
++    v_steps := v_steps + 1; if v_steps > 5000 then raise exception 'FAIL export did not terminate'; end if;
++    v_rows := app.org_export_table_page(v_job, v_work ->> 'table_name', nullif(v_work ->> 'after_id','')::uuid, 200);
++    v_count := jsonb_array_length(v_rows);
++    if v_count = 0 then
++      perform app.org_export_finish_table(v_job, v_work ->> 'table_name', nullif(v_work ->> 'after_id','')::uuid);
++    else
++      perform app.org_export_record_chunk(v_job, v_work ->> 'table_name', (v_work ->> 'chunk_index')::int, v_count, repeat('c', 64),
++        (v_rows -> 0 ->> 'id')::uuid, (v_rows -> (v_count - 1) ->> 'id')::uuid,
++        (v_work ->> 'storage_prefix') || '/tables/' || (v_work ->> 'table_name') || '/chunk-' || lpad(v_work ->> 'chunk_index', 5, '0') || '.jsonl');
++      insert into exp_counts values (v_work ->> 'table_name', v_count);
++    end if;
++  end loop;
++  for r in select table_name from app.organization_export_table_specs loop
++    execute format('select count(*) from public.%I where organization_id = $1', r.table_name) into v_src using v_org;
++    select coalesce(sum(n), 0) into v_got from exp_counts where t = r.table_name;
++    if v_src <> v_got then raise exception 'FAIL export of % returned % rows, organization owns %', r.table_name, v_got, v_src; end if;
++    v_all := v_all + v_got;
++  end loop;
++  if v_all = 0 then raise exception 'FAIL populated export exported no rows'; end if;
++  if app.org_export_configuration() ->> 'id' <> v_org::text then raise exception 'FAIL export configuration organization'; end if;
++  raise notice 'ORGANIZATION EXPORT POPULATED PASS (% rows across % allowlisted tables, every count equals the organization''s own)', v_all, (select count(*) from app.organization_export_table_specs);
++end $$;
++rollback;
++SQL
+   sql -Atc "select to_regprocedure('app.list_audit_events(text,uuid,integer)') is not null as audit_rpc, to_regprocedure('app.record_payment(uuid,text,numeric,text,uuid,uuid)') is not null as payment_rpc"
+   echo "POPULATED UPGRADE PASS"
+ } >"$log" 2>&1 || { tail -70 "$log"; exit 1; }
+--- a/run_all_gates.sh
++++ b/run_all_gates.sh
+@@ -116,6 +116,7 @@
+   supabase/migrations/20261025100000_size_band_booking_customer_adapters.sql
+   supabase/migrations/20261026100000_customer_pet_edit.sql
+   supabase/migrations/20261027100000_size_band_payroll.sql
++  supabase/migrations/20261028100000_org_export_foundation.sql
+   supabase/migrations/20261028110000_dashboard_card_settings.sql
+ )
+ mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
+@@ -152,7 +153,7 @@
+ step "GATE 3 — in-memory + preset-contract tests"
+ npx tsx packages/backend/test/assembly_service.inmemory.test.ts
+ npx tsx packages/backend/test/preset_contract.test.ts
+-npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts test/customer-profile-edit.test.ts test/customer-pet-edit.test.ts test/size-bands.test.ts test/size-band-ui.test.tsx test/payroll-dynamic-size.test.ts
++npm exec --workspace apps/web -- tsx --test test/customer-code-contract.test.ts test/search-and-profile.test.ts test/audit-diff.test.ts test/finance-export.test.ts test/customer-bulk-edit-contract.test.ts test/customer-profile-edit.test.ts test/customer-pet-edit.test.ts test/size-bands.test.ts test/size-band-ui.test.tsx test/payroll-dynamic-size.test.ts test/dashboard-read-model.test.ts test/org-export-contract.test.ts test/catalog-actions-validation.test.ts test/control-plane-ui.test.tsx
+ 
+ step "GATE 4 — fresh PostgreSQL migrate (timestamped lineage incl 00150)"
+ run_as_postgres dropdb --if-exists operro_gate
+@@ -177,6 +178,7 @@
+ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261021100000_test_business_admin_checklist_isolation.sql
+ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261021110000_test_audit_event_access.sql
+ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261028110000_test_dashboard_card_settings.sql
++psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261028100000_test_org_export.sql
+ 
+ step "GATE 4c — customer-code concurrency"
+ CC_TMP="$(mktemp -d /tmp/operro-customer-code.XXXXXX)"
+--- a/supabase/migrations/20261027100000_size_band_payroll.sql
++++ b/supabase/migrations/20261027100000_size_band_payroll.sql
+@@ -97,11 +97,12 @@
+ -- ---------------------------------------------------------------------------
+ -- compute_payroll_item: identical to 20261010110000 except the per-dog matrix
+ -- loop, which groups by the resolved band key (not the raw pets.size column) and
+--- records perDogDetail. Same signature, stability, definer and search_path.
++-- records perDogDetail, and an empty search_path (every reference is already
++-- schema-qualified). Same signature and stability.
+ -- ---------------------------------------------------------------------------
+ create or replace function app.compute_payroll_item(p_org uuid, p_membership uuid, p_period_start date, p_period_end date)
+ returns jsonb
+-security definer set search_path = app, public
++security definer set search_path = ''
+ language plpgsql stable as $$
+ declare
+   v_org_settings public.payroll_cycle_settings%rowtype;
+@@ -243,7 +244,7 @@
+   service_revenue numeric, invoice_number text, invoice_id uuid, invoice_status text,
+   pet_size_label text, service_size_key text, service_size_label text
+ )
+-security definer set search_path = app, public
++security definer set search_path = ''
+ language plpgsql stable as $$
+ #variable_conflict use_column
+ begin
+--- a/supabase/migrations/20261028100000_org_export_foundation.sql
++++ b/supabase/migrations/20261028100000_org_export_foundation.sql
+@@ -241,6 +241,7 @@
+   p_sha256 text, p_first_id uuid, p_last_id uuid, p_storage_path text) returns void
+ language plpgsql security definer set search_path = '' as $$
+ declare v_org uuid := app.fn_active_organization(); v_state public.organization_export_table_state; v_prefix text; v_expected text;
++  v_page_count bigint; v_page_first uuid; v_page_last uuid;
+ begin
+   if not app.org_export_authorized() then raise exception 'not_authorized' using errcode='42501'; end if;
+   select s.* into v_state from public.organization_export_table_state s join public.organization_export_jobs j on j.id=s.job_id
+@@ -256,6 +257,13 @@
+   end if;
+   if p_index <> v_state.next_chunk_index then raise exception 'invalid_chunk_index' using errcode='22023'; end if;
+   if v_state.last_id is not null and p_first_id <= v_state.last_id then raise exception 'invalid_chunk' using errcode='22023'; end if;
++  -- The claimed count and id range must be exactly the next bounded page the server itself resolves after the
++  -- stored cursor: a skipped, shifted, shortened-to-hide or fabricated range cannot be recorded.
++  execute format('select count(*), (array_agg(id order by id))[1], (array_agg(id order by id desc))[1] from (select id from public.%I where organization_id=$1 and ($2 is null or id > $2) order by id limit $3) page', p_table)
++    into v_page_count, v_page_first, v_page_last using v_org, v_state.last_id, p_row_count;
++  if v_page_count <> p_row_count or v_page_first is distinct from p_first_id or v_page_last is distinct from p_last_id then
++    raise exception 'invalid_chunk' using errcode='22023';
++  end if;
+   select storage_prefix into v_prefix from public.organization_export_jobs where id=p_job;
+   v_expected := v_prefix || '/tables/' || p_table || '/chunk-' || lpad(p_index::text, 5, '0') || '.jsonl';
+   if p_storage_path is distinct from v_expected then raise exception 'invalid_storage_path' using errcode='22023'; end if;
+@@ -266,14 +274,17 @@
+ 
+ create function app.org_export_finish_table(p_job uuid, p_table text, p_after_id uuid) returns void
+ language plpgsql security definer set search_path = '' as $$
+-declare v_org uuid := app.fn_active_organization();
+-begin
+-  if not app.org_export_authorized() then raise exception 'not_authorized' using errcode='42501'; end if;
+-  update public.organization_export_table_state s set completed=true
+-  from public.organization_export_jobs j
+-  where s.job_id=p_job and s.table_name=p_table and s.last_id is not distinct from p_after_id
+-    and not s.completed and j.id=s.job_id and j.organization_id=v_org and j.status='running';
+-  if not found then raise exception 'invalid_export_work' using errcode='22023'; end if;
++declare v_org uuid := app.fn_active_organization(); v_state public.organization_export_table_state; v_remaining boolean;
++begin
++  if not app.org_export_authorized() then raise exception 'not_authorized' using errcode='42501'; end if;
++  select s.* into v_state from public.organization_export_table_state s join public.organization_export_jobs j on j.id=s.job_id
++   where s.job_id=p_job and s.table_name=p_table and not s.completed and j.organization_id=v_org and j.status='running' for update of s;
++  if not found or v_state.last_id is distinct from p_after_id then raise exception 'invalid_export_work' using errcode='22023'; end if;
++  -- A table is complete only when the source has nothing left after the cursor this job recorded.
++  execute format('select exists (select 1 from public.%I where organization_id=$1 and ($2 is null or id > $2))', p_table)
++    into v_remaining using v_org, v_state.last_id;
++  if v_remaining then raise exception 'export_incomplete' using errcode='22023'; end if;
++  update public.organization_export_table_state set completed=true where job_id=p_job and table_name=p_table;
+ end $$;
+ 
+ -- Workspace configuration. Explicit columns and an explicit settings-key allowlist, so a

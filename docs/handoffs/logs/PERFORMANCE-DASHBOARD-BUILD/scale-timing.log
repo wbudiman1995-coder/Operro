@@ -1,0 +1,33 @@
+ bookings 
+----------
+   200000
+(1 row)
+
+ invoices 
+----------
+   120000
+(1 row)
+
+ payments 
+----------
+    72000
+(1 row)
+
+ customers 
+-----------
+     60000
+(1 row)
+
+Time: 0.231 ms
+Time: 0.104 ms
+Time: 0.130 ms
+Time: 0.756 ms
+=== 30-day range
+Time: 797.207 ms
+Time: 1506.858 ms (00:01.507)
+Time: 321.412 ms
+=== 366-day range
+Time: 159.819 ms
+Time: 422.572 ms
+Time: 862.919 ms
+Time: 0.727 ms

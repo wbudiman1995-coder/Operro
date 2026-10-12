@@ -1,0 +1,2 @@
+DETECTED top-level-only redaction -> psql:/repo/supabase/tests/20261029150000_test_audit_reconciliation.sql:150: ERROR:  FAIL nested secret leaked or safe metadata lost: {"new": {"id": "c6f00000-0000-4000-8000-0000000000ca", "name": "Nes
+DETECTED reordered arrays -> psql:/repo/supabase/tests/20261029150000_test_audit_reconciliation.sql:150: ERROR:  FAIL recursive redaction shape/order: {"a": [{"s": "3"}, {"s": "1"}, {}], "n": null, "num": 2, "deep": {"x": {"y": [

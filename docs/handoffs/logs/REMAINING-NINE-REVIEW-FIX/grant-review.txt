@@ -1,0 +1,71 @@
+Pager usage is off.
+== Functions created by the eight remaining-nine migrations (anything in schema app created after the baseline) ==
+                   fn                   |  mode   |  search_path   | anon | public_ | authenticated 
+----------------------------------------+---------+----------------+------+---------+---------------
+ audit_redact(1 args)                   | invoker | search_path="" | f    | f       | f
+ audit_redact_value(1 args)             | invoker | search_path="" | f    | f       | f
+ audit_table_permission(1 args)         | invoker | search_path="" | f    | f       | f
+ audit_table_visible(1 args)            | definer | search_path="" | f    | f       | f
+ create_whatsapp_draft(3 args)          | definer | search_path="" | f    | f       | t
+ finance_cash_position(3 args)          | invoker | search_path="" | f    | f       | t
+ health_summary(0 args)                 | definer | search_path="" | f    | f       | t
+ landing_page_allowed(1 args)           | definer | search_path="" | f    | f       | f
+ my_landing_page(0 args)                | definer | search_path="" | f    | f       | t
+ pet_visit_stats(1 args)                | definer | search_path="" | f    | f       | t
+ reconcile_invoice_payments(3 args)     | invoker | search_path="" | f    | f       | t
+ reconcile_payroll_sources(2 args)      | definer | search_path="" | f    | f       | t
+ reconcile_unbilled_visits(3 args)      | invoker | search_path="" | f    | f       | t
+ record_recovery_drill(7 args)          | definer | search_path="" | f    | f       | t
+ recovery_status(0 args)                | definer | search_path="" | f    | f       | t
+ save_custom_field_definition(7 args)   | definer | search_path="" | f    | f       | t
+ schema_version(0 args)                 | invoker | search_path="" | f    | f       | t
+ search_audit_events(8 args)            | definer | search_path="" | f    | f       | t
+ set_custom_field_archived(2 args)      | definer | search_path="" | f    | f       | t
+ set_custom_field_values(3 args)        | definer | search_path="" | f    | f       | t
+ set_evidence_retention_days(1 args)    | definer | search_path="" | f    | f       | t
+ set_my_landing_page(1 args)            | definer | search_path="" | f    | f       | t
+ set_whatsapp_draft_status(3 args)      | definer | search_path="" | f    | f       | t
+ set_whatsapp_opt_out(2 args)           | definer | search_path="" | f    | f       | t
+ storage_cleanup_authorized(1 args)     | definer | search_path="" | f    | f       | f
+ storage_cleanup_begin(1 args)          | definer | search_path="" | f    | f       | t
+ storage_cleanup_candidates(2 args)     | definer | search_path="" | f    | f       | f
+ storage_cleanup_finish(1 args)         | definer | search_path="" | f    | f       | t
+ storage_cleanup_preview(1 args)        | definer | search_path="" | f    | f       | t
+ storage_cleanup_record(2 args)         | definer | search_path="" | f    | f       | t
+ tg_recovery_drills_append_only(0 args) | invoker | search_path="" | f    | f       | f
+ tg_write_audit_pk(0 args)              | definer | search_path="" | f    | f       | f
+ try_timestamptz(1 args)                | invoker | search_path="" | f    | f       | f
+ update_customer_pet(13 args)           | definer | search_path="" | f    | f       | t
+ update_customer_pet(15 args)           | definer | search_path="" | f    | f       | t
+ whatsapp_normalize_phone(1 args)       | invoker | search_path="" | f    | f       | f
+ whatsapp_source_permitted(1 args)      | definer | search_path="" | f    | f       | t
+(37 rows)
+
+
+== Definers WITHOUT an empty search_path (must be none) ==
+ proname 
+---------
+(0 rows)
+
+
+== New tables: RLS flag and client-role privileges ==
+             tbl              | rls | authenticated_privs | anon_privs | policies 
+------------------------------+-----+---------------------+------------+----------
+ custom_field_definitions     | t   | SELECT              |            |        1
+ custom_field_values          | t   | SELECT              |            |        1
+ recovery_drills              | t   | SELECT              |            |        1
+ storage_cleanup_items        | t   | SELECT              |            |        1
+ storage_cleanup_runs         | t   | SELECT              |            |        1
+ user_preferences             | t   | SELECT              |            |        1
+ whatsapp_contact_preferences | t   | SELECT              |            |        1
+ whatsapp_drafts              | t   | SELECT              |            |        1
+(8 rows)
+
+
+== Existing function whose body changed: 13-argument update_customer_pet keeps its grants ==
+                                                                                                                                         args                                                                                                                                         | anon | authenticated 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------+---------------
+ p_pet uuid, p_customer uuid, p_expected_updated_at timestamp with time zone, p_name text, p_species text, p_breed text, p_sex text, p_birthdate date, p_weight_kg numeric, p_manual_size text, p_color text, p_temperament text, p_notes text                                        | f    | t
+ p_pet uuid, p_customer uuid, p_expected_updated_at timestamp with time zone, p_name text, p_species text, p_breed text, p_sex text, p_birthdate date, p_weight_kg numeric, p_manual_size text, p_color text, p_temperament text, p_notes text, p_coat_type text, p_skin_history text | f    | t
+(2 rows)
+

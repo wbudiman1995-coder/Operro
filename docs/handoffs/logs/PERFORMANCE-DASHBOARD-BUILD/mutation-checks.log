@@ -1,0 +1,22 @@
+M1 collected counts pending/failed payments: detected
+M2 issued counts void invoices: detected
+M3 archived customers counted as new: detected
+M4 sources do not require branches.all: detected
+M5 operations skip booking.read: detected
+M6 failed refunds counted: detected
+M7 comparison need not be adjacent: detected
+M8 payment on void invoice counts as first payment: detected
+M9 first completed ignores earlier history: detected
+M10 legacy payload drops the new keys: detected
+M11 Groomer role not refused: detected
+M12 zero-due invoices counted outstanding: detected
+M13 boundaries use UTC: detected
+M14 366-day cap off by one: detected
+M15 customers-only role loses NULL columns: detected
+M16 other-tenant data visible (org filter dropped on bookings): detected
+M17 finance skips finance.read: detected
+M18 operations ignore the branch grant: detected
+M19 finance invoices/payments ignore the branch grant: detected
+M20 payments lose the organization filter: detected
+M21 revoked-membership check removed (sources): NOT DETECTED
+detected 20 of 21 mutations

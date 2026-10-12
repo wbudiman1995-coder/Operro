@@ -1,0 +1,11 @@
+ apps/web/src/app/dashboard/page.tsx                | 16 +++++++--
+ apps/web/src/components/dashboard-shell.tsx        | 14 ++++++--
+ apps/web/src/lib/dashboard-read-model.ts           | 41 +++++++++++++++++++++-
+ apps/web/src/lib/health.ts                         |  2 +-
+ apps/web/test/control-plane-ui.test.tsx            |  9 ++---
+ apps/web/test/dashboard-read-model.test.ts         | 12 ++++---
+ apps/web/test/remaining-nine-ui.test.tsx           |  2 +-
+ integration/run_populated_upgrade_rehearsal.sh     |  4 +++
+ run_all_gates.sh                                   |  4 ++-
+ .../tests/20261029170000_test_health_recovery.sql  |  2 +-
+ 10 files changed, 87 insertions(+), 19 deletions(-)

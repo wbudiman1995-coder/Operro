@@ -1,0 +1,188 @@
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+INSERT 0 2
+INSERT 0 20
+INSERT 0 3
+INSERT 0 7
+INSERT 0 5
+INSERT 0 3
+INSERT 0 1
+INSERT 0 2
+INSERT 0 4
+INSERT 0 1
+INSERT 0 5
+INSERT 0 7
+UPDATE 7
+INSERT 0 7
+INSERT 0 1
+INSERT 0 10
+INSERT 0 14
+INSERT 0 11
+INSERT 0 13
+INSERT 0 5
+SET
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: complete allowlist stored; legacy four-key payload preserves the three performance keys
+DO
+NOTICE:  PASS: old tenant keeps new keys absent; unrelated settings preserved
+NOTICE:  PASS: partial new-key set rejected
+NOTICE:  PASS: non-boolean new key rejected
+NOTICE:  PASS: unknown key rejected
+NOTICE:  PASS: legacy keys still required
+NOTICE:  PASS: null legacy value rejected
+NOTICE:  PASS: array rejected
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+DO
+NOTICE:  PASS: role without settings.manage refused
+ act_as 
+--------
+ 
+(1 row)
+
+DO
+RESET
+NOTICE:  PASS: forged organization cannot write settings
+DO
+NOTICE:  PASS: other tenant settings untouched
+SET
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: operations current/previous, draft + soft-deleted excluded, Jakarta day boundaries
+NOTICE:  PASS: empty period returns two zero rows
+DO
+NOTICE:  PASS: a 366-day range is accepted
+NOTICE:  PASS: 367-day range rejected (equal-length comparison supplied)
+NOTICE:  PASS: inverted range rejected
+NOTICE:  PASS: non-adjacent comparison rejected
+NOTICE:  PASS: unequal-length comparison rejected
+NOTICE:  PASS: null date rejected
+NOTICE:  PASS: unknown time zone rejected
+DO
+NOTICE:  PASS: out-of-range dates rejected
+NOTICE:  PASS: issued / collected / refunded per currency and period; void, pending, failed excluded
+NOTICE:  PASS: finance boundaries follow the requested time zone
+NOTICE:  PASS: outstanding snapshot nets partial payments, ignores zero-due invoices, separates currency
+NOTICE:  PASS: empty period returns no period rows (never invented zeros)
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: branch-restricted finance sees only its own branch, including refunds and outstanding
+DO
+NOTICE:  PASS: branch-restricted operations see only their own branch
+NOTICE:  PASS: branch-restricted caller refused source performance (customers have no branch)
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: no finance.read: finance refused
+NOTICE:  PASS: no customer.read: sources refused
+DO
+NOTICE:  PASS: booking.read alone still gets operations
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: customers-only role: finance refused
+NOTICE:  PASS: customers-only role: operations refused
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: Groomer role refused (RLS would silently truncate)
+NOTICE:  PASS: Groomer role refused operations
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: sources are normalized; first completed / first paid counted once per customer in the right period
+NOTICE:  PASS: missing source reported honestly; payments on void invoices are not a first payment
+NOTICE:  PASS: customers registered earlier count only for first business; archived and deleted customers excluded
+DO
+NOTICE:  PASS: source function returns counts only
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: without booking.read / finance.read the dependent columns are NULL, not zero
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+DO
+NOTICE:  PASS: tenant B sees only tenant B
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: forged organization: finance refused
+NOTICE:  PASS: forged organization: operations refused
+NOTICE:  PASS: forged organization: sources refused
+DO
+SET
+NOTICE:  PASS: anon cannot execute finance aggregate
+NOTICE:  PASS: anon cannot execute operations aggregate
+NOTICE:  PASS: anon cannot execute source aggregate
+DO
+NOTICE:  PASS: anon cannot save card settings
+RESET
+INSERT 0 12
+SET
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: output bounded to ten named sources plus one other and one missing row; totals preserved
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: a caller with no branch grant sees no bookings through the aggregate
+DO
+RESET
+UPDATE 1
+SET
+ act_as 
+--------
+ 
+(1 row)
+
+NOTICE:  PASS: revoked membership: operations refused
+NOTICE:  PASS: revoked membership: finance refused
+DO
+NOTICE:  PASS: revoked membership: sources refused
+RESET
+NOTICE:  PASS: read-only (stable, empty search_path), no anon/public execute, schema version bumped
+DO
+ROLLBACK

@@ -1,0 +1,10 @@
+DETECTED  E3.2 anyone is a business owner member -> psql:/repo/supabase/tests/20261029155000_test_access_policy_regression.sql:135: ERROR:  FAIL: tenant Admin cannot change the checklist (statement succeeded)
+DETECTED  E3.2 Bantuan Operro provisioned WITH finance.read -> psql:/repo/supabase/tests/20261029155000_test_access_policy_regression.sql:195: ERROR:  FAIL: Bantuan Operro lacks finance.read
+DETECTED  E2.3 drafts RLS off -> psql:/repo/supabase/tests/20261029140000_test_whatsapp_drafts.sql:181: ERROR:  FAIL finance-only user sees non-invoice drafts (7 rows)
+DETECTED  E2.2 cash position runs as definer (RLS bypass) -> psql:/repo/supabase/tests/20261029130000_test_finance_cash_position.sql:140: ERROR:  FAIL branch-scoped payments 1260000.00
+DETECTED  E1.2 custom field values RLS off -> psql:/repo/supabase/tests/20261029100000_test_custom_fields.sql:230: ERROR:  FAIL role without customer.read sees custom fields
+DETECTED  E3.3 one-running-apply index dropped (lease) -> psql:/repo/supabase/tests/20261029160000_test_storage_cleanup.sql:165: ERROR:  FAIL: a second run for the same organization is refused while the first holds its lease (st
+DETECTED  E3.4 drill history readable by anyone -> psql:/repo/supabase/tests/20261029170000_test_health_recovery.sql:148: ERROR:  FAIL: and a business owner cannot read the drill rows directly even though two exist
+DETECTED  E2.4 audit viewer lost its table filter -> psql:/repo/supabase/tests/20261029150000_test_audit_reconciliation.sql:144: ERROR:  FAIL reader without roles.manage saw access-management audit rows
+DETECTED  E1.3 completed filter removed (counts cancelled work) -> psql:/repo/supabase/tests/20261029110000_test_pet_coat_profile.sql:175: ERROR:  FAIL repeat pet completed_jobs=11 (want 3)
+DETECTED  E1.4 landing page no longer re-validated live -> psql:/repo/supabase/tests/20261029120000_test_settings_and_preferences.sql:114: ERROR:  FAIL: cannot choose a page the role cannot open (statement succeeded)

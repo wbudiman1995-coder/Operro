@@ -1,0 +1,238 @@
+PostgreSQL: 16.15 (Debian 16.15-1.pgdg13+2)
+Baseline migration: 20260924110000
+CREATE SCHEMA
+CREATE TABLE
+CREATE SCHEMA
+CREATE TABLE
+CREATE TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+DO
+DO
+DO
+CREATE SCHEMA
+CREATE EXTENSION
+ALTER TABLE
+CREATE FUNCTION
+DO
+BASELINE 20260721000100
+psql:/work/supabase/migrations/20260721000100_extensions_and_helpers.sql:47: NOTICE:  extension "pgcrypto" already exists, skipping
+BASELINE 20260721000150
+psql:/work/supabase/migrations/20260721000150_fix_uuidv7_supabase.sql:22: NOTICE:  extension "pgcrypto" already exists, skipping
+BASELINE 20260721000200
+BASELINE 20260721000300
+BASELINE 20260721000400
+BASELINE 20260721000500
+BASELINE 20260721000600
+BASELINE 20260721000700
+BASELINE 20260721000800
+BASELINE 20260721000900
+BASELINE 20260721001000
+BASELINE 20260721001100
+BASELINE 20260721001200
+BASELINE 20260721001300
+psql:/work/supabase/migrations/20260721001300_core_neutrality_grooming_lines.sql:488: NOTICE:  BACKFILL OK: all legacy grooming pet/service values mapped; no non-grooming booking carries pet_id/service_id.
+BASELINE 20260721001350
+BASELINE 20260721001400
+BASELINE 20260910120000
+BASELINE 20260916150000
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "membership_plans_org_isolation" for relation "public.membership_plans" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_memberships_org_isolation" for relation "public.customer_memberships" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "packages_org_isolation" for relation "public.packages" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_packages_org_isolation" for relation "public.customer_packages" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "customer_package_ledger_org_isolation" for relation "public.customer_package_ledger" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_accounts_org_isolation" for relation "public.loyalty_accounts" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "loyalty_ledger_org_isolation" for relation "public.loyalty_ledger" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_accounts_org_isolation" for relation "public.wallet_accounts" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "wallet_ledger_org_isolation" for relation "public.wallet_ledger" does not exist, skipping
+psql:/work/supabase/migrations/20260916150000_customer_program_tenant_isolation.sql:45: NOTICE:  policy "referrals_org_isolation" for relation "public.referrals" does not exist, skipping
+BASELINE 20260917100000
+BASELINE 20260917100100
+BASELINE 20260917100200
+BASELINE 20260917100300
+BASELINE 20260918130000
+BASELINE 20260918140000
+BASELINE 20260918150000
+BASELINE 20260918160000
+BASELINE 20260918170000
+BASELINE 20260918180000
+BASELINE 20260919100000
+BASELINE 20260919110000
+BASELINE 20260922100000
+BASELINE 20260922110000
+BASELINE 20260922120000
+BASELINE 20260922130000
+BASELINE 20260922140000
+BASELINE 20260924100000
+BASELINE 20260924110000
+Baseline migrations applied: 37
+INSERT 0 1
+INSERT 0 1
+psql:supabase/seeds/homepaw_demo.sql:160: NOTICE:  HomePaw Demo ready for wbudiman1995@gmail.com. Switch workspace to HomePaw Demo and refresh the session.
+DO
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+Populated baseline counts org,customer,pet,booking: 2,6,7,6
+UPGRADE 20260919120000
+UPGRADE 20260924120000
+UPGRADE 20260924130000
+UPGRADE 20260924140000
+UPGRADE 20260925100000
+UPGRADE 20260926090000
+psql:/work/supabase/migrations/20260926090000_membership_renewal_billing_and_reconciliation.sql:221: NOTICE:  function app.renew_customer_package(uuid,uuid,timestamptz,timestamptz,text,uuid) does not exist, skipping
+UPGRADE 20260927090000
+UPGRADE 20260927100000
+UPGRADE 20260928100000
+UPGRADE 20260929100000
+UPGRADE 20260930100000
+UPGRADE 20261001100000
+UPGRADE 20261002090000
+UPGRADE 20261002100000
+UPGRADE 20261003100000
+UPGRADE 20261010100000
+UPGRADE 20261010110000
+UPGRADE 20261010120000
+UPGRADE 20261012100000
+UPGRADE 20261013100000
+UPGRADE 20261013110000
+UPGRADE 20261014100000
+UPGRADE 20261015100000
+UPGRADE 20261016100000
+UPGRADE 20261016110000
+UPGRADE 20261017100000
+UPGRADE 20261017110000
+UPGRADE 20261018100000
+UPGRADE 20261018110000
+UPGRADE 20261018120000
+UPGRADE 20261019100000
+UPGRADE 20261019110000
+UPGRADE 20261020100000
+UPGRADE 20261020110000
+UPGRADE 20261020120000
+UPGRADE 20261022100000
+UPGRADE 20261022110000
+UPGRADE 20261026100000
+UPGRADE 20261028100000
+UPGRADE 20261028110000
+UPGRADE 20261029100000
+UPGRADE 20261029110000
+UPGRADE 20261029120000
+UPGRADE 20261029130000
+UPGRADE 20261029140000
+UPGRADE 20261029150000
+UPGRADE 20261029160000
+UPGRADE 20261029170000
+Upgrade migrations applied: 48
+After upgrade counts org,customer,pet,booking: 2,6,7,6
+DO
+HOMEPAW OWNER WORKSPACE PROVISION PASS
+INSERT 0 3
+INSERT 0 2
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 12
+INSERT 0 10
+UPDATE 1
+INSERT 0 4
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 4
+INSERT 0 4
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+Pre-SB-06 payroll export detail rows|hash: 1|de8a454dc359c7cb433e5e203d4c70f6
+Pre-size-band fingerprint lines: 23
+SIZE-BAND 20261023100000_size_band_tables.sql
+SIZE-BAND 20261023110000_size_band_shadow_sync.sql
+SIZE-BAND 20261023120000_size_band_resolver.sql
+SIZE-BAND 20261023130000_size_band_integrity.sql
+SIZE-BAND 20261024100000_size_band_management_rpcs.sql
+SIZE-BAND 20261025100000_size_band_booking_customer_adapters.sql
+SIZE-BAND 20261027100000_size_band_payroll.sql
+bookings|7|495de60bb969eabb010b2862365c4417
+customer_package_ledger|5|9c0085385c355c1aebc8aee3a0a1784a
+customer_packages|5|47bdb4ebfb49cac8d36ce27708b144bb
+customers|9|ed189cdfe4bce151745d605c20a079c7
+grooming_job_pets|10|5e2c4fb631fdad14a53378f0c7b2a84a
+grooming_job_pet_services|11|ec8d42ffdb06d9d8b3e60be79cba23a5
+grooming_jobs|7|11efa741aea42aab78d77f17f5238192
+invoice_lines|0|-
+invoices|4|8b70ee9977f39ae03d48db2f6f625730
+organization_dog_size_boundaries|2|6f9d8402c133c0863a8bacb78235e821
+organization_pet_types|12|316e2c4bca55bd40e0de1b60e9c8257d
+organizations|5|47b9268e6185da74fa1c2f323e831eba
+package band distribution|cat=1,extra_small=1,large=1,<null>=3
+packages|6|92b1a18b00603b60a04ea73be6d4ca57
+payments|1|ca2cb141c6b855f90d4728bc108d9f86
+payroll_cycle_settings|1|d6c4ce673e7acb9ed1dcfc2dd1ef1db1
+payroll_items|1|8a8fb8b59052906762ce951ff7905cd2
+payroll_runs|1|c90f9558998ffd4a57430a34dea52271
+pets|29|e1554c360f6a4bd48c40837b6c24a39f
+pets.size distribution|extra_large=5,extra_small=3,large=5,medium=3,<null>=11,small=2
+service_catalog|8|e3fb25b9cd01b0e43aa671fc3056ec54
+snapshot distribution|cat=1,large=2,<null>=7,rabbit=1
+staff_payroll_settings|1|5d4065bb3c5a080cf11049293832327f
+SIZE BAND DATA PRESERVATION PASS (counts and row hashes of pets, snapshots, packages, entitlements, prices, durations, invoices, payroll unchanged)
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+psql:integration/size_band_upgrade_checks.sql:26: NOTICE:  PASS U-03/U-04 5 organizations (incl. soft-deleted, custom-boundary and no-row) backfilled with five legacy bands + cat, legacy mode, boundaries copied verbatim
+DO
+psql:integration/size_band_upgrade_checks.sql:54: NOTICE:  PASS U-01/U-03 resolver parity on populated data: 63 pet x service combinations; every measured dog equals the old function
+DO
+DO
+psql:integration/size_band_upgrade_checks.sql:76: NOTICE:  PASS U-03 service_band_prices backfill equals the legacy price/duration columns (NULL stays no row)
+psql:integration/size_band_upgrade_checks.sql:97: NOTICE:  PASS U-01 migrated packages still enforce the size band on sale; history snapshots stay NULL
+DO
+BEGIN
+psql:integration/size_band_upgrade_checks.sql:164: NOTICE:  PASS SB-06 stored payroll matrices untouched; existing data re-saves unchanged; changed unknown keys refused; compute parity (large = 30000 inherited, flat when a staff matrix omits it)
+psql:integration/size_band_upgrade_checks.sql:164: NOTICE:  PASS SB-06 paid run refuses recompute and stays byte-identical; export detail works on migrated data (live L + untouched snapshot)
+DO
+ROLLBACK
+DO
+psql:integration/size_band_upgrade_checks.sql:181: NOTICE:  PASS SB-06 grants after upgrade: no anon/PUBLIC execute; internals closed; export RPC authenticated-only
+PAYROLL EXPORT PRESERVATION PASS (rows|hash 1|de8a454dc359c7cb433e5e203d4c70f6 identical before and after SB-06)
+SIZE BAND BACKFILL IDEMPOTENCY PASS (bands=30 settings=5 prices=8)
+                                              set_config                                               
+-------------------------------------------------------------------------------------------------------
+ {"sub":"047f1e5c-5935-4566-b793-417df9f7cc9c","active_org_id":"019fbdd0-ee52-7f57-8318-a288203c78c1"}
+(1 row)
+
+NOTICE:  ORGANIZATION EXPORT POPULATED PASS (7 rows across 42 allowlisted tables, every count equals the organization's own)
+                                                          set_config                                                          
+------------------------------------------------------------------------------------------------------------------------------
+ {"sub":"047f1e5c-5935-4566-b793-417df9f7cc9c","role":"authenticated","active_org_id":"019fbdd0-ee52-7f57-8318-a288203c78c1"}
+(1 row)
+
+psql:integration/remaining_nine_upgrade_probe.sql:53: NOTICE:  upgrade probe A: every new surface executes on the upgraded HomePaw workspace
+                                                          set_config                                                          
+------------------------------------------------------------------------------------------------------------------------------
+ {"sub":"5c000000-0000-4000-8000-0000000000a1","role":"authenticated","active_org_id":"5c000000-0000-4000-8000-000000000001"}
+(1 row)
+
+psql:integration/remaining_nine_upgrade_probe.sql:113: NOTICE:  upgrade probe B: derived figures equal independent queries and new features work on populated rows
+psql:integration/remaining_nine_upgrade_probe.sql:130: NOTICE:  REMAINING NINE POPULATED PROBE PASS
+t|t
+POPULATED UPGRADE PASS

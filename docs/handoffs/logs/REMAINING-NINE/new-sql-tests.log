@@ -1,0 +1,338 @@
+######## 20261029100000_test_custom_fields.sql
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: all five field types, both entity scopes
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: typed values stored; old record without values has none
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: identical save is idempotent
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: formula-like text rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: @ text rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: + text rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: control character rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: overlong text rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: exponent number rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: formula number rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: impossible date rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: non-boolean rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: unknown option rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: unknown definition rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: array payload rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: non-string JSON value rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: customer definition on a pet rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: unknown customer rejected
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: failed batch leaves no partial write
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: removed option key refused for new writes
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: option edits keep surviving keys, never reuse keys
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: type cannot change
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: stale definition refused
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: duplicate label (case/space) refused
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: duplicate option refused
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: select without options refused
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: options on non-select refused
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: formula type refused
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: unknown entity refused
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: sort order bound enforced
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: archived definition refuses writes
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: archived definition cannot be edited
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: archive hides/refuses but preserves; unarchive restores
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: blank clears a value
+supabase/tests/20261029100000_test_custom_fields.sql:184: NOTICE:  PASS: pet definition on a customer rejected
+supabase/tests/20261029100000_test_custom_fields.sql:196: NOTICE:  PASS: definition and value changes audited through app.audit_log
+supabase/tests/20261029100000_test_custom_fields.sql:209: NOTICE:  PASS: customer.manage without settings.manage cannot define
+supabase/tests/20261029100000_test_custom_fields.sql:209: NOTICE:  PASS: staff cannot archive
+supabase/tests/20261029100000_test_custom_fields.sql:209: NOTICE:  PASS: staff writes values, reads definitions, cannot define/archive
+supabase/tests/20261029100000_test_custom_fields.sql:221: NOTICE:  PASS: reader cannot write values
+supabase/tests/20261029100000_test_custom_fields.sql:221: NOTICE:  PASS: direct definition insert denied
+supabase/tests/20261029100000_test_custom_fields.sql:221: NOTICE:  PASS: direct value update denied
+supabase/tests/20261029100000_test_custom_fields.sql:221: NOTICE:  PASS: direct value delete denied
+supabase/tests/20261029100000_test_custom_fields.sql:221: NOTICE:  PASS: reader read-only; direct DML denied
+supabase/tests/20261029100000_test_custom_fields.sql:230: NOTICE:  PASS: role without permission cannot write
+supabase/tests/20261029100000_test_custom_fields.sql:230: NOTICE:  PASS: role without customer.read sees nothing
+supabase/tests/20261029100000_test_custom_fields.sql:245: NOTICE:  PASS: tenant B cannot use tenant A definition on its own customer
+supabase/tests/20261029100000_test_custom_fields.sql:245: NOTICE:  PASS: tenant B cannot write tenant A customer
+supabase/tests/20261029100000_test_custom_fields.sql:245: NOTICE:  PASS: tenant B cannot archive tenant A definition
+supabase/tests/20261029100000_test_custom_fields.sql:245: NOTICE:  PASS: tenant B cannot edit tenant A definition
+supabase/tests/20261029100000_test_custom_fields.sql:245: NOTICE:  PASS: tenant isolation (reads, writes, archive, edit)
+supabase/tests/20261029100000_test_custom_fields.sql:253: NOTICE:  PASS: forged active organization refused
+supabase/tests/20261029100000_test_custom_fields.sql:253: NOTICE:  PASS: forged organization claim refused
+supabase/tests/20261029100000_test_custom_fields.sql:277: NOTICE:  PASS: grants, definer search_path
+######## 20261029110000_test_pet_coat_profile.sql
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: repeats counted once each; cancelled/no-show/draft/in-progress/future/skipped/deleted excluded
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: empty history, archived pet, cancelled-only pet
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: null id list rejected
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: more than 100 ids rejected
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: tenant scoped, bounded
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: coat + skin history stored through the guarded RPC; count unaffected by the edit
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: legacy 13-argument caller cannot wipe the coat profile
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: unknown coat type rejected
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: overlong skin history rejected
+supabase/tests/20261029110000_test_pet_coat_profile.sql:175: NOTICE:  PASS: stale version rejected
+supabase/tests/20261029110000_test_pet_coat_profile.sql:184: NOTICE:  PASS: reader cannot edit coat
+supabase/tests/20261029110000_test_pet_coat_profile.sql:184: NOTICE:  PASS: reader reads counts, cannot edit
+supabase/tests/20261029110000_test_pet_coat_profile.sql:188: NOTICE:  PASS: role without customer.read denied
+supabase/tests/20261029110000_test_pet_coat_profile.sql:196: NOTICE:  PASS: org B cannot edit org A pet
+supabase/tests/20261029110000_test_pet_coat_profile.sql:196: NOTICE:  PASS: tenant isolation for stats and edits
+supabase/tests/20261029110000_test_pet_coat_profile.sql:210: NOTICE:  PASS: snapshots untouched, no stored counter, anon/public have no access
+######## 20261029120000_test_settings_and_preferences.sql
+supabase/tests/20261029120000_test_settings_and_preferences.sql:67: NOTICE:  PASS: below minimum rejected
+supabase/tests/20261029120000_test_settings_and_preferences.sql:67: NOTICE:  PASS: above maximum rejected
+supabase/tests/20261029120000_test_settings_and_preferences.sql:67: NOTICE:  PASS: null rejected
+supabase/tests/20261029120000_test_settings_and_preferences.sql:67: NOTICE:  PASS: owner writes validated value, preserves sibling settings
+supabase/tests/20261029120000_test_settings_and_preferences.sql:71: NOTICE:  PASS: settings.manage manager (not owner) cannot write
+supabase/tests/20261029120000_test_settings_and_preferences.sql:75: NOTICE:  PASS: staff in another business cannot write
+supabase/tests/20261029120000_test_settings_and_preferences.sql:81: NOTICE:  PASS: forged org claim by non-member refused
+supabase/tests/20261029120000_test_settings_and_preferences.sql:81: NOTICE:  PASS: non-member cannot set a preference
+supabase/tests/20261029120000_test_settings_and_preferences.sql:95: NOTICE:  PASS: malformed scalar settings normalised
+supabase/tests/20261029120000_test_settings_and_preferences.sql:114: NOTICE:  PASS: cannot choose a page the role cannot open
+supabase/tests/20261029120000_test_settings_and_preferences.sql:114: NOTICE:  PASS: arbitrary route rejected
+supabase/tests/20261029120000_test_settings_and_preferences.sql:114: NOTICE:  PASS: external URL rejected
+supabase/tests/20261029120000_test_settings_and_preferences.sql:114: NOTICE:  PASS: empty string rejected (null clears)
+supabase/tests/20261029120000_test_settings_and_preferences.sql:114: NOTICE:  PASS: valid choices stored; invalid/unpermitted refused
+supabase/tests/20261029120000_test_settings_and_preferences.sql:121: NOTICE:  PASS: saved landing falls back in a business that lacks the capability
+supabase/tests/20261029120000_test_settings_and_preferences.sql:131: NOTICE:  PASS: direct table update denied
+supabase/tests/20261029120000_test_settings_and_preferences.sql:131: NOTICE:  PASS: direct insert denied
+supabase/tests/20261029120000_test_settings_and_preferences.sql:137: NOTICE:  PASS: preferences are isolated per user
+supabase/tests/20261029120000_test_settings_and_preferences.sql:150: NOTICE:  PASS: cannot re-pick a revoked page
+supabase/tests/20261029120000_test_settings_and_preferences.sql:150: NOTICE:  PASS: revoked capability falls back to dashboard; null clears
+supabase/tests/20261029120000_test_settings_and_preferences.sql:159: NOTICE:  PASS: suspended membership falls back
+supabase/tests/20261029120000_test_settings_and_preferences.sql:174: NOTICE:  PASS: malformed stored value impossible
+supabase/tests/20261029120000_test_settings_and_preferences.sql:174: NOTICE:  PASS: grants
+######## 20261029130000_test_finance_cash_position.sql
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: IDR october totals, tz boundary, failed/deleted/other-month exclusion
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: mixed currency kept separate
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: multi-month grouping; refunds counted in the month they were refunded
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: period boundaries follow the requested time zone
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: empty period returns nothing
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: reversed period rejected
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: period longer than 366 days rejected
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: null period rejected
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: unknown time zone rejected
+supabase/tests/20261029130000_test_finance_cash_position.sql:127: NOTICE:  PASS: out-of-range dates rejected
+supabase/tests/20261029130000_test_finance_cash_position.sql:140: NOTICE:  PASS: branch-restricted user sees only own branches; invisible-payment refunds do not leak
+supabase/tests/20261029130000_test_finance_cash_position.sql:146: NOTICE:  PASS: role without finance.read refused
+supabase/tests/20261029130000_test_finance_cash_position.sql:156: NOTICE:  PASS: tenant B sees only tenant B money
+supabase/tests/20261029130000_test_finance_cash_position.sql:160: NOTICE:  PASS: forged active organization refused
+supabase/tests/20261029130000_test_finance_cash_position.sql:171: NOTICE:  PASS: read-only (stable, invoker) and not callable by anon/public
+######## 20261029140000_test_whatsapp_drafts.sql
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: invoice draft, phone normalised from DB, create is idempotent
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: renewal for a non-existent membership refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: void invoice refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: missing phone refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: implausible phone refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: archived customer refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: unresolved template variables refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: control character refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: overlong message refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: empty message refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: unknown source type refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: refusals
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: marked_sent is terminal
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: cannot cancel after marked_sent
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: lifecycle, idempotent repeats, terminal state, new draft after terminal
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: failed cannot jump to opened
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: failed cannot jump to marked_sent
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: canceled is terminal
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: provider-style status rejected
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: read-receipt status rejected
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: overlong note rejected
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: failed/retry/cancel transitions
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: opted-out customer cannot get a draft
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:143: NOTICE:  PASS: opt-out cancels, blocks creation, can be reversed
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:157: NOTICE:  PASS: draft of an archived customer cannot be opened
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:157: NOTICE:  PASS: draft of an archived customer cannot be marked sent
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:157: NOTICE:  PASS: archived source can only be canceled
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:168: NOTICE:  PASS: revoked onboarding link refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:168: NOTICE:  PASS: single-use link secret is never stored
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:168: NOTICE:  PASS: onboarding draft has no recipient and refuses to store the link secret
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:181: NOTICE:  PASS: finance-only cannot create follow-up drafts
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:181: NOTICE:  PASS: finance-only cannot create onboarding drafts
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:181: NOTICE:  PASS: only customer.manage can change opt-out
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:181: NOTICE:  PASS: status rules apply to visible drafts (marked_sent is terminal)
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:181: NOTICE:  PASS: null draft id rejected
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:181: NOTICE:  PASS: finance-only role: invoice drafts only
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:193: NOTICE:  PASS: crm reader cannot create invoice drafts
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:193: NOTICE:  PASS: a draft this role cannot see (or that does not exist) is not found
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:193: NOTICE:  PASS: direct DML denied
+193: NOTICE:  PASS: direct insert denied
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:193: NOTICE:  PASS: crm reader: follow-up drafts only
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:206: NOTICE:  PASS: cannot draft for another tenant's invoice
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:206: NOTICE:  PASS: cannot draft for another tenant's customer
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:206: NOTICE:  PASS: cannot change another tenant's draft
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:206: NOTICE:  PASS: cannot opt out another tenant's customer
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:206: NOTICE:  PASS: tenant isolation
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:210: NOTICE:  PASS: forged active organization refused
+supabase/tests/20261029140000_test_whatsapp_drafts.sql:231: NOTICE:  PASS: audit entries (inserts, status changes with actor, opt-outs) and grants
+######## 20261029150000_test_audit_reconciliation.sql
+supabase/tests/20261029150000_test_audit_reconciliation.sql:130: NOTICE:  PASS: UPDATE events carry only changed fields and the resolved actor
+supabase/tests/20261029150000_test_audit_reconciliation.sql:130: NOTICE:  PASS: secret-looking fields are redacted
+supabase/tests/20261029150000_test_audit_reconciliation.sql:130: NOTICE:  PASS: unknown action filter rejected
+supabase/tests/20261029150000_test_audit_reconciliation.sql:130: NOTICE:  PASS: reversed window rejected
+supabase/tests/20261029150000_test_audit_reconciliation.sql:130: NOTICE:  PASS: half a cursor rejected
+supabase/tests/20261029150000_test_audit_reconciliation.sql:130: NOTICE:  PASS: filters
+supabase/tests/20261029150000_test_audit_reconciliation.sql:130: NOTICE:  PASS: keyset pagination covers every row
+supabase/tests/20261029150000_test_audit_reconciliation.sql:144: NOTICE:  PASS: branch-limited and capability-limited audit view
+supabase/tests/20261029150000_test_audit_reconciliation.sql:146: NOTICE:  PASS: role without reports.view refused
+supabase/tests/20261029150000_test_audit_reconciliation.sql:148: NOTICE:  PASS: groomer refused
+supabase/tests/20261029150000_test_audit_reconciliation.sql:156: NOTICE:  PASS: tenant isolation of the audit view
+supabase/tests/20261029150000_test_audit_reconciliation.sql:158: NOTICE:  PASS: forged organization refused
+supabase/tests/20261029150000_test_audit_reconciliation.sql:219: NOTICE:  PASS: invoice discrepancies (void, refunded, mixed currency, branch rows, failed payments ignored)
+supabase/tests/20261029150000_test_audit_reconciliation.sql:219: NOTICE:  PASS: half a cursor rejected
+supabase/tests/20261029150000_test_audit_reconciliation.sql:225: NOTICE:  PASS: branch scope applies to invoice reconciliation
+supabase/tests/20261029150000_test_audit_reconciliation.sql:227: NOTICE:  PASS: groomer without finance.read refused
+supabase/tests/20261029150000_test_audit_reconciliation.sql:232: NOTICE:  PASS: tenant isolation of invoice reconciliation
+supabase/tests/20261029150000_test_audit_reconciliation.sql:261: NOTICE:  PASS: completed visits without a valid (non-void) invoice are exactly the unbilled ones
+supabase/tests/20261029150000_test_audit_reconciliation.sql:264: NOTICE:  PASS: caller who cannot read orders is refused rather than shown false positives
+supabase/tests/20261029150000_test_audit_reconciliation.sql:269: NOTICE:  PASS: unbilled visit reconciliation tenant isolation
+supabase/tests/20261029150000_test_audit_reconciliation.sql:315: NOTICE:  PASS: clean published payroll is quiet; legacy snapshot is reported without guessing; unpublished is out of scope
+supabase/tests/20261029150000_test_audit_reconciliation.sql:331: NOTICE:  PASS: deleted source edge is reported as source_reduced
+supabase/tests/20261029150000_test_audit_reconciliation.sql:351: NOTICE:  PASS: voided invoice behind a published payroll item is reported as source_reduced
+supabase/tests/20261029150000_test_audit_reconciliation.sql:366: NOTICE:  PASS: bounded payroll scan continues until the published set is exhausted
+supabase/tests/20261029150000_test_audit_reconciliation.sql:370: NOTICE:  PASS: reader without payroll.read refused
+supabase/tests/20261029150000_test_audit_reconciliation.sql:375: NOTICE:  PASS: payroll scan tenant isolation
+supabase/tests/20261029150000_test_audit_reconciliation.sql:377: NOTICE:  PASS: forged organization refused for payroll scan
+supabase/tests/20261029150000_test_audit_reconciliation.sql:396: NOTICE:  PASS: payroll history untouched; grants and search_path
+######## 20261029155000_test_access_policy_regression.sql
+supabase/tests/20261029155000_test_access_policy_regression.sql:98: NOTICE:  PASS: sanity: this identity is the Operro platform owner
+supabase/tests/20261029155000_test_access_policy_regression.sql:98: NOTICE:  PASS: platform owner can switch into the suspended workspace
+supabase/tests/20261029155000_test_access_policy_regression.sql:98: NOTICE:  PASS: platform-owner superuser policy: membership and permissions in the suspended workspace
+supabase/tests/20261029155000_test_access_policy_regression.sql:98: NOTICE:  PASS: platform owner reads the suspended workspace's payroll rows through RLS
+supabase/tests/20261029155000_test_access_policy_regression.sql:98: NOTICE:  PASS: platform owner reads the suspended workspace's finance rows through RLS
+supabase/tests/20261029155000_test_access_policy_regression.sql:98: NOTICE:  PASS: platform owner reads and changes the suspended workspace's Admin checklist and member list
+supabase/tests/20261029155000_test_access_policy_regression.sql:98: NOTICE:  PASS: the checklist can never carry access-management permissions, even for the platform owner
+supabase/tests/20261029155000_test_access_policy_regression.sql:98: NOTICE:  PASS: unknown permission keys are rejected
+supabase/tests/20261029155000_test_access_policy_regression.sql:115: NOTICE:  PASS: token hook stamps the platform flag from the profile, not from the request
+supabase/tests/20261029155000_test_access_policy_regression.sql:115: NOTICE:  PASS: platform owner keeps the suspended workspace after token refresh
+supabase/tests/20261029155000_test_access_policy_regression.sql:115: NOTICE:  PASS: the suspended business's own owner does NOT keep it after token refresh
+supabase/tests/20261029155000_test_access_policy_regression.sql:115: NOTICE:  PASS: a forged is_platform_admin claim is overwritten by the profile value
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: Admin holds exactly the owner-chosen checklist
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: tenant Admin cannot change the checklist
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: tenant Admin cannot read the access payload
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: tenant Admin cannot demote the owner
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: tenant Admin cannot promote themselves to owner
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: tenant Admin cannot issue invitations
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: direct role_permissions writes are revoked
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: direct membership writes are revoked
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: direct organization status writes are revoked
+supabase/tests/20261029155000_test_access_policy_regression.sql:135: NOTICE:  PASS: tenant Admin cannot suspend a workspace
+supabase/tests/20261029155000_test_access_policy_regression.sql:144: NOTICE:  PASS: suspended workspace: stale Admin token carries no authority
+supabase/tests/20261029155000_test_access_policy_regression.sql:144: NOTICE:  PASS: suspended workspace: stale Admin token reads no tenant rows
+supabase/tests/20261029155000_test_access_policy_regression.sql:144: NOTICE:  PASS: suspended workspace: Admin cannot change the checklist
+supabase/tests/20261029155000_test_access_policy_regression.sql:152: NOTICE:  PASS: suspended workspace: even its own owner cannot change the checklist (platform owner only)
+supabase/tests/20261029155000_test_access_policy_regression.sql:152: NOTICE:  PASS: suspended workspace: its owner cannot read the access payload
+supabase/tests/20261029155000_test_access_policy_regression.sql:152: NOTICE:  PASS: suspended workspace: its owner cannot switch into it
+supabase/tests/20261029155000_test_access_policy_regression.sql:164: NOTICE:  PASS: active business owner manages their own checklist
+supabase/tests/20261029155000_test_access_policy_regression.sql:164: NOTICE:  PASS: business owner A cannot change business B's checklist
+supabase/tests/20261029155000_test_access_policy_regression.sql:164: NOTICE:  PASS: business owner A cannot read business B's access payload
+supabase/tests/20261029155000_test_access_policy_regression.sql:164: NOTICE:  PASS: business owner A reads none of business B's payroll rows
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: sanity: the helper keeps normal operational capabilities
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: Bantuan Operro lacks payroll.read
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: Bantuan Operro lacks payroll.manage
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: Bantuan Operro lacks payroll.approve
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: Bantuan Operro lacks finance.read
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: Bantuan Operro lacks reports.view
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: Bantuan Operro lacks roles.manage
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: Bantuan Operro lacks users.manage
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: payroll_runs hidden by RLS
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: payroll_items hidden by RLS
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: finance tables hidden by RLS
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: sanity: the helper still reads customers of its own workspace
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: payroll export RPC denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: payroll recompute RPC denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: finance cash position denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: invoice/payment reconciliation denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: payroll reconciliation denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: audit viewer denied (reports.view)
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: payment register returns no rows
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: access payload denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: checklist denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: role management denied (no self-promotion)
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: invitations denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:195: NOTICE:  PASS: direct permission edits denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:203: NOTICE:  PASS: superuser policy: the server-stamped claim grants authority anywhere
+supabase/tests/20261029155000_test_access_policy_regression.sql:208: NOTICE:  PASS: without the claim the same user has nothing in a foreign workspace
+supabase/tests/20261029155000_test_access_policy_regression.sql:208: NOTICE:  PASS: and sees no foreign rows
+supabase/tests/20261029155000_test_access_policy_regression.sql:219: NOTICE:  PASS: suspended membership: stale token denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:227: NOTICE:  PASS: deactivated user profile: stale token denied
+supabase/tests/20261029155000_test_access_policy_regression.sql:237: NOTICE:  PASS: revoked capability: only that capability is lost, immediately
+supabase/tests/20261029155000_test_access_policy_regression.sql:247: NOTICE:  PASS: workspace suspended while a token is live: its owner loses tenant access at once
+supabase/tests/20261029155000_test_access_policy_regression.sql:247: NOTICE:  PASS: workspace suspended while a token is live: its owner loses checklist control at once
+supabase/tests/20261029155000_test_access_policy_regression.sql:254: NOTICE:  PASS: platform owner still controls the checklist of the newly suspended workspace
+supabase/tests/20261029155000_test_access_policy_regression.sql:267: NOTICE:  PASS: access-management functions are not callable by anon or PUBLIC
+######## 20261029160000_test_storage_cleanup.sql
+supabase/tests/20261029160000_test_storage_cleanup.sql:109: NOTICE:  PASS: dry run lists exactly the expired, unreferenced, in-prefix, retention-managed objects (got {0001,0002,0004,0013})
+supabase/tests/20261029160000_test_storage_cleanup.sql:109: NOTICE:  PASS: candidate count recorded
+supabase/tests/20261029160000_test_storage_cleanup.sql:109: NOTICE:  PASS: dry run changed no attachment
+supabase/tests/20261029160000_test_storage_cleanup.sql:109: NOTICE:  PASS: dry run is its own completed bookkeeping record
+supabase/tests/20261029160000_test_storage_cleanup.sql:109: NOTICE:  PASS: preview is bounded by the requested limit
+supabase/tests/20261029160000_test_storage_cleanup.sql:109: NOTICE:  PASS: an oversized limit is clamped, never unbounded
+supabase/tests/20261029160000_test_storage_cleanup.sql:109: NOTICE:  PASS: only the business owner may apply (settings.manage is not enough)
+supabase/tests/20261029160000_test_storage_cleanup.sql:109: NOTICE:  PASS: only the business owner may record results
+supabase/tests/20261029160000_test_storage_cleanup.sql:109: NOTICE:  PASS: only the business owner may finish
+supabase/tests/20261029160000_test_storage_cleanup.sql:117: NOTICE:  PASS: apply without a preview is refused
+supabase/tests/20261029160000_test_storage_cleanup.sql:117: NOTICE:  PASS: an item id is not a preview id
+supabase/tests/20261029160000_test_storage_cleanup.sql:122: NOTICE:  PASS: a preview older than 24 hours is stale
+supabase/tests/20261029160000_test_storage_cleanup.sql:131: NOTICE:  PASS: another tenant cannot apply this tenant's preview
+supabase/tests/20261029160000_test_storage_cleanup.sql:131: NOTICE:  PASS: tenant B sees none of tenant A's cleanup records
+supabase/tests/20261029160000_test_storage_cleanup.sql:165: NOTICE:  PASS: apply marks only items still eligible; ones that changed since the preview are skipped (marked 2, skipped 2)
+supabase/tests/20261029160000_test_storage_cleanup.sql:165: NOTICE:  PASS: metadata is tombstoned BEFORE any object removal is reported
+supabase/tests/20261029160000_test_storage_cleanup.sql:165: NOTICE:  PASS: an attachment that became referenced after the preview is left alone
+supabase/tests/20261029160000_test_storage_cleanup.sql:165: NOTICE:  PASS: graced, referenced, proof, foreign-prefix, malformed, unmanaged and complaint attachments are untouched
+supabase/tests/20261029160000_test_storage_cleanup.sql:165: NOTICE:  PASS: runner receives exactly the two objects to remove
+supabase/tests/20261029160000_test_storage_cleanup.sql:165: NOTICE:  PASS: run holds the lease
+supabase/tests/20261029160000_test_storage_cleanup.sql:165: NOTICE:  PASS: a second run for the same organization is refused while the first holds its lease
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: unknown result value rejected
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: malformed item id rejected
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: non-array payload rejected
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: recording against a run that is not running is refused
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: results recorded
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: repeating a settled result changes nothing (idempotent)
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: a deleted item can never be flipped back
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: a run with a failed object finishes partial, not completed
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: finishing twice is a no-op
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: failed object stays pending with an attempt count
+supabase/tests/20261029160000_test_storage_cleanup.sql:183: NOTICE:  PASS: run summary counts
+supabase/tests/20261029160000_test_storage_cleanup.sql:203: NOTICE:  PASS: objects already tombstoned are no longer candidates
+supabase/tests/20261029160000_test_storage_cleanup.sql:203: NOTICE:  PASS: retry hands back the failed object
+supabase/tests/20261029160000_test_storage_cleanup.sql:203: NOTICE:  PASS: an object that is already gone is recorded as missing
+supabase/tests/20261029160000_test_storage_cleanup.sql:203: NOTICE:  PASS: nothing pending: completed
+supabase/tests/20261029160000_test_storage_cleanup.sql:203: NOTICE:  PASS: retry run summary
+supabase/tests/20261029160000_test_storage_cleanup.sql:203: NOTICE:  PASS: repeating the whole cycle is a no-op
+supabase/tests/20261029160000_test_storage_cleanup.sql:228: NOTICE:  PASS: after 5 failed attempts the object is abandoned for manual attention
+supabase/tests/20261029160000_test_storage_cleanup.sql:228: NOTICE:  PASS: an abandoned object is no longer retried automatically
+supabase/tests/20261029160000_test_storage_cleanup.sql:228: NOTICE:  PASS: abandoned objects keep runs visible as partial
+supabase/tests/20261029160000_test_storage_cleanup.sql:244: NOTICE:  PASS: a run whose lease lapsed is abandoned
+supabase/tests/20261029160000_test_storage_cleanup.sql:244: NOTICE:  PASS: and a new run can start
+supabase/tests/20261029160000_test_storage_cleanup.sql:254: NOTICE:  PASS: tenant B previews only its own object
+supabase/tests/20261029160000_test_storage_cleanup.sql:254: NOTICE:  PASS: the eligibility function is not callable by clients
+supabase/tests/20261029160000_test_storage_cleanup.sql:271: NOTICE:  PASS: runs, items and tombstoned attachments are audited
+supabase/tests/20261029160000_test_storage_cleanup.sql:271: NOTICE:  PASS: grants and search_path
+######## 20261029170000_test_health_recovery.sql
+supabase/tests/20261029170000_test_health_recovery.sql:90: NOTICE:  PASS: schema version reported
+supabase/tests/20261029170000_test_health_recovery.sql:90: NOTICE:  PASS: failed and stale-running exports are counted for this tenant only
+supabase/tests/20261029170000_test_health_recovery.sql:90: NOTICE:  PASS: last completed export is reported
+supabase/tests/20261029170000_test_health_recovery.sql:90: NOTICE:  PASS: partial cleanup run, lapsed lease and pending objects are surfaced
+supabase/tests/20261029170000_test_health_recovery.sql:90: NOTICE:  PASS: pending and stale capacity requests are surfaced
+supabase/tests/20261029170000_test_health_recovery.sql:90: NOTICE:  PASS: a business owner receives no platform-wide section
+supabase/tests/20261029170000_test_health_recovery.sql:90: NOTICE:  PASS: raw failure text and other tenants never appear
+supabase/tests/20261029170000_test_health_recovery.sql:90: NOTICE:  PASS: no credential, path, billing or size field is exposed
+supabase/tests/20261029170000_test_health_recovery.sql:97: NOTICE:  PASS: a non-owner manager (even with settings.manage and reports.view) cannot read health
+supabase/tests/20261029170000_test_health_recovery.sql:97: NOTICE:  PASS: a non-owner manager cannot read recovery status
+supabase/tests/20261029170000_test_health_recovery.sql:99: NOTICE:  PASS: forged organization claim refused
+supabase/tests/20261029170000_test_health_recovery.sql:105: NOTICE:  PASS: tenant B sees only tenant B counts
+supabase/tests/20261029170000_test_health_recovery.sql:105: NOTICE:  PASS: tenant B has no stale running export (tenant A's does not leak)
+supabase/tests/20261029170000_test_health_recovery.sql:115: NOTICE:  PASS: grants
+supabase/tests/20261029170000_test_health_recovery.sql:124: NOTICE:  PASS: with no drill on record the status says so (recovery is not proven)
+supabase/tests/20261029170000_test_health_recovery.sql:124: NOTICE:  PASS: a business owner cannot record a platform restore drill
+supabase/tests/20261029170000_test_health_recovery.sql:141: NOTICE:  PASS: a drill dated in the future is rejected
+supabase/tests/20261029170000_test_health_recovery.sql:141: NOTICE:  PASS: unknown outcome rejected
+supabase/tests/20261029170000_test_health_recovery.sql:141: NOTICE:  PASS: a drill may not claim to have restored over production
+supabase/tests/20261029170000_test_health_recovery.sql:141: NOTICE:  PASS: negative RPO rejected
+supabase/tests/20261029170000_test_health_recovery.sql:141: NOTICE:  PASS: a connection string in notes is refused
+supabase/tests/20261029170000_test_health_recovery.sql:141: NOTICE:  PASS: a bearer token in the evidence reference is refused
+supabase/tests/20261029170000_test_health_recovery.sql:141: NOTICE:  PASS: a password in notes is refused
+supabase/tests/20261029170000_test_health_recovery.sql:141: NOTICE:  PASS: platform owner sees full detail of the latest drill
+supabase/tests/20261029170000_test_health_recovery.sql:141: NOTICE:  PASS: platform owner reads the drill history
+supabase/tests/20261029170000_test_health_recovery.sql:148: NOTICE:  PASS: business owner sees the date and outcome of the last drill
+supabase/tests/20261029170000_test_health_recovery.sql:148: NOTICE:  PASS: but none of the platform notes, evidence or targets (tenant redaction)
+supabase/tests/20261029170000_test_health_recovery.sql:148: NOTICE:  PASS: and a business owner cannot read the drill rows directly even though two exist
+supabase/tests/20261029170000_test_health_recovery.sql:157: NOTICE:  PASS: drills cannot be edited
+supabase/tests/20261029170000_test_health_recovery.sql:157: NOTICE:  PASS: drills cannot be deleted
+supabase/tests/20261029170000_test_health_recovery.sql:166: NOTICE:  PASS: platform owner gets platform-wide counts
+supabase/tests/20261029170000_test_health_recovery.sql:166: NOTICE:  PASS: platform counts carry no tenant names or raw text

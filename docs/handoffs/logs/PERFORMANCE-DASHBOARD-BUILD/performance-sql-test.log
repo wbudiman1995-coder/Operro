@@ -1,0 +1,189 @@
+=== 20261030100000_test_performance_dashboard.sql
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+BEGIN
+INSERT 0 2
+INSERT 0 2
+INSERT 0 20
+INSERT 0 3
+INSERT 0 7
+INSERT 0 5
+INSERT 0 3
+INSERT 0 1
+INSERT 0 2
+INSERT 0 4
+INSERT 0 1
+INSERT 0 5
+INSERT 0 7
+UPDATE 7
+INSERT 0 7
+INSERT 0 1
+INSERT 0 10
+INSERT 0 14
+INSERT 0 11
+INSERT 0 13
+INSERT 0 5
+SET
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:175: NOTICE:  PASS: complete allowlist stored; legacy four-key payload preserves the three performance keys
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:175: NOTICE:  PASS: old tenant keeps new keys absent; unrelated settings preserved
+DO
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:183: NOTICE:  PASS: partial new-key set rejected
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:183: NOTICE:  PASS: non-boolean new key rejected
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:183: NOTICE:  PASS: unknown key rejected
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:183: NOTICE:  PASS: legacy keys still required
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:183: NOTICE:  PASS: null legacy value rejected
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:183: NOTICE:  PASS: array rejected
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:187: NOTICE:  PASS: role without settings.manage refused
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:191: NOTICE:  PASS: forged organization cannot write settings
+DO
+RESET
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:197: NOTICE:  PASS: other tenant settings untouched
+DO
+SET
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:216: NOTICE:  PASS: operations current/previous, draft + soft-deleted excluded, Jakarta day boundaries
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:216: NOTICE:  PASS: empty period returns two zero rows
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:216: NOTICE:  PASS: a 366-day range is accepted
+DO
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:225: NOTICE:  PASS: 367-day range rejected (equal-length comparison supplied)
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:225: NOTICE:  PASS: inverted range rejected
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:225: NOTICE:  PASS: non-adjacent comparison rejected
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:225: NOTICE:  PASS: unequal-length comparison rejected
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:225: NOTICE:  PASS: null date rejected
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:225: NOTICE:  PASS: unknown time zone rejected
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:225: NOTICE:  PASS: out-of-range dates rejected
+DO
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:253: NOTICE:  PASS: issued / collected / refunded per currency and period; void, pending, failed excluded
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:253: NOTICE:  PASS: finance boundaries follow the requested time zone
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:253: NOTICE:  PASS: outstanding snapshot nets partial payments, ignores zero-due invoices, separates currency
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:253: NOTICE:  PASS: empty period returns no period rows (never invented zeros)
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:269: NOTICE:  PASS: branch-restricted finance sees only its own branch, including refunds and outstanding
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:269: NOTICE:  PASS: branch-restricted operations see only their own branch
+DO
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:272: NOTICE:  PASS: branch-restricted caller refused source performance (customers have no branch)
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:281: NOTICE:  PASS: no finance.read: finance refused
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:281: NOTICE:  PASS: no customer.read: sources refused
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:281: NOTICE:  PASS: booking.read alone still gets operations
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:286: NOTICE:  PASS: customers-only role: finance refused
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:286: NOTICE:  PASS: customers-only role: operations refused
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:291: NOTICE:  PASS: Groomer role refused (RLS would silently truncate)
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:291: NOTICE:  PASS: Groomer role refused operations
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:324: NOTICE:  PASS: sources are normalized; first completed / first paid counted once per customer in the right period
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:324: NOTICE:  PASS: missing source reported honestly; payments on void invoices are not a first payment
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:324: NOTICE:  PASS: customers registered earlier count only for first business; archived and deleted customers excluded
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:324: NOTICE:  PASS: source function returns counts only
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:334: NOTICE:  PASS: without booking.read / finance.read the dependent columns are NULL, not zero
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:348: NOTICE:  PASS: tenant B sees only tenant B
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:354: NOTICE:  PASS: forged organization: finance refused
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:354: NOTICE:  PASS: forged organization: operations refused
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:354: NOTICE:  PASS: forged organization: sources refused
+DO
+SET
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:363: NOTICE:  PASS: anon cannot execute finance aggregate
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:363: NOTICE:  PASS: anon cannot execute operations aggregate
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:363: NOTICE:  PASS: anon cannot execute source aggregate
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:363: NOTICE:  PASS: anon cannot save card settings
+DO
+RESET
+INSERT 0 12
+SET
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:383: NOTICE:  PASS: output bounded to ten named sources plus one other and one missing row; totals preserved
+DO
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:395: NOTICE:  PASS: a caller with no branch grant sees no bookings through the aggregate
+DO
+RESET
+UPDATE 1
+SET
+ act_as 
+--------
+ 
+(1 row)
+
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:404: NOTICE:  PASS: revoked membership: operations refused
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:404: NOTICE:  PASS: revoked membership: finance refused
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:404: NOTICE:  PASS: revoked membership: sources refused
+DO
+RESET
+psql:/repo/supabase/tests/20261030100000_test_performance_dashboard.sql:427: NOTICE:  PASS: read-only (stable, empty search_path), no anon/public execute, schema version bumped
+DO
+ROLLBACK

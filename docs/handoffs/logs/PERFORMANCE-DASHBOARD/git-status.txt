@@ -1,0 +1,37 @@
+## codex/parity-orchestration...origin/codex/parity-orchestration
+ M apps/web/src/app/dashboard/page.tsx
+ M apps/web/src/components/dashboard-shell.tsx
+ M apps/web/src/lib/dashboard-read-model.ts
+ M apps/web/src/lib/health.ts
+ M apps/web/test/control-plane-ui.test.tsx
+ M apps/web/test/dashboard-read-model.test.ts
+ M apps/web/test/remaining-nine-ui.test.tsx
+ M integration/run_populated_upgrade_rehearsal.sh
+ M run_all_gates.sh
+ M supabase/tests/20261029170000_test_health_recovery.sql
+?? agent-bundles/Operro-Claude-Performance-Dashboard-4902945.zip
+?? agent-bundles/Operro-DeepSeek-Engine-1-Owner-Experience-20261009.zip
+?? agent-bundles/Operro-DeepSeek-Engine-2-Operations-20261009.zip
+?? agent-bundles/Operro-DeepSeek-Engine-3-Platform-Resilience-20261009.zip
+?? apps/web/src/components/performance-dashboard.tsx
+?? apps/web/src/lib/dashboard-performance.ts
+?? apps/web/src/lib/dashboard-period.ts
+?? apps/web/test/dashboard-performance.test.tsx
+?? apps/web/test/dashboard-period.test.ts
+?? deepseek-outsourcing/2026-10-09/
+?? docs/agent-work/CLAUDE-DYNAMIC-SIZE-BUNDLE-4.md
+?? docs/agent-work/CLAUDE-NEXT-BIG-BUILD-20261009.md
+?? docs/agent-work/CLAUDE-PERFORMANCE-DASHBOARD-BUILD-20261010.md
+?? docs/agent-work/CLAUDE-PERFORMANCE-DASHBOARD-MANIFEST-20261010.txt
+?? docs/agent-work/CLAUDE-REMAINING-NINE-TASKS-20261009.md
+?? docs/handoffs/CLAUDE-PERFORMANCE-DASHBOARD-HANDOFF.md
+?? docs/handoffs/logs/CONTROL-PLANE/
+?? docs/handoffs/logs/INTEGRATION/sb06-populated-upgrade.log
+?? docs/handoffs/logs/PERFORMANCE-DASHBOARD/
+?? docs/handoffs/logs/REMAINING-NINE-REVIEW-FIX/
+?? docs/handoffs/logs/REMAINING-NINE/
+?? integration/performance_dashboard_upgrade_probe.sql
+?? scripts/build-claude-performance-dashboard-packet.ps1
+?? scripts/build-deepseek-chat-packets.ps1
+?? supabase/migrations/20261030100000_performance_dashboard.sql
+?? supabase/tests/20261030100000_test_performance_dashboard.sql

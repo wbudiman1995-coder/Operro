@@ -1,0 +1,12 @@
+4902945 feat(parity): complete remaining HomePaw workstreams
+45fc289 feat(dashboard): add configurable card visibility
+25f150e Add organization export verifier
+a2c5fe6 Complete dynamic size band integration
+04aecd3 Add agent handoff and bundle artifacts
+efebb76 Add scoped dashboard metrics and audit history
+fa272fe Add tenant-safe Customer 360 pet editing
+95ab4bd Add dynamic size booking and customer adapters
+7c7f585 Add dynamic size band management
+3063ec3 Add guarded Customer 360 profile editing
+5d454fe Add tenant-safe CRM bulk editing
+8758cff Add dynamic size band database foundation

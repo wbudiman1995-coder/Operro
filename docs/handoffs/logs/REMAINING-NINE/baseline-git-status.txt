@@ -1,0 +1,46 @@
+$ git status --short --branch        (captured before any edit, 9 Oct 2026)
+## codex/parity-orchestration...origin/codex/parity-orchestration
+ M apps/web/test/authorization.test.ts
+ M apps/web/test/org-export-contract.test.ts
+ M integration/retention_renewal_followups_smoke.sql
+ M integration/run_populated_upgrade_rehearsal.sh
+ M run_all_gates.sh
+ M supabase/migrations/20261027100000_size_band_payroll.sql
+ M supabase/migrations/20261028100000_org_export_foundation.sql
+?? agent-bundles/Operro-DeepSeek-Engine-1-Owner-Experience-20261009.zip
+?? agent-bundles/Operro-DeepSeek-Engine-2-Operations-20261009.zip
+?? agent-bundles/Operro-DeepSeek-Engine-3-Platform-Resilience-20261009.zip
+?? apps/web/test/control-plane-ui.test.tsx
+?? deepseek-outsourcing/2026-10-09/
+?? docs/agent-work/CLAUDE-DYNAMIC-SIZE-BUNDLE-4.md
+?? docs/agent-work/CLAUDE-NEXT-BIG-BUILD-20261009.md
+?? docs/agent-work/CLAUDE-REMAINING-NINE-TASKS-20261009.md
+?? docs/handoffs/CLAUDE-CONTROL-PLANE-BATCH-HANDOFF.md
+?? docs/handoffs/logs/CONTROL-PLANE/
+?? docs/handoffs/logs/INTEGRATION/sb06-populated-upgrade.log
+?? scripts/build-deepseek-chat-packets.ps1
+?? supabase/tests/20261028100000_test_org_export.sql
+
+$ git log --oneline -4
+45fc289 feat(dashboard): add configurable card visibility
+25f150e Add organization export verifier
+a2c5fe6 Complete dynamic size band integration
+04aecd3 Add agent handoff and bundle artifacts
+
+$ git diff --stat
+ apps/web/test/authorization.test.ts                | 11 +++---
+ apps/web/test/org-export-contract.test.ts          |  9 +++++
+ integration/retention_renewal_followups_smoke.sql  |  4 +++
+ integration/run_populated_upgrade_rehearsal.sh     | 39 ++++++++++++++++++++++
+ run_all_gates.sh                                   |  4 ++-
+ .../20261027100000_size_band_payroll.sql           |  7 ++--
+ .../20261028100000_org_export_foundation.sql       | 23 +++++++----
+ 7 files changed, 82 insertions(+), 15 deletions(-)
+
+$ git diff -- apps/web supabase integration run_all_gates.sh
+See baseline-git-diff.txt. It was printed in full in the session before the first edit; the file is regenerated with difflib from HEAD and
+the tree as found (this session's own additive hunks in run_all_gates.sh and run_populated_upgrade_rehearsal.sh removed), so line counts can
+differ slightly from git's own diff --stat above. The seven files are the previous session's work (docs/handoffs/CLAUDE-CONTROL-PLANE-BATCH-HANDOFF.md):
+stale authorization.test.ts Customer 360 `history` expectations, export completeness enforced in SQL, `search_path = ''` on two payroll definers,
+the GATE 7d fixture `reset role`, the export probe in the populated-upgrade rehearsal, and the export/dashboard entries in run_all_gates.sh.
+They were inspected and left as found.

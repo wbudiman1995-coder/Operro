@@ -1,0 +1,33 @@
+                                                                              fn                                                                              | definer |         config          | anon | authenticated | public_exec 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------+---------+-------------------------+------+---------------+-------------
+ compute_payroll_item(p_org uuid, p_membership uuid, p_period_start date, p_period_end date)                                                                  | t       | search_path=""          | f    | f             | f
+ org_export_authorized()                                                                                                                                      | t       | search_path=""          | f    | f             | f
+ org_export_cancel(p_job uuid, p_reason text)                                                                                                                 | t       | search_path=""          | f    | t             | f
+ org_export_chunks(p_job uuid)                                                                                                                                | t       | search_path=""          | f    | t             | f
+ org_export_complete(p_job uuid, p_manifest jsonb)                                                                                                            | t       | search_path=""          | f    | t             | f
+ org_export_configuration()                                                                                                                                   | t       | search_path=""          | f    | t             | f
+ org_export_finish_table(p_job uuid, p_table text, p_after_id uuid)                                                                                           | t       | search_path=""          | f    | t             | f
+ org_export_list()                                                                                                                                            | t       | search_path=""          | f    | t             | f
+ org_export_manifest(p_job uuid)                                                                                                                              | t       | search_path=""          | f    | t             | f
+ org_export_next_work(p_job uuid)                                                                                                                             | t       | search_path=""          | f    | t             | f
+ org_export_record_chunk(p_job uuid, p_table text, p_index integer, p_row_count integer, p_sha256 text, p_first_id uuid, p_last_id uuid, p_storage_path text) | t       | search_path=""          | f    | t             | f
+ org_export_start(p_include_storage boolean)                                                                                                                  | t       | search_path=""          | f    | t             | f
+ org_export_storage_listing(p_job uuid)                                                                                                                       | t       | search_path=""          | f    | t             | f
+ org_export_table_page(p_job uuid, p_table text, p_after_id uuid, p_limit integer)                                                                            | t       | search_path=""          | f    | t             | f
+ org_export_tables(p_job uuid)                                                                                                                                | t       | search_path=""          | f    | t             | f
+ payroll_eligible_pets(p_org uuid, p_period_start date, p_period_end date)                                                                                    | t       | search_path=app, public | f    | f             | f
+ payroll_export_detail_rows(p_org uuid, p_period_start date, p_period_end date)                                                                               | t       | search_path=""          | f    | t             | f
+ payroll_pet_size_key(p_org uuid, p_species text, p_weight numeric, p_stored_size text)                                                                       | t       | search_path=""          | f    | f             | f
+ payroll_transport_shares(p_org uuid, p_period_start date, p_period_end date)                                                                                 | t       | search_path=app, public | f    | f             | f
+ tg_validate_payroll_size_matrix()                                                                                                                            | t       | search_path=""          | f    | f             | f
+ update_dashboard_card_settings(p_cards jsonb)                                                                                                                | t       | search_path=""          | f    | t             | f
+(21 rows)
+
+ ?column? |             relname             | rls | anon_sel | auth_sel | auth_ins 
+----------+---------------------------------+-----+----------+----------+----------
+ tables   | organization_export_chunks      | t   | f        | f        | f
+ tables   | organization_export_jobs        | t   | f        | f        | f
+ tables   | organization_export_table_specs | t   | f        | f        | f
+ tables   | organization_export_table_state | t   | f        | f        | f
+(4 rows)
+

@@ -1,0 +1,46 @@
+## codex/parity-orchestration
+ M apps/web/package.json
+ M apps/web/src/app/catalog/actions.ts
+ M apps/web/src/app/dashboard/page.tsx
+ M apps/web/src/app/payroll/page.tsx
+ M apps/web/src/app/payroll/payroll-actions.ts
+ M apps/web/src/app/settings/storage/page.tsx
+ M apps/web/src/components/dashboard-shell.tsx
+ M apps/web/src/components/payroll-settings-form.tsx
+ M apps/web/src/components/payroll-staff-card.tsx
+ M apps/web/src/lib/dashboard-read-model.ts
+ M apps/web/src/lib/payroll-data.ts
+ M apps/web/src/lib/payroll-export.ts
+ M apps/web/src/lib/pilot-data.ts
+ M apps/web/src/lib/size-bands.ts
+ M apps/web/test/dashboard-read-model.test.ts
+ M integration/run_populated_upgrade_rehearsal.sh
+ M integration/size_band_management_smoke.sql
+ M integration/size_band_upgrade_checks.sql
+ M integration/size_band_upgrade_fixture.sql
+ M run_all_gates.sh
+ M supabase/tests/20261001100000_test_payroll_engine.sql
+?? agent-bundles/Operro-DeepSeek-Engine-1-Owner-Experience-20261009.zip
+?? agent-bundles/Operro-DeepSeek-Engine-2-Operations-20261009.zip
+?? agent-bundles/Operro-DeepSeek-Engine-3-Platform-Resilience-20261009.zip
+?? apps/web/src/app/dashboard/actions.ts
+?? apps/web/src/app/settings/storage/export-actions.ts
+?? apps/web/src/components/dashboard-settings-form.tsx
+?? apps/web/src/components/organization-export-panel.tsx
+?? apps/web/src/lib/org-export-manifest.ts
+?? apps/web/src/lib/org-export-verify.ts
+?? apps/web/src/lib/org-export.ts
+?? apps/web/src/lib/payroll-size-matrix.ts
+?? apps/web/test/catalog-actions-validation.test.ts
+?? apps/web/test/org-export-contract.test.ts
+?? apps/web/test/payroll-dynamic-size.test.ts
+?? deepseek-outsourcing/2026-10-09/
+?? docs/agent-work/CLAUDE-DYNAMIC-SIZE-BUNDLE-4.md
+?? docs/agent-work/CLAUDE-NEXT-BIG-BUILD-20261009.md
+?? docs/handoffs/logs/INTEGRATION/sb06-populated-upgrade.log
+?? integration/size_band_payroll_smoke.sql
+?? scripts/build-deepseek-chat-packets.ps1
+?? supabase/migrations/20261027100000_size_band_payroll.sql
+?? supabase/migrations/20261028100000_org_export_foundation.sql
+?? supabase/migrations/20261028110000_dashboard_card_settings.sql
+?? supabase/tests/20261028110000_test_dashboard_card_settings.sql

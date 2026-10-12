@@ -1,0 +1,15 @@
+warning: in the working copy of 'apps/web/src/app/customers/[customerId]/actions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/app/customers/[customerId]/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/app/finance/export/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/app/settings/storage/actions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/components/customer-pet-editor.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/lib/customer-360.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/lib/customer-pet-edit.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/lib/finance-export.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/test/customer-pet-edit.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/test/org-export-contract.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'integration/run_populated_upgrade_rehearsal.sh', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'run_all_gates.sh', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'supabase/migrations/20261027100000_size_band_payroll.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'supabase/migrations/20261028100000_org_export_foundation.sql', LF will be replaced by CRLF the next time Git touches it
+exit=0

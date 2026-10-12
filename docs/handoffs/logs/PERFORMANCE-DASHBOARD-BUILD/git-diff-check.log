@@ -1,0 +1,10 @@
+warning: in the working copy of 'apps/web/src/app/dashboard/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/components/dashboard-shell.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/lib/dashboard-read-model.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/lib/health.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/test/control-plane-ui.test.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/test/dashboard-read-model.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/test/remaining-nine-ui.test.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'integration/run_populated_upgrade_rehearsal.sh', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'run_all_gates.sh', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'supabase/tests/20261029170000_test_health_recovery.sql', LF will be replaced by CRLF the next time Git touches it
