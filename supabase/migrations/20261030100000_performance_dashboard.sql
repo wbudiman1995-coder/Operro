@@ -144,7 +144,7 @@ grant execute on function app.dashboard_check_periods(date, date, date, date, te
 -- ---------------------------------------------------------------------------------------------------------------
 -- Operations: completed / open / canceled / no-show appointments, current vs previous period.
 -- ---------------------------------------------------------------------------------------------------------------
-create function app.dashboard_operations_performance(p_from date, p_to date, p_prev_from date, p_prev_to date, p_timezone text default 'Asia/Jakarta')
+create or replace function app.dashboard_operations_performance(p_from date, p_to date, p_prev_from date, p_prev_to date, p_timezone text default 'Asia/Jakarta')
 returns table (period text, completed integer, open_count integer, canceled integer, no_show integer)
 language plpgsql stable security definer set search_path = '' as $$
 declare
@@ -199,7 +199,7 @@ grant execute on function app.dashboard_operations_performance(date, date, date,
 -- Finance: issued / collected / refunded per currency for both periods, plus the outstanding snapshot.
 -- Refunds are reached only through a payment in a visible branch (refunds carry no branch of their own).
 -- ---------------------------------------------------------------------------------------------------------------
-create function app.dashboard_finance_performance(p_from date, p_to date, p_prev_from date, p_prev_to date, p_timezone text default 'Asia/Jakarta')
+create or replace function app.dashboard_finance_performance(p_from date, p_to date, p_prev_from date, p_prev_to date, p_timezone text default 'Asia/Jakarta')
 returns table (
   period text, currency text,
   issued_total numeric, issued_count integer,
@@ -292,7 +292,7 @@ grant execute on function app.dashboard_finance_performance(date, date, date, da
 -- when the caller lacks booking.read / finance.read. At most ten named sources are returned per period; the rest
 -- are folded into one "other" row, and customers without a source stay in their own "missing" row.
 -- ---------------------------------------------------------------------------------------------------------------
-create function app.dashboard_source_performance(p_from date, p_to date, p_prev_from date, p_prev_to date, p_timezone text default 'Asia/Jakarta')
+create or replace function app.dashboard_source_performance(p_from date, p_to date, p_prev_from date, p_prev_to date, p_timezone text default 'Asia/Jakarta')
 returns table (
   period text, source_label text, is_missing boolean, is_other boolean, source_count integer,
   new_customers integer, first_completed integer, first_paid integer)
