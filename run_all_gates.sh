@@ -127,6 +127,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261029160000_storage_cleanup_foundation.sql
   supabase/migrations/20261029170000_health_recovery.sql
   supabase/migrations/20261030100000_performance_dashboard.sql
+  supabase/migrations/20261030110000_payroll_read_helper_hardening.sql
   supabase/migrations/20261031100000_dashboard_operational_alerts.sql
   supabase/migrations/20261031110000_cash_control_register.sql
   supabase/migrations/20261031120000_whatsapp_batch_log.sql
@@ -205,6 +206,7 @@ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029155000_test_acc
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029160000_test_storage_cleanup.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029170000_test_health_recovery.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261030100000_test_performance_dashboard.sql
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261030110000_test_payroll_read_helper_hardening.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261031100000_test_dashboard_operational_alerts.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261031110000_test_cash_control_register.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261031120000_test_whatsapp_batch_log.sql
