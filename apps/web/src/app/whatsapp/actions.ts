@@ -2,11 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import { loadInvoiceDocument } from "@/lib/invoice-document";
-import { buildFollowupMessage, buildRenewalMessage } from "@/lib/followup-messages";
-import { loadFollowupRetentionSettings, loadOverdueQueue } from "@/lib/followup-retention";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
-import { invoiceDraftMessage, isWhatsAppSource, isWhatsAppStatus } from "@/lib/whatsapp-drafts";
+import { buildDraftMessage } from "@/lib/whatsapp-message-build";
+import { isWhatsAppSource, isWhatsAppStatus } from "@/lib/whatsapp-drafts";
 
 export interface WhatsAppActionState { error: string | null; success: string | null }
 
@@ -38,52 +36,9 @@ export async function createWhatsAppDraftAction(_previous: WhatsAppActionState, 
     const sourceType = single(formData, "sourceType");
     const sourceId = single(formData, "sourceId");
     if (!isWhatsAppSource(sourceType) || sourceType === "onboarding" || !sourceId || !UUID.test(sourceId)) return { error: "Sumber pesan tidak valid.", success: null };
-    const businessName = workspace.activeOrganization.name;
-    let text: string | null = null;
-    let blocked: string | null = null;
-
-    if (sourceType === "invoice") {
-      if (!workspace.capabilities["finance.read"]) return { error: "Anda tidak memiliki izin melihat invoice.", success: null };
-      const doc = await loadInvoiceDocument(workspace.supabase, workspace.activeOrganization.id, sourceId);
-      if (!doc) return { error: ERRORS.source_not_found, success: null };
-      const templates = doc.organization.waTemplates;
-      const template = doc.balanceDue <= 0 ? templates.paidCompletion : doc.billingMode === "package_sale" ? templates.subscriptionBilling : templates.outstanding;
-      ({ text, blockedReason: blocked } = invoiceDraftMessage({
-        template, customerName: doc.customer.name, invoiceNumber: doc.invoiceNumber,
-        amount: doc.balanceDue <= 0 ? doc.total : doc.balanceDue, currency: doc.currency, notes: doc.customerNotes ?? "",
-      }));
-    } else if (sourceType === "followup") {
-      if (!workspace.capabilities["customer.read"]) return { error: "Anda tidak memiliki izin melihat pelanggan.", success: null };
-      const customer = await workspace.supabase.from("customers").select("display_name").eq("organization_id", workspace.activeOrganization.id).eq("id", sourceId).is("deleted_at", null).maybeSingle();
-      if (customer.error || !customer.data) return { error: ERRORS.source_not_found, success: null };
-      const [settings, queue] = await Promise.all([
-        loadFollowupRetentionSettings(workspace.supabase),
-        loadOverdueQueue(workspace.supabase, { search: customer.data.display_name as string, pageSize: 50 }),
-      ]);
-      const group = queue.groups.find((candidate) => candidate.customerId === sourceId);
-      if (!group) return { error: "Pelanggan ini tidak lagi masuk daftar follow-up.", success: null };
-      ({ text, blockedReason: blocked } = buildFollowupMessage(settings.followupTemplate, {
-        customerName: group.customerName, businessName,
-        pets: group.pets.flatMap((pet) => (pet.daysSince === null ? [] : [{ name: pet.petName, daysSince: pet.daysSince }])),
-      }));
-    } else {
-      if (!workspace.capabilities["membership.read"]) return { error: "Anda tidak memiliki izin melihat paket.", success: null };
-      const preview = await workspace.supabase.schema("app").rpc("preview_package_renewal", { p_customer_package: sourceId });
-      if (preview.error || !preview.data) return { error: ERRORS.source_not_found, success: null };
-      const data = preview.data as Record<string, unknown>;
-      const membership = await workspace.supabase.from("customer_packages").select("customer_id").eq("organization_id", workspace.activeOrganization.id).eq("id", sourceId).maybeSingle();
-      const customer = membership.data ? await workspace.supabase.from("customers").select("display_name").eq("organization_id", workspace.activeOrganization.id).eq("id", membership.data.customer_id as string).maybeSingle() : null;
-      const pet = data.pet_id ? await workspace.supabase.from("pets").select("name").eq("organization_id", workspace.activeOrganization.id).eq("id", String(data.pet_id)).maybeSingle() : null;
-      if (!customer?.data) return { error: ERRORS.source_not_found, success: null };
-      const settings = await loadFollowupRetentionSettings(workspace.supabase);
-      const incompatible = Boolean(data.incompatible);
-      ({ text, blockedReason: blocked } = buildRenewalMessage(settings.renewalTemplate, {
-        customerName: customer.data.display_name as string, petLabel: (pet?.data?.name as string | undefined) ?? null, tierName: String(data.package_name), businessName,
-        amount: Number(data.price), currency: String(data.currency),
-        amountBlockedReason: incompatible ? (data.blocking_reason ? String(data.blocking_reason) : "Paket tidak dapat diperpanjang saat ini.") : null,
-      }));
-    }
-    if (blocked || !text) return { error: blocked ?? "Pesan tidak dapat dibuat.", success: null };
+    const built = await buildDraftMessage(workspace, sourceType, sourceId);
+    if (!built.ok) return { error: built.error, success: null };
+    const text = built.text;
 
     const { data, error } = await workspace.supabase.schema("app").rpc("create_whatsapp_draft", { p_source_type: sourceType, p_source_id: sourceId, p_message: text });
     if (error) {

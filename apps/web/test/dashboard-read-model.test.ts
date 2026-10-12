@@ -5,7 +5,7 @@ import test from "node:test";
 
 import { CAPABILITY_KEYS, type CapabilityMap } from "../src/lib/authorization";
 import { loadDashboardData } from "../src/lib/pilot-data";
-import { buildDashboardReadPlan, DASHBOARD_CARD_DEFAULTS, DASHBOARD_CARD_KEYS, DASHBOARD_METRIC_CARD_KEYS, dashboardDayRanges, readDashboardCardSettings, sumRecordedAmounts } from "../src/lib/dashboard-read-model";
+import { buildDashboardReadPlan, DASHBOARD_CARD_DEFAULTS, DASHBOARD_CARD_KEYS, DASHBOARD_METRIC_CARD_KEYS, DASHBOARD_PERFORMANCE_CARD_KEYS, dashboardDayRanges, readDashboardCardSettings, sumRecordedAmounts } from "../src/lib/dashboard-read-model";
 
 const root = path.resolve(import.meta.dirname, "../../..");
 const pilotData = fs.readFileSync(path.join(root, "apps/web/src/lib/pilot-data.ts"), "utf8");
@@ -127,8 +127,11 @@ test("dashboard settings write: session org equality check, settings.manage, com
   assert.match(migration, /revoke all on function app\.update_dashboard_card_settings\(jsonb\) from public, anon, authenticated/);
   for (const key of DASHBOARD_METRIC_CARD_KEYS) assert.ok(migration.includes(`'${key}'`), key);
   const latest = fs.readFileSync(path.join(root, "supabase/migrations/20261030100000_performance_dashboard.sql"), "utf8");
-  for (const key of DASHBOARD_CARD_KEYS) assert.ok(latest.includes(`'${key}'`), `${key} must be in the replacement allowlist`);
+  for (const key of [...DASHBOARD_METRIC_CARD_KEYS, ...DASHBOARD_PERFORMANCE_CARD_KEYS]) assert.ok(latest.includes(`'${key}'`), `${key} must be in the replacement allowlist`);
   assert.match(latest, /set search_path = ''/);
+  const newest = fs.readFileSync(path.join(root, "supabase/migrations/20261031100000_dashboard_operational_alerts.sql"), "utf8");
+  for (const key of DASHBOARD_CARD_KEYS) assert.ok(newest.includes(`'${key}'`), `${key} must be in the newest allowlist`);
+  assert.match(newest, /set search_path = ''/);
   assert.match(latest, /revoke all on function app\.update_dashboard_card_settings\(jsonb\) from public, anon, authenticated/);
 });
 

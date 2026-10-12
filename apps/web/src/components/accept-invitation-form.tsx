@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { describeInvitationError } from "@/lib/invitation-errors";
 import { createClient } from "@/lib/supabase/client";
 
 export function AcceptInvitationForm({ token }: { token: string }) {
@@ -16,7 +17,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
     const supabase = createClient();
     const { error } = await supabase.schema("app").rpc("claim_access_invitation", { p_token: token });
     if (error) {
-      setMessage(error.message.includes("wrong_or_unverified_email") ? "Masuk menggunakan email penerima undangan yang sudah diverifikasi." : "Link tidak tersedia, kedaluwarsa, atau sudah digunakan. Minta link baru kepada pemilik.");
+      setMessage(describeInvitationError(error));
       return;
     }
     await supabase.auth.refreshSession();

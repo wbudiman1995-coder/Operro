@@ -9,6 +9,7 @@ import {
   type WhatsAppActionState,
 } from "@/app/whatsapp/actions";
 import type { WhatsAppDraftRow } from "@/lib/whatsapp-draft-data";
+import type { DraftEvent } from "@/lib/whatsapp-batches";
 import { SOURCE_LABELS, WHATSAPP_STATUS_LABELS, allowedNextStatuses, blockedReason, maskPhone, waUrl, type WhatsAppSource } from "@/lib/whatsapp-drafts";
 
 const initial: WhatsAppActionState = { error: null, success: null };
@@ -23,7 +24,7 @@ const STATUS_TONE: Record<string, string> = {
   failed: "bg-rose-50 text-rose-700", canceled: "bg-slate-100 text-slate-500",
 };
 
-export function DraftRow({ draft, canManageContacts }: { draft: WhatsAppDraftRow; canManageContacts: boolean }) {
+export function DraftRow({ draft, canManageContacts, events }: { draft: WhatsAppDraftRow; canManageContacts: boolean; events?: readonly DraftEvent[] }) {
   const [state, action, pending] = useActionState(setWhatsAppDraftStatusAction, initial);
   const [optState, optAction, optPending] = useActionState(setWhatsAppOptOutAction, initial);
   const [note, setNote] = useState("");
@@ -49,6 +50,8 @@ export function DraftRow({ draft, canManageContacts }: { draft: WhatsAppDraftRow
     <details className="mt-2"><summary className="cursor-pointer text-xs font-semibold text-emerald-700">Lihat isi pesan</summary>
       <p className="mt-2 whitespace-pre-line rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-700">{draft.messageText}</p></details>
     {draft.statusNote ? <p className="mt-2 text-[11px] text-slate-500">Catatan: {draft.statusNote}</p> : null}
+    {events && events.length > 0 ? <details className="mt-2"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Riwayat ({events.length}) — catatan pengguna, bukan konfirmasi WhatsApp</summary>
+      <ol className="mt-2 space-y-1 text-[11px] text-slate-600">{events.map((event) => <li key={event.id}>{new Date(event.occurredAt).toLocaleString("id-ID")} · {event.from ? `${WHATSAPP_STATUS_LABELS[event.from].split(" (")[0]} → ` : "dibuat: "}{WHATSAPP_STATUS_LABELS[event.to].split(" (")[0]}{event.actor ? ` · ${event.actor}` : ""}{event.note ? ` · “${event.note}”` : ""}</li>)}</ol></details> : null}
     <p className="mt-1 text-[11px] text-slate-400">Status terakhir diubah {new Date(draft.statusChangedAt).toLocaleString("id-ID")}{draft.statusChangedBy ? ` oleh ${draft.statusChangedBy}` : ""}. Ini catatan pengguna, bukan konfirmasi dari WhatsApp.</p>
     <div className="mt-3 flex flex-wrap items-center gap-2">
       {url ? <a href={url} target="_blank" rel="noreferrer" onClick={() => { if (draft.status === "draft") submit("opened"); }} className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white">Buka di WhatsApp</a> : null}

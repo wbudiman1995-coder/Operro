@@ -267,7 +267,7 @@ begin
     if has_function_privilege('anon', v_fn.oid, 'execute') or exists (select 1 from aclexplode(v_fn.proacl) a where a.grantee = 0) then raise exception 'FAIL % executable by anon/PUBLIC', v_fn.proname; end if;
     if (v_fn.proname = 'org_export_authorized') = has_function_privilege('authenticated', v_fn.oid, 'execute') then raise exception 'FAIL % authenticated grant is wrong', v_fn.proname; end if;
   end loop;
-  if (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'app' and p.proname like 'org\_export\_%') <> 14 then raise exception 'FAIL expected 14 export functions'; end if;
+  if (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'app' and p.proname like 'org\_export\_%') <> 18 then raise exception 'FAIL expected 18 export functions (14 foundation + 4 scope/retention/verification, 20261031130000)'; end if;
   raise notice 'PASS export structure: allowlist has no credential-like columns, every function is definer + empty search_path + authenticated-only';
 end $$;
 

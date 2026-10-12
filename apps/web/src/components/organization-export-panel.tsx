@@ -2,12 +2,19 @@
 
 import { useState } from "react";
 
-import { cancelOrganizationExportAction, startOrganizationExportAction, stepOrganizationExportAction, verifyOrganizationExportAction } from "@/app/settings/storage/export-actions";
+import { cancelOrganizationExportAction, purgeOrganizationExportAction, startOrganizationExportAction, stepOrganizationExportAction, verifyOrganizationExportAction } from "@/app/settings/storage/export-actions";
 import type { ExportJobSummary } from "@/lib/org-export";
 
 const STATUS_LABEL: Record<ExportJobSummary["status"], string> = { running: "belum selesai", completed: "selesai", failed: "gagal", cancelled: "dibatalkan" };
 
-export function OrganizationExportPanel({ authorized, jobs }: { authorized: boolean; jobs: ExportJobSummary[] }) {
+function verificationText(job: ExportJobSummary): string {
+  if (job.status !== "completed" || job.purged_at) return "";
+  if (!job.verified_at) return " · belum diverifikasi";
+  const when = new Date(job.verified_at).toLocaleString("id-ID");
+  return job.verified_ok ? ` · metadata terverifikasi ${when}` : ` · verifikasi GAGAL ${when} (${job.verified_failures ?? "?"} temuan)`;
+}
+
+export function OrganizationExportPanel({ authorized, jobs, purgeable = [] }: { authorized: boolean; jobs: ExportJobSummary[]; purgeable?: readonly string[] }) {
   const [includeStorage, setIncludeStorage] = useState(true);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -27,6 +34,10 @@ export function OrganizationExportPanel({ authorized, jobs }: { authorized: bool
   }
   async function cancel(jobId: string) { setBusy(true); setMessage((await cancelOrganizationExportAction(jobId)).message); setBusy(false); }
   async function verify(jobId: string) { setBusy(true); setMessage("Memeriksa berkas…"); setMessage((await verifyOrganizationExportAction(jobId)).message); setBusy(false); }
+  async function purge(jobId: string) {
+    if (!window.confirm("Hapus semua berkas arsip ini dari penyimpanan? Riwayat tetap ada, tetapi arsip tidak dapat dipulihkan atau diverifikasi lagi.")) return;
+    setBusy(true); setMessage("Menghapus berkas arsip…"); setMessage((await purgeOrganizationExportAction(jobId)).message); setBusy(false);
+  }
 
   return (
     <section className="mt-6 rounded-2xl border bg-white p-5">
@@ -38,10 +49,11 @@ export function OrganizationExportPanel({ authorized, jobs }: { authorized: bool
         {message ? <p role="status" className="mt-3 text-xs text-slate-600">{message}</p> : null}
         {jobs.length ? <ul className="mt-4 space-y-2">{jobs.map((job) => (
           <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-3 text-xs">
-            <span>{new Date(job.created_at).toLocaleString("id-ID")} · <strong>{STATUS_LABEL[job.status]}</strong>{job.status === "running" ? ` (${job.tables_done}/${job.tables_total} tabel)` : ""}{job.failed_reason ? ` · ${job.failed_reason}` : ""}</span>
+            <span>{new Date(job.created_at).toLocaleString("id-ID")} · <strong>{job.purged_at ? "berkas dihapus" : STATUS_LABEL[job.status]}</strong>{job.status === "running" ? ` (${job.tables_done}/${job.tables_total} tabel)` : ""}{job.failed_reason ? ` · ${job.failed_reason}` : ""}{verificationText(job)}</span>
             <span className="flex gap-2">
-              {job.status === "completed" ? <button type="button" onClick={() => verify(job.id)} disabled={busy} className="rounded border px-2 py-1 font-semibold disabled:opacity-50">Verifikasi metadata</button> : null}
+              {job.status === "completed" && !job.purged_at ? <button type="button" onClick={() => verify(job.id)} disabled={busy} className="rounded border px-2 py-1 font-semibold disabled:opacity-50">Verifikasi metadata</button> : null}
               {job.status === "running" ? <button type="button" onClick={() => cancel(job.id)} disabled={busy} className="rounded border px-2 py-1 font-semibold disabled:opacity-50">Batalkan</button> : null}
+              {purgeable.includes(job.id) ? <button type="button" onClick={() => purge(job.id)} disabled={busy} className="rounded border border-rose-200 px-2 py-1 font-semibold text-rose-700 disabled:opacity-50">Hapus berkas (melewati masa simpan)</button> : null}
             </span>
           </li>))}</ul> : null}
       </>}

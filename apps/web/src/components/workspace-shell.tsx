@@ -71,6 +71,7 @@ const managementNavigation: NavigationItemConfig[] = [
   { label: "Riwayat perubahan", href: "/audit", icon: ReportsIcon, permission: "reports.view" },
   { label: "Rekonsiliasi", href: "/reconciliation", icon: FinanceIcon, anyPermission: ["finance.read", "payroll.read"] },
   { label: "Keluhan", href: "/complaints", icon: TasksIcon, anyPermission: ["customer.read", "task.manage", "reports.view"] },
+  { label: "Pengaturan bisnis", href: "/settings/business", icon: CatalogIcon, anyPermission: ["settings.manage", "branches.manage"] },
   { label: "Pengaturan dokumen", href: "/settings/documents", icon: FinanceIcon, permission: "settings.manage" },
   { label: "Isian tambahan", href: "/settings/custom-fields", icon: CustomersIcon, permission: "settings.manage" },
   { label: "Data & penyimpanan", href: "/settings/storage", icon: InventoryIcon, permission: "settings.manage" },

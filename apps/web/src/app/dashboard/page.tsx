@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { defaultWorkspacePath, loadBranchAccess } from "@/lib/authorization";
 import { loadBranchTimezones } from "@/lib/branch-context";
+import { loadOperationalAlerts } from "@/lib/dashboard-alerts";
 import { loadDashboardPerformance } from "@/lib/dashboard-performance";
 import { resolveDashboardPeriod, type DashboardPeriodInput } from "@/lib/dashboard-period";
 import { loadDashboardCardSettings, loadDashboardData } from "@/lib/pilot-data";
@@ -29,9 +30,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     ? branchTimezones.defaultTimezone
     : [...branchAccess.ids].flatMap((id) => branchTimezones.byBranchId.get(id) ?? []).sort()[0] ?? branchTimezones.defaultTimezone;
   const resolution = resolveDashboardPeriod(query, new Date(), dashboardTimeZone);
-  const [data, performance] = await Promise.all([
+  // Authority probe only (is this member the business owner?); decides whether the maintenance alert is requested at all.
+  const isBusinessOwner = dashboardCards.operational_alerts
+    ? (await supabase.schema("app").rpc("is_business_owner_member", { p_org: activeOrganization.id })).data === true
+    : false;
+  const [data, performance, alerts] = await Promise.all([
     loadDashboardData(supabase, activeOrganization.id, capabilities, branchAccess, dashboardTimeZone, dashboardCards),
     loadDashboardPerformance(supabase, capabilities, branchAccess, resolution.period, dashboardTimeZone, dashboardCards),
+    loadOperationalAlerts(supabase, capabilities, branchAccess, isBusinessOwner, dashboardCards),
   ]);
 
   return (
@@ -45,6 +51,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       period={resolution.period}
       periodError={resolution.ok ? null : resolution.message}
       performance={performance}
+      alerts={alerts}
     />
   );
 }

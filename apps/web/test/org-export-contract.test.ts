@@ -7,6 +7,7 @@ import { verifyOrganizationExport } from "../src/lib/org-export-verify";
 
 const root = path.resolve(import.meta.dirname, "../../..");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/20261028100000_org_export_foundation.sql"), "utf8").replace(/\r\n/g, "\n");
+const scopeMigration = fs.readFileSync(path.join(root, "supabase/migrations/20261031130000_export_scope_retention.sql"), "utf8").replace(/\r\n/g, "\n");
 const exportLib = fs.readFileSync(path.join(root, "apps/web/src/lib/org-export.ts"), "utf8");
 const exportActions = fs.readFileSync(path.join(root, "apps/web/src/app/settings/storage/export-actions.ts"), "utf8");
 
@@ -97,7 +98,7 @@ test("export web layer: organization comes from the session, uploads are idempot
 
 test("every RPC the web layer calls exists in the migration with exactly those parameter names", () => {
   const defined = new Map<string, string[]>();
-  for (const match of migration.matchAll(/create function app\.(org_export_[a-z_]+)\(([^)]*)\)/g)) defined.set(match[1], [...match[2].matchAll(/(p_[a-z_]+)\s/g)].map((param) => param[1]).sort());
+  for (const match of [migration, scopeMigration].join("\n").matchAll(/create function app\.(org_export_[a-z_]+)\(([^)]*)\)/g)) defined.set(match[1], [...match[2].matchAll(/(p_[a-z_]+)\s/g)].map((param) => param[1]).sort());
   const calls = [...exportLib.matchAll(/rpc(?:<[^()]*?>)?\(supabase, "(org_export_[a-z_]+)", \{([^}]*)\}\)/g)];
   assert.ok(calls.length >= 11, `found ${calls.length} rpc calls`);
   for (const [, name, args] of calls) {

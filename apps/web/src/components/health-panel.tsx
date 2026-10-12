@@ -1,4 +1,6 @@
-import type { CountResult, HealthSummary, Readiness, ReconciliationCounts, RecoveryStatus } from "@/lib/health";
+import Link from "next/link";
+
+import type { CountResult, HealthSummary, OwnerAction, Readiness, ReconciliationCounts, RecoveryStatus } from "@/lib/health";
 
 const DRILL_TONE: Record<Readiness["drillState"], string> = {
   never: "border-rose-200 bg-rose-50 text-rose-900",
@@ -22,8 +24,8 @@ function Count({ label, result }: { label: string; result: CountResult }) {
  * Read-only. Every number is a count or timestamp of something Operro already stores; provider status, backups and
  * billing are explicitly out of view, and recovery is never described as proven without a passed drill on record.
  */
-export function HealthPanel({ summary, recovery, reconciliation, readiness, version, platform }: {
-  summary: HealthSummary; recovery: RecoveryStatus; reconciliation: ReconciliationCounts; readiness: Readiness; version: string; platform: boolean;
+export function HealthPanel({ summary, recovery, reconciliation, readiness, version, platform, actions = [] }: {
+  summary: HealthSummary; recovery: RecoveryStatus; reconciliation: ReconciliationCounts; readiness: Readiness; version: string; platform: boolean; actions?: readonly OwnerAction[];
 }) {
   return <div className="mt-7 space-y-6">
     <section aria-labelledby="recovery-title" className={`rounded-2xl border p-5 ${DRILL_TONE[readiness.drillState]}`}>
@@ -36,6 +38,17 @@ export function HealthPanel({ summary, recovery, reconciliation, readiness, vers
         <div className="sm:col-span-2"><dt className="inline font-semibold">Catatan: </dt><dd className="inline">{recovery.detail.notes ?? "—"}</dd></div>
         <div className="sm:col-span-2"><dt className="inline font-semibold">Referensi bukti: </dt><dd className="inline">{recovery.detail.evidence_ref ?? "—"}</dd></div>
       </dl> : null}
+    </section>
+
+    <section aria-labelledby="actions-title" className="rounded-2xl border border-slate-200 bg-white p-5">
+      <h2 id="actions-title" className="font-bold">Tindakan untuk pemilik</h2>
+      <p className="mt-1 text-xs text-slate-500">Setiap temuan yang belum selesai disertai langkah yang dapat Anda lakukan. Daftar kosong berarti tidak ada temuan dari data yang dibaca, bukan jaminan bahwa penyedia sehat.</p>
+      {actions.length === 0 ? <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-900">Tidak ada tindakan yang tertunda dari data yang dibaca.</p> : (
+        <ul className="mt-3 space-y-2">{actions.map((action) => (
+          <li key={action.id} className={`rounded-lg border p-3 text-xs ${action.severity === "attention" ? "border-rose-200 bg-rose-50 text-rose-900" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+            <p><span className="mr-2 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold uppercase">{action.severity === "attention" ? "Perlu tindakan" : "Rapikan"}</span>{action.text}</p>
+            <p className="mt-1 font-semibold">{action.href ? <Link href={action.href} className="underline">{action.label}</Link> : action.label}</p>
+          </li>))}</ul>)}
     </section>
 
     <section aria-labelledby="signals-title" className="rounded-2xl border border-slate-200 bg-white p-5">
