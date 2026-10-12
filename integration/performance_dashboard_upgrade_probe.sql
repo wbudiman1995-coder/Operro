@@ -69,7 +69,7 @@ begin
      or (select count(*) from public.payments) <> b.payments_n or (select count(*) from public.refunds) <> b.refunds_n
      or (select count(*) from public.customers) <> b.customers_n then
     raise exception 'FAIL the read-only dashboard changed existing rows'; end if;
-  if app.schema_version() <> '20261030100000' then raise exception 'FAIL schema version'; end if;
+  if app.schema_version() <> '20261030110000' then raise exception 'FAIL schema version'; end if;
   raise notice 'PERFORMANCE DASHBOARD POPULATED PROBE PASS';
 end $$;
 rollback;

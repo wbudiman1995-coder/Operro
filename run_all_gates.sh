@@ -127,6 +127,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261029160000_storage_cleanup_foundation.sql
   supabase/migrations/20261029170000_health_recovery.sql
   supabase/migrations/20261030100000_performance_dashboard.sql
+  supabase/migrations/20261030110000_payroll_read_helper_hardening.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -198,6 +199,7 @@ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029155000_test_acc
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029160000_test_storage_cleanup.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261029170000_test_health_recovery.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261030100000_test_performance_dashboard.sql
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261030110000_test_payroll_read_helper_hardening.sql
 
 step "GATE 4c — customer-code concurrency"
 CC_TMP="$(mktemp -d /tmp/operro-customer-code.XXXXXX)"

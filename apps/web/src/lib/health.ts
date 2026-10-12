@@ -13,7 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CapabilityMap } from "@/lib/authorization";
 import { loadInvoicePaymentIssues, loadUnbilledVisits, scanPayrollSources } from "@/lib/reconciliation";
 
-export const EXPECTED_SCHEMA_VERSION = "20261030100000";
+export const EXPECTED_SCHEMA_VERSION = "20261030110000";
 export const DRILL_FRESH_DAYS = 90;
 export const RECONCILIATION_COUNT_CAP = 100;
 
