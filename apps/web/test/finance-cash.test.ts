@@ -93,7 +93,16 @@ test("export includes payments, refunds, expenses and cash sheets; mixed currenc
       { id: "r2", organization_id: ORG, payment_id: "p0002", invoice_id: null, amount: "5", status: "succeeded", reason: "=HYPERLINK(\"http://evil\")", refunded_at: "2026-10-11T03:00:00Z" },
       { id: "r3", organization_id: OTHER, payment_id: "px", invoice_id: null, amount: "999", status: "succeeded", reason: "other tenant", refunded_at: "2026-10-12T03:00:00Z" },
     ],
-    invoices: [{ id: "i1", organization_id: ORG, invoice_number: "INV-1" }],
+    invoices: [
+      { id: "i1", organization_id: ORG, invoice_number: "INV-1", status: "paid", currency: "IDR", subtotal: 100000, discount_total: 0, tax_total: 0, total: 100000, issued_at: "2026-10-01T00:00:00Z", due_at: null, paid_at: "2026-10-02T00:00:00Z" },
+      { id: "i2", organization_id: ORG, invoice_number: "=INV-2", status: "issued", currency: "USD", subtotal: 50, discount_total: 5, tax_total: 0, total: 45, issued_at: "2026-10-03T00:00:00Z", due_at: "2026-10-10T00:00:00Z", paid_at: null },
+      { id: "i3", organization_id: OTHER, invoice_number: "OTHER-1", status: "issued", currency: "IDR", subtotal: 1, discount_total: 0, tax_total: 0, total: 1, issued_at: "2026-10-03T00:00:00Z", due_at: null, paid_at: null },
+    ],
+    cash_movements: [
+      { id: "m1", organization_id: ORG, account_id: "a1", kind: "capital_contribution", direction: "in", amount: "500000", currency: "IDR", occurred_on: "2026-10-02", counterparty: "=Winston", memo: "-modal", source_type: null, source_id: null, reversal_of: null, created_at: "2026-10-02T01:00:00Z" },
+      { id: "m2", organization_id: ORG, account_id: "a1", kind: "reversal", direction: "out", amount: "500000", currency: "IDR", occurred_on: "2026-10-03", counterparty: "=Winston", memo: "salah catat", source_type: null, source_id: null, reversal_of: "m1", created_at: "2026-10-03T01:00:00Z" },
+      { id: "m3", organization_id: OTHER, account_id: "ax", kind: "cash_in", direction: "in", amount: "999", currency: "IDR", occurred_on: "2026-10-02", counterparty: null, memo: "other tenant", source_type: null, source_id: null, reversal_of: null, created_at: "2026-10-02T01:00:00Z" },
+    ],
     expenses: [
       { id: "e1", organization_id: ORG, description: "=cmd|calc", category: "-sewa", amount: 70000, currency: "IDR", status: "recorded", incurred_at: "2026-10-15", deleted_at: null },
       { id: "e2", organization_id: ORG, description: "deleted", category: null, amount: 1, currency: "IDR", status: "recorded", incurred_at: "2026-10-15", deleted_at: "2026-10-16" },
@@ -102,13 +111,32 @@ test("export includes payments, refunds, expenses and cash sheets; mixed currenc
   };
   const client = fakeClient(tables, {
     ...registerRpc([payment(1, ORG, { customer_name: "@evil", method: "cash" }), payment(2, ORG, { customer_name: "+62 812" })]),
+    cash_register_position: () => [
+      { account_id: "a1", account_name: "Kas toko", kind: "cash", currency: "IDR", branch_id: null, status: "active", version: 1, total_in: "500000", total_out: "500000", balance: "0", movement_count: 2, last_movement_on: "2026-10-03" },
+      { account_id: "a2", account_name: "=Evil acct", kind: "bank", currency: "USD", branch_id: null, status: "active", version: 1, total_in: "100", total_out: "10", balance: "90", movement_count: 2, last_movement_on: "2026-10-04" },
+    ],
     finance_cash_position: () => [
       { period: "2026-10", currency: "IDR", payments_in: "1260000", payments_count: 4, refunds_out: "130000", refunds_count: 2, expenses_out: "385000", expenses_count: 3, net: "745000", excluded_payments: 2 },
       { period: "2026-10", currency: "USD", payments_in: "40", payments_count: 1, refunds_out: "5", refunds_count: 1, expenses_out: "12", expenses_count: 1, net: "23", excluded_payments: 0 },
     ],
   });
   const book = await finance.buildFinanceExport(client as never, ORG, {}, { period, timeZone: "Asia/Jakarta" });
-  assert.deepEqual(book.worksheets.map((s) => s.name), ["Pembayaran", "Pengembalian Dana - Semua", "Pengeluaran - Semua", "Posisi Kas", "Catatan Kas"]);
+  assert.deepEqual(book.worksheets.map((s) => s.name), ["Pembayaran", "Pengembalian Dana - Semua", "Invoice - Semua", "Pengeluaran - Semua", "Register Akun Kas", "Register Mutasi Kas", "Posisi Kas", "Catatan Kas"]);
+
+  const invoiceSheet = cells(book, "Invoice - Semua");
+  assert.equal(invoiceSheet.length, 3, "header + this tenant's two invoices; the other tenant's invoice never appears");
+  assert.equal(String(invoiceSheet[2][0]).startsWith("'="), true, "formula-like invoice number is neutralised");
+  assert.deepEqual(invoiceSheet.slice(1).map((r) => r[2]).sort(), ["IDR", "USD"], "each invoice keeps its own currency");
+
+  const registerAccounts = cells(book, "Register Akun Kas");
+  assert.equal(registerAccounts.length, 3);
+  assert.equal(String(registerAccounts[2][0]).startsWith("'="), true, "formula-like account name is neutralised");
+  assert.deepEqual([registerAccounts[1][2], registerAccounts[1][6], registerAccounts[2][2], registerAccounts[2][6]], ["IDR", 0, "USD", 90], "balance is per account in its own currency");
+  const registerMovements = cells(book, "Register Mutasi Kas");
+  assert.equal(registerMovements.length, 3, "this tenant's two movements only");
+  assert.equal(String(registerMovements[1][7]).startsWith("'-"), true, "formula-like memo is neutralised");
+  assert.equal(String(registerMovements[1][6]).startsWith("'="), true, "formula-like counterparty is neutralised");
+  assert.deepEqual([registerMovements[1][3], registerMovements[2][3], registerMovements[2][10]], ["Setoran modal", "Pembalikan", "m1"], "kinds are labelled and the reversal points at its original");
 
   const refunds = cells(book, "Pengembalian Dana - Semua");
   assert.equal(refunds.length, 3, "header + the 2 refunds of THIS tenant (the other tenant's refund never appears)");
@@ -134,6 +162,8 @@ test("export includes payments, refunds, expenses and cash sheets; mixed currenc
   const notes = cells(book, "Catatan Kas").map((r) => String(r[1])).join("\n");
   assert.match(notes, /Bukan buku besar akuntansi/);
   assert.match(notes, /tidak pernah dijumlahkan/);
+  assert.match(notes, /Register Akun Kas/);
+  assert.match(notes, /tidak direkonsiliasi dengan bank/);
   assert.match(notes, /2026-10-01 s\.d\. 2026-10-31/);
 
   // Every tenant-owned table read is scoped by organization_id.

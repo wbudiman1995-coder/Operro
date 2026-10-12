@@ -44,6 +44,13 @@ Use a **disposable** project. Never restore over production.
    RPO/RTO in minutes, short notes, and an evidence reference (ticket or document id). Records cannot be edited or
    deleted; record a new drill instead.
 
+### Related procedures (added with the final parity closeout)
+
+- [`DISPOSABLE_RESTORE_DRILL.md`](DISPOSABLE_RESTORE_DRILL.md) and [`RESTORE_DRILL_EVIDENCE_TEMPLATE.md`](RESTORE_DRILL_EVIDENCE_TEMPLATE.md):
+  the stricter drill (provider backup *and* offline archive-readiness dry run) and the fixed evidence format.
+- [`UNATTENDED_CLEANUP.md`](UNATTENDED_CLEANUP.md): why no scheduler exists and what must be decided before one does.
+- [`STAGING_ACCESS_QC.md`](STAGING_ACCESS_QC.md): the hosted-staging script for the real invitation and multi-organization flow.
+
 ## Application rollback (separate from data recovery)
 
 Vercel keeps previous deployments. To roll back the web app use the provider's rollback

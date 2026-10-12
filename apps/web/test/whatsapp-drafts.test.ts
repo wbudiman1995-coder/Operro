@@ -80,7 +80,8 @@ test("server actions never accept a phone, organization or message from the brow
   const actions = read("apps/web/src/app/whatsapp/actions.ts");
   assert.doesNotMatch(actions, /formData\.get\("(?:phone|recipient|message|text|organization)/);
   assert.doesNotMatch(actions, /(?:single\(formData,|getAll\(|get\()\s*"(?:organization|org)/i, "tenancy never comes from the form");
-  assert.match(actions, /workspace\.activeOrganization/);
+  assert.match(actions, /buildDraftMessage\(workspace/);
+  assert.match(read("apps/web/src/lib/whatsapp-message-build.ts"), /activeOrganization/, "tenancy comes from the workspace, in the shared builder");
   assert.match(actions, /create_whatsapp_draft/);
   assert.match(actions, /sourceType === "onboarding"/, "onboarding drafts cannot be created from the center (their link is never stored)");
   const page = read("apps/web/src/app/whatsapp/page.tsx");

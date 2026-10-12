@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { chunkPath, ORG_EXPORT_EXCLUDED, ORG_EXPORT_FORMAT, ORG_EXPORT_VERSION, sha256, stableJson, tableHash, type ExportChunk, type ExportManifest, type ExportTable } from "@/lib/org-export-manifest";
+import { parseExportScope, type ExportScope } from "@/lib/org-export-scope";
 import { verifyOrganizationExport, type ExportVerification } from "@/lib/org-export-verify";
 
 const ARCHIVE_BUCKET = "organization-exports";
@@ -13,7 +14,12 @@ type Work = { done: boolean; table_name?: string; after_id?: string | null; chun
 type ChunkRow = { table_name: string; chunk_index: number; row_count: number; sha256: string; first_id: string; last_id: string; path: string };
 type TableRow = { table_name: string; sort_order: number };
 type StorageListing = { included: boolean; truncated: boolean; objects: unknown[] };
-export type ExportJobSummary = { id: string; status: "running" | "completed" | "failed" | "cancelled"; include_storage: boolean; created_at: string; completed_at: string | null; failed_reason: string | null; manifest_sha256: string | null; tables_done: number; tables_total: number };
+export type ExportJobSummary = {
+  id: string; status: "running" | "completed" | "failed" | "cancelled"; include_storage: boolean; created_at: string; completed_at: string | null; failed_reason: string | null;
+  manifest_sha256: string | null; tables_done: number; tables_total: number;
+  /** Retention and the last recorded metadata verification (20261031130000). Absent on a database that predates it. */
+  purged_at?: string | null; purged_files?: number | null; verified_at?: string | null; verified_ok?: boolean | null; verified_failures?: number | null;
+};
 
 function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }
 async function rpc<T>(supabase: SupabaseClient, name: string, args: Record<string, unknown>): Promise<T> {
@@ -102,14 +108,98 @@ async function finalizeOrganizationExport(supabase: SupabaseClient, jobId: strin
 }
 
 /** Dry-run verification of a completed archive: re-reads and re-hashes its files. Restores nothing. */
-export async function verifyStoredOrganizationExport(supabase: SupabaseClient, jobId: string): Promise<ExportVerification & { manifestSha256: string | null }> {
+export async function verifyStoredOrganizationExport(supabase: SupabaseClient, jobId: string): Promise<ExportVerification & { manifestSha256: string | null; recorded: boolean }> {
   const manifest = await rpc<ExportManifest>(supabase, "org_export_manifest", { p_job: jobId });
   const files = await downloadAll(supabase, manifestPaths(manifest));
-  return { ...verifyOrganizationExport(manifest, (path) => files.get(path) ?? null), manifestSha256: manifest.manifestSha256 };
+  const result = verifyOrganizationExport(manifest, (path) => files.get(path) ?? null);
+  // Remember the outcome so health and the job list can say "never verified" or "last verification failed". Best effort:
+  // a recording failure must not turn a finished verification into an error, and the result is the application's own record.
+  let recorded = false;
+  try { await rpc(supabase, "org_export_record_verification", { p_job: jobId, p_ok: result.ok, p_failure_count: result.failures.length }); recorded = true; }
+  catch (error) { console.error("org_export_record_verification_failed", errorMessage(error)); }
+  return { ...result, manifestSha256: manifest.manifestSha256, recorded };
+}
+
+/** Live scope of the archive (owner only): allowlisted tables with row counts, and every other tenant table with a reason. */
+export async function loadExportScope(supabase: SupabaseClient): Promise<ExportScope | null> {
+  try { return parseExportScope(await rpc<unknown>(supabase, "org_export_scope", {})); }
+  catch (error) {
+    if ((error as { code?: string }).code !== "42501") console.error("org_export_scope_failed", errorMessage(error));
+    return null;
+  }
+}
+
+/** The manifest of a completed, not purged archive, or null (never throws: used only for display). */
+export async function readCompletedManifest(supabase: SupabaseClient, jobId: string): Promise<ExportManifest | null> {
+  try { return await rpc<ExportManifest>(supabase, "org_export_manifest", { p_job: jobId }); }
+  catch (error) { console.error("org_export_manifest_read_failed", errorMessage(error)); return null; }
+}
+
+export type PurgeCandidate = { id: string; status: string; created_at: string; storage_prefix: string };
+export async function listPurgeCandidates(supabase: SupabaseClient): Promise<PurgeCandidate[]> {
+  try { return await rpc<PurgeCandidate[]>(supabase, "org_export_purge_candidates", {}); }
+  catch (error) {
+    if ((error as { code?: string }).code !== "42501") console.error("org_export_purge_candidates_failed", errorMessage(error));
+    return [];
+  }
+}
+
+const PURGE_LIST_PAGE = 1000;
+const PURGE_REMOVE_BATCH = 100;
+const PURGE_MAX_FILES_PER_CALL = 5000;
+
+async function listArchiveFiles(supabase: SupabaseClient, prefix: string, limit: number): Promise<string[]> {
+  const files: string[] = [];
+  const queue = [prefix];
+  for (let guard = 0; queue.length > 0 && files.length < limit; guard += 1) {
+    if (guard > 5000) throw new Error("org_export_purge_too_many_folders");
+    const dir = queue.shift()!;
+    for (let offset = 0; files.length < limit; offset += PURGE_LIST_PAGE) {
+      const listed = await supabase.storage.from(ARCHIVE_BUCKET).list(dir, { limit: PURGE_LIST_PAGE, offset, sortBy: { column: "name", order: "asc" } });
+      if (listed.error) throw new Error(`org_export_purge_list_failed:${listed.error.message}`);
+      for (const item of listed.data ?? []) {
+        if (item.id === null || item.id === undefined) queue.push(`${dir}/${item.name}`); else files.push(`${dir}/${item.name}`);
+      }
+      if ((listed.data?.length ?? 0) < PURGE_LIST_PAGE) break;
+    }
+  }
+  return files;
+}
+
+/**
+ * Removes the files of one purge-candidate archive from Storage (owner session; the delete policy is scoped to the
+ * archive prefix) and, only when a fresh listing shows nothing left, records the purge. Safe to repeat: an interrupted or
+ * partial run is simply resumed. A removal that Storage reports as successful but that left the object in place (policy
+ * denial) is detected by the re-listing and reported, never recorded as done.
+ */
+export async function purgeExportArchive(supabase: SupabaseClient, jobId: string): Promise<{ done: boolean; removed: number }> {
+  const candidates = await listPurgeCandidates(supabase);
+  const job = candidates.find((candidate) => candidate.id === jobId);
+  if (!job) throw new Error("org_export_not_purgeable");
+  const prefix = job.storage_prefix;
+  if (!/^[0-9a-f-]{36}\/exports\/[0-9a-f-]{36}$/i.test(prefix)) throw new Error("org_export_prefix_invalid");
+  let removed = 0;
+  const files = await listArchiveFiles(supabase, prefix, PURGE_MAX_FILES_PER_CALL);
+  for (let offset = 0; offset < files.length; offset += PURGE_REMOVE_BATCH) {
+    const batch = files.slice(offset, offset + PURGE_REMOVE_BATCH);
+    const result = await supabase.storage.from(ARCHIVE_BUCKET).remove(batch);
+    if (result.error) throw new Error(`org_export_purge_remove_failed:${result.error.message}`);
+    removed += result.data?.length ?? 0;
+  }
+  const left = await listArchiveFiles(supabase, prefix, 1);
+  if (left.length > 0) {
+    if (removed === 0) throw new Error("org_export_purge_blocked");
+    return { done: false, removed };
+  }
+  await rpc(supabase, "org_export_mark_purged", { p_job: jobId, p_files: removed });
+  return { done: true, removed };
 }
 
 export function describeExportError(error: unknown): string {
   const message = errorMessage(error);
   if (/not_authorized/.test(message)) return "Hanya pemilik bisnis yang dapat mengekspor data organisasi.";
+  if (/job_purged/.test(message)) return "Berkas arsip ini sudah dihapus (masa simpan), sehingga tidak dapat diverifikasi.";
+  if (/org_export_not_purgeable/.test(message)) return "Arsip ini bukan kandidat penghapusan (masih dalam masa simpan, atau arsip selesai terbaru).";
+  if (/org_export_purge_blocked/.test(message)) return "Penyimpanan menolak penghapusan berkas. Arsip tidak ditandai terhapus.";
   return message;
 }

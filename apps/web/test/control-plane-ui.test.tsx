@@ -56,12 +56,12 @@ test("an interrupted run is offered for resume or cancel; a completed run for me
   assert.doesNotMatch(done, /Lanjutkan export|Batalkan/);
 });
 
-test("dashboard settings form lists exactly the seven cards and reflects the saved visibility", () => {
+test("dashboard settings form lists exactly the eight cards and reflects the saved visibility", () => {
   const html = renderToStaticMarkup(
-    <dashboardModule.DashboardSettingsForm organizationId="org-1" visibility={{ booking_today: true, revenue_today: false, active_customers: true, open_tasks: false, performance_operations: true, performance_finance: false, performance_sources: true }} />,
+    <dashboardModule.DashboardSettingsForm organizationId="org-1" visibility={{ booking_today: true, revenue_today: false, active_customers: true, open_tasks: false, performance_operations: true, performance_finance: false, performance_sources: true, operational_alerts: false }} />,
   );
-  for (const key of ["booking_today", "revenue_today", "active_customers", "open_tasks", "performance_operations", "performance_finance", "performance_sources"]) assert.match(html, new RegExp(`name="card_${key}"`));
-  assert.equal((html.match(/type="checkbox"/g) ?? []).length, 7);
+  for (const key of ["booking_today", "revenue_today", "active_customers", "open_tasks", "performance_operations", "performance_finance", "performance_sources", "operational_alerts"]) assert.match(html, new RegExp(`name="card_${key}"`));
+  assert.equal((html.match(/type="checkbox"/g) ?? []).length, 8);
   assert.match(html, /name="card_performance_finance" value="false"/);
   assert.match(html, /name="card_revenue_today" value="false"/);
   assert.match(html, /name="card_booking_today" value="true"/);

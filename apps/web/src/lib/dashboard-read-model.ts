@@ -5,7 +5,9 @@ import { addDaysISO, zonedDateTimeToUtc, zonedDayISO } from "@/lib/timezone";
 export const DASHBOARD_METRIC_CARD_KEYS = ["booking_today", "revenue_today", "active_customers", "open_tasks"] as const;
 /** The three period-based performance sections. Must stay identical to app.update_dashboard_card_settings. */
 export const DASHBOARD_PERFORMANCE_CARD_KEYS = ["performance_operations", "performance_finance", "performance_sources"] as const;
-export const DASHBOARD_CARD_KEYS = [...DASHBOARD_METRIC_CARD_KEYS, ...DASHBOARD_PERFORMANCE_CARD_KEYS] as const;
+/** The optional operational-alerts section. Must stay identical to app.update_dashboard_card_settings (20261031100000). */
+export const DASHBOARD_ALERT_CARD_KEYS = ["operational_alerts"] as const;
+export const DASHBOARD_CARD_KEYS = [...DASHBOARD_METRIC_CARD_KEYS, ...DASHBOARD_PERFORMANCE_CARD_KEYS, ...DASHBOARD_ALERT_CARD_KEYS] as const;
 export type DashboardCardKey = (typeof DASHBOARD_CARD_KEYS)[number];
 export type DashboardCardVisibility = Record<DashboardCardKey, boolean>;
 
@@ -17,6 +19,7 @@ export const DASHBOARD_CARD_LABELS: Record<DashboardCardKey, string> = {
   performance_operations: "Performa operasional",
   performance_finance: "Performa keuangan",
   performance_sources: "Performa sumber pelanggan",
+  operational_alerts: "Peringatan operasional",
 };
 
 export const DASHBOARD_CARD_DEFAULTS: DashboardCardVisibility = {
@@ -27,6 +30,7 @@ export const DASHBOARD_CARD_DEFAULTS: DashboardCardVisibility = {
   performance_operations: true,
   performance_finance: true,
   performance_sources: true,
+  operational_alerts: true,
 };
 
 /** Invalid or absent entries retain the legacy all-visible behavior. */

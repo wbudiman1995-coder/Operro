@@ -9,7 +9,9 @@ import { DashboardSettingsForm } from "@/components/dashboard-settings-form";
 import { EmptyState, PageHeader, StatCard, StatusBadge } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import type { CapabilityMap } from "@/lib/authorization";
+import { OperationalAlerts } from "@/components/operational-alerts";
 import { PerformanceDashboard } from "@/components/performance-dashboard";
+import type { AlertsState } from "@/lib/dashboard-alerts";
 import type { DashboardPerformance } from "@/lib/dashboard-performance";
 import type { DashboardPeriod } from "@/lib/dashboard-period";
 import { comparisonDirection, DASHBOARD_METRIC_CARD_KEYS, type DashboardCardVisibility } from "@/lib/dashboard-read-model";
@@ -27,6 +29,7 @@ interface DashboardShellProps {
   period: DashboardPeriod;
   periodError: string | null;
   performance: DashboardPerformance;
+  alerts: AlertsState;
 }
 
 function countComparison(current: number, previous: number, unit: string): string {
@@ -53,7 +56,7 @@ function UnavailableMetric({ label, title, description }: { label: string; title
   );
 }
 
-export function DashboardShell({ organizations, activeOrganization, userEmail, data, capabilities, dashboardCards, period, periodError, performance }: DashboardShellProps) {
+export function DashboardShell({ organizations, activeOrganization, userEmail, data, capabilities, dashboardCards, period, periodError, performance, alerts }: DashboardShellProps) {
   const quickActions = [
     capabilities["booking.create"] ? { label: "Buat booking baru", href: "/schedule?create=1" } : null,
     capabilities["customer.read"] || capabilities["customer.manage"] ? { label: "Buka pelanggan", href: "/customers" } : null,
@@ -102,6 +105,8 @@ export function DashboardShell({ organizations, activeOrganization, userEmail, d
           : <StatCard label="Tugas tertunda" value={String(data.openTasks)} helper="Todo atau sedang berjalan pada cabang yang diizinkan." tone={data.openTasks ? "warning" : "success"} />}
         </> : null}
       </section> : null}
+
+      <OperationalAlerts state={alerts} />
 
       <PerformanceDashboard period={period} periodError={periodError} performance={performance} timeZone={data.timeZone} />
 

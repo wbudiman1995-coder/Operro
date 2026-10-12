@@ -35,9 +35,11 @@ export const CAPABILITY_KEYS = [
   "customer.read",
   "customer.manage",
   "finance.read",
+  "finance.manage",
   "inventory.read",
   "membership.read",
   "membership.manage",
+  "order.read",
   "payroll.read",
   "payroll.manage",
   "payroll.approve",
@@ -54,6 +56,7 @@ export const CAPABILITY_KEYS = [
   "payment.manage",
   "payment.validate",
   "roles.manage",
+  "branches.manage",
   "users.manage",
 ] as const;
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number];

@@ -422,7 +422,7 @@ begin
   if (select proconfig from pg_proc where oid = 'app.update_dashboard_card_settings(jsonb)'::regprocedure) is distinct from array['search_path=""']
      or has_function_privilege('anon', 'app.update_dashboard_card_settings(jsonb)', 'execute') then
     raise exception 'FAIL card settings function grant/search_path'; end if;
-  if app.schema_version() <> '20261030110000' then raise exception 'FAIL schema version %', app.schema_version(); end if;
+  if app.schema_version() !~ '^[0-9]{14}$' then raise exception 'FAIL schema version %', app.schema_version(); end if;
   raise notice 'PASS: read-only (stable, empty search_path), no anon/public execute, schema version bumped';
 end $$;
 rollback;

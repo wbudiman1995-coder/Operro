@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { groupCashByCurrency, type CashPeriod, type CashPositionRow } from "@/lib/cash-position";
 
 function money(value: number, currency: string): string {
@@ -20,7 +22,7 @@ export function CashPositionPanel({ period, rows, timeZone, error, exportHref }:
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 id="cash-position-title" className="font-bold">Posisi kas (laporan baca-saja)</h2>
-        <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">Dihitung dari pembayaran berhasil, pengembalian dana berhasil, dan pengeluaran pada periode {period.from} s.d. {period.to} (zona waktu {timeZone}). Setiap mata uang dipisah. Ini bukan buku besar akuntansi: tanpa saldo awal, modal, transfer antar rekening, pajak, atau payroll.</p>
+        <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">Dihitung dari pembayaran berhasil, pengembalian dana berhasil, dan pengeluaran pada periode {period.from} s.d. {period.to} (zona waktu {timeZone}). Setiap mata uang dipisah. Ini bukan buku besar akuntansi: tanpa saldo awal, modal, transfer antar rekening, pajak, atau payroll. Saldo awal dan modal yang dideklarasikan ada di <Link href="/finance/register" className="font-bold underline">Register kas</Link> dan sengaja tidak digabung di sini.</p>
       </div>
       {exportHref ? <a href={exportHref} className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">Export Excel (termasuk posisi kas)</a> : null}
     </div>

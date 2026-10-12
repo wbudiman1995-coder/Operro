@@ -40,7 +40,7 @@ interface DraftDbRow {
 export async function loadWhatsAppDrafts(
   supabase: SupabaseClient,
   organizationId: string,
-  options: { status?: WhatsAppStatus; source?: WhatsAppSource; cursor?: DraftCursor; pageSize?: number } = {},
+  options: { status?: WhatsAppStatus; source?: WhatsAppSource; batchId?: string; cursor?: DraftCursor; pageSize?: number } = {},
 ): Promise<WhatsAppDraftPage> {
   const pageSize = Math.max(1, Math.min(options.pageSize ?? WHATSAPP_PAGE_SIZE, 100));
   let query = supabase.from("whatsapp_drafts")
@@ -50,6 +50,7 @@ export async function loadWhatsAppDrafts(
     .limit(pageSize + 1);
   if (options.status) query = query.eq("status", options.status);
   if (options.source) query = query.eq("source_type", options.source);
+  if (options.batchId) query = query.eq("batch_id", options.batchId);
   if (options.cursor) query = query.or(`created_at.lt.${options.cursor.createdAt},and(created_at.eq.${options.cursor.createdAt},id.lt.${options.cursor.id})`);
   const { data, error } = await query;
   if (error) throw new Error(`whatsapp_drafts_failed:${error.message}`);
@@ -103,11 +104,11 @@ export interface DraftCandidates {
 }
 
 /** null = the caller lacks the capability for that source (restricted, not "nothing to do"). */
-export async function loadDraftCandidates(supabase: SupabaseClient, organizationId: string, capabilities: CapabilityMap): Promise<DraftCandidates> {
+export async function loadDraftCandidates(supabase: SupabaseClient, organizationId: string, capabilities: CapabilityMap, limit = 10): Promise<DraftCandidates> {
   const invoices = capabilities["finance.read"]
     ? await (async () => {
         const result = await supabase.from("invoices").select("id,invoice_number,customer_id,total,currency")
-          .eq("organization_id", organizationId).eq("status", "issued").order("issued_at", { ascending: false }).limit(10);
+          .eq("organization_id", organizationId).eq("status", "issued").order("issued_at", { ascending: false }).limit(limit);
         if (result.error) throw new Error(`whatsapp_candidates_invoices_failed:${result.error.message}`);
         const ids = [...new Set((result.data ?? []).flatMap((row) => (row.customer_id ? [row.customer_id as string] : [])))];
         const customers = ids.length ? await supabase.from("customers").select("id,display_name,phone").eq("organization_id", organizationId).in("id", ids) : { data: [], error: null };
@@ -119,7 +120,7 @@ export async function loadDraftCandidates(supabase: SupabaseClient, organization
         });
       })()
     : null;
-  const followups = capabilities["customer.read"] ? (await loadOverdueQueue(supabase, { pageSize: 10 })).groups : null;
-  const renewals = capabilities["membership.read"] ? (await loadRenewalQueue(supabase, { pageSize: 10 })).groups : null;
+  const followups = capabilities["customer.read"] ? (await loadOverdueQueue(supabase, { pageSize: limit })).groups : null;
+  const renewals = capabilities["membership.read"] ? (await loadRenewalQueue(supabase, { pageSize: limit })).groups : null;
   return { invoices, followups, renewals };
 }

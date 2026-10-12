@@ -228,6 +228,10 @@ SQL
   perf_out=$(sql -q -f integration/performance_dashboard_upgrade_probe.sql 2>&1) || { echo "$perf_out"; echo "FAIL: performance dashboard populated probe"; exit 1; }
   printf '%s\n' "$perf_out"
   grep -q 'PERFORMANCE DASHBOARD POPULATED PROBE PASS' <<<"$perf_out" || { echo "FAIL: performance dashboard populated probe did not reach its pass marker"; exit 1; }
+  # Final parity closeout migrations (alerts, cash register, WhatsApp batches, export scope, hours, consent, health).
+  closeout_out=$(sql -q -f integration/final_closeout_upgrade_probe.sql 2>&1) || { echo "$closeout_out"; echo "FAIL: final closeout populated probe"; exit 1; }
+  printf '%s\n' "$closeout_out"
+  grep -q 'FINAL CLOSEOUT POPULATED PROBE PASS' <<<"$closeout_out" || { echo "FAIL: final closeout populated probe did not reach its pass marker"; exit 1; }
   sql -Atc "select to_regprocedure('app.list_audit_events(text,uuid,integer)') is not null as audit_rpc, to_regprocedure('app.record_payment(uuid,text,numeric,text,uuid,uuid)') is not null as payment_rpc"
   echo "POPULATED UPGRADE PASS"
 } >"$log" 2>&1 || { tail -70 "$log"; exit 1; }

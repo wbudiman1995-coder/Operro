@@ -186,7 +186,7 @@ export interface ScheduleWorkspace {
   truncated: boolean;
 }
 
-function readConfiguredHours(settings: unknown) {
+export function readConfiguredHours(settings: unknown) {
   const container = typeof settings === "object" && settings !== null ? (settings as Record<string, unknown>) : {};
   const schedule = typeof container.schedule === "object" && container.schedule !== null ? (container.schedule as Record<string, unknown>) : {};
   const start = Number(schedule.dayStartMinutes);
