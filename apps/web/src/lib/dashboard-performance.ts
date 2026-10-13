@@ -15,6 +15,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BranchAccess, CapabilityMap } from "@/lib/authorization";
 import type { DashboardPeriod } from "@/lib/dashboard-period";
 import { buildPerformanceReadPlan, DASHBOARD_CARD_DEFAULTS, type DashboardCardVisibility } from "@/lib/dashboard-read-model";
+import { loadSourceReturn, type SourceReturn } from "@/lib/marketing-spend";
 
 export type CardState<T> =
   /** The organization turned this card off: nothing is queried and nothing is shown. */
@@ -53,6 +54,8 @@ export interface DashboardPerformance {
   operations: CardState<OperationsData>;
   finance: CardState<FinanceData>;
   sources: CardState<SourceData>;
+  /** Cash collected from this period's new customers per source against recorded marketing spend (migration 20261101100000). */
+  sourceReturn: CardState<SourceReturn>;
 }
 
 type Row = Record<string, unknown>;
@@ -158,6 +161,18 @@ async function run<T>(
   }
 }
 
+async function runSourceReturn(supabase: SupabaseClient, period: DashboardPeriod, timeZone: string): Promise<CardState<SourceReturn>> {
+  try {
+    return { status: "ready", data: await loadSourceReturn(supabase, period.current.from, period.current.to, timeZone) };
+  } catch (cause) {
+    const code = (cause as { code?: string }).code;
+    if (code === "42501") return { status: "restricted", reason: "Akses ditolak oleh database untuk peran ini; angka tidak ditampilkan." };
+    if (code === "PGRST202" || code === "42883") return { status: "unavailable", reason: "ROI per sumber belum tersedia di database yang terhubung (migrasi 20261101100000 belum diterapkan)." };
+    console.error("dashboard_performance_source_return_failed", { code });
+    return { status: "unavailable", reason: "ROI per sumber tidak dapat dimuat saat ini. Tabel pelanggan di atas tidak terpengaruh." };
+  }
+}
+
 const hidden = { status: "hidden" } as const;
 const noBranch = "Belum ada cabang yang diberikan kepada peran ini.";
 
@@ -191,6 +206,12 @@ export async function loadDashboardPerformance(
     : plan.sources ? run(supabase, "sources", "dashboard_source_performance", period, timeZone, (data) => parseSourceRows(data, plan.sourcesBooking, plan.sourcesFinance))
     : Promise.resolve(hidden);
 
-  const [operationsState, financeState, sourcesState] = await Promise.all([operations, finance, sources]);
-  return { operations: operationsState, finance: financeState, sources: sourcesState };
+  // The return needs everything the sources card needs plus finance.read; a caller missing any of it makes no query.
+  const sourceReturn: Promise<CardState<SourceReturn>> = !visibility.performance_sources ? Promise.resolve(hidden)
+    : !canCustomers || !branchAccess.all ? Promise.resolve({ status: "restricted", reason: "ROI per sumber hanya tersedia bagi peran dengan akses pelanggan dan semua cabang." })
+    : !capabilities["finance.read"] ? Promise.resolve({ status: "restricted", reason: "ROI per sumber memerlukan finance.read; angka tidak dimuat." })
+    : runSourceReturn(supabase, period, timeZone);
+
+  const [operationsState, financeState, sourcesState, sourceReturnState] = await Promise.all([operations, finance, sources, sourceReturn]);
+  return { operations: operationsState, finance: financeState, sources: sourcesState, sourceReturn: sourceReturnState };
 }

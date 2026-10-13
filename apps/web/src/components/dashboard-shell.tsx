@@ -108,7 +108,7 @@ export function DashboardShell({ organizations, activeOrganization, userEmail, d
 
       <OperationalAlerts state={alerts} />
 
-      <PerformanceDashboard period={period} periodError={periodError} performance={performance} timeZone={data.timeZone} />
+      <PerformanceDashboard period={period} periodError={periodError} performance={performance} timeZone={data.timeZone} canManageSpend={Boolean(capabilities["finance.manage"])} />
 
       {userEmail.toLowerCase() === "wbudiman1995@gmail.com" ? <Link href="/platform" className="mt-6 block rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">Buka panel platform Operro → organisasi, undangan, pemakaian proyek, dan permintaan kapasitas</Link> : null}
 

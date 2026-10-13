@@ -65,13 +65,18 @@ test("card visibility falls back safely: absent new keys are visible, wrong type
 test("an owner reads each aggregate once, with only validated period arguments and no organization identifier", async () => {
   const { calls, client } = rpcClient();
   const result = await loadDashboardPerformance(client, caps("booking.read", "finance.read", "customer.read"), everyBranch, period, "Asia/Jakarta");
-  assert.deepEqual(calls.map((call) => call.name).sort(), ["dashboard_finance_performance", "dashboard_operations_performance", "dashboard_source_performance"]);
+  assert.deepEqual(calls.map((call) => call.name).sort(), ["dashboard_finance_performance", "dashboard_operations_performance", "dashboard_source_performance", "dashboard_source_roi"]);
   for (const call of calls) {
     assert.equal(call.schema, "app");
+    if (call.name === "dashboard_source_roi") {
+      // The return takes the current period only (the comparison period plays no part in it).
+      assert.deepEqual(call.args, { p_from: "2026-10-01", p_to: "2026-10-10", p_timezone: "Asia/Jakarta" });
+      continue;
+    }
     assert.deepEqual(Object.keys(call.args).sort(), ["p_from", "p_prev_from", "p_prev_to", "p_timezone", "p_to"]);
     assert.deepEqual(call.args, { p_from: "2026-10-01", p_to: "2026-10-10", p_prev_from: "2026-09-21", p_prev_to: "2026-09-30", p_timezone: "Asia/Jakarta" });
   }
-  assert.deepEqual([result.operations.status, result.finance.status, result.sources.status], ["ready", "ready", "ready"]);
+  assert.deepEqual([result.operations.status, result.finance.status, result.sources.status, result.sourceReturn.status], ["ready", "ready", "ready", "ready"]);
 });
 
 test("finance cards do not load without finance.read, and no call is issued for any denied domain", async () => {
@@ -114,6 +119,7 @@ test("database refusals and failures degrade one card at a time and are never sh
     dashboard_operations_performance: { data: null, error: { code: "42501", message: "not_authorized" } },
     dashboard_finance_performance: { data: null, error: { code: "PGRST202", message: "function not found" } },
     dashboard_source_performance: { data: null, error: { code: "XX000", message: "boom" } },
+    dashboard_source_roi: { data: null, error: { code: "PGRST202", message: "function not found" } },
   });
   const original = console.error;
   console.error = () => undefined;
@@ -123,6 +129,8 @@ test("database refusals and failures degrade one card at a time and are never sh
     assert.equal(result.finance.status, "unavailable");
     assert.match(result.finance.status === "unavailable" ? result.finance.reason : "", /20261030100000/);
     assert.equal(result.sources.status, "unavailable");
+    assert.equal(result.sourceReturn.status, "unavailable");
+    assert.match(result.sourceReturn.status === "unavailable" ? result.sourceReturn.reason : "", /20261101100000/);
     assert.doesNotMatch(JSON.stringify(result), /"data"/);
   } finally {
     console.error = original;
@@ -213,6 +221,7 @@ function ready(overrides: Partial<DashboardPerformance> = {}): DashboardPerforma
       { period: "current", currency: "USD", issued_total: 50, issued_count: 1, collected_total: 40, collected_count: 1, collected_on_void_count: 0, refunded_total: 5, refunded_count: 1, outstanding_total: 0, outstanding_count: 0, overdue_count: 0 },
     ]) },
     sources: { status: "ready", data: parseSourceRows([{ period: "current", source_label: "Instagram", is_missing: false, is_other: false, source_count: 1, new_customers: 2, first_completed: 1, first_paid: 2 }], true, true) },
+    sourceReturn: { status: "ready", data: { rows: [], truncated: false } },
     ...overrides,
   };
 }
@@ -243,6 +252,7 @@ test("restricted and unavailable cards render a clear state and no figures", () 
     operations: { status: "restricted", reason: "Peran ini tidak memiliki booking.read; angka tidak dimuat." },
     finance: { status: "restricted", reason: "Peran ini tidak memiliki finance.read; angka tidak dimuat." },
     sources: { status: "unavailable", reason: "Data tidak dapat dimuat saat ini. Coba muat ulang halaman." },
+    sourceReturn: { status: "restricted", reason: "ROI per sumber memerlukan finance.read; angka tidak dimuat." },
   });
   assert.equal((html.match(/Tidak tersedia untuk peran ini/g) ?? []).length, 2);
   assert.match(html, /Data belum dapat dimuat/);
@@ -251,13 +261,14 @@ test("restricted and unavailable cards render a clear state and no figures", () 
 });
 
 test("hidden cards are absent; all hidden says so; empty data uses empty states, not zeros", () => {
-  const hidden = render({ operations: { status: "hidden" }, finance: { status: "hidden" }, sources: { status: "hidden" } });
+  const hidden = render({ operations: { status: "hidden" }, finance: { status: "hidden" }, sources: { status: "hidden" }, sourceReturn: { status: "hidden" } });
   assert.match(hidden, /Kartu performa disembunyikan/);
   assert.doesNotMatch(hidden, /Operasional|Keuangan|sumber pelanggan<\/h3>/);
   const empty = render({
     operations: { status: "ready", data: parseOperationsRows([]) },
     finance: { status: "ready", data: parseFinanceRows([]) },
     sources: { status: "ready", data: parseSourceRows([], true, true) },
+    sourceReturn: { status: "ready", data: { rows: [], truncated: false } },
   });
   assert.match(empty, /Belum ada booking pada periode ini/);
   assert.match(empty, /Belum ada data keuangan pada periode ini/);

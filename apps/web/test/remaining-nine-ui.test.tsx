@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import Module from "node:module";
+import path from "node:path";
 import test, { before } from "node:test";
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -202,8 +204,10 @@ test("storage cleanup panel: dry-run first, explicit about deletion, no sizes or
   assert.match(none, /Belum ada proses/);
 });
 
+// The fixture follows the newest migration so that adding a migration never needs an edit here (health-recovery.test.ts pins EXPECTED_SCHEMA_VERSION).
+const newestMigration = fs.readdirSync(path.join(import.meta.dirname, "../../../supabase/migrations")).filter((name) => /^\d{14}_.+\.sql$/.test(name)).sort().pop()!.slice(0, 14);
 const healthy = {
-  schema_version: "20261031160000", generated_at: "2026-10-09T00:00:00Z",
+  schema_version: newestMigration, generated_at: "2026-10-09T00:00:00Z",
   exports: { failed_30d: 0, stale_running: 0, last_completed_at: null, last_failure_at: null },
   cleanup: { problem_runs_30d: 0, stale_running: 0, last_apply_status: null, last_apply_at: null, pending_objects: 0 },
   capacity_requests: { pending: 0, oldest_pending_at: null, stale_pending: 0 },

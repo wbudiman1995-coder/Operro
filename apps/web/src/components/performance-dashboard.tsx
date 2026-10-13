@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/pilot-ui";
 import {
   describeChange, formatMoney, type CardState, type DashboardPerformance, type FinanceCurrency, type OperationsData, type SourceData, type SourceRow,
 } from "@/lib/dashboard-performance";
+import { formatRatio, RETURN_DEFINITION, type SourceReturn, type SourceReturnRow } from "@/lib/marketing-spend";
 import { DASHBOARD_PERIOD_LABELS, DASHBOARD_PERIOD_PRESETS, MAX_DASHBOARD_PERIOD_DAYS, type DashboardPeriod } from "@/lib/dashboard-period";
 
 interface Props {
@@ -18,6 +19,8 @@ interface Props {
   periodError: string | null;
   performance: DashboardPerformance;
   timeZone: string;
+  /** finance.manage: shows the link that records marketing spend (the database still decides). */
+  canManageSpend?: boolean;
 }
 
 const PRESET_LINKS = DASHBOARD_PERIOD_PRESETS.filter((preset) => preset !== "custom");
@@ -121,7 +124,63 @@ function Definition({ children }: { children: React.ReactNode }) {
   return <details className="mt-4 text-xs text-[#5b6472]"><summary className="cursor-pointer font-semibold text-[#0f8a72]">Definisi angka</summary><div className="mt-2 space-y-1 leading-5">{children}</div></details>;
 }
 
-export function PerformanceDashboard({ period, periodError, performance, timeZone }: Props) {
+function SourceReturnBlock({ state, canManageSpend }: { state: DashboardPerformance["sourceReturn"]; canManageSpend: boolean }) {
+  const noSpend = "Belum ada biaya pemasaran tercatat pada periode ini, sehingga ROI per sumber tidak tersedia.";
+  if (state.status === "hidden") return null;
+  if (state.status !== "ready") {
+    return <p role="note" className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">{state.reason} Tabel ini hanya menghitung pelanggan.</p>;
+  }
+  const data: SourceReturn = state.data;
+  const spendRows = data.rows.filter((row) => row.hasSpend);
+  if (spendRows.length === 0) {
+    return (
+      <p role="note" className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+        {noSpend} Tabel ini hanya menghitung pelanggan. {canManageSpend ? <Link href="/finance/marketing" className="font-bold text-[#0f8a72]">Catat biaya pemasaran</Link> : null}
+      </p>
+    );
+  }
+  const currencies = [...new Set(data.rows.map((row) => row.currency))].sort((a, b) => (a === "IDR" ? -1 : b === "IDR" ? 1 : a.localeCompare(b)));
+  return (
+    <div className="mt-5" aria-label="ROI sederhana per sumber">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h4 className="text-sm font-bold text-[#1a2233]">ROI sederhana per sumber (pelanggan baru periode ini)</h4>
+        <Link href="/finance/marketing" className="text-xs font-bold text-[#0f8a72]">Biaya pemasaran</Link>
+      </div>
+      {currencies.length > 1 ? <p role="note" className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">Terdapat lebih dari satu mata uang. Angka ditampilkan per mata uang dan tidak dijumlahkan.</p> : null}
+      <div className="space-y-4">
+        {currencies.map((currency) => <ReturnTable key={currency} currency={currency} rows={data.rows.filter((row) => row.currency === currency)} />)}
+      </div>
+      {data.truncated ? <p className="mt-2 text-xs text-slate-500">Hanya {data.rows.length} baris teratas ditampilkan.</p> : null}
+      <Definition>{RETURN_DEFINITION.map((line) => <p key={line}>{line}</p>)}</Definition>
+    </div>
+  );
+}
+
+function ReturnTable({ currency, rows }: { currency: string; rows: SourceReturnRow[] }) {
+  const money = (value: number) => formatMoney(value, currency);
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[34rem] text-left text-xs">
+        <caption className="pb-1 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">{currency}</caption>
+        <thead><tr className="text-slate-500"><th scope="col" className="py-1 pr-3 font-semibold">Sumber</th><th scope="col" className="py-1 pr-3 text-right font-semibold">Biaya</th><th scope="col" className="py-1 pr-3 text-right font-semibold">Pelanggan baru / membayar</th><th scope="col" className="py-1 pr-3 text-right font-semibold">Pendapatan bersih</th><th scope="col" className="py-1 pr-3 text-right font-semibold">Selisih</th><th scope="col" className="py-1 text-right font-semibold">Rasio</th></tr></thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.key}:${row.currency}`} className="border-t border-slate-100">
+              <th scope="row" className="py-1.5 pr-3 font-semibold text-slate-800">{row.label}</th>
+              <td className="py-1.5 pr-3 text-right tabular-nums">{row.hasSpend ? money(row.spend) : "Tidak dicatat"}</td>
+              <td className="py-1.5 pr-3 text-right tabular-nums">{row.cohortCustomers} / {row.payingCustomers}</td>
+              <td className="py-1.5 pr-3 text-right tabular-nums">{money(row.netRevenue)}</td>
+              <td className="py-1.5 pr-3 text-right tabular-nums">{row.hasSpend ? money(row.netResult) : "—"}</td>
+              <td className="py-1.5 text-right font-bold tabular-nums">{formatRatio(row.ratio)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function PerformanceDashboard({ period, periodError, performance, timeZone, canManageSpend = false }: Props) {
   const { operations, finance, sources } = performance;
   const allHidden = [operations, finance, sources].every((state) => state.status === "hidden");
   const financeMulti = finance.status === "ready" && finance.data.currencies.length > 1;
@@ -196,7 +255,7 @@ export function PerformanceDashboard({ period, periodError, performance, timeZon
         <div className={sectionClass}>
           <div className="mb-4 flex items-center justify-between gap-3"><h3 className="font-bold text-[#1a2233]">Performa sumber pelanggan</h3><Link href="/customers" className="text-xs font-bold text-[#0f8a72]">Buka pelanggan</Link></div>
           <Sources data={sources.data} />
-          <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">Biaya pemasaran per sumber tidak tercatat di Operro, sehingga ROI per sumber tidak tersedia. Tabel ini hanya menghitung pelanggan.</p>
+          <SourceReturnBlock state={performance.sourceReturn} canManageSpend={canManageSpend} />
           <Definition>
             <p>Sumber adalah isian “sumber” pada profil pelanggan saat ini (huruf besar/kecil dan spasi diseragamkan). Mengubah sumber pelanggan mengubah atribusinya, termasuk untuk periode lalu.</p>
             <p>Pelanggan baru: pelanggan tidak diarsipkan menurut tanggal dibuat. Booking selesai pertama: booking selesai paling awal milik pelanggan jatuh pada periode. Pembayaran invoice pertama: pembayaran berhasil paling awal pada invoice tidak batal jatuh pada periode. Pelanggan lama dapat muncul di dua kolom terakhir.</p>
