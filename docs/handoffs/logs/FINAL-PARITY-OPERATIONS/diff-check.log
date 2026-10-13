@@ -967,3 +967,7 @@ docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4678: trailing 
 +                                                 set_config                                                 
 exit=2
 $ git diff --check c825aab..HEAD (plain; flags only the CR of CRLF working-tree files, not real whitespace)
+
+--- final (after the .gitattributes commit), at HEAD:
+$ git -c core.whitespace=cr-at-eol diff --check c825aab..HEAD
+exit=0
