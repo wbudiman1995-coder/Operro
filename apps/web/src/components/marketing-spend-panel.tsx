@@ -11,16 +11,18 @@ import { ReverseSpendForm, SpendForm } from "@/components/marketing-spend-forms"
 import { formatMoney } from "@/lib/dashboard-performance";
 import { groupSpendByCurrency, RETURN_DEFINITION, type MarketingSpend } from "@/lib/marketing-spend";
 
-export function MarketingSpendPanel({ spend, canManage, today, requestKeys, error, nextHref }: {
+export function MarketingSpendPanel({ spend, canManage, today, requestKeys, error, nextHref, sourceLabels = [] }: {
   spend: MarketingSpend | null;
   canManage: boolean;
   today: string;
   requestKeys: { entry: string; reversals: Record<string, string> };
   error: string | null;
   nextHref: string | null;
+  /** The organization's suggested source labels (business defaults); merged with labels already used in the ledger. */
+  sourceLabels?: readonly string[];
 }) {
   const totals = spend ? groupSpendByCurrency(spend.entries) : [];
-  const suggestions = spend ? [...new Set(spend.entries.map((entry) => entry.sourceLabel))].slice(0, 30) : [];
+  const suggestions = [...new Set([...sourceLabels, ...(spend ? spend.entries.map((entry) => entry.sourceLabel) : [])])].slice(0, 40);
   return (
     <div className="mt-6 space-y-6">
       <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900">

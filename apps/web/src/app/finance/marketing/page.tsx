@@ -8,6 +8,7 @@ import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { loadBranchAccess } from "@/lib/authorization";
 import { loadBranchTimezones } from "@/lib/branch-context";
+import { loadSourceSuggestions } from "@/lib/business-defaults";
 import { loadMarketingSpend, type MarketingSpend, type SpendCursor } from "@/lib/marketing-spend";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 import { zonedDayISO } from "@/lib/timezone";
@@ -28,7 +29,7 @@ export default async function MarketingSpendPage({ searchParams }: { searchParam
     return <WorkspaceShell {...workspace} activePath="/finance"><RestrictedNotice title="Tidak ada izin melihat biaya pemasaran" description="Biaya pemasaran berlaku untuk seluruh bisnis dan memerlukan izin finance.read dengan akses semua cabang." /></WorkspaceShell>;
   }
   const params = await searchParams;
-  const timezones = await loadBranchTimezones(workspace.supabase, workspace.activeOrganization.id);
+  const [timezones, sourceLabels] = await Promise.all([loadBranchTimezones(workspace.supabase, workspace.activeOrganization.id), loadSourceSuggestions(workspace.supabase)]);
   let spend: MarketingSpend | null = null;
   let error: string | null = null;
   try {
@@ -42,6 +43,6 @@ export default async function MarketingSpendPage({ searchParams }: { searchParam
   const nextHref = spend?.nextCursor ? `/finance/marketing?cursor=${spend.nextCursor.spentOn}_${spend.nextCursor.id}` : null;
   return <WorkspaceShell {...workspace} activePath="/finance">
     <PageHeader eyebrow="Kontrol biaya" title="Biaya pemasaran" description="Catatan biaya per sumber pelanggan yang tidak dapat diubah, dipakai untuk ROI sederhana di dasbor." />
-    <MarketingSpendPanel spend={spend} canManage={Boolean(workspace.capabilities["finance.manage"])} today={today} requestKeys={requestKeys} error={error} nextHref={nextHref} />
+    <MarketingSpendPanel spend={spend} canManage={Boolean(workspace.capabilities["finance.manage"])} today={today} requestKeys={requestKeys} error={error} nextHref={nextHref} sourceLabels={sourceLabels} />
   </WorkspaceShell>;
 }

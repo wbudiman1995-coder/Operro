@@ -31,6 +31,8 @@ import { CustomFieldValues } from "@/components/custom-field-values";
 import { CustomerPetEditor } from "@/components/customer-pet-editor";
 import { PET_COAT_LABELS } from "@/lib/customer-pet-edit";
 import { CustomerProfileEditor } from "@/components/customer-profile-editor";
+import { SourceSuggestions } from "@/components/source-suggestions";
+import { loadSourceSuggestions } from "@/lib/business-defaults";
 import { EmptyState, StatusBadge } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
@@ -152,8 +154,11 @@ export default async function CustomerDetailPage({
     },
   };
 
+  const sourceLabels = capabilities["customer.manage"] ? await loadSourceSuggestions(workspace.supabase) : [];
+
   return (
     <WorkspaceShell {...workspace} activePath="/customers">
+      <SourceSuggestions labels={sourceLabels} />
       <Customer360Header overview={overview} />
       {capabilities["customer.manage"] ? <CustomerProfileEditor customerId={customerId} updatedAt={overview.updatedAt} defaults={{ displayName: overview.name, phone: overview.phone ?? "", email: overview.email ?? "", source: overview.source ?? "", notes: overview.notes ?? "" }} /> : null}
       <CustomFieldValues definitions={customerFieldDefinitions} values={customerFieldValues} className="mt-3 rounded-2xl border border-slate-200 bg-white p-4" />

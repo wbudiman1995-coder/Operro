@@ -67,7 +67,7 @@ export function CustomerBulkEditor({
       <select name="sourceMode" value={sourceMode} onChange={(event) => setSourceMode(event.target.value as typeof sourceMode)} aria-label="Ubah sumber pelanggan" className="h-9 rounded-lg border px-2">
         <option value="unchanged">Sumber: tidak berubah</option><option value="set">Sumber: isi</option><option value="clear">Sumber: kosongkan</option>
       </select>
-      {sourceMode === "set" ? <input name="source" value={source} onChange={(event) => setSource(event.target.value)} maxLength={80} placeholder="Sumber akuisisi" aria-label="Sumber pelanggan" className="h-9 rounded-lg border px-2" /> : null}
+      {sourceMode === "set" ? <input name="source" list="source-label-suggestions" value={source} onChange={(event) => setSource(event.target.value)} maxLength={80} placeholder="Sumber akuisisi" aria-label="Sumber pelanggan" className="h-9 rounded-lg border px-2" /> : null}
       <button type="submit" disabled={pending || selectedVisible.length === 0 || !hasChange} className="h-9 rounded-lg bg-emerald-700 px-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{pending ? "Menyimpan..." : "Terapkan"}</button>
       {state.error ? <span className="font-semibold text-rose-700">{state.error}</span> : null}
       {state.success ? <span className="font-semibold text-emerald-700">{state.success}</span> : null}

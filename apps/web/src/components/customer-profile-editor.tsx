@@ -39,7 +39,7 @@ export function CustomerProfileEditor({ customerId, updatedAt, defaults }: { cus
       </div>
       <div className="grid gap-2.5 sm:grid-cols-2">
         <label className={labelClass}>Email<input className={inputClass} name="email" type="email" value={values.email} onChange={update("email")} maxLength={254} /></label>
-        <label className={labelClass}>Sumber<input className={inputClass} name="source" value={values.source} onChange={update("source")} maxLength={80} /></label>
+        <label className={labelClass}>Sumber<input className={inputClass} name="source" list="source-label-suggestions" value={values.source} onChange={update("source")} maxLength={80} /></label>
       </div>
       <label className={`${labelClass} block`}>Catatan<textarea className={`${inputClass} h-auto py-2`} name="notes" rows={4} value={values.notes} onChange={update("notes")} maxLength={4000} /></label>
       <div className="flex flex-wrap items-center justify-between gap-2">

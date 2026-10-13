@@ -46,7 +46,7 @@ export function OnboardingAdmin({
       <h2 className="font-bold">Buat link pendaftaran</h2>
       <p className="mt-1 text-xs text-slate-500">Satu kali pakai, kedaluwarsa otomatis dalam dua hari.</p>
       <form action={action} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-        <input name="source" className="field" placeholder="Sumber, contoh Instagram"/>
+        <input name="source" list="source-label-suggestions" className="field" placeholder="Sumber, contoh Instagram"/>
         <input name="note" className="field" placeholder="Catatan lead internal"/>
         <button disabled={pending} className="rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white">{pending?"Membuat…":"Buat link"}</button>
       </form>

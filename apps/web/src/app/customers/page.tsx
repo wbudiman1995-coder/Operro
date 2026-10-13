@@ -6,6 +6,8 @@ import { CustomerDatabase } from "@/components/customer-database";
 import { FastCustomerImport } from "@/components/fast-customer-import";
 import { PageHeader } from "@/components/pilot-ui";
 import { WorkspaceShell } from "@/components/workspace-shell";
+import { SourceSuggestions } from "@/components/source-suggestions";
+import { loadSourceSuggestions } from "@/lib/business-defaults";
 import { loadCustomerWorkspace } from "@/lib/pilot-data";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 
@@ -13,11 +15,13 @@ export const metadata = { title: "Pelanggan" };
 
 export default async function CustomersPage() {
   const workspace = await requireActiveWorkspace();
+  const sourceLabels = await loadSourceSuggestions(workspace.supabase);
   const [data, sizeBandsResult, petTypesResult] = await Promise.all([loadCustomerWorkspace(workspace.supabase, workspace.activeOrganization.id), workspace.supabase.from("organization_size_bands").select("id,band_key,band_kind,label,sort_order,upper_kg,upper_inclusive,status").eq("organization_id", workspace.activeOrganization.id).eq("band_kind", "dog_weight").eq("status", "active").order("sort_order"), workspace.supabase.from("organization_pet_types").select("key,label,is_active").eq("organization_id", workspace.activeOrganization.id).eq("is_active", true).order("label")]);
   const dogBands = (sizeBandsResult.data ?? []).map((band) => ({ id: band.id, key: band.band_key, kind: "dog_weight" as const, label: band.label, sortOrder: band.sort_order, upperKg: band.upper_kg === null ? null : Number(band.upper_kg), upperInclusive: band.upper_inclusive, status: "active" as const }));
   const incompleteLocations = data.customers.filter((customer) => customer.addresses.length === 0 || customer.addresses.every((address) => address.latitude === null || address.longitude === null)).length;
 
   return <WorkspaceShell {...workspace} activePath="/customers">
+    <SourceSuggestions labels={sourceLabels} />
     <PageHeader eyebrow="CRM HomePaw" title="Pelanggan & hewan" description="Satu profil pelanggan untuk semua hewan, alamat home service, catatan grooming, dan saldo paket." action={<Link href="/customers/onboarding" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">Tinjau pendaftaran masuk</Link>} />
     <Link href="/customers/onboarding" className="mt-5 block rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><strong>Pendaftaran dari link masuk ke sini →</strong><span className="mt-1 block text-xs">Admin atau pemilik dapat memperbaiki data, lalu menyetujui agar pelanggan dan pet masuk ke daftar ini.</span></Link>
     {incompleteLocations > 0 ? <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">{incompleteLocations} pelanggan belum memiliki alamat dengan koordinat lengkap. Lengkapi sebelum menyusun rute home service.</p> : null}

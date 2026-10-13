@@ -10,6 +10,7 @@ import type { InvoiceStudioData } from "@/lib/invoice-workspace";
 const initial: PilotActionState = { error: null, success: null };
 const field = "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10";
 const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const addDays = (value: string, days: number) => { const date = new Date(`${value}T12:00:00`); date.setDate(date.getDate() + days); return localDate(date); };
 const nextDate = (value: string) => { const date = new Date(`${value}T12:00:00`); date.setDate(date.getDate() + 1); return localDate(date); };
 
 function Result({ state }: { state: PilotActionState }) {
@@ -17,8 +18,10 @@ function Result({ state }: { state: PilotActionState }) {
   return <p role="status" className={`rounded-xl px-4 py-3 text-sm font-semibold ${state.error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>{state.error ?? state.success}</p>;
 }
 
-export function InvoiceStudio({ data, requestKey, defaultBookingId }: { data: InvoiceStudioData; requestKey: string; defaultBookingId?: string }) {
+/** `dueDays` is the organization's default due period for a NEW invoice (null: the day after the invoice date). The date stays editable. */
+export function InvoiceStudio({ data, requestKey, defaultBookingId, dueDays = null }: { data: InvoiceStudioData; requestKey: string; defaultBookingId?: string; dueDays?: number | null }) {
   const today = localDate();
+  const dueFrom = (value: string) => (dueDays === null ? nextDate(value) : addDays(value, dueDays));
   const [mode, setMode] = useState<"after_visit" | "package_sale">("after_visit");
   const [search, setSearch] = useState("");
   const [selectedSource, setSelectedSource] = useState(data.recentBookings.some((item) => item.id === defaultBookingId) ? `booking:${defaultBookingId}` : data.recentBookings[0] ? `booking:${data.recentBookings[0].id}` : data.manualVisits[0] ? `visit:${data.manualVisits[0].id}` : "");
@@ -28,7 +31,7 @@ export function InvoiceStudio({ data, requestKey, defaultBookingId }: { data: In
   const [packagePetId, setPackagePetId] = useState("");
   const [packageKey, setPackageKey] = useState(requestKey);
   const [invoiceDate, setInvoiceDate] = useState(today);
-  const [dueDate, setDueDate] = useState(nextDate(today));
+  const [dueDate, setDueDate] = useState(dueFrom(today));
   const [bookingState, bookingAction, bookingPending] = useActionState(createBookingInvoiceAction, initial);
   const [visitState, visitAction, visitPending] = useActionState(createManualVisitInvoiceAction, initial);
   const [packageState, packageAction, packagePending] = useActionState(createPackageInvoiceAction, initial);
@@ -42,7 +45,7 @@ export function InvoiceStudio({ data, requestKey, defaultBookingId }: { data: In
   const selectedPackage = data.packages.find((item) => item.id === packageId);
   const eligiblePackagePets = selectedCustomer?.pets.filter((pet) => !selectedPackage?.sizeBand || pet.band === selectedPackage.sizeBand) ?? [];
   const availableGroomers = data.groomers.filter((item) => !selectedBooking || item.branchId === selectedBooking.branchId);
-  const changeInvoiceDate = (value: string) => { setInvoiceDate(value); setDueDate(nextDate(value)); };
+  const changeInvoiceDate = (value: string) => { setInvoiceDate(value); setDueDate(dueFrom(value)); };
 
   return <div className="space-y-6">
     <div className="grid gap-3 sm:grid-cols-2" role="tablist" aria-label="Mode penagihan">
