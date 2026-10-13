@@ -232,6 +232,11 @@ SQL
   closeout_out=$(sql -q -f integration/final_closeout_upgrade_probe.sql 2>&1) || { echo "$closeout_out"; echo "FAIL: final closeout populated probe"; exit 1; }
   printf '%s\n' "$closeout_out"
   grep -q 'FINAL CLOSEOUT POPULATED PROBE PASS' <<<"$closeout_out" || { echo "FAIL: final closeout populated probe did not reach its pass marker"; exit 1; }
+  # Final parity operations migrations (spend and return, cash mappings, provider boundary, defaults, readiness, drill evidence).
+  ops_out=$(sql -q -f integration/final_operations_upgrade_probe.sql 2>&1) || { echo "$ops_out"; echo "FAIL: final operations populated probe"; exit 1; }
+  printf '%s
+' "$ops_out"
+  grep -q 'FINAL OPERATIONS POPULATED PROBE PASS' <<<"$ops_out" || { echo "FAIL: final operations populated probe did not reach its pass marker"; exit 1; }
   sql -Atc "select to_regprocedure('app.list_audit_events(text,uuid,integer)') is not null as audit_rpc, to_regprocedure('app.record_payment(uuid,text,numeric,text,uuid,uuid)') is not null as payment_rpc"
   echo "POPULATED UPGRADE PASS"
 } >"$log" 2>&1 || { tail -70 "$log"; exit 1; }
