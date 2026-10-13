@@ -3,7 +3,6 @@ import { ResourceForm, ServiceForm } from "@/components/pilot-forms";
 import { EmptyState, PageHeader } from "@/components/pilot-ui";
 import { ResourceManager } from "@/components/resource-manager";
 import { ServiceManager } from "@/components/service-manager";
-import { HomepawServiceStarter } from "@/components/homepaw-service-starter";
 import { CatalogPriceMatrix } from "@/components/catalog-price-matrix";
 import { DogSizeBoundariesForm } from "@/components/dog-size-boundaries-form";
 import { SizeBandEditor, SizeBandModeControl, SizeBandSummary } from "@/components/size-band-editor";
@@ -29,7 +28,6 @@ export default async function CatalogPage() {
       ? (owner.data === true ? <SizeBandEditor key={data.sizeBands.settings.layoutVersion} bands={data.sizeBands.bands} layoutVersion={data.sizeBands.settings.layoutVersion} /> : <SizeBandSummary bands={data.sizeBands.bands} />)
       : owner.data === true ? <DogSizeBoundariesForm initialValues={{ xs: Number(boundaries.data?.xs_lt_kg ?? 5), s: Number(boundaries.data?.s_lt_kg ?? 10), m: Number(boundaries.data?.m_lt_kg ?? 15), l: Number(boundaries.data?.l_lte_kg ?? 25) }} /> : null}
     {workspace.capabilities["service.manage"] ? <PetTypeForm petTypes={data.petTypes} /> : null}
-    {workspace.capabilities["service.manage"] ? <HomepawServiceStarter sizeBands={data.sizeBands} /> : null}
     {workspace.capabilities["service.manage"] ? <CatalogPriceMatrix services={data.services} sizeBands={data.sizeBands} /> : null}
     <div className="mt-7 grid gap-6 lg:grid-cols-2">{workspace.capabilities["service.manage"] ? <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="font-bold">Tambah layanan</h2><div className="mt-5"><ServiceForm petTypes={data.petTypes} sizeBands={data.sizeBands} /></div></section> : null}{workspace.capabilities["resource.manage"] ? <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="font-bold">Tambah groomer</h2><div className="mt-5"><ResourceForm branches={data.branches} memberships={data.memberships} /></div></section> : null}</div>
     <div className="mt-7 grid gap-6 lg:grid-cols-2">

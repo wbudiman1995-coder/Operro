@@ -24,12 +24,23 @@ export async function prepareOrganizationAction(_state: AccessState, data: FormD
   const supabase = await isPlatformOwner();
   if (!supabase) return denied;
   const name = String(data.get("name") ?? "").trim();
-  const slug = String(data.get("slug") ?? "").trim().toLowerCase();
-  if (name.length < 2 || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) return { error: "Isi nama dan slug huruf kecil tanpa spasi.", success: null };
-  const result = await supabase.schema("app").rpc("prepare_operro_organization", { p_name: name, p_slug: slug });
-  if (result.error) return { error: result.error.code === "23505" ? "Slug sudah dipakai. Pilih slug lain." : "Organisasi belum dapat dibuat.", success: null };
+  const baseSlug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+  if (name.length < 2 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(baseSlug)) return { error: "Nama bisnis harus berisi huruf atau angka agar workspace dapat dibuat.", success: null };
+
+  // The slug remains an internal stable identifier, but should never be an obstacle in the platform-owner workflow.
+  // A concurrent creation can take the same readable candidate, so let the database's unique constraint arbitrate it.
+  let created = false;
+  for (let attempt = 1; attempt <= 100; attempt += 1) {
+    const suffix = attempt === 1 ? "" : `-${attempt}`;
+    const slug = `${baseSlug.slice(0, 60 - suffix.length)}${suffix}`;
+    const result = await supabase.schema("app").rpc("prepare_operro_organization", { p_name: name, p_slug: slug });
+    if (!result.error) { created = true; break; }
+    if (result.error.code !== "23505") return { error: "Organisasi belum dapat dibuat.", success: null };
+  }
+  if (!created) return { error: "Organisasi belum dapat dibuat. Coba lagi.", success: null };
   revalidatePath("/platform");
-  return { error: null, success: `Organisasi ${name} disiapkan. Sekarang buat link untuk pemiliknya.` };
+  revalidatePath("/organizations");
+  return { error: null, success: `Organisasi ${name} aktif dan siap digunakan. Sekarang buat link untuk pemilik bisnisnya.` };
 }
 
 export async function issueAccessInviteAction(_state: AccessState, data: FormData): Promise<AccessState> {

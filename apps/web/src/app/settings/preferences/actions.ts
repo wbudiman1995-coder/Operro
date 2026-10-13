@@ -22,6 +22,7 @@ export async function saveLandingPageAction(_previous: PreferenceState, formData
       return { error: "Preferensi belum tersimpan. Coba lagi.", success: null };
     }
     revalidatePath("/settings/preferences");
+    revalidatePath("/start");
     return { error: null, success: choice ? "Halaman awal disimpan untuk akun Anda." : "Halaman awal dikembalikan ke Ringkasan." };
   } catch (error) {
     console.error("landing_page_save_unexpected", error);
