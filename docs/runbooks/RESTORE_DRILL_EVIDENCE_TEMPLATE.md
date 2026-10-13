@@ -7,7 +7,7 @@ result yourself. A box left unticked means *not checked*, and the drill cannot b
 
 | Field | Value |
 |---|---|
-| Drill kind | ☐ A. provider-backup  ☐ B. export-archive-dry-run |
+| Drill kind | ☐ A. provider-backup  ☐ B. export-archive-dry-run  ☐ C. guarded-archive-restore |
 | Date (Asia/Jakarta) | |
 | Performed by (name only) | |
 | Reviewed by (second person; required for `passed`) | |
@@ -22,7 +22,10 @@ result yourself. A box left unticked means *not checked*, and the drill cannot b
 | Field | Value |
 |---|---|
 | Restore point (A) or archive job id (B) | |
-| Archive manifest hash prefix (B) | |
+| Archive manifest hash prefix (B, C) | |
+| Archive manifest sha256, full 64 hex (B, C: this is what you enter on `/settings/health`) | |
+| Restore report `reportSha256`, full 64 hex (C only) | |
+| SQL file `sqlSha256` from the report (C only) | |
 | Last recorded metadata verification (B): date and result | |
 | Scope fingerprint (`/settings/storage` → Cakupan arsip) (B) | |
 | Tables in the archive / tables with data NOT in the archive | / |
@@ -47,6 +50,17 @@ result yourself. A box left unticked means *not checked*, and the drill cannot b
 - ☐ Target table counts for the organization were zero (`target_not_empty` absent)
 - ☐ `external_reference` lines reviewed and each explained (which identities must exist before a real load): `…`
 - ☐ Append-only tables noted; load would be INSERT-only with triggers bypassed: `…`
+
+**C — guarded archive restore (`restore-org-export.ts` + the generated SQL)**
+
+- ☐ The target database name has no `prod`/`production`/`live`/`main` in it and is not a database anyone uses; marker script run (`restore-target-marker.sql`)
+- ☐ The manifest hash printed by the tool equals the hash `/settings/storage` shows for that archive: `…`
+- ☐ The script header and the report were read before running; `externalReferences` and `warnings` listed in §5
+- ☐ `restore-output.txt` ends with one `RESTORE_RESULT {... "verified": true}` line (paste it): `…`
+- ☐ A second run of the same script was refused with `restore_target_not_empty` and changed nothing
+- ☐ RLS spot-check and immutability check of A done on the restored data (UPDATE/DELETE refused on `cash_movements`, `marketing_spend_entries`, `financial_ledger`)
+- ☐ Database torn down at: `…`
+- Record as **partial** at best: C does not exercise the provider backup, Storage objects, Auth identities or secrets.
 
 **A — provider backup**
 

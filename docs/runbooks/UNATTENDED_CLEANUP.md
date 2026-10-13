@@ -52,6 +52,47 @@ privileged path in this pass would have created exactly the broad, unreviewed ca
 5. Switch on one real organization with the owner's written agreement; watch three cycles; then widen.
 6. Record the staging evidence next to the migration in the release notes.
 
+## The service-identity model proposed for decision 2 (specification only; no code ships)
+
+This is the shape that satisfies the requirements above without putting the service-role key into the web app. It is written down so
+that the platform owner's decision can be implemented in **one** reviewed change with its own role tests, not guessed at.
+
+1. **A runner is an ordinary Supabase Auth user** created by the platform owner for this purpose only (for example
+   `maintenance-runner@<your domain>`), with **no membership in any organization**. Its e-mail and password live only in the hosting
+   provider's secret store. It signs in through the normal Auth endpoint and receives a normal authenticated JWT; the service-role key
+   is never used.
+2. **A registry table** `maintenance_runners(user_id, label, enabled, created_by, created_at)` is writable only by the platform owner
+   through an RPC. `app.is_maintenance_runner()` is true only for an enabled registered user. Setting `enabled = false` is the platform
+   kill switch: the next call of any runner RPC is refused.
+3. **New scheduled RPCs** (separate from the owner's own, which stay unchanged) accept an organization id and refuse unless **all** hold:
+   the caller `is_maintenance_runner()`; that organization's `storage_cleanup_schedules.enabled` is true; the organization is active.
+   They reuse the existing run lease, dry-run-first rule, per-object retry and abandon logic by calling the same internal functions.
+   Each records the runner's user id as the actor in the audit trail.
+4. **Storage deletion rights** for the runner are a Storage policy that allows a delete only on objects whose first path segment is the
+   id of an organization with consent enabled and only while the caller is an enabled runner. A runner can therefore never touch an
+   organization that did not opt in, and switching consent off (or disabling the runner) removes the right at once.
+5. **A scheduler** (decision 1) calls one route that signs in as the runner, asks the database for the next organization due (one per call,
+   bounded), and runs preview then apply for that organization only. The route is disabled by default (an environment flag) and returns
+   immediately when it is unset.
+6. **Failure policy** (decision 5) lives in the database: after N consecutive failed or partial runs the organization's consent row gets a
+   `disabled_reason` and the health page shows it.
+
+Not decided here and not built: the scheduler product, who holds the runner credential, the cadence, the alert channel, and the staging soak.
+
+## The operator path that ships today (migration `20261101160000`)
+
+Until a runner exists the owner is the scheduler, and the health page now tells them when to act, from existing run records only:
+
+| Signal on `/settings/health` and `/settings/storage` | Meaning |
+|---|---|
+| Pratinjau pembersihan terakhir | When a dry-run preview last ran. |
+| Pembersihan selesai terakhir | When an apply run last finished with status completed. |
+| N berkas belum dijalankan | Candidates the **latest** preview found that no apply run has started after. A preview alone removes nothing. Shown as an owner action linking to `/settings/storage`. |
+| Persetujuan pembersihan otomatis tercatat | Consent is on but nothing runs it (already shown). |
+
+Suggested rhythm for an owner (a recommendation, not enforced): preview monthly; apply when the preview lists files; investigate any
+"sebagian/gagal/terhenti" item the same day.
+
 ## What to do today
 
 Nothing is scheduled. Owners run *Buat pratinjau* → review → *Jalankan pembersihan* from `/settings/storage` when they want

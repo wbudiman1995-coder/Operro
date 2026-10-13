@@ -14,7 +14,7 @@ import type { CapabilityMap } from "@/lib/authorization";
 import { summarizeScope, type ExportScope } from "@/lib/org-export-scope";
 import { loadInvoicePaymentIssues, loadUnbilledVisits, scanPayrollSources } from "@/lib/reconciliation";
 
-export const EXPECTED_SCHEMA_VERSION = "20261101150000";
+export const EXPECTED_SCHEMA_VERSION = "20261101160000";
 export const DRILL_FRESH_DAYS = 90;
 export const RECONCILIATION_COUNT_CAP = 100;
 
@@ -26,7 +26,9 @@ export interface HealthSummary {
     /** Added by 20261101150000; absent on an older database, in which case the signals below are simply not derived. */
     completed_archives?: number; newest_completed_at?: string | null; unverified_completed?: number; last_verification_ok?: boolean | null; purge_candidates?: number;
   };
-  cleanup: { problem_runs_30d: number; stale_running: number; last_apply_status: string | null; last_apply_at: string | null; pending_objects: number; schedule_consent?: boolean };
+  cleanup: { problem_runs_30d: number; stale_running: number; last_apply_status: string | null; last_apply_at: string | null; pending_objects: number; schedule_consent?: boolean;
+    /** Added by 20261101160000: when a cleanup last completed, when a preview last ran, and the candidates of the latest preview that no apply has acted on. */
+    last_completed_apply_at?: string | null; last_dry_run_at?: string | null; unapplied_preview_candidates?: number };
   capacity_requests: { pending: number; oldest_pending_at: string | null; stale_pending: number };
   platform?: { pending_capacity_requests: number; oldest_pending_capacity_request_at: string | null; failed_exports_30d: number; problem_cleanup_runs_30d: number };
 }
@@ -35,7 +37,13 @@ export interface RecoveryStatus {
   last_drill_date: string | null;
   last_outcome: "passed" | "failed" | "partial" | null;
   last_passed_date: string | null;
-  detail: null | { restored_to: string; rpo_minutes: number | null; rto_minutes: number | null; notes: string | null; evidence_ref: string | null; recorded_at: string };
+  /** Added by 20261101160000: drills whose archive manifest hash matches a completed export on this platform (it proves the archive existed, not a restore). */
+  drills_with_matching_evidence?: number;
+  detail: null | {
+    restored_to: string; rpo_minutes: number | null; rto_minutes: number | null; notes: string | null; evidence_ref: string | null; recorded_at: string;
+    /** Platform owner only (20261101160000). */
+    kind?: string | null; archive_manifest_sha256?: string | null; restore_report_sha256?: string | null; evidence_matches_export?: boolean | null;
+  };
 }
 export interface CountResult { count: number | null; capped: boolean; note: string | null }
 export interface ReconciliationCounts { unbilledVisits: CountResult; invoicePayments: CountResult; payrollSources: CountResult }
@@ -115,12 +123,14 @@ export function deriveOwnerActions(summary: HealthSummary, recovery: RecoverySta
   if (cl.problem_runs_30d > 0) actions.push({ id: "cleanup_problem", severity: "attention", text: `${cl.problem_runs_30d} pembersihan penyimpanan berakhir sebagian/gagal/terhenti dalam 30 hari terakhir.`, label: "Buat pratinjau dan jalankan ulang pembersihan", href: storage });
   if (cl.stale_running > 0) actions.push({ id: "cleanup_stalled", severity: "attention", text: `${cl.stale_running} pembersihan masih berstatus berjalan padahal lease-nya habis.`, label: "Jalankan pembersihan lagi (lease lama diambil alih)", href: storage });
   if (cl.pending_objects > 0) actions.push({ id: "cleanup_pending", severity: "attention", text: `${cl.pending_objects} objek penyimpanan menunggu dihapus atau perlu perhatian manual.`, label: "Jalankan pembersihan sesuai pratinjau", href: storage });
+  if ((cl.unapplied_preview_candidates ?? 0) > 0) actions.push({ id: "cleanup_unapplied_preview", severity: "info", text: `Pratinjau pembersihan terakhir menemukan ${cl.unapplied_preview_candidates} berkas yang dapat dihapus dan belum dijalankan. Pratinjau saja tidak menghapus apa pun.`, label: "Tinjau pratinjau dan jalankan pembersihan bila sesuai", href: storage });
   if (cl.schedule_consent === true) actions.push({ id: "cleanup_consent_no_runner", severity: "info", text: "Persetujuan pembersihan otomatis tercatat, tetapi belum ada penjadwal; tidak ada yang berjalan otomatis.", label: "Tinjau atau matikan persetujuan", href: storage });
   for (const [id, label, result] of [["unbilled", "kunjungan selesai tanpa invoice valid", reconciliation.unbilledVisits], ["invoice_payment", "invoice dan pembayaran tidak cocok", reconciliation.invoicePayments], ["payroll_source", "sumber payroll bermasalah", reconciliation.payrollSources]] as const) {
     if (result.count !== null && result.count > 0) actions.push({ id: `reconcile_${id}`, severity: "attention", text: `${result.capped ? `${result.count}+` : result.count} ${label} belum diselesaikan.`, label: "Tinjau di Rekonsiliasi", href: "/reconciliation" });
   }
   if (cap.stale_pending > 0) actions.push({ id: "capacity_waiting", severity: "info", text: `${cap.stale_pending} permintaan kapasitas menunggu lebih dari 14 hari.`, label: "Hubungi Operro untuk menindaklanjuti", href: null });
   if (summary.schema_version !== EXPECTED_SCHEMA_VERSION) actions.push({ id: "schema_mismatch", severity: "attention", text: `Versi skema database (${summary.schema_version}) berbeda dari yang diharapkan aplikasi (${EXPECTED_SCHEMA_VERSION}).`, label: "Minta pemilik platform menerapkan migrasi atau memutar balik aplikasi", href: null });
+  if (recovery.detail && recovery.detail.evidence_matches_export === false) actions.push({ id: "drill_evidence_unmatched", severity: "attention", text: "Hash arsip pada uji pemulihan terakhir tidak cocok dengan export selesai mana pun di platform ini.", label: "Periksa hash yang dicatat dan catat ulang uji bila perlu", href: null });
   const drill = deriveReadiness(summary, recovery, reconciliation, now).drillState;
   if (drill !== "recent_pass") actions.push({ id: "drill", severity: "attention", text: drill === "never" ? "Pemulihan belum pernah dibuktikan dengan uji ke proyek percobaan." : drill === "stale" ? "Bukti uji pemulihan sudah kedaluwarsa." : "Uji pemulihan terakhir tidak lulus.", label: "Minta pemilik platform menjalankan runbook DISPOSABLE_RESTORE_DRILL dan mencatat hasilnya", href: null });
   return actions;
