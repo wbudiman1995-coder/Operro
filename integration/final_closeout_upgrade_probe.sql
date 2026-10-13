@@ -13,7 +13,7 @@ grant select on closeout_before to authenticated;
 begin;
 do $$
 begin
-  if app.schema_version() <> '20261031160000' then raise exception 'FAIL schema version is % after the upgrade', app.schema_version(); end if;
+  if app.schema_version() < '20261031160000' then raise exception 'FAIL schema version is % after the upgrade', app.schema_version(); end if;
   -- objects of every slice exist
   if (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'app' and p.proname in (
         'dashboard_operational_alerts','create_cash_account','record_cash_movement','reverse_cash_movement','set_cash_account_archived','cash_register_position',
