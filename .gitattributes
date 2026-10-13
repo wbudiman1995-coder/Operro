@@ -1,2 +1,2 @@
 docs/handoffs/logs/INTEGRATION/*.log -whitespace
-docs/handoffs/logs/FINAL-PARITY-OPERATIONS/*.log -whitespace
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/* -whitespace
