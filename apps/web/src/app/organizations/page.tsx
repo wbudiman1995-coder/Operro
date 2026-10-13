@@ -11,6 +11,7 @@ import { OperroMark } from "@/components/operro-mark";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { loadAuthContext } from "@/lib/auth-context";
 import { defaultWorkspacePath, loadCapabilities } from "@/lib/authorization";
+import { loadAccessibleOrganizations } from "@/lib/organizations";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Pilih organisasi" };
@@ -24,7 +25,11 @@ export default async function OrganizationsPage() {
   }
 
   if (context.organizations.length === 0) {
-    return <NoOrganizationState email={context.user.email ?? "akun Operro"} />;
+    const includingSuspended = await loadAccessibleOrganizations(supabase, context.user.id, true);
+    const suspended = includingSuspended
+      .filter((organization) => organization.status === "suspended")
+      .map((organization) => ({ name: organization.name, reason: organization.suspensionReason }));
+    return <NoOrganizationState email={context.user.email ?? "akun Operro"} suspendedOrganizations={suspended} />;
   }
 
   if (context.organizations.length === 1 && context.activeOrganization) {

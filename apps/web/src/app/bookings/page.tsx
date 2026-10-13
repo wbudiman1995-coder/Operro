@@ -64,9 +64,10 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   const from = zonedDateTimeToUtc(weekStartISO, 0, defaultTimezone).toISOString();
   const to = zonedDateTimeToUtc(weekEndISO, 0, defaultTimezone).toISOString();
 
-  const [data, capabilities] = await Promise.all([
+  const [data, capabilities, groomer] = await Promise.all([
     loadBookingWorkspace(supabase, organizationId, from, to),
     loadCapabilities(supabase),
+    supabase.schema("app").rpc("is_groomer_member"),
   ]);
-  return <BookingShell organizations={context.organizations} activeOrganization={context.activeOrganization} userEmail={context.user.email ?? "Akun Operro"} capabilities={capabilities} data={data} weekStartISO={weekStartISO} defaultTimezone={defaultTimezone} created={Boolean(params.created)} />;
+  return <BookingShell organizations={context.organizations} activeOrganization={context.activeOrganization} userEmail={context.user.email ?? "Akun Operro"} capabilities={capabilities} isGroomer={groomer.data === true} data={data} weekStartISO={weekStartISO} defaultTimezone={defaultTimezone} created={Boolean(params.created)} />;
 }

@@ -29,7 +29,7 @@ import { OperroMark } from "@/components/operro-mark";
 import type { CapabilityMap } from "@/lib/authorization";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
-type MenuItem = { label: string; href: string; icon: Icon; permission?: keyof CapabilityMap; anyPermission?: readonly (keyof CapabilityMap)[] };
+type MenuItem = { label: string; href: string; icon: Icon; permission?: keyof CapabilityMap; anyPermission?: readonly (keyof CapabilityMap)[]; groomerOnly?: boolean; hideFromGroomer?: boolean };
 
 const sections: { label: string; items: MenuItem[] }[] = [
   {
@@ -45,8 +45,9 @@ const sections: { label: string; items: MenuItem[] }[] = [
   {
     label: "Pengelolaan",
     items: [
-      { label: "Operasional", href: "/operations", icon: GroomingIcon, permission: "booking.update" },
-      { label: "Jadwal saya", href: "/my-schedule", icon: MyScheduleIcon, permission: "booking.read" },
+      { label: "Operasional", href: "/operations", icon: GroomingIcon, permission: "booking.update", hideFromGroomer: true },
+      { label: "Kunjungan", href: "/visits", icon: GroomingIcon, permission: "booking.read", hideFromGroomer: true },
+      { label: "Jadwal saya", href: "/my-schedule", icon: MyScheduleIcon, permission: "booking.read", groomerOnly: true },
       { label: "Layanan & tim", href: "/catalog", icon: CatalogIcon, anyPermission: ["service.manage", "resource.manage"] },
       { label: "Paket", href: "/programs", icon: ProgramsIcon, permission: "membership.read" },
       { label: "Inventaris", href: "/inventory", icon: InventoryIcon, permission: "inventory.read" },
@@ -62,13 +63,15 @@ const sections: { label: string; items: MenuItem[] }[] = [
   },
 ];
 
-function isVisible(item: MenuItem, capabilities: CapabilityMap) {
+function isVisible(item: MenuItem, capabilities: CapabilityMap, isGroomer: boolean) {
   if (item.permission && !capabilities[item.permission]) return false;
   if (item.anyPermission && !item.anyPermission.some((key) => capabilities[key])) return false;
+  if (item.groomerOnly && !isGroomer) return false;
+  if (item.hideFromGroomer && isGroomer) return false;
   return true;
 }
 
-export function WorkspaceMobileMenu({ activePath, userEmail, capabilities }: { activePath: string; userEmail: string; capabilities: CapabilityMap }) {
+export function WorkspaceMobileMenu({ activePath, userEmail, capabilities, isGroomer }: { activePath: string; userEmail: string; capabilities: CapabilityMap; isGroomer: boolean }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -114,7 +117,7 @@ export function WorkspaceMobileMenu({ activePath, userEmail, capabilities }: { a
             <div className="space-y-6 py-5">
               {userEmail.toLowerCase() === "wbudiman1995@gmail.com" ? <Link href="/platform" onClick={() => setOpen(false)} className="block rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-bold text-emerald-200">Panel platform Operro</Link> : null}
               {sections.map((section) => {
-                const visibleItems = section.items.filter((item) => isVisible(item, capabilities));
+                const visibleItems = section.items.filter((item) => isVisible(item, capabilities, isGroomer));
                 if (visibleItems.length === 0) return null;
                 return <section key={section.label}>
                   <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{section.label}</p>

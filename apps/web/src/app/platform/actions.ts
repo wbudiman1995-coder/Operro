@@ -49,7 +49,7 @@ export async function issueAccessInviteAction(_state: AccessState, data: FormDat
   const org = String(data.get("organizationId") ?? "");
   const email = String(data.get("email") ?? "").trim().toLowerCase();
   const role = String(data.get("role") ?? "");
-  if (!/^[0-9a-f-]{36}$/i.test(org) || !/^[^@ ]+@[^@ ]+\.[^@ ]+$/.test(email) || !["Pemilik", "Admin", "Bantuan Operro", "Groomer"].includes(role)) return denied;
+  if (!/^[0-9a-f-]{36}$/i.test(org) || !/^[^@ ]+@[^@ ]+\.[^@ ]+$/.test(email) || !["Pemilik", "Admin", "Bantuan Operro"].includes(role)) return denied;
   const result = await supabase.schema("app").rpc("issue_access_invitation", { p_org: org, p_email: email, p_role: role });
   if (result.error) return { error: result.error.message.includes("invalid_invitation") ? "Organisasi tidak aktif atau peran belum tersedia. Aktifkan organisasi lalu coba lagi." : "Link undangan belum dapat dibuat. Coba masuk ulang; jika berulang, laporkan kepada Operro.", success: null };
   if (typeof result.data !== "string") return { error: "Link undangan belum dapat dibuat. Coba lagi.", success: null };
@@ -70,6 +70,18 @@ export async function setOrganizationStatusAction(_state: AccessState, data: For
   revalidatePath("/platform");
   revalidatePath("/organizations");
   return { error: null, success: status === "suspended" ? "Organisasi ditangguhkan. Akses dan langganan dijeda." : "Organisasi diaktifkan kembali." };
+}
+
+export async function deleteOrganizationAction(_state: AccessState, data: FormData): Promise<AccessState> {
+  const supabase = await isPlatformOwner();
+  if (!supabase) return denied;
+  const org = String(data.get("organizationId") ?? "");
+  const confirmation = String(data.get("confirmation") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(org) || confirmation.length < 7) return { error: "Ketik konfirmasi penghapusan yang tepat.", success: null };
+  const result = await supabase.schema("app").rpc("delete_operro_organization", { p_org: org, p_confirmation: confirmation });
+  if (result.error) return { error: result.error.message.includes("delete_confirmation_mismatch") ? "Konfirmasi tidak cocok. Ketik tepat HAPUS diikuti slug organisasi." : "Organisasi belum dapat dihapus.", success: null };
+  revalidatePath("/platform"); revalidatePath("/organizations");
+  return { error: null, success: "Organisasi dan data relasional terkait telah dihapus." };
 }
 
 export async function setBillingPeriodAction(_state: AccessState, data: FormData): Promise<AccessState> {

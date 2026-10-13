@@ -21,6 +21,9 @@ export const requireActiveWorkspace = cache(async function requireActiveWorkspac
   const context = await loadAuthContext(supabase);
   if (!context) redirect("/login");
   if (!context.activeOrganization) redirect("/organizations");
-  const capabilities = await loadCapabilities(supabase);
-  return { supabase, organizations: context.organizations, activeOrganization: context.activeOrganization, userEmail: context.user.email ?? "Akun Operro", userId: context.user.id, capabilities };
+  const [capabilities, groomer] = await Promise.all([
+    loadCapabilities(supabase),
+    supabase.schema("app").rpc("is_groomer_member"),
+  ]);
+  return { supabase, organizations: context.organizations, activeOrganization: context.activeOrganization, userEmail: context.user.email ?? "Akun Operro", userId: context.user.id, capabilities, isGroomer: groomer.data === true };
 });

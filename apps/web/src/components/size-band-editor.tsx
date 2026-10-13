@@ -26,15 +26,15 @@ export function SizeBandSummary({ bands }: { bands: SizeBand[] }) {
   </section>;
 }
 
-/** Platform-only switch for the selected tenant. The database re-checks the role, the tenant and the version. */
+/** Business-owner switch for the selected active tenant. The database re-checks role, tenant and version. */
 export function SizeBandModeControl({ mode, layoutVersion }: { mode: "legacy" | "dynamic"; layoutVersion: number }) {
   const [pending, start] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const target = mode === "dynamic" ? "legacy" : "dynamic";
   return <section aria-labelledby="size-mode-title" className="mt-7 rounded-3xl border border-indigo-200 bg-indigo-50 p-5 sm:p-7">
-    <h2 id="size-mode-title" className="font-bold text-indigo-950">Mode kategori ukuran (khusus platform)</h2>
-    <p className="mt-1 text-xs leading-5 text-indigo-900">Saat ini: <strong>{mode === "dynamic" ? "dinamis (pemilik dapat menambah/mengubah kategori)" : "batas lama XS/S/M/L/XL"}</strong>. Pemilik bisnis tidak dapat mengaktifkan mode ini sendiri. Kembali ke mode lama hanya bisa jika kategori masih XS/S/M/L/XL.</p>
+    <h2 id="size-mode-title" className="font-bold text-indigo-950">Mode kategori ukuran</h2>
+    <p className="mt-1 text-xs leading-5 text-indigo-900">Saat ini: <strong>{mode === "dynamic" ? "dinamis (Anda dapat menambah, mengubah, mengarsipkan, atau menghapus kategori)" : "batas lama XS/S/M/L/XL"}</strong>. Kembali ke mode lama hanya bisa jika kategori masih XS/S/M/L/XL.</p>
     {confirming
       ? <div className="mt-3 flex flex-wrap items-center gap-2"><span className="text-xs font-semibold">Ubah ke mode {target === "dynamic" ? "dinamis" : "lama"}?</span>
           <button type="button" disabled={pending} className={smallButton} onClick={() => start(async () => { const result = await setSizeBandModeAction({ version: layoutVersion, mode: target }); setStatus(result.ok ? { kind: "ok", text: result.message } : { kind: "error", text: result.error }); setConfirming(false); })}>{pending ? "Memproses…" : "Ya, ubah"}</button>

@@ -45,6 +45,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       organizations={workspace.organizations}
       activeOrganization={activeOrganization}
       userEmail={workspace.userEmail}
+      isGroomer={workspace.isGroomer}
       data={data}
       capabilities={capabilities}
       dashboardCards={dashboardCards}

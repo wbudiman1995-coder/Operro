@@ -25,6 +25,7 @@ interface DashboardShellProps {
   userEmail: string;
   data: DashboardData;
   capabilities: CapabilityMap;
+  isGroomer?: boolean;
   dashboardCards: DashboardCardVisibility;
   period: DashboardPeriod;
   periodError: string | null;
@@ -56,7 +57,7 @@ function UnavailableMetric({ label, title, description }: { label: string; title
   );
 }
 
-export function DashboardShell({ organizations, activeOrganization, userEmail, data, capabilities, dashboardCards, period, periodError, performance, alerts }: DashboardShellProps) {
+export function DashboardShell({ organizations, activeOrganization, userEmail, data, capabilities, isGroomer = false, dashboardCards, period, periodError, performance, alerts }: DashboardShellProps) {
   const quickActions = [
     capabilities["booking.create"] ? { label: "Buat booking baru", href: "/schedule?create=1" } : null,
     capabilities["customer.read"] || capabilities["customer.manage"] ? { label: "Buka pelanggan", href: "/customers" } : null,
@@ -67,7 +68,7 @@ export function DashboardShell({ organizations, activeOrganization, userEmail, d
   const anyCardVisible = DASHBOARD_METRIC_CARD_KEYS.some((key) => dashboardCards[key]);
 
   return (
-    <WorkspaceShell organizations={organizations} activeOrganization={activeOrganization} userEmail={userEmail} activePath="/dashboard" capabilities={capabilities}>
+    <WorkspaceShell organizations={organizations} activeOrganization={activeOrganization} userEmail={userEmail} activePath="/dashboard" capabilities={capabilities} isGroomer={isGroomer}>
       <PageHeader
         eyebrow={activeOrganization.status === "trial" ? "Workspace uji coba" : "Workspace aktif"}
         title="Ringkasan operasional"

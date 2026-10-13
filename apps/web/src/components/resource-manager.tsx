@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import { archiveResourceAction, updateResourceAction, updateResourceCompensationAction, type PilotActionState } from "@/app/pilot-actions";
 import { MapsCoordinateFields } from "@/components/customer-address-forms";
+import { GroomerCodeButton } from "@/components/groomer-code-button";
 import type { CatalogWorkspace } from "@/lib/pilot-data";
 
 const initialState: PilotActionState = { error: null, success: null };
@@ -45,7 +46,8 @@ export function ResourceManager({ resource, branches, memberships, canManageReso
       <button type="button" onClick={copyScheduleLink} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">{copied ? "Tersalin" : "Salin link groomer"}</button>
       {canManageResource ? <button type="button" onClick={() => setEditing((value) => !value)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">{editing ? "Tutup" : "Edit"}</button> : null}
     </div>
-    <p className="mt-2 text-[11px] text-slate-500">Link groomer memerlukan akun yang diundang dan terhubung ke profil ini. Foto diunggah dari Jadwal saya, bukan link publik.</p>
+    {canManageResource && resource.status === "active" ? <div className="mt-3"><GroomerCodeButton resourceId={resource.id} name={resource.name} /></div> : null}
+    <p className="mt-2 text-[11px] text-slate-500">Kode groomer membuka Jadwal saya tanpa pendaftaran email. Foto sebelum/sesudah tetap disimpan melalui akses yang terbatas pada jadwal groomer tersebut.</p>
     {editing ? <form action={updateAction} className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4">
       <input type="hidden" name="resourceId" value={resource.id} />
       <input className={field} name="name" defaultValue={resource.name} required />
@@ -63,7 +65,7 @@ export function ResourceManager({ resource, branches, memberships, canManageReso
       <div className="grid gap-3 sm:grid-cols-2"><select className={field} name="payType" defaultValue={resource.payType ?? "salary"}><option value="salary">Gaji bulanan</option><option value="hourly">Per jam</option></select><input className={field} name="baseAmount" type="number" min="0" step="1000" defaultValue={resource.baseSalary ?? 0} aria-label="Gaji pokok" /></div>
       <Message state={payState} /><button disabled={paying} className="rounded-xl bg-amber-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{paying ? "Menyimpan…" : "Simpan kompensasi"}</button>
     </form> : null}
-    {canManageResource ? <form action={archiveAction} className="mt-3 flex flex-wrap items-center gap-2">
+    {canManageResource && !resource.deletedAt ? <form action={archiveAction} className="mt-3 flex flex-wrap items-center gap-2">
       <input type="hidden" name="resourceId" value={resource.id} /><input type="hidden" name="confirm" value="yes" />
       <button disabled={archiving} className="text-[11px] font-bold text-rose-600 disabled:opacity-50">Arsipkan groomer</button><Message state={archiveState} />
     </form> : null}

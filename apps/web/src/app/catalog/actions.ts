@@ -81,7 +81,7 @@ export async function deleteSizeBandAction(input: { version: number; bandId: str
   return layoutResult(result.data, "Kategori dihapus permanen.");
 }
 
-/** Platform owner only (enforced in SQL) and only for the tenant that is currently selected. */
+/** Business owner only (enforced in SQL) and only for the tenant that is currently selected. */
 export async function setSizeBandModeAction(input: { version: number; mode: "legacy" | "dynamic" }): Promise<SizeBandActionResult> {
   const workspace = await requireActiveWorkspace();
   if (!input || !validVersion(input.version) || (input.mode !== "legacy" && input.mode !== "dynamic")) return INVALID;

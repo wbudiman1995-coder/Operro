@@ -36,6 +36,7 @@ interface WorkspaceShellProps {
   userEmail: string;
   activePath: string;
   capabilities: CapabilityMap;
+  isGroomer: boolean;
   children: ReactNode;
 }
 
@@ -45,6 +46,8 @@ type NavigationItemConfig = {
   icon: typeof DashboardIcon;
   permission?: keyof CapabilityMap;
   anyPermission?: readonly (keyof CapabilityMap)[];
+  groomerOnly?: boolean;
+  hideFromGroomer?: boolean;
 };
 
 const primaryNavigation: NavigationItemConfig[] = [
@@ -55,9 +58,9 @@ const primaryNavigation: NavigationItemConfig[] = [
 ];
 
 const managementNavigation: NavigationItemConfig[] = [
-  { label: "Operasional", href: "/operations", icon: GroomingIcon, permission: "booking.update" },
-  { label: "Kunjungan", href: "/visits", icon: GroomingIcon, permission: "booking.read" },
-  { label: "Jadwal saya", href: "/my-schedule", icon: MyScheduleIcon, permission: "booking.read" },
+  { label: "Operasional", href: "/operations", icon: GroomingIcon, permission: "booking.update", hideFromGroomer: true },
+  { label: "Kunjungan", href: "/visits", icon: GroomingIcon, permission: "booking.read", hideFromGroomer: true },
+  { label: "Jadwal saya", href: "/my-schedule", icon: MyScheduleIcon, permission: "booking.read", groomerOnly: true },
   { label: "Layanan & tim", href: "/catalog", icon: CatalogIcon, anyPermission: ["service.manage", "resource.manage"] },
   { label: "Paket", href: "/programs", icon: ProgramsIcon, permission: "membership.read" },
   { label: "Inventaris", href: "/inventory", icon: InventoryIcon, permission: "inventory.read" },
@@ -105,15 +108,17 @@ function NavigationItem({
   );
 }
 
-function isNavigationVisible(item: NavigationItemConfig, capabilities: CapabilityMap) {
+function isNavigationVisible(item: NavigationItemConfig, capabilities: CapabilityMap, isGroomer: boolean) {
   if (item.permission && !capabilities[item.permission]) return false;
   if (item.anyPermission && !item.anyPermission.some((key) => capabilities[key])) return false;
+  if (item.groomerOnly && !isGroomer) return false;
+  if (item.hideFromGroomer && isGroomer) return false;
   return true;
 }
 
-function WorkspaceNavigation({ activePath, capabilities }: { activePath: string; capabilities: CapabilityMap }) {
-  const visiblePrimary = primaryNavigation.filter((item) => isNavigationVisible(item, capabilities));
-  const visibleManagement = managementNavigation.filter((item) => isNavigationVisible(item, capabilities));
+function WorkspaceNavigation({ activePath, capabilities, isGroomer }: { activePath: string; capabilities: CapabilityMap; isGroomer: boolean }) {
+  const visiblePrimary = primaryNavigation.filter((item) => isNavigationVisible(item, capabilities, isGroomer));
+  const visibleManagement = managementNavigation.filter((item) => isNavigationVisible(item, capabilities, isGroomer));
   return (
     <>
       <nav aria-label="Navigasi utama" className="mt-7 space-y-1">
@@ -129,13 +134,13 @@ function WorkspaceNavigation({ activePath, capabilities }: { activePath: string;
   );
 }
 
-export function WorkspaceShell({ organizations, activeOrganization, userEmail, activePath, capabilities, children }: WorkspaceShellProps) {
-  const visiblePrimary = primaryNavigation.filter((item) => isNavigationVisible(item, capabilities));
+export function WorkspaceShell({ organizations, activeOrganization, userEmail, activePath, capabilities, isGroomer, children }: WorkspaceShellProps) {
+  const visiblePrimary = primaryNavigation.filter((item) => isNavigationVisible(item, capabilities, isGroomer));
   return (
     <div className="min-h-screen bg-[#f6f7f9] text-[#1a2233]">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 overflow-y-auto border-r border-white/[0.06] bg-[#0f1b2d] p-4 lg:flex lg:flex-col">
         <div className="border-b border-white/[0.08] px-2 pb-4 pt-1"><OperroMark inverse /></div>
-        <WorkspaceNavigation activePath={activePath} capabilities={capabilities} />
+        <WorkspaceNavigation activePath={activePath} capabilities={capabilities} isGroomer={isGroomer} />
         {userEmail.toLowerCase() === "wbudiman1995@gmail.com" ? <Link href="/platform" className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200">Panel platform Operro</Link> : null}
         <div className="mt-auto space-y-3 pt-8">
           <div className="flex items-center gap-3 rounded-[12px] border border-white/[0.08] bg-white/[0.05] p-3">
@@ -154,7 +159,7 @@ export function WorkspaceShell({ organizations, activeOrganization, userEmail, a
           <div className="mx-auto flex max-w-[1440px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex w-full items-center justify-between gap-3 sm:w-auto lg:hidden">
               <div className="flex min-w-0 items-center gap-3">
-                <WorkspaceMobileMenu activePath={activePath} userEmail={userEmail} capabilities={capabilities} />
+                <WorkspaceMobileMenu activePath={activePath} userEmail={userEmail} capabilities={capabilities} isGroomer={isGroomer} />
                 <OperroMark />
               </div>
               <span className="max-w-36 truncate text-xs font-semibold text-slate-400">{userEmail}</span>

@@ -6,6 +6,7 @@
 import Link from "next/link";
 
 import { BranchHoursForm } from "@/components/branch-hours-form";
+import { BranchCreateForm } from "@/components/branch-create-form";
 import { PageHeader } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
@@ -47,6 +48,7 @@ export default async function BusinessSettingsPage() {
         {branches === null ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-xs font-semibold text-rose-700">Daftar cabang belum dapat dimuat. Ini bukan berarti tidak ada cabang: coba muat ulang halaman.</p>
           : branches.length === 0 ? <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Tidak ada cabang yang dapat Anda akses.</p>
           : branches.map((branch) => <BranchHoursForm key={`${branch.id}:${branch.updatedAt}`} branch={branch} canEdit={canEdit} />)}
+        <BranchCreateForm canEdit={canEdit} />
       </div>
     </section>
     <section className="mt-6 rounded-2xl border bg-white p-5" aria-label="Bawaan bisnis">

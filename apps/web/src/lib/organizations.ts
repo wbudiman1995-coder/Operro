@@ -16,6 +16,7 @@ export interface AccessibleOrganization {
   vertical: string | null;
   membershipId: string;
   membershipCreatedAt: string;
+  suspensionReason: string | null;
 }
 
 interface OrganizationRow {
@@ -24,6 +25,7 @@ interface OrganizationRow {
   slug: string;
   status: OrganizationStatus;
   vertical: string | null;
+  settings: unknown;
   deleted_at: null;
 }
 
@@ -44,7 +46,7 @@ function normalizeOrganization(value: unknown): OrganizationRow | null {
     return null;
   }
 
-  const { id, name, slug, status, vertical, deleted_at: deletedAt } = candidate;
+  const { id, name, slug, status, vertical, settings, deleted_at: deletedAt } = candidate;
 
   if (
     !isString(id) ||
@@ -63,8 +65,15 @@ function normalizeOrganization(value: unknown): OrganizationRow | null {
     slug,
     status,
     vertical,
+    settings,
     deleted_at: null,
   };
+}
+
+function suspensionReason(settings: unknown): string | null {
+  if (!isRecord(settings) || !isRecord(settings.platform_billing)) return null;
+  const reason = settings.platform_billing.reason;
+  return isString(reason) ? reason : null;
 }
 
 function normalizeMembershipRows(value: unknown, includeSuspended = false): AccessibleOrganization[] {
@@ -103,6 +112,7 @@ function normalizeMembershipRows(value: unknown, includeSuspended = false): Acce
       vertical: organization.vertical,
       membershipId,
       membershipCreatedAt,
+      suspensionReason: suspensionReason(organization.settings),
     });
   }
 
@@ -127,6 +137,7 @@ export async function loadAccessibleOrganizations(
           slug,
           status,
           vertical,
+          settings,
           deleted_at
         )
       `,
