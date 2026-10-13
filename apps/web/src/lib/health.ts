@@ -14,7 +14,7 @@ import type { CapabilityMap } from "@/lib/authorization";
 import { summarizeScope, type ExportScope } from "@/lib/org-export-scope";
 import { loadInvoicePaymentIssues, loadUnbilledVisits, scanPayrollSources } from "@/lib/reconciliation";
 
-export const EXPECTED_SCHEMA_VERSION = "20261101140000";
+export const EXPECTED_SCHEMA_VERSION = "20261101150000";
 export const DRILL_FRESH_DAYS = 90;
 export const RECONCILIATION_COUNT_CAP = 100;
 
@@ -23,7 +23,7 @@ export interface HealthSummary {
   generated_at: string;
   exports: {
     failed_30d: number; stale_running: number; last_completed_at: string | null; last_failure_at: string | null;
-    /** Added by 20261101140000; absent on an older database, in which case the signals below are simply not derived. */
+    /** Added by 20261101150000; absent on an older database, in which case the signals below are simply not derived. */
     completed_archives?: number; newest_completed_at?: string | null; unverified_completed?: number; last_verification_ok?: boolean | null; purge_candidates?: number;
   };
   cleanup: { problem_runs_30d: number; stale_running: number; last_apply_status: string | null; last_apply_at: string | null; pending_objects: number; schedule_consent?: boolean };
