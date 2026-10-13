@@ -84,8 +84,58 @@ operational records, and then record the drill at `/settings/health` (platform o
 
 Records are append-only: correct a mistake by recording a new drill.
 
+## C. Guarded restore of an archive into a disposable database (writes only to that database)
+
+Kind `C` actually loads an organization-export archive into a database you created for the purpose, with a generated script that
+guards itself. It proves that **this archive can be loaded and reproduces its source rows exactly**; it does not prove that Operro
+is recoverable (that needs A, and recovery of Storage objects, Auth identities and secrets, which are not in the archive).
+
+What the script guarantees, because it is written into the SQL itself:
+
+1. it runs only in the database named when it was generated (`current_database()`), and only if `public.operro_restore_target`
+   exists and says `disposable` (no migration creates it; you declare it with `restore-target-marker.sql`);
+2. the database is at the schema version the probe reported, the organization row exists, and **nothing** exists for that organization
+   in any table to be loaded (a second run, or a half-restored database, is refused);
+3. each chunk is re-hashed in the database against the manifest, every row must carry the archive's organization id, and rows are
+   inserted only (append-only and audit triggers are not re-fired, so financial history is not rewritten or re-audited);
+4. afterwards each stored row is compared with the archive row, each table's row count and id-list hash must equal the archive's, and
+   every append-only trigger must still be enabled; any failure rolls the whole transaction back.
+
+Steps (stop at the first problem):
+
+1. Create an empty database whose name does not contain `prod`, `production`, `live` or `main`. Apply every Operro migration to it.
+   Write down its name. It must not be a database anyone uses.
+2. Download and verify the archive exactly as in B steps 1-2.
+3. Declare the target and create the organization row (no default configuration is seeded):
+   ```bash
+   psql "$DISPOSABLE_DATABASE_URL" -v ON_ERROR_STOP=1 -v org=<id> -v name='<name>' -v slug='<slug>' -f docs/runbooks/restore-target-marker.sql
+   ```
+4. Probe the target (B step 3), then generate the script. **The database name is mandatory**:
+   ```bash
+   npx tsx apps/web/scripts/restore-org-export.ts sql ./archive ./probe.json --target-database <name> --out ./restore.sql
+   ```
+   It refuses (exit 1, nothing written) when the archive fails verification, contains an unknown or unsafe table or a credential-like
+   column, the target is not empty or at another organization, or the name looks like production. It never connects to a database and
+   never overwrites a file. It writes `restore.sql` and `restore.sql.report.json` (counts, per-table id hashes, the SQL's own hash).
+5. Read `restore.sql`'s header and the report's `externalReferences` and `warnings`. Check that the manifest hash printed equals the
+   hash `/settings/storage` shows for that archive.
+6. Run it against the disposable database only, keeping the output:
+   ```bash
+   psql "$DISPOSABLE_DATABASE_URL" -v ON_ERROR_STOP=1 -f ./restore.sql | tee restore-output.txt
+   ```
+   Success prints one line `RESTORE_RESULT {... "verified": true}`. Any error rolls back and leaves the database empty.
+   Setting `session_replication_role` needs a role that may do so (the project owner on a local or disposable database).
+7. Record the three artifacts for the evidence template: the manifest hash, the report's `reportSha256`, and `restore-output.txt`.
+   Then do the RLS spot-check and immutability check of A on the restored data, and tear the database down.
+
+Record kind C as `partial` at best. `passed` is reserved for A, because C does not exercise the provider backup, Storage, Auth or
+secrets. The `/settings/health` form accepts the manifest hash and the report hash and marks whether the manifest hash matches a
+completed export of this platform (see the evidence section of `RECOVERY_READINESS.md`); the drill remains a human-attested fact.
+
 ## What this procedure deliberately does not do
 
-- It does not restore, import or write to any database from an archive. There is no importer in Operro.
+- It does not restore into any database by itself: the generator writes a script, and a person runs it on a database they declared
+  disposable. There is no importer inside the application, no restore button, and no route can reach the generator.
+- It does not restore Storage object bodies, Auth identities, memberships, roles or provider credentials, or point-in-time state.
 - It does not call Supabase or Vercel APIs, read provider billing or quotas, or schedule anything.
 - It does not turn a pass into a guarantee. A pass is one dated fact about one backup or one archive.
