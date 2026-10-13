@@ -239,7 +239,10 @@ export async function createCustomerAction(_previous: PilotActionState, formData
     p_pets: pets.map((pet) => ({ ...pet, name: pet.name.trim(), weightKg: pet.weightKg || null })),
     p_address: address,
   });
-  if (error) return databaseError("Pelanggan gagal dibuat", error.message);
+  if (error) {
+    const reason = /invalid_pet_weight/i.test(error.message) ? "berat pet harus berupa angka lebih dari nol" : /invalid_pet/i.test(error.message) ? "nama, jenis, atau ukuran pet tidak cocok dengan konfigurasi aktif" : /not_authorized|42501/i.test(error.message) ? "izin customer.manage diperlukan" : error.message;
+    return databaseError("Pelanggan gagal dibuat", reason);
+  }
   revalidatePath("/customers"); revalidatePath("/bookings"); revalidatePath("/dashboard");
   return { error: null, success: `${name} dan ${pets.length} pet berhasil ditambahkan.` };
 }
@@ -797,7 +800,10 @@ export async function addPetTypeAction(_previous: PilotActionState, formData: Fo
   const key = label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30);
   if (label.length < 2 || !/^[a-z][a-z0-9_]{1,29}$/.test(key)) return databaseError("Jenis pet", "nama harus menghasilkan kode huruf minimal dua karakter");
   const result = await context.supabase.schema("app").rpc("set_org_pet_type", { p_org: context.organizationId, p_key: key, p_label: label, p_active: true });
-  if (result.error) return databaseError("Jenis pet", "jenis baru belum dapat disimpan");
+  if (result.error) {
+    const reason = /not_authorized|42501/i.test(result.error.message) ? "izin service.manage diperlukan" : /invalid_pet_type/i.test(result.error.message) ? "nama jenis pet tidak valid atau mencoba menonaktifkan Anjing/Kucing" : result.error.message;
+    return databaseError("Jenis pet", reason);
+  }
   revalidatePath("/catalog"); revalidatePath("/customers"); revalidatePath("/bookings");
   return { error: null, success: `${label} siap. Atur harga dan durasi tiap layanan sebelum menerima booking.` };
 }

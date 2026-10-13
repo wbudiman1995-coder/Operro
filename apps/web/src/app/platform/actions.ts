@@ -51,7 +51,7 @@ export async function issueAccessInviteAction(_state: AccessState, data: FormDat
   const role = String(data.get("role") ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(org) || !/^[^@ ]+@[^@ ]+\.[^@ ]+$/.test(email) || !["Pemilik", "Admin", "Bantuan Operro"].includes(role)) return denied;
   const result = await supabase.schema("app").rpc("issue_access_invitation", { p_org: org, p_email: email, p_role: role });
-  if (result.error) return { error: result.error.message.includes("invalid_invitation") ? "Organisasi tidak aktif atau peran belum tersedia. Aktifkan organisasi lalu coba lagi." : "Link undangan belum dapat dibuat. Coba masuk ulang; jika berulang, laporkan kepada Operro.", success: null };
+  if (result.error) return { error: result.error.message.includes("invalid_invitation") ? "Organisasi tidak aktif atau peran belum tersedia. Aktifkan organisasi lalu coba lagi." : result.error.message.includes("not_authorized") ? "Hanya Pemilik bisnis dapat mengundang Admin bisnis. Pemilik Operro dapat mengundang Pemilik, Admin, atau Bantuan Operro." : "Link undangan belum dapat dibuat. Coba masuk ulang; jika berulang, laporkan kepada Operro.", success: null };
   if (typeof result.data !== "string") return { error: "Link undangan belum dapat dibuat. Coba lagi.", success: null };
   revalidatePath("/platform");
   revalidatePath("/settings/access");
