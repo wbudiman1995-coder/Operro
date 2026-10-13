@@ -21,6 +21,7 @@ export function ResourceManager({ resource, branches, memberships, canManageReso
   const [archiveState, archiveAction, archiving] = useActionState(archiveResourceAction, initialState);
   const [payState, payAction, paying] = useActionState(updateResourceCompensationAction, initialState);
   const schedulePath = `/schedule?branch=${resource.branchId}&groomer=${resource.id}`;
+  const historyPath = `/team/history/${resource.id}`;
   const groomerPath = "/my-schedule";
 
   async function copyScheduleLink() {
@@ -42,8 +43,8 @@ export function ResourceManager({ resource, branches, memberships, canManageReso
       <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${resource.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{resource.status}</span>
     </div>
     <div className="mt-3 flex flex-wrap gap-2">
-      <a href={schedulePath} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800">Buka jadwal</a>
-      <button type="button" onClick={copyScheduleLink} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">{copied ? "Tersalin" : "Salin link groomer"}</button>
+      {resource.deletedAt ? <a href={historyPath} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800">Buka riwayat booking</a> : <a href={schedulePath} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800">Buka jadwal</a>}
+      {!resource.deletedAt ? <button type="button" onClick={copyScheduleLink} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">{copied ? "Tersalin" : "Salin link groomer"}</button> : null}
       {canManageResource ? <button type="button" onClick={() => setEditing((value) => !value)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">{editing ? "Tutup" : "Edit"}</button> : null}
     </div>
     {canManageResource && resource.status === "active" ? <div className="mt-3"><GroomerCodeButton resourceId={resource.id} name={resource.name} /></div> : null}
