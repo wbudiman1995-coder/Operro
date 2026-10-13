@@ -47,7 +47,7 @@ export default async function WhatsAppCenterPage({ searchParams }: { searchParam
   return <WorkspaceShell {...workspace} activePath="/whatsapp">
     <PageHeader eyebrow="Komunikasi" title="Pusat WhatsApp" description="Antrean draf pesan WhatsApp untuk invoice, follow-up, perpanjangan, dan undangan pendaftaran." action={<Link href="/whatsapp/batches" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-800">Batch dan riwayat</Link>} />
     <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900">
-      Operro tidak mengirim pesan WhatsApp dan tidak membaca status pengiriman. Anda membuka draf di WhatsApp sendiri. Status &ldquo;dibuka&rdquo;, &ldquo;ditandai terkirim&rdquo;, dan &ldquo;ditandai gagal&rdquo; adalah catatan dari pengguna, bukan konfirmasi pengiriman dari WhatsApp.
+      Operro tidak mengirim pesan WhatsApp dan tidak membaca status pengiriman. Anda membuka draf di WhatsApp sendiri. Status &ldquo;dibuka&rdquo;, &ldquo;ditandai terkirim&rdquo;, dan &ldquo;ditandai gagal&rdquo; adalah catatan dari pengguna, bukan konfirmasi pengiriman dari WhatsApp. Penyedia resmi belum tersedia; pemilik bisnis dapat melihat persiapannya di <Link href="/settings/whatsapp-provider" className="font-bold underline">Penyedia resmi WhatsApp</Link>.
     </p>
 
     <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

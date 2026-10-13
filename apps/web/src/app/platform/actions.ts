@@ -119,3 +119,18 @@ export async function setAdminPermissionsAction(_state: AccessState, data: FormD
   revalidatePath("/settings/access");
   return { error: null, success: "Checklist izin Admin tersimpan." };
 }
+
+export async function setWhatsAppProviderPlatformGateAction(_state: AccessState, data: FormData): Promise<AccessState> {
+  const supabase = await isPlatformOwner();
+  if (!supabase) return denied;
+  const value = String(data.get("enabled") ?? "");
+  if (value !== "true" && value !== "false") return denied;
+  const { error } = await supabase.schema("app").rpc("set_whatsapp_provider_platform_gate", { p_enabled: value === "true" });
+  if (error) {
+    console.error("whatsapp_provider_platform_gate_failed", { code: error.code });
+    return { error: "Saklar WhatsApp belum dapat diubah.", success: null };
+  }
+  revalidatePath("/platform");
+  revalidatePath("/settings/whatsapp-provider");
+  return { error: null, success: value === "true" ? "Pengaturan penyedia resmi dibuka. Ini belum mengirim WhatsApp." : "Pengaturan penyedia resmi ditutup. Draf manual tetap tersedia." };
+}

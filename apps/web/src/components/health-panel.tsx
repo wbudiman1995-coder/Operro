@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { describeEvidence } from "@/lib/recovery-evidence";
 import type { CountResult, HealthSummary, OwnerAction, Readiness, ReconciliationCounts, RecoveryStatus } from "@/lib/health";
 
 const DRILL_TONE: Record<Readiness["drillState"], string> = {
@@ -37,6 +38,7 @@ export function HealthPanel({ summary, recovery, reconciliation, readiness, vers
         <div><dt className="inline font-semibold">RPO / RTO terukur: </dt><dd className="inline">{recovery.detail.rpo_minutes ?? "—"} / {recovery.detail.rto_minutes ?? "—"} menit</dd></div>
         <div className="sm:col-span-2"><dt className="inline font-semibold">Catatan: </dt><dd className="inline">{recovery.detail.notes ?? "—"}</dd></div>
         <div className="sm:col-span-2"><dt className="inline font-semibold">Referensi bukti: </dt><dd className="inline">{recovery.detail.evidence_ref ?? "—"}</dd></div>
+        <div className="sm:col-span-2"><dt className="inline font-semibold">Bukti hash: </dt><dd className="inline">{describeEvidence(recovery.detail.kind, recovery.detail.evidence_matches_export)}</dd></div>
       </dl> : null}
     </section>
 
@@ -58,6 +60,8 @@ export function HealthPanel({ summary, recovery, reconciliation, readiness, vers
         <div><dt className="inline font-semibold text-slate-500">Versi skema database: </dt><dd className="inline">{summary.schema_version} {readiness.schemaMatches ? "(sesuai aplikasi)" : <strong className="text-rose-700">(tidak sesuai)</strong>}</dd></div>
         <div><dt className="inline font-semibold text-slate-500">Export terakhir selesai: </dt><dd className="inline">{when(summary.exports.last_completed_at)}</dd></div>
         <div><dt className="inline font-semibold text-slate-500">Pembersihan terakhir: </dt><dd className="inline">{summary.cleanup.last_apply_at ? `${when(summary.cleanup.last_apply_at)} (${summary.cleanup.last_apply_status})` : "belum pernah"}</dd></div>
+        {summary.cleanup.last_dry_run_at !== undefined ? <div><dt className="inline font-semibold text-slate-500">Pratinjau pembersihan terakhir: </dt><dd className="inline">{summary.cleanup.last_dry_run_at ? `${when(summary.cleanup.last_dry_run_at)}${(summary.cleanup.unapplied_preview_candidates ?? 0) > 0 ? ` (${summary.cleanup.unapplied_preview_candidates} berkas belum dijalankan)` : ""}` : "belum pernah"}</dd></div> : null}
+        {summary.cleanup.last_completed_apply_at !== undefined ? <div><dt className="inline font-semibold text-slate-500">Pembersihan selesai terakhir: </dt><dd className="inline">{summary.cleanup.last_completed_apply_at ? when(summary.cleanup.last_completed_apply_at) : "belum pernah"}</dd></div> : null}
         <div><dt className="inline font-semibold text-slate-500">Permintaan kapasitas menunggu: </dt><dd className="inline">{summary.capacity_requests.pending}{summary.capacity_requests.oldest_pending_at ? ` (tertua ${when(summary.capacity_requests.oldest_pending_at)})` : ""}</dd></div>
         <div><dt className="inline font-semibold text-slate-500">Dibuat pada: </dt><dd className="inline">{when(summary.generated_at)}</dd></div>
       </dl>

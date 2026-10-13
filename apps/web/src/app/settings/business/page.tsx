@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { loadBranchAccess } from "@/lib/authorization";
+import { BusinessDefaultsForm } from "@/components/business-defaults-form";
+import { loadBusinessDefaults, NO_DEFAULTS, type BusinessDefaults } from "@/lib/business-defaults";
 import { loadBranchHours, SETTINGS_MAP, type BranchHours } from "@/lib/business-settings";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 
@@ -31,7 +33,11 @@ export default async function BusinessSettingsPage() {
   let branches: BranchHours[] | null = null;
   try { branches = await loadBranchHours(workspace.supabase, workspace.activeOrganization.id, access); }
   catch (error) { console.error("business_settings_branches_failed", error instanceof Error ? error.message : "unknown"); }
+  let defaults: BusinessDefaults | null = NO_DEFAULTS;
+  try { defaults = await loadBusinessDefaults(workspace.supabase); }
+  catch (error) { console.error("business_defaults_load_failed", error instanceof Error ? error.message : "unknown"); defaults = null; }
   const canEdit = owner.data === true || Boolean(caps["branches.manage"]);
+  const canEditDefaults = owner.data === true || Boolean(caps["settings.manage"]);
   return <WorkspaceShell {...workspace} activePath="/settings/business">
     <PageHeader eyebrow="Pengaturan workspace" title="Pengaturan bisnis" description="Jam kalender per cabang, dan peta lokasi setiap pengaturan bisnis: milik organisasi, cabang, pribadi, atau platform." action={<Link href="/dashboard" className="rounded-lg border px-3 py-2 text-xs font-bold">Kembali</Link>} />
     <section className="mt-7 rounded-2xl border bg-white p-5" aria-label="Jam kalender">
@@ -41,6 +47,15 @@ export default async function BusinessSettingsPage() {
         {branches === null ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-xs font-semibold text-rose-700">Daftar cabang belum dapat dimuat. Ini bukan berarti tidak ada cabang: coba muat ulang halaman.</p>
           : branches.length === 0 ? <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Tidak ada cabang yang dapat Anda akses.</p>
           : branches.map((branch) => <BranchHoursForm key={`${branch.id}:${branch.updatedAt}`} branch={branch} canEdit={canEdit} />)}
+      </div>
+    </section>
+    <section className="mt-6 rounded-2xl border bg-white p-5" aria-label="Bawaan bisnis">
+      <h2 className="font-bold">Bawaan bisnis</h2>
+      <p className="mt-1 text-xs leading-5 text-slate-500">Dua pengaturan HomePaw yang diadopsi sebagai bawaan yang aman: saran label sumber pelanggan dan jatuh tempo bawaan invoice baru. Keduanya divalidasi, dicatat, dan dilindungi dari penyimpanan bersamaan (orang kedua diminta memuat ulang). Tidak mengubah data yang sudah ada.</p>
+      <div className="mt-4">
+        {defaults === null
+          ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-xs font-semibold text-rose-700">Bawaan bisnis belum dapat dimuat. Ini bukan berarti belum ada bawaan: coba muat ulang halaman.</p>
+          : <BusinessDefaultsForm key={defaults.version} defaults={defaults} canEdit={canEditDefaults} />}
       </div>
     </section>
     <section className="mt-6 rounded-2xl border bg-white p-5" aria-label="Peta pengaturan">

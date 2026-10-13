@@ -1,0 +1,14 @@
+$ npm run typecheck (apps/web)
+
+> web@0.1.0 typecheck
+> tsc --noEmit
+
+exit=0
+$ npm run lint -- --max-warnings=0 (apps/web)
+
+> web@0.1.0 lint
+> eslint --max-warnings=0
+
+exit=0
+$ npx tsc -p tsconfig.typecheck.json --noEmit (root)
+exit=0

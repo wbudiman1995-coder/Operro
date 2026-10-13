@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BillingPeriodForm, OpenOrganizationButton, OrganizationAccessManager, OrganizationPreparationForm, OrganizationStatusForm } from "@/components/access-management";
+import { AccessReadinessPanel } from "@/components/access-readiness-panel";
 import { OperroMark } from "@/components/operro-mark";
 import { StorageRequestReview } from "@/components/storage-request-form";
+import { WhatsAppProviderPlatformControl, type WhatsAppProviderPlatformGate } from "@/components/whatsapp-provider-platform-control";
+import { describeReadinessError, loadAccessReadiness, type AccessReadiness } from "@/lib/access-readiness-summary";
 import { loadAuthContext } from "@/lib/auth-context";
 import { formatBytes, SUPABASE_FREE_DATABASE_BYTES, SUPABASE_FREE_FILE_BYTES } from "@/lib/storage-usage";
 import { createClient } from "@/lib/supabase/server";
@@ -15,11 +18,22 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
   if (!context) redirect("/login");
   const ownerCheck = await supabase.schema("app").rpc("is_operro_owner");
   if (ownerCheck.error || ownerCheck.data !== true) return <main className="mx-auto max-w-xl p-8"><h1 className="text-xl font-bold">Akses platform ditolak</h1><p className="mt-2 text-sm">Panel ini hanya untuk pemilik Operro.</p><Link href="/organizations" className="mt-4 inline-block text-emerald-700 underline">Kembali ke workspace</Link></main>;
-  const [orgResult, requestResult, storageResult] = await Promise.all([
+  const [orgResult, requestResult, storageResult, providerGateResult] = await Promise.all([
     supabase.from("organizations").select("id,name,slug,status,settings").is("deleted_at", null).order("name"),
     supabase.from("storage_upgrade_requests").select("id,organization_id,requested_gb,note,status,created_at").order("created_at", { ascending: false }).limit(100),
     supabase.schema("app").rpc("platform_storage_snapshot"),
+    supabase.schema("app").rpc("whatsapp_provider_platform_gate"),
   ]);
+  const gateRow = Array.isArray(providerGateResult.data) ? providerGateResult.data[0] : providerGateResult.data;
+  const providerGate: WhatsAppProviderPlatformGate | null = gateRow && typeof gateRow === "object" ? {
+    enabled: (gateRow as { enabled?: unknown }).enabled === true,
+    note: typeof (gateRow as { note?: unknown }).note === "string" ? (gateRow as { note: string }).note : null,
+    updatedAt: typeof (gateRow as { updated_at?: unknown }).updated_at === "string" ? (gateRow as { updated_at: string }).updated_at : null,
+  } : null;
+  let readiness: AccessReadiness | null = null;
+  let readinessError: string | null = null;
+  try { readiness = await loadAccessReadiness(supabase); }
+  catch (cause) { console.error("access_readiness_failed", cause instanceof Error ? cause.message : "unknown"); readinessError = describeReadinessError(cause as { code?: string }); }
   const organizations = orgResult.data ?? [];
   const { org } = await searchParams;
   const selected = organizations.find(row => row.id === org) ?? organizations[0] ?? null;
@@ -39,6 +53,8 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
     <section className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border bg-white p-4"><p className="text-xs text-slate-500">Database seluruh proyek</p><p className="mt-1 font-bold">{usage ? formatBytes(Number(usage.database_bytes ?? 0)) : "Tidak tersedia"}</p><p className="text-[11px] text-slate-500">Patokan Free {formatBytes(SUPABASE_FREE_DATABASE_BYTES)}</p></div><div className="rounded-2xl border bg-white p-4"><p className="text-xs text-slate-500">File seluruh proyek</p><p className="mt-1 font-bold">{usage ? formatBytes(Number(usage.file_bytes ?? 0)) : "Tidak tersedia"}</p><p className="text-[11px] text-slate-500">{usage?.file_count ?? 0} file · patokan Free {formatBytes(SUPABASE_FREE_FILE_BYTES)}</p></div><div className="rounded-2xl border bg-white p-4"><p className="text-xs text-slate-500">Permintaan tambahan aktif</p><p className="mt-1 font-bold">{requests.filter(row => ["requested", "contacted"].includes(row.status)).length}</p><p className="text-[11px] text-slate-500">Masuk ke antrean di bawah; penagihan tetap manual.</p></div></section>
     <p className="text-xs text-slate-600">Database mencakup jadwal, pelanggan, metadata dan indeks seluruh proyek; file mencakup foto dan dokumen Storage. Ini bukan angka kuota Vercel, egress, atau tagihan resmi penyedia.</p>
     <div className="flex flex-wrap gap-4 text-xs font-bold"><a href="https://supabase.com/dashboard/org/ftwuxwriwgphoyttcmmp/usage" target="_blank" rel="noreferrer" className="text-emerald-700 underline">Pemakaian Supabase ↗</a><a href="https://vercel.com/wbudiman1995-coders-projects/~/usage" target="_blank" rel="noreferrer" className="text-emerald-700 underline">Pemakaian Vercel ↗</a></div>
+    <AccessReadinessPanel readiness={readiness} error={readinessError} />
+    <WhatsAppProviderPlatformControl gate={providerGate} error={providerGateResult.error ? "Saklar penyedia WhatsApp tidak dapat dimuat." : null} />
     <OrganizationPreparationForm />
     <section className="rounded-2xl border bg-white p-5"><h2 className="font-bold">Organisasi ({organizations.length})</h2><div className="mt-3 flex flex-wrap gap-2">{organizations.map(row => <Link key={row.id} href={`/platform?org=${row.id}`} className={`rounded-lg border px-3 py-2 text-xs font-bold ${selected?.id === row.id ? "border-emerald-700 bg-emerald-50 text-emerald-800" : "bg-white"}`}>{row.name} · {row.status}</Link>)}</div>{orgResult.error ? <p className="mt-2 text-xs text-rose-700">Daftar organisasi tidak dapat dimuat.</p> : null}</section>
     {selected ? <><section className="rounded-2xl border bg-white p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-bold">{selected.name}</h2><p className="mb-2 text-xs text-slate-500">/{selected.slug} · {selected.status} · {selected.id}</p><p className="mb-3 text-xs"><strong>Email pemilik bisnis:</strong> {businessOwners.length ? businessOwners.map((owner) => owner.email).join(", ") : "Belum ada pemilik aktif; buat undangan Pemilik bisnis di bawah."}</p></div><OpenOrganizationButton organizationId={selected.id} /></div><OrganizationStatusForm key={`${selected.id}:${selected.status}`} organizationId={selected.id} status={selected.status} /></section><BillingPeriodForm organizationId={selected.id} rows={billing} />{access ? <OrganizationAccessManager key={selected.id} organizationId={selected.id} access={access} platform organizationStatus={selected.status} /> : <p className="rounded-xl bg-rose-50 p-4 text-xs text-rose-700">Akses anggota belum dapat dimuat.</p>}<section className="rounded-2xl border bg-white p-5"><h2 className="font-bold">Riwayat undangan</h2><div className="mt-2 space-y-2 text-xs">{invites.length ? invites.map((invite, index) => <p key={`${invite.email}-${index}`} className="rounded-lg bg-slate-50 p-2">{invite.email} · {invite.role} · {invite.status} · {new Date(invite.created_at).toLocaleDateString("id-ID")}</p>) : <p className="text-slate-500">Belum ada undangan.</p>}</div></section></> : null}

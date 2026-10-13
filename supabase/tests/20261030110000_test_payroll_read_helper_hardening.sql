@@ -103,7 +103,7 @@ begin
       raise exception 'FAIL: helper search_path is not empty: %', f;
     end if;
   end loop;
-  if app.schema_version() <> '20261030110000' then raise exception 'FAIL: schema version %', app.schema_version(); end if;
+  if app.schema_version() < '20261030110000' then raise exception 'FAIL: schema version %', app.schema_version(); end if;
   raise notice 'PASS: internal grants removed; every remaining payroll read helper has an empty search_path';
 end $$;
 

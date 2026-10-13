@@ -1,0 +1,23 @@
+▶ a guarded restore script reproduces the archive exactly, refuses every unsafe target and keeps history immutable
+  ✔ generation refuses a production-looking name and a missing argument, and writes nothing (49.9059ms)
+  ✔ the generated script does not overwrite an existing file (7.0746ms)
+  ✔ a target that is not marked disposable is refused and nothing is written (2276.5768ms)
+  ✔ a marker with no 'disposable' row is refused (2633.8383ms)
+  ✔ the script refuses to run in a database other than the one named at generation (2272.3536ms)
+  ✔ a target without the organization row, or at another schema version, is refused (4209.3108ms)
+  ✔ a target that already holds this organization's rows is refused (2792.7378ms)
+  ✔ a tampered chunk is caught by its hash, and a late failure rolls the whole transaction back (3981.6195ms)
+  ✔ the restore succeeds on a disposable, empty, marked target and the result equals the source (2350.3902ms)
+  ✔ immutable history is still protected after the load, and the neighbour tenant never appeared (2760.6029ms)
+  ✔ running the same script again is refused and changes nothing (1263.6331ms)
+  ✔ another organization already in the target is left exactly as it was (3489.5253ms)
+✔ a guarded restore script reproduces the archive exactly, refuses every unsafe target and keeps history immutable (66131.8906ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 82172.1132
+exit=0

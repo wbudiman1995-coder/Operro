@@ -109,10 +109,11 @@ test("error text is plain language and never raw", () => {
 test("settings map: distinguishes organization, branch, personal and platform scope and refuses to pretend unmapped keys exist", () => {
   const scopes = new Set(SETTINGS_MAP.map((row) => row.scope));
   for (const scope of ["Organisasi", "Cabang", "Pribadi", "Platform"]) assert.ok(scopes.has(scope as never), scope);
-  assert.ok(SETTINGS_MAP.filter((row) => row.href === null).length >= 4, "unmapped settings are listed without a fake link");
+  assert.deepEqual(SETTINGS_MAP.filter((row) => row.href === null).map((row) => row.homepaw), ["(currency)", "(billing plan, quota)"], "only currency and platform billing remain without a business-owned home, and they are listed without a fake link");
   const sourceLabels = SETTINGS_MAP.find((row) => row.homepaw === "sourceLabels")!;
-  assert.equal(sourceLabels.href, null);
-  assert.match(sourceLabels.note, /keputusan produk/);
+  assert.equal(sourceLabels.href, "/settings/business");
+  assert.match(sourceLabels.note, /hanya saran/i);
+  assert.match(SETTINGS_MAP.find((row) => row.homepaw === "dueDayDefault")!.note, /invoice yang sudah ada tidak berubah/);
   assert.match(SETTINGS_MAP.find((row) => row.homepaw === "(currency)")!.note, /mencampur riwayat/);
   assert.equal(SETTINGS_MAP.find((row) => row.scope === "Pribadi")!.href, "/settings/preferences");
   for (const row of SETTINGS_MAP) if (row.href) assert.match(row.href, /^\/[a-z/-]+$/, `${row.label} links internally`);

@@ -2,12 +2,14 @@
  * P2 cash-control register (parity #31). Balances are the sum of declared movements per account and currency;
  * payments, refunds, expenses and payroll do not post here. Reading needs finance.read; writing needs finance.manage.
  */
+import { CashOnHandPanel } from "@/components/cash-on-hand-panel";
 import { CashRegisterPanel } from "@/components/cash-register-panel";
 import { PageHeader } from "@/components/pilot-ui";
 import { RestrictedNotice } from "@/components/restricted-notice";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { filterAccessibleBranches, loadBranchAccess } from "@/lib/authorization";
 import { loadBranchTimezones } from "@/lib/branch-context";
+import { loadCashOnHand, type CashOnHand } from "@/lib/cash-mapping";
 import { loadCashRegister, type CashRegister, type MovementCursor } from "@/lib/cash-register";
 import { requireActiveWorkspace } from "@/lib/require-workspace";
 import { zonedDayISO } from "@/lib/timezone";
@@ -41,6 +43,17 @@ export default async function CashRegisterPage({ searchParams }: { searchParams:
     console.error("cash_register_load_failed", cause instanceof Error ? cause.message : "unknown");
     error = "Register kas belum dapat dimuat. Ini bukan tanda saldo nol: coba muat ulang halaman.";
   }
+  let onHand: CashOnHand | null = null;
+  let onHandError: string | null = null;
+  try {
+    onHand = await loadCashOnHand(workspace.supabase, timezones.defaultTimezone);
+  } catch (cause) {
+    const code = (cause as { code?: string }).code;
+    console.error("cash_on_hand_load_failed", cause instanceof Error ? cause.message : "unknown");
+    onHandError = code === "PGRST202" || code === "42883"
+      ? "Kas di tangan belum tersedia di database yang terhubung (migrasi 20261101110000 belum diterapkan)."
+      : "Kas di tangan belum dapat dimuat. Ini bukan tanda saldo nol: coba muat ulang halaman.";
+  }
   const today = zonedDayISO(new Date(), timezones.defaultTimezone);
   const requestKeys = {
     movement: crypto.randomUUID(),
@@ -49,6 +62,7 @@ export default async function CashRegisterPage({ searchParams }: { searchParams:
   const nextHref = register?.nextCursor ? `/finance/register?cursor=${register.nextCursor.occurredOn}_${register.nextCursor.id}` : null;
   return <WorkspaceShell {...workspace} activePath="/finance">
     <PageHeader eyebrow="Kontrol kas" title="Register kas" description="Akun kas, bank, dan e-wallet dengan mutasi yang tidak dapat diubah: saldo awal, modal, penarikan pemilik, dan kas masuk/keluar lain." />
+    <div className="mt-6"><CashOnHandPanel onHand={onHand} error={onHandError} canManage={Boolean(workspace.capabilities["finance.manage"])} asOfLabel={`Per hari ini (${timezones.defaultTimezone})`} /></div>
     <CashRegisterPanel register={register} canManage={Boolean(workspace.capabilities["finance.manage"])} canCreateOrgWide={branchAccess.all} branches={branches} today={today} requestKeys={requestKeys} error={error} nextHref={nextHref} />
   </WorkspaceShell>;
 }

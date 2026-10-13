@@ -44,7 +44,15 @@ Use a **disposable** project. Never restore over production.
    RPO/RTO in minutes, short notes, and an evidence reference (ticket or document id). Records cannot be edited or
    deleted; record a new drill instead.
 
-### Related procedures (added with the final parity closeout)
+### Verifiable evidence for a drill (20261101160000)
+
+`/settings/health` (platform owner) records a drill with its **kind** and, for archive drills, the **manifest hash** (and for a guarded
+restore the **report hash**) printed by `verify-org-export.ts` / `restore-org-export.ts`. The database sets `evidence_matches_export` to
+true only when a completed organization export on this platform has exactly that manifest hash. That proves the archive existed; it
+does not prove a restore happened, so the record stays a human-attested fact. Archive drills (B and C) can never be recorded as
+`passed`; only a provider-backup drill (A) can. Nothing here reads Supabase backup or point-in-time status.
+
+## Related procedures (added with the final parity closeout)
 
 - [`DISPOSABLE_RESTORE_DRILL.md`](DISPOSABLE_RESTORE_DRILL.md) and [`RESTORE_DRILL_EVIDENCE_TEMPLATE.md`](RESTORE_DRILL_EVIDENCE_TEMPLATE.md):
   the stricter drill (provider backup *and* offline archive-readiness dry run) and the fixed evidence format.

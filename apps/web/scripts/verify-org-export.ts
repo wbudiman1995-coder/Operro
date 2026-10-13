@@ -14,7 +14,7 @@ import path from "node:path";
 
 import { planRestoreReadiness, type RestorePlan } from "../src/lib/org-export-restore-plan";
 
-function findManifest(root: string): string | null {
+export function findManifest(root: string): string | null {
   const stack = [root];
   const found: string[] = [];
   while (stack.length > 0 && found.length < 2) {

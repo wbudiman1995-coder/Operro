@@ -1,0 +1,973 @@
+$ git -c core.whitespace=cr-at-eol diff --check c825aab..HEAD
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:40: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:49: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:58: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:117: trailing whitespace.
++                                                          set_config                                                          
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:123: trailing whitespace.
++                                                          set_config                                                          
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:129: trailing whitespace.
++                                                          set_config                                                          
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:194: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:196: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:239: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:241: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:248: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:250: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:259: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:261: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:267: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:269: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:278: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:280: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:311: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:313: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:327: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:329: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:335: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:337: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:342: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:344: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:369: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:371: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:379: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:381: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:386: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:388: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:393: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:395: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:405: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:407: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:415: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:417: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:426: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:428: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:433: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:435: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:441: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:443: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:451: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:453: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:463: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:465: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:495: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:497: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:511: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:513: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:518: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:520: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:525: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:527: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:532: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:534: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:562: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:564: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:595: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:597: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:608: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:610: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:620: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:622: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:631: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:633: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:642: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:644: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:673: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:685: trailing whitespace.
++ set_config 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:687: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:693: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:695: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:708: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:710: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:715: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:717: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:722: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:724: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:729: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:731: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:736: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:738: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:751: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:753: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:759: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:761: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:765: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:767: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:773: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:775: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:786: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:788: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:793: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:795: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:800: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:802: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:807: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:809: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:825: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:827: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:837: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:839: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:847: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:849: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:856: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:858: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:865: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:867: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:872: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:874: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:879: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:881: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:897: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:899: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:905: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:907: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:926: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:928: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:942: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:944: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:951: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:953: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:960: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:962: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:970: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:972: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1000: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1002: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1007: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1009: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1018: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1020: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1029: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1031: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1040: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1042: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1050: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1052: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1058: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1060: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1094: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1096: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1109: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1111: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1120: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1122: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1130: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1132: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1138: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1140: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1148: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1150: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1183: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1185: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1195: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1197: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1203: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1205: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1238: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1240: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1252: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1254: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1260: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1262: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1267: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1269: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1279: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1281: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1287: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1289: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1302: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1304: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1316: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1318: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1351: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1353: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1366: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1368: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1373: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1375: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1384: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1386: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1406: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1408: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1416: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1418: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1425: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1427: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1433: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1435: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1441: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1443: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1451: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1453: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1458: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1460: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1465: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1467: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1483: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1485: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1490: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1492: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1500: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1502: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1527: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1529: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1534: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1536: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1540: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1542: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1546: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1548: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1552: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1554: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1557: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1559: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1563: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1565: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1601: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1603: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1621: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1623: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1631: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1633: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1642: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1644: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1651: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1653: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1659: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1661: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1666: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1668: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1673: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1675: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1712: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1714: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1728: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1730: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1736: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1738: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1743: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1745: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1750: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1752: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1759: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1761: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1819: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1821: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1832: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1834: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1847: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1849: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1857: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1859: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1869: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1871: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1913: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1915: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1970: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1972: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1981: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1983: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1991: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:1993: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2001: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2003: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2009: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2011: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2061: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2063: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2087: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2089: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2095: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2097: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2105: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2107: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2112: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2114: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2151: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2153: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2164: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2166: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2202: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2204: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2229: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2231: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2236: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2238: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2244: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2246: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2251: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2253: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2259: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2261: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2288: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2290: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2304: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2306: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2315: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2317: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2329: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2331: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2337: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2339: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2350: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2352: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2358: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2360: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2365: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2367: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2372: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2374: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2379: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2381: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2388: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2390: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2397: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2399: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2408: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2410: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2416: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2418: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2424: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2426: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2444: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2446: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2451: trailing whitespace.
++ claims 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2453: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2476: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2478: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2495: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2497: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2504: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2506: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2512: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2514: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2539: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2541: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2550: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2552: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2566: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2568: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2573: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2575: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2581: trailing whitespace.
++ act_as 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2583: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2772: trailing whitespace.
++                                                complete_booking                                                 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2777: trailing whitespace.
++      issue_invoice_for_booking       
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2784: trailing whitespace.
++                                                complete_booking                                                 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2863: trailing whitespace.
++ sb6_job 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2865: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2895: trailing whitespace.
++ sb6_job 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2897: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2931: trailing whitespace.
++ sb6_job 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2933: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2969: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2975: trailing whitespace.
++ ok 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2977: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2983: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:2994: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3005: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3015: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3025: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3040: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3047: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3061: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3069: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3080: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3094: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3386: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3388: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3391: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3393: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3396: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3398: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3401: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3403: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3406: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3408: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3411: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3413: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3419: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3421: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3424: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3426: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3429: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3431: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3440: trailing whitespace.
++ fixture_visit 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3442: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3607: trailing whitespace.
++               result                
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3753: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3763: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3773: trailing whitespace.
++              set_config              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3780: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3785: trailing whitespace.
++      review_customer_onboarding      
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3793: trailing whitespace.
++ set_config 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3802: trailing whitespace.
++              set_config              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3807: trailing whitespace.
++              set_config              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3814: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3823: trailing whitespace.
++ set_config 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3833: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3846: trailing whitespace.
++              set_config              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3851: trailing whitespace.
++              set_config              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3856: trailing whitespace.
++              set_config              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3861: trailing whitespace.
++              set_config              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3868: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3878: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3889: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3905: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:3917: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4168: trailing whitespace.
++                                                            set_config                                                             
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4176: trailing whitespace.
++ set_config 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4184: trailing whitespace.
++                                                            set_config                                                             
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4193: trailing whitespace.
++                                                                                   set_config                                                                                   
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4205: trailing whitespace.
++                                                            set_config                                                             
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4223: trailing whitespace.
++                                                            set_config                                                             
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4236: trailing whitespace.
++                                                            set_config                                                             
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4246: trailing whitespace.
++                                                            set_config                                                             
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4256: trailing whitespace.
++                                                            set_config                                                             
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4294: trailing whitespace.
++ act 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4296: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4305: trailing whitespace.
++ act 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4307: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4319: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4321: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4325: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4327: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4331: trailing whitespace.
++ act 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4333: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4340: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4342: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4346: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4348: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4351: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4353: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4357: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4359: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4364: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4366: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4369: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4371: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4376: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4378: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4382: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4384: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4389: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4391: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4395: trailing whitespace.
++ act 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4397: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4404: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4406: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4410: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4412: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4416: trailing whitespace.
++ expect 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4418: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4423: trailing whitespace.
++ act 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4425: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4431: trailing whitespace.
++            result             
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4468: trailing whitespace.
++                                                        set_config                                                         
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4478: trailing whitespace.
++                                 set_config                                 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4488: trailing whitespace.
++                                 set_config                                 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4498: trailing whitespace.
++                                 set_config                                 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4508: trailing whitespace.
++                                 set_config                                 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4518: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4526: trailing whitespace.
++                                                        set_config                                                         
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4541: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4551: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4560: trailing whitespace.
++                                                        set_config                                                         
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4569: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4578: trailing whitespace.
++                                                        set_config                                                         
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4587: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4596: trailing whitespace.
++                                                        set_config                                                         
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4604: trailing whitespace.
++                                                        set_config                                                         
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4614: trailing whitespace.
++                                 set_config                                 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4624: trailing whitespace.
++                                                        set_config                                                         
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4629: trailing whitespace.
++ set_operro_organization_status 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4631: trailing whitespace.
++ 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4641: trailing whitespace.
++                                                              set_config                                                              
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4651: trailing whitespace.
++                                 set_config                                 
+docs/handoffs/logs/FINAL-PARITY-OPERATIONS/baseline-db-gates.log:4678: trailing whitespace.
++                                                 set_config                                                 
+exit=2
+$ git diff --check c825aab..HEAD (plain; flags only the CR of CRLF working-tree files, not real whitespace)
+
+--- final (after the .gitattributes commit), at HEAD:
+$ git -c core.whitespace=cr-at-eol diff --check c825aab..HEAD
+exit=0
