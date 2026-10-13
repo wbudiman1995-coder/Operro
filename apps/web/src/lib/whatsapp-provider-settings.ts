@@ -49,7 +49,7 @@ export async function loadProviderState(supabase: SupabaseClient): Promise<Provi
   return parseProviderState(data);
 }
 
-export interface ProviderFormInput { provider: string; phoneNumberId: string; businessAccountId: string; consentAttested: boolean; version: string }
+export interface ProviderFormInput { provider: string; phoneNumberId: string; businessAccountId: string; consentAttested: boolean; enabled: boolean; version: string }
 
 export function validateProviderForm(input: ProviderFormInput): { ok: true; version: number } | { ok: false; message: string } {
   if (!(PROVIDERS as readonly string[]).includes(input.provider)) return { ok: false, message: "Penyedia tidak valid." };

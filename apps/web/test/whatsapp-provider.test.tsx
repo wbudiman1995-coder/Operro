@@ -113,26 +113,30 @@ test("provider state: enabled is only ever true while the platform allows it", (
 });
 
 test("the form refuses anything that looks like a credential and requires a provider for ids", () => {
-  const ok = { provider: "meta_cloud", phoneNumberId: " 123456789012345 ", businessAccountId: "", consentAttested: true, version: "0" };
+  const ok = { provider: "meta_cloud", phoneNumberId: " 123456789012345 ", businessAccountId: "", consentAttested: true, enabled: false, version: "0" };
   assert.deepEqual(validateProviderForm(ok), { ok: true, version: 0 });
   for (const bad of [
     { ...ok, phoneNumberId: "EAAB-token" }, { ...ok, phoneNumberId: "123" }, { ...ok, businessAccountId: "abc12345" }, { ...ok, provider: "twilio" },
     { ...ok, provider: "none" }, { ...ok, version: "-1" }, { ...ok, version: "x" },
   ]) assert.equal(validateProviderForm(bad).ok, false, JSON.stringify(bad));
-  assert.deepEqual(validateProviderForm({ provider: "none", phoneNumberId: "", businessAccountId: "", consentAttested: false, version: "3" }), { ok: true, version: 3 });
+  assert.deepEqual(validateProviderForm({ provider: "none", phoneNumberId: "", businessAccountId: "", consentAttested: false, enabled: false, version: "3" }), { ok: true, version: 3 });
   assert.match(describeProviderError({ code: "22023", message: "provider_not_available" }), /pemilik platform/);
   assert.doesNotMatch(describeProviderError({ code: "XX000", message: "relation whatsapp_provider_settings" }), /relation|whatsapp_provider_settings/);
 });
 
-test("the settings page states it is unavailable, offers no way to enable, and lists the real prerequisites", () => {
+test("the settings page explains the closed platform gate and only enables its setup checkbox after the platform opens it", () => {
   const html = renderToStaticMarkup(<WhatsAppProviderPanel error={null} state={{ platformAvailable: false, provider: "none", phoneNumberId: null, businessAccountId: null, consentAttested: false, consentAttestedAt: null, enabled: false, version: 0 }} />);
-  assert.match(html, /Belum tersedia/);
+  assert.match(html, /Belum dibuka platform/);
   assert.match(html, /Operro tidak mengirim pesan WhatsApp/);
   assert.match(html, /<input type="checkbox" disabled/, "the enable box exists only as a disabled control");
-  assert.match(html, /database menolak pengaktifan/);
+  assert.match(html, /Belum dapat dipilih: pemilik platform Operro belum membuka pengaturan resmi/);
   for (const line of PROVIDER_REQUIREMENTS) assert.ok(html.includes(line), line.slice(0, 40));
   assert.doesNotMatch(html, /type="password"|name="token"|name="secret"|apiKey/i);
   assert.doesNotMatch(html, /terkirim otomatis|status dibaca aktif/i);
+  const opened = renderToStaticMarkup(<WhatsAppProviderPanel error={null} state={{ platformAvailable: true, provider: "meta_cloud", phoneNumberId: "123456789", businessAccountId: null, consentAttested: true, consentAttestedAt: null, enabled: false, version: 1 }} />);
+  assert.match(opened, /name="enabled"/);
+  assert.doesNotMatch(opened, /name="enabled"[^>]*disabled/);
+  assert.match(opened, /Operro tidak mengirim pesan WhatsApp/);
   const failed = renderToStaticMarkup(<WhatsAppProviderPanel state={null} error="Pengaturan penyedia belum dapat dimuat." />);
   assert.match(failed, /role="alert"/);
   assert.doesNotMatch(failed, /Persiapan penyedia resmi/);
@@ -148,8 +152,8 @@ test("loadProviderState reads one RPC with no argument and reports a refusal wit
   await assert.rejects(() => loadProviderState(denied), (error: Error & { code?: string }) => error.code === "42501");
 });
 
-test("the action cannot enable a provider and sends no organization", () => {
+test("the action sends the owner-selected setup state but never an organization, secret, or sender call", () => {
   const actions = fs.readFileSync(path.join(root, "apps/web/src/app/settings/whatsapp-provider/actions.ts"), "utf8");
-  assert.match(actions, /p_enabled: false/);
-  assert.doesNotMatch(actions, /p_enabled: (true|input)|p_org\b|organization_id/);
+  assert.match(actions, /p_enabled: input\.enabled/);
+  assert.doesNotMatch(actions, /p_org\b|organization_id|fetch\s*\(|process\.env/);
 });

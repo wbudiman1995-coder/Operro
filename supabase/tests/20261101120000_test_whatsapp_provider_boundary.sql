@@ -47,10 +47,8 @@ do $$
 begin
   perform pg_temp.check((select enabled from public.platform_flags where key = 'whatsapp_provider_available') is false, 'the platform flag is seeded FALSE');
   perform pg_temp.check(app.whatsapp_provider_available() is false, 'and the provider is therefore not available');
-  perform pg_temp.check(not exists (
-    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'app' and p.prokind = 'f' and pg_get_functiondef(p.oid) ~* 'update\s+public\.platform_flags|insert\s+into\s+public\.platform_flags'),
-    'no function in the app schema can change a platform flag');
+  perform pg_temp.check(to_regprocedure('app.set_whatsapp_provider_platform_gate(boolean)') is not null,
+    'the later platform-owner migration adds one narrow, audited setup gate');
 end $$;
 
 set local role authenticated;

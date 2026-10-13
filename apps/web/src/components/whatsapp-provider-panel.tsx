@@ -10,13 +10,13 @@ const initial: ProviderActionState = { error: null, success: null };
 const input = "mt-1 block h-9 w-full rounded-lg border border-slate-200 px-2 text-xs";
 const label = "text-[11px] font-semibold text-slate-500";
 
-/** Settings for the official provider boundary. It cannot enable anything: the platform has not opened a provider. */
+/** Settings for the official provider boundary. Even when enabled, this release sends no messages. */
 export function WhatsAppProviderPanel({ state, error }: { state: ProviderState | null; error: string | null }) {
   const [result, action, pending] = useActionState(saveProviderSettingsAction, initial);
   return (
     <div className="mt-6 space-y-6">
       <p role="note" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900">
-        <strong>Belum tersedia.</strong> Operro tidak mengirim pesan WhatsApp dan tidak menerima status pengiriman dari penyedia mana pun. Halaman ini hanya mencatat ID non-rahasia dan pernyataan persetujuan pelanggan sebagai persiapan. Status &ldquo;terkirim&rdquo; atau &ldquo;dibaca&rdquo; otomatis baru mungkin setelah penyedia resmi, kredensial, webhook, dan identitas layanan diputuskan. Sampai saat itu, draf tetap dibuka dan dilaporkan manual di <Link href="/whatsapp" className="font-bold underline">Pusat WhatsApp</Link>.
+        <strong>{state?.platformAvailable ? "Pengaturan dibuka, pengiriman belum ada." : "Belum dibuka platform."}</strong> Operro tidak mengirim pesan WhatsApp dan tidak menerima status pengiriman dari penyedia mana pun pada rilis ini. Halaman ini mencatat ID non-rahasia dan pernyataan persetujuan pelanggan sebagai persiapan. Status &ldquo;terkirim&rdquo; atau &ldquo;dibaca&rdquo; otomatis baru mungkin setelah penyedia resmi, kredensial, webhook, dan identitas layanan diputuskan. Sampai saat itu, draf tetap dibuka dan dilaporkan manual di <Link href="/whatsapp" className="font-bold underline">Pusat WhatsApp</Link>.
       </p>
       {error ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm font-semibold text-rose-700">{error}</p> : null}
       {state === null ? null : (
@@ -38,9 +38,9 @@ export function WhatsAppProviderPanel({ state, error }: { state: ProviderState |
               <input type="checkbox" name="consentAttested" defaultChecked={state.consentAttested} className="mt-0.5" />
               <span>Saya menyatakan bahwa pelanggan yang akan dihubungi telah memberi persetujuan tertulis untuk menerima pesan WhatsApp dari bisnis ini dan dapat berhenti kapan saja. Pernyataan ini dicatat dengan tanggal dan nama saya.</span>
             </label>
-            <label className="flex items-start gap-2 text-xs text-slate-400 sm:col-span-2">
-              <input type="checkbox" disabled aria-describedby="provider-enable-note" className="mt-0.5" />
-              <span id="provider-enable-note">Aktifkan penyedia. Belum dapat dipilih: pemilik platform Operro belum membuka penyedia resmi, dan database menolak pengaktifan.</span>
+            <label className={`flex items-start gap-2 text-xs sm:col-span-2 ${state.platformAvailable ? "text-slate-700" : "text-slate-400"}`}>
+              <input type="checkbox" name="enabled" defaultChecked={state.enabled} disabled={!state.platformAvailable} aria-describedby="provider-enable-note" className="mt-0.5" />
+              <span id="provider-enable-note">Aktifkan pengaturan penyedia. {state.platformAvailable ? "Ini hanya menyimpan kesiapan organisasi; Operro belum mengirim WhatsApp." : "Belum dapat dipilih: pemilik platform Operro belum membuka pengaturan resmi."}</span>
             </label>
             <div className="flex items-end"><button type="submit" disabled={pending} className="h-9 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-60">{pending ? "Menyimpan…" : "Simpan persiapan"}</button></div>
             <p aria-live="polite" className="text-xs font-semibold sm:col-span-2">{result.error ? <span className="text-rose-700">{result.error}</span> : result.success ? <span className="text-emerald-700">{result.success}</span> : null}</p>

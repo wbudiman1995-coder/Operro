@@ -14,7 +14,7 @@ import type { CapabilityMap } from "@/lib/authorization";
 import { summarizeScope, type ExportScope } from "@/lib/org-export-scope";
 import { loadInvoicePaymentIssues, loadUnbilledVisits, scanPayrollSources } from "@/lib/reconciliation";
 
-export const EXPECTED_SCHEMA_VERSION = "20261101160000";
+export const EXPECTED_SCHEMA_VERSION = "20261101170000";
 export const DRILL_FRESH_DAYS = 90;
 export const RECONCILIATION_COUNT_CAP = 100;
 

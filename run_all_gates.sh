@@ -142,6 +142,7 @@ EXPECTED_MIGRATIONS=(
   supabase/migrations/20261101140000_business_defaults.sql
   supabase/migrations/20261101150000_access_readiness.sql
   supabase/migrations/20261101160000_recovery_evidence_cleanup_signals.sql
+  supabase/migrations/20261101170000_whatsapp_provider_platform_toggle.sql
 )
 mapfile -t ACTUAL_MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort)
 if [ "$(printf '%s\n' "${EXPECTED_MIGRATIONS[@]}")" != "$(printf '%s\n' "${ACTUAL_MIGRATIONS[@]}")" ]; then
@@ -279,6 +280,7 @@ psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261101120000_test_wha
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261101140000_test_business_defaults.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261101150000_test_access_readiness.sql
 psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261101160000_test_recovery_evidence.sql
+psql_db operro_gate -v ON_ERROR_STOP=1 -f supabase/tests/20261101170000_test_whatsapp_provider_platform_toggle.sql
 
 step "GATE 7f — HomePaw intake, per-pet size pricing, and membership tiers"
 bash integration/homepaw_qc_db.sh
