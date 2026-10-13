@@ -1,0 +1,21 @@
+psql:integration/final_closeout_upgrade_probe.sql:111: NOTICE:  closeout surfaces agree with independent queries on the populated HomePaw workspace (0.106208 s)
+              ?column?               
+-------------------------------------
+ FINAL CLOSEOUT POPULATED PROBE PASS
+(1 row)
+psql:integration/final_operations_upgrade_probe.sql:49: NOTICE:  operations objects present, no data created by the migrations, gate closed, immutability holds on populated data
+                                                          set_config                                                          
+------------------------------------------------------------------------------------------------------------------------------
+ {"sub":"047f1e5c-5935-4566-b793-417df9f7cc9c","role":"authenticated","active_org_id":"019fbdd0-ee52-7f57-8318-a288203c78c1"}
+(1 row)
+
+psql:integration/final_operations_upgrade_probe.sql:163: NOTICE:  ROI probe: window 2025-10-13 .. 2026-10-13, 3 currency/source rows, cohort customers 7, collected IDR 710000.00
+psql:integration/final_operations_upgrade_probe.sql:163: NOTICE:  mapping probe: effective 2026-10-10, mapped cash payments 240000.00, unmapped other-method payments 470000.00
+psql:integration/final_operations_upgrade_probe.sql:163: NOTICE:  operations surfaces agree with independent queries on the populated HomePaw workspace
+                result                 
+---------------------------------------
+ FINAL OPERATIONS POPULATED PROBE PASS
+(1 row)
+t|t
+POPULATED UPGRADE PASS
+exit=0

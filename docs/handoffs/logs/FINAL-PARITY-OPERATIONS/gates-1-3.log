@@ -1,0 +1,536 @@
+
+########## GATE 1 — strict TypeScript typecheck ##########
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+npm warn deprecated rimraf@2.7.1: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated fstream@1.0.12: This package is no longer supported.
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 489 packages, and audited 494 packages in 1m
+
+154 packages are looking for funding
+  run `npm fund` for details
+
+9 vulnerabilities (2 moderate, 7 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+Version 5.9.3
+typecheck exit=0
+
+########## GATE 2 — workspace build ##########
+
+> web@0.1.0 build
+> next build
+
+▲ Next.js 16.3.6 (Turbopack)
+✓ Running next.config.ts took 1043ms
+- Experiments (use with caution):
+  · serverActions
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.6s
+  Running TypeScript ...
+  Finished TypeScript in 3.9s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/46) ...
+  Generating static pages using 11 workers (11/46) 
+  Generating static pages using 11 workers (22/46) 
+  Generating static pages using 11 workers (34/46) 
+✓ Generating static pages using 11 workers (46/46) in 985ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /accept/[token]
+├ ƒ /api/availability/slots
+├ ƒ /api/complaints/export
+├ ƒ /api/health/supabase
+├ ƒ /api/maps/expand
+├ ƒ /api/onboarding/[token]
+├ ƒ /api/regions
+├ ƒ /api/search
+├ ƒ /attendance
+├ ƒ /audit
+├ ƒ /billing
+├ ƒ /billing/[id]
+├ ƒ /billing/[id]/pdf
+├ ƒ /bookings
+├ ƒ /catalog
+├ ƒ /complaints
+├ ƒ /customers
+├ ƒ /customers/[customerId]
+├ ƒ /customers/export
+├ ƒ /customers/onboarding
+├ ƒ /dashboard
+├ ƒ /finance
+├ ƒ /finance/export
+├ ƒ /finance/marketing
+├ ƒ /finance/register
+├ ƒ /finance/register/mapping
+├ ƒ /followups
+├ ƒ /inventory
+├ ƒ /invoices/[invoiceId]
+├ ƒ /invoices/new
+├ ƒ /join/[token]
+├ ƒ /leaderboard
+├ ƒ /leaderboard/[resourceId]
+├ ƒ /login
+├ ƒ /my-schedule
+├ ƒ /operations
+├ ƒ /organizations
+├ ƒ /payroll
+├ ƒ /payroll/export
+├ ƒ /platform
+├ ƒ /programs
+├ ƒ /programs/memberships
+├ ƒ /reconciliation
+├ ƒ /reports
+├ ƒ /schedule
+├ ƒ /settings/access
+├ ƒ /settings/business
+├ ƒ /settings/custom-fields
+├ ƒ /settings/documents
+├ ƒ /settings/health
+├ ƒ /settings/preferences
+├ ƒ /settings/storage
+├ ƒ /settings/whatsapp-provider
+├ ƒ /start
+├ ƒ /tasks
+├ ƒ /visits
+├ ƒ /whatsapp
+├ ƒ /whatsapp/batches
+└ ƒ /whatsapp/batches/[batchId]
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+> @operro/backend@0.1.0 build
+> tsc -b --force
+
+
+> @operro/preset-grooming@0.1.0 build
+> tsc -b --force
+
+
+> @operro/sdk@0.1.0 build
+> tsc -b --force
+
+-rw-r--r-- 1 DW_wi 197609 403 Oct 13 12:57 packages/backend/dist/index.d.ts
+-rw-r--r-- 1 DW_wi 197609 368 Oct 13 12:57 packages/backend/dist/index.js
+-rw-r--r-- 1 DW_wi 197609 329 Oct 13 12:57 packages/preset-grooming/dist/index.d.ts
+-rw-r--r-- 1 DW_wi 197609 294 Oct 13 12:57 packages/preset-grooming/dist/index.js
+-rw-r--r-- 1 DW_wi 197609 222 Oct 13 12:57 packages/sdk/dist/index.d.ts
+-rw-r--r-- 1 DW_wi 197609 187 Oct 13 12:57 packages/sdk/dist/index.js
+
+########## GATE 3 — in-memory + preset-contract tests ##########
+PASS: 1 authorized addPet delegates to repo/RPC
+PASS: 2 addLine defaults quantity to 1
+PASS: 3 missing module denied
+PASS: 4 wrong-branch denied
+PASS: 5 missing permission denied
+PASS: 6 voidLine without reason -> BUSINESS_RULE, no RPC
+PASS: 7 setLineQuantity(0) -> BUSINESS_RULE
+PASS: 8 repo 42501 -> AUTHORIZATION
+PASS: 9 repo 23505 -> CONFLICT
+PASS: 10 repo pet_customer_mismatch -> BUSINESS_RULE
+PASS: 11 assignPetResource delegates to repo/RPC
+PASS: 12 getJob returns empty job with real branchId (item 5)
+
+12 assertions passed.
+PASS: 1 42501/wrong_branch -> AUTHORIZATION
+PASS: 2 pet_already_on_booking -> CONFLICT
+PASS: 3 line_not_found -> NOT_FOUND
+PASS: 4 pet_customer_mismatch -> BUSINESS_RULE
+PASS: 5 resource_not_active_or_not_in_branch classified
+PASS: 6 package_requires_unit_quantity -> BUSINESS_RULE
+PASS: 7 unknown -> INTERNAL
+PASS: 8 prefix match returns stable code
+PASS: 9 contract includes resource_not_active_or_not_in_branch
+PASS: 10 obsolete resource_not_active_or_not_in_org removed
+PASS: 11 RPC name from preset
+PASS: 12 gate from preset
+PASS: 13 repository methods accept preset Repo* input types (compile-time)
+
+13 assertions passed.
+✔ the summary is parsed into numbers and flags and malformed rows are dropped (5.7677ms)
+✔ every flag the database can emit has a plain explanation and an action (6.7642ms)
+✔ the panel lists only organizations that need attention, with what to do, and reveals no identity (21.8085ms)
+✔ nothing to do, a failed load and a missing function are three different states (5.725ms)
+✔ the loader calls one argument-free RPC and keeps the error code (4.0677ms)
+✔ the platform page shows the panel, the library creates nothing, and the staging script only reads (9.2868ms)
+✔ every database refusal of an invitation claim maps to a distinct, actionable message (2.2066ms)
+✔ a transient or unknown failure is never reported as a bad link (0.6247ms)
+✔ the accept form uses the mapping, keeps the token out of logs and URLs, and offers sign-in on the invited e-mail only (1.6515ms)
+✔ the migration lineage has no policy that lets a client read invitation tokens or write memberships (2.7693ms)
+✔ UPDATE reports only the fields whose value actually changed (3.5176ms)
+✔ uses owner-facing labels and a readable fallback (0.4413ms)
+✔ UPDATE ignores audit metadata even when it changed (0.3024ms)
+✔ INSERT and DELETE report no changed fields (0.257ms)
+✔ customer audit review is capability gated before the RPC is called (1.954ms)
+✔ audit filters validate every input and never pass raw text through (10.5077ms)
+✔ audit window uses business-zone day boundaries, inclusive of the end day (79.4346ms)
+✔ changed-field summaries come from the reduced diff and use readable labels (2.5507ms)
+✔ audit page: asks for one extra row to detect another page, resolves labels, and exposes a keyset cursor (1.2966ms)
+✔ reconciliation loaders are read-only RPC reads that send no tenancy and paginate with one extra row (11.6339ms)
+✔ every discrepancy kind has plain-language copy and none promises an automatic fix (2.2507ms)
+✔ pages are capability-gated, read-only, and the migration never writes (6.6014ms)
+✔ stored defaults are parsed defensively and an absent row means 'no defaults' (3.6898ms)
+✔ labels text is normalized one label per line (0.5789ms)
+✔ the form is checked the way the database checks it (1.2369ms)
+✔ database errors become plain language and never leak raw text (0.7216ms)
+✔ the default due date is the issue date plus the period, else the day after, across month ends and leap days (0.8039ms)
+✔ reading goes through row-level security only and a failed suggestion read never blocks a form (2.1091ms)
+✔ the settings form shows saved values, hides the save button from a read-only member and says what the values do (28.1841ms)
+✔ suggestions render as a datalist and nothing when there are none (1.8446ms)
+✔ customer source inputs only SUGGEST (free text stays valid) and the invoice studio keeps its old default without a period (5.979ms)
+✔ the action sends only the two values and a version, and no organization (2.1733ms)
+✔ time helpers round-trip every quarter hour, including 24:00 as a closing time (2.8728ms)
+✔ calendar-hours validation uses exactly the database bounds (same vectors as the SQL test) (2.1819ms)
+✔ branch hours: only branches the caller may reach, stored vs default shown, malformed settings fall back, the token is kept verbatim (3.1281ms)
+✔ form: carries the branch and the verbatim token, never an organization; read-only roles get no write control (92.5615ms)
+✔ error text is plain language and never raw (0.6378ms)
+✔ settings map: distinguishes organization, branch, personal and platform scope and refuses to pretend unmapped keys exist (0.8768ms)
+✔ action and migration: typed RPC only, token shape checked, no arbitrary settings write (4.7969ms)
+✔ a complete account carries every part of its position; an incomplete one carries none of the mapped parts (3.5736ms)
+✔ totals add complete accounts of one currency only (0.781ms)
+✔ unmapped flows and mapping history parse with their reasons (1.463ms)
+✔ the mapping form is checked the way the database checks it (4.3528ms)
+✔ database errors become plain language and never leak raw text (1.0046ms)
+✔ the panel shows the parts of the position, the unmapped flows and the definition, and claims no bank reconciliation (109.5659ms)
+✔ without any mapping the panel says the figure is only declared movements (3.5333ms)
+✔ a failed load is an alert, never a zero position; an empty organization has an empty state (1.8929ms)
+✔ the mapping history names accounts and branches and marks a stopped mapping (2.4829ms)
+✔ the loader calls only the two readers and a count, with no organization and a validated zone (3.4725ms)
+✔ the library and the action never take an organization from the browser; the page is gated (2.9161ms)
+✔ position and movement rows are parsed defensively; junk rows are dropped (6.0759ms)
+✔ balances are grouped per currency and never added across currencies (0.9288ms)
+✔ movement form pre-checks: amount, date, party, source pairing; the database repeats every rule (1.0229ms)
+✔ error text is plain Indonesian and never leaks raw database messages (0.5833ms)
+✔ loader: position first, then a keyset page; an extra row means more; reversals are looked up for the shown page (4.2376ms)
+✔ panel for a manager: per-currency balances, forms, reversal only on live entries, honest copy (127.1755ms)
+✔ panel for a read-only role shows balances but offers no write control (11.8494ms)
+✔ panel states: empty register, load failure (never a zero) and paging (59.7727ms)
+✔ branch-limited creator is offered only their branches (no organization-wide option) (31.832ms)
+✔ actions: finance.manage gate, no tenant/user/currency/direction sent, errors mapped; migration is immutable-by-trigger (2.386ms)
+✔ catalog action accepts valid labels from 1 to 40 trimmed characters (1.9559ms)
+✔ catalog action rejects empty and whitespace-only labels (0.2779ms)
+✔ catalog action rejects a 41-character trimmed label (0.2147ms)
+✔ catalog action allows surrounding whitespace on an otherwise valid label (0.2445ms)
+✔ catalog action preserves the remaining payload guards (0.668ms)
+✔ the repository has no scheduler or service identity, which is why the availability flag is false (435.5279ms)
+✔ state parsing is defensive; a missing or malformed state is 'not shown', never 'off' (1.3266ms)
+✔ wording: off says how cleanup really happens; consent without a runner says nothing will run; only a real runner may say active (54.4797ms)
+✔ panel: owner sees the consent switch and the no-runner statement; non-owners and unknown state get honest alternatives (28.7911ms)
+✔ action and migration: owner-only RPC, no deletion, no runner (6.8168ms)
+✔ export panel is honest that this is an archive, not a restorable backup (43.1623ms)
+✔ a non-owner sees the explanation and no export controls (1.1156ms)
+✔ an interrupted run is offered for resume or cancel; a completed run for metadata verification (52.2598ms)
+✔ dashboard settings form lists exactly the eight cards and reflects the saved visibility (5.8195ms)
+✔ accepts a valid value for each of the five types and clears on blank (53.3387ms)
+✔ rejects formula-like and malformed values (1.102ms)
+✔ refuses unknown, archived, repeated and cross-scope keys (0.8852ms)
+✔ displays stored values, hides empty ones and flags removed options (0.7281ms)
+✔ definition form: creation needs scope+type, edits cannot carry them, select options are bounded (2.7021ms)
+✔ migration, actions and page keep the server-derived tenancy and capability contract (5.4735ms)
+✔ single selection stops at the limit but selected rows remain deselectable (2.335ms)
+✔ select visible changes only visible rows and respects the global limit (2.7733ms)
+✔ clear visible works at the limit and preserves hidden selection (0.5111ms)
+✔ visible selection preserves visible order and empty visibility is never all-selected (5.3247ms)
+✔ action resolves authorization and organization only on the server (0.9115ms)
+✔ action bounds and validates identifiers before constructing a fixed payload (10.1908ms)
+✔ action scopes its one customer update and reports partial results (2.8895ms)
+✔ UI is capability gated, bounded, visible-only, and has an explicit clear-visible control (0.3881ms)
+✔ authenticated cross-organization update uses a known hidden id and verifies unchanged ownership (0.4046ms)
+✔ full gate invokes the focused bulk-edit contract (0.6671ms)
+✔ migration owns stable tenant-scoped allocation without a 999 truncation (1.9945ms)
+✔ all customer-facing call sites use the persisted code (0.5152ms)
+✔ application source no longer synthesizes a CUS code from UUIDs (0.6111ms)
+✔ full gate wires migration, SQL/RLS, concurrency and populated-upgrade regressions (0.407ms)
+✔ parses editable pet facts without derived or tenant fields (84.0338ms)
+✔ normalizes blank optional values and permits a weightless dog band (0.6291ms)
+✔ coat type and skin history: blank clears, unknown coat or overlong history is rejected, no stored counter is accepted (2.244ms)
+✔ visit stats are derived from completed work only and the editor/page surface them read-only (1.0256ms)
+✔ rejects malformed species, size, weight, date, duplicates, and non-dog manual size (2.0696ms)
+✔ enforces all edit field length limits (0.9585ms)
+✔ server action authorizes, validates, and calls only the tenant-derived RPC (0.6762ms)
+✔ RPC is authenticated, active-tenant scoped, permission gated, and delegates sizing to the existing pet trigger (0.7224ms)
+✔ Customer 360 exposes active tenant choices and never submits derived pricing data (0.592ms)
+✔ full gate invokes focused web and SQL coverage (0.5326ms)
+✔ parses exactly the five allowed fields (63.051ms)
+✔ trims fields and normalizes blank optionals (0.9288ms)
+✔ normalizes email and rejects obvious invalid forms (0.5886ms)
+✔ enforces required name and every length boundary (0.7822ms)
+✔ rejects repeated and non-string form values (3.93ms)
+✔ preserves internal note formatting (0.3733ms)
+✔ validates strict UUID and timestamp tokens (0.684ms)
+✔ action uses server authorization and validates before one scoped optimistic update (0.835ms)
+✔ action keeps audit in the database and does not expose raw database messages (1.2852ms)
+✔ page and editor are capability gated and use the persisted version (0.5623ms)
+✔ full gate invokes the focused test (0.8478ms)
+dashboard_alert_stale_open_bookings_failed { code: '57014' }
+✔ the read plan removes every alert the caller may not read, and hides the whole section when the card is off (4.8994ms)
+✔ a hidden section issues no call at all; a denied alert issues none either; the others still load (3.1124ms)
+✔ one failing alert never hides the others, and a failure is never shown as zero (11.0902ms)
+✔ unbilled visits reuse the reconciliation RPC, count up to 100 and report 100+ (7.8419ms)
+✔ parseAlertRows keeps currencies apart, ignores other keys and unusable numbers, and reports the explicit zero row (2.158ms)
+✔ every alert links to exactly one internal page, states what it measures, and none claims ROI or profit (1.118ms)
+✔ component: alerts with items show title, count, per-currency amount, definition and a single link (110.84ms)
+✔ component: hidden renders nothing; all-zero and nothing-loadable are distinct, honest states (1.6608ms)
+✔ card setting: absent key is visible, wrong type ignored; the migration allowlist names the key (21.4304ms)
+✔ migration shape: definer with empty search_path, explicit grants, tenant filter on every read, no writes (1.3513ms)
+✔ the read plan removes every domain the caller may not read, and a hidden card (6.2993ms)
+✔ card visibility falls back safely: absent new keys are visible, wrong types are ignored, unknown keys are dropped (0.4675ms)
+✔ an owner reads each aggregate once, with only validated period arguments and no organization identifier (7.4811ms)
+✔ finance cards do not load without finance.read, and no call is issued for any denied domain (2.2595ms)
+✔ a branch-restricted caller reads operations and finance but never the customer-wide source breakdown (0.6909ms)
+✔ hidden cards issue no query (0.5705ms)
+✔ database refusals and failures degrade one card at a time and are never shown as zero (1.401ms)
+✔ a forged organization cannot be injected: the loader exposes no organization parameter (2.3712ms)
+✔ operations rows are shaped per period and default to zero only for a returned period (0.5231ms)
+✔ finance rows keep currencies separate and never sum across them (2.3515ms)
+✔ source rows merge both periods, fold into other/missing, and carry no customer data (0.9868ms)
+✔ columns the caller may not read are null (unavailable), never zero (60.4358ms)
+✔ change text is neutral and handles a zero baseline (0.6401ms)
+✔ the full dashboard states its period, comparison, definitions and the missing spend/ROI honestly (29.2245ms)
+✔ restricted and unavailable cards render a clear state and no figures (12.2923ms)
+✔ hidden cards are absent; all hidden says so; empty data uses empty states, not zeros (13.7344ms)
+✔ the selector offers presets plus a bounded custom range, and surfaces a refused input (38.033ms)
+✔ static contract: the migration's definer aggregates, grants and capability checks (2.0013ms)
+✔ no selection keeps the existing default: today against yesterday (85.2277ms)
+✔ 'today' follows the Jakarta calendar, not UTC or the server clock (1.5193ms)
+✔ presets are inclusive and compared with the immediately preceding equal-length range (9.894ms)
+✔ month arithmetic crosses year ends and leap days (23.1369ms)
+✔ every accepted selection has an adjacent previous range of equal length (39.6547ms)
+✔ custom ranges are inclusive and bounded at 366 days (3.6002ms)
+✔ malformed, inverted, future and unknown input is refused safely with the default (8.9767ms)
+✔ stray from/to values are ignored for presets (1.2366ms)
+✔ labels are Indonesian and name both ranges (1.5918ms)
+✔ capability denial removes the corresponding dashboard read domains (3.642ms)
+✔ branch scope preserves only server-resolved grants and distinguishes all branches (0.7723ms)
+✔ card settings default safely and accept only known booleans (1.7952ms)
+✔ hidden booking KPI does not suppress upcoming bookings or widen access (1.5355ms)
+✔ each hidden card suppresses only its own metric read (16.2177ms)
+✔ dashboard loader keeps the upcoming read independent of booking metric visibility (4.5607ms)
+✔ dashboard queries retain tenant and branch filters (1.1935ms)
+✔ recorded revenue is the sum of persisted valid amounts only (0.6247ms)
+✔ comparison periods use the named business time zone (58.8252ms)
+✔ dashboard settings write: session org equality check, settings.manage, complete allowlist via the guarded RPC (3.1868ms)
+✔ hidden cards do not execute their underlying queries (behavioral, via a recording client) (24.7738ms)
+✔ a visible card without its capability stays restricted (null), never a misleading zero, and reads nothing (12.1012ms)
+✔ export includes payments, refunds, expenses and cash sheets; mixed currencies stay on their own rows (30.9481ms)
+✔ register filters and the cash period reach the database, and the organization is never sent (1.5269ms)
+✔ empty history still produces every sheet with headers only (1.1291ms)
+✔ pagination: the payment sheet contains every register row beyond one RPC page (14.7182ms)
+✔ refunds spanning more than one 500-row page are all exported (12.5637ms)
+✔ cash period parsing: default is the business month so far; bad ranges are errors, never guesses (14.511ms)
+✔ per-currency totals never mix currencies and round to cents (0.4902ms)
+✔ route and page keep the finance.read gate and a read-only SQL function (1.6361ms)
+✔ collects every keyset page in order (3.2064ms)
+✔ fails instead of silently truncating or losing a cursor (1.3965ms)
+✔ neutralizes formula-like text while preserving numeric Excel cells (0.6367ms)
+✔ finance export keeps server authorization, tenant currency lookup, and a pagination sentinel (1.8797ms)
+✔ a healthy, verified, drilled workspace has no pending owner actions (4.9707ms)
+✔ with no drill the first action is always 'recovery not proven', and it points at the runbook, not at a fake button (1.0353ms)
+✔ export findings map to specific, in-app owner actions (0.9633ms)
+✔ an older database without the new fields yields no invented export findings (0.8054ms)
+✔ the archive scope gap is an attention item only when unreviewed tables actually hold data (3.8033ms)
+✔ cleanup, reconciliation, capacity, schema and consent findings each get an action; consent never reads as automation (0.8137ms)
+✔ panel renders every action with its label, links only to in-app pages, and an empty list is not presented as proof of health (83.4241ms)
+✔ platform data stays platform-only and the page adds no provider call (4.2554ms)
+✔ schema version constant tracks the newest migration file and the SQL function (drift fails here) (3.9323ms)
+✔ with no drill on record recovery is explicitly NOT proven, however healthy the signals look (1.779ms)
+✔ failed, stale and fresh drills are distinguished and a pass is a dated fact, not a guarantee (4.7263ms)
+✔ failure and stale states each surface as an attention item with counts only (0.4989ms)
+✔ reconciliation counts never turn a missing permission or a failure into a reassuring zero (2.1568ms)
+✔ loadHealth fails loudly rather than inventing a healthy default when the database refuses (1.262ms)
+✔ app version shows only the package version and a 7-hex commit id (0.5879ms)
+✔ page, form and runbook: owner-gated, read-only, no provider calls, a documented manual exercise (6.521ms)
+✔ source return rows keep their own currency and never invent a ratio without spend (3.9911ms)
+✔ an over-long result is cut at the row limit and says so (0.7147ms)
+✔ ratio text never shows zero or infinity for a missing denominator (6.1525ms)
+✔ net spend is grouped per currency and reversals subtract (0.8098ms)
+✔ the spend form is checked in the browser the way the database will check it (0.9084ms)
+✔ database errors become plain language and never leak raw text (0.457ms)
+✔ with no recorded spend the dashboard says ROI is unavailable and offers the spend page (26.6824ms)
+✔ with spend the return is shown per currency with its definition and no profit claim (7.3378ms)
+✔ a restricted or failed return is a note, never a table or a zero (5.7161ms)
+✔ the dashboard loader makes no return query unless every capability is held (2.2065ms)
+✔ the spend page: empty, failed and read-only states are honest (10.0675ms)
+✔ loadMarketingSpend reads through row-level security only and sends no organization id (0.906ms)
+✔ the library and actions never take an organization from the browser and the page is gated (5.5641ms)
+✔ verifies a complete archive (9.0548ms)
+✔ rejects a missing chunk (1.0694ms)
+✔ rejects a tampered chunk (hash) (0.7128ms)
+✔ rejects tenant mismatch (1.1248ms)
+✔ rejects out-of-order rows, a wrong id range and a non-deterministic path (3.2647ms)
+✔ rejects forbidden credential-like keys in rows, configuration and storage listing (2.5212ms)
+✔ rejects another organization's storage object (0.8579ms)
+✔ rejects a manifest edited after sealing and an archive path outside the organization prefix (0.9321ms)
+✔ manifest hashing is deterministic regardless of key order or locale (0.4599ms)
+✔ escapes formula-leading tabular cells (0.6857ms)
+✔ export migration: every definer has an empty search_path, no client role keeps default execute, and no secret-bearing table is listed (0.9509ms)
+✔ export web layer: organization comes from the session, uploads are idempotent, finalize re-verifies (0.3971ms)
+✔ every RPC the web layer calls exists in the migration with exactly those parameter names (0.9842ms)
+✔ export completeness is enforced in SQL, not trusted from the client (0.3095ms)
+✔ a consistent archive against a compatible empty target passes, with a dependency-safe INSERT-only order (27.6236ms)
+✔ order follows foreign keys even when the manifest lists children first (4.5801ms)
+✔ unsafe, unknown and over-wide input is rejected (19.2687ms)
+✔ foreign keys inside the archive must be satisfied by the archive; self references and composites work (3.3106ms)
+✔ the target must be empty for this organization and must describe the same organization (15.5821ms)
+✔ a tampered or missing archive file fails the plan through the archive verifier (2.5002ms)
+✔ a foreign-key cycle is reported instead of looping, and its tables stay in the plan, flagged as having no safe order (11.2447ms)
+✔ the plan is pure: it takes callbacks and data, and the module names no network or database client (2.1543ms)
+✔ CLI: passes on a bucket-layout and a job-folder-only extraction, fails with exit 1 on a defect, exit 2 on bad usage (240.1866ms)
+✔ CLI: a manifest that names a path outside the archive is refused and nothing outside is read (50.0811ms)
+✔ a verified archive and a compatible empty target produce one guarded transaction and a report (17.9293ms)
+✔ every guard is in the script, in the order that makes a failure harmless (10.5817ms)
+✔ an archive that fails verification yields no script (1.265ms)
+✔ unknown tables, unsafe tables, credential-like columns and foreign tenants are refused (5.855ms)
+✔ a target that already holds rows, or whose probe belongs to another organization, is refused (10.8335ms)
+✔ a target database name must be stated, well formed and not production-looking (14.1726ms)
+✔ row text can never close the quoting around it (3.0887ms)
+✔ the id-list hash is order independent and matches plain code-unit order (1.8602ms)
+✔ no migration creates the disposable marker, and no application code imports the restore generator (299.9896ms)
+✔ the command line refuses bad usage, never overwrites, and writes nothing when generation is refused (107.9862ms)
+org_export_record_verification_failed org_export_record_verification_failed:boom
+✔ scope parsing is defensive: junk rows dropped, unknown classes degrade to not_reviewed, numbers coerced (45.9914ms)
+✔ summary counts classes and flags unreviewed tables that actually hold data (0.794ms)
+✔ drift compares an old archive with the workspace now, per table, and names tables the archive predates (2.0934ms)
+✔ scope panel: unreviewed data is called out as NOT in the archive; no scope is an honest unavailable state, never a clean one (73.6603ms)
+✔ export panel: verification state, purge button only for candidates, purged archives lose verify (23.7864ms)
+✔ purge removes every file in batches, re-lists, and only then records it (17.4053ms)
+✔ purge: a removal that storage reports as ok but did not happen is detected and never recorded (7.5745ms)
+✔ purge: a job that is not a candidate, or a malformed prefix, touches nothing (21.5933ms)
+✔ verifying an archive records the result without changing it; a recording failure never hides the verification (10.9555ms)
+✔ wiring: scope, purge and verification are owner-only RPCs; the storage page degrades instead of showing zero (3.6941ms)
+✔ matrix keys come from the tenant's own bands: legacy XS-XL and a sixth band are accepted (2.0098ms)
+✔ a blank or missing field stays absent while an explicit 0 is kept as a deliberate zero (0.2645ms)
+✔ unknown, cross-tenant and cat keys are refused before the database sees them (0.3807ms)
+✔ archived keys: unchanged stored rate is tolerated, a new or changed rate is refused (0.2579ms)
+✔ malformed matrices are refused (0.2364ms)
+✔ editor rows: active bands in weight order plus archived bands only while they still hold a rate (0.8768ms)
+✔ perDogDetail reads frozen per-size rows and tolerates results calculated before SB-06 (0.5513ms)
+✔ server actions validate against the tenant's bands, not a fixed key list or caller-supplied organization (0.5802ms)
+✔ settings UI takes labels and keys from the loaded bands, with no built-in map (0.4716ms)
+✔ SB-06 migration: one authoritative sizing path, no caller-supplied key/label/org/amount, frozen results untouched (0.7338ms)
+✔ the matrix validation fires on insert and on updates of the matrix column of both settings tables (0.3263ms)
+✔ payroll gates: dynamic payroll smoke and this suite are wired (0.2011ms)
+✔ XLSX detail sheet shows the server-derived label and the immutable booking-line size, not raw keys (357.4672ms)
+✔ landing choice comes from a closed map: unknown, external and path-like values never become a route (1.7446ms)
+✔ evidence retention accepts only whole days inside the database bounds (0.7658ms)
+✔ organization-owned and user-owned writes are separate RPCs; neither accepts tenancy or user ids from the browser (2.6814ms)
+✔ post-login and org switch go through /start so the saved default is applied with live capabilities (2.1609ms)
+✔ an archive drill can never be recorded as passed, and the evidence fields follow the kind (2.2859ms)
+✔ every kind has a label and the labels match the runbook letters (0.3695ms)
+✔ database errors become plain language and never leak raw text (0.3655ms)
+✔ evidence wording says what a matching hash proves and what it does not (0.3223ms)
+✔ the drill form offers 'passed' only for a provider-backup drill and no hash field until an archive kind is chosen (13.1619ms)
+✔ a preview that nobody applied becomes a named owner action, and an unmatched drill hash is an attention item (1.1022ms)
+✔ an archive drill never makes recovery look proven (31.6372ms)
+✔ the schema version is the newest migration and the action uses the evidence recorder without sending an organization (1.5616ms)
+✔ custom field editor renders each type, submits only cf_ keys and never an organization id (586.261ms)
+✔ custom field editor renders nothing when the business defined no fields (0.6268ms)
+✔ custom field values list skips empty fields (old records) and labels booleans (1.544ms)
+✔ definition manager separates scopes, explains archive and offers re-activation (7.6424ms)
+✔ landing preference form disables pages the role cannot open and explains a stale saved choice (2.4055ms)
+✔ evidence retention form is editable for the owner and read-only otherwise, and says it is not retroactive (2.0492ms)
+✔ pet editor offers the HomePaw coat options, skin history, and no editable visit counter (20.1787ms)
+✔ cash panel keeps currencies apart, labels itself read-only/not a ledger, and says so when a period is empty (78.3384ms)
+✔ WhatsApp draft rows: open link only when allowed, never claim delivery, block opted-out/archived (43.3923ms)
+✔ storage cleanup panel: dry-run first, explicit about deletion, no sizes or prices, owner-only apply (2.2059ms)
+✔ health panel: never claims recovery is proven, shows missing provider coverage, and shows 'unavailable' instead of zero (41.7412ms)
+✔ recovery drill form warns against credentials and states that records are permanent (3.4897ms)
+✔ requires a minimum term length (5.4272ms)
+✔ trims surrounding whitespace and caps length (0.4566ms)
+✔ rejects non-string input (0.2451ms)
+✔ escapes LIKE metacharacters so a query cannot widen its own match (0.3752ms)
+✔ hostile terms survive normalization without being rejected outright (1.14ms)
+✔ LIKE metacharacters are escaped and no others are introduced (0.8438ms)
+✔ PostgREST structural characters pass through as ordinary text (3.7102ms)
+✔ an injected filter fragment stays a literal search term (0.3314ms)
+✔ a single character is rejected before any query is built (0.3346ms)
+✔ deduplicates customers matched by name, phone, or persisted code (5.0801ms)
+✔ merge preserves first-seen ordering and tolerates empty inputs (0.3803ms)
+✔ derives tenant size keys from the loaded layout (0.4654ms)
+✔ returns no size band for missing or invalid weight (0.8717ms)
+✔ renders age from a birthdate (0.8765ms)
+✔ rejects unusable birthdates including future dates (0.317ms)
+✔ surfaces only scalar metadata as custom fields (3.1403ms)
+✔ tolerates non-object metadata (0.7826ms)
+✔ reads medical flags from both object and array shapes (2.89ms)
+✔ SizeBandEditor: labelled rows, no keys exposed, accessible controls, announce region (181.3745ms)
+✔ SizeBandEditor is mobile safe: rows stack, nothing forces a fixed width, inputs can shrink (28.8682ms)
+✔ read-only members get a summary without any mutation control; platform mode control is separate (3.9277ms)
+✔ legacy rendering contract: the price matrix keeps its original field names and has no band fields (11.7781ms)
+✔ dynamic rendering contract: matrix columns come from the organization's bands with copy-from-previous (43.7255ms)
+✔ ServiceForm: legacy payload unchanged, dynamic payload uses band keys and the layout version (62.5448ms)
+✔ PackageForm starts from the fixed legacy options; dynamic options arrive from SQL-backed data (7.5719ms)
+✔ HomePaw starter in dynamic mode follows the tenant bands and marks bands the template does not price (72.5354ms)
+✔ shared golden vectors: the display preview agrees with the SQL golden file for every layout and weight (4.2036ms)
+✔ legacy edge is preserved in the preview: exactly 25.00 kg is large, 25.01 kg is extra_large (0.7593ms)
+✔ dynamic preview resolves a sixth band and server-loaded row prices without nearest-band fallback (1.9572ms)
+✔ pricing columns and package options follow the organization's active bands, with Cat last and archived bands hidden (1.2879ms)
+✔ range labels come from the contiguous partition, honoring inclusive upper bounds (0.7454ms)
+✔ layout draft validation mirrors the SQL rules as early feedback (2.0695ms)
+✔ draft payload never carries keys, closes the top band, and keeps ids only for existing bands (1.1915ms)
+✔ reordering swaps which band covers a range but never moves a cutoff (0.703ms)
+✔ dynamic price form fields are keyed by band key, blank means base price, and values are validated (74.9016ms)
+✔ copy from previous band uses the nearest smaller dog band and never copies into the first or Cat (0.8238ms)
+✔ starter template maps only the historical keys; other bands fall back to base prices (0.3237ms)
+✔ impact parsing and descriptions are plain, labelled and call out blocking package conflicts (0.7236ms)
+✔ database error codes become owner-facing Indonesian text; dependency details are itemised (1.6972ms)
+✔ objects are removed only after begin has tombstoned metadata, and each outcome is recorded (5.1021ms)
+✔ an object that is already absent is 'missing' - but only when listing actually succeeded (0.8716ms)
+✔ a removal that did not really remove the object (policy denial) is a failure, not a success (0.8745ms)
+✔ a Storage error is a partial failure that is recorded, never reported as success (26.7715ms)
+✔ work is processed in bounded batches and progress is recorded after each batch (47.8639ms)
+✔ if recording fails mid-run the run is still finished (lease released) and the error is surfaced (0.8179ms)
+✔ a begin refusal (stale preview, other tenant, lease held, not owner) propagates and removes nothing (1.0577ms)
+✔ server actions re-check capability, require an explicit confirmation, and the UI never shows bytes or prices (9.3748ms)
+✔ source rules mirror the database: three batchable sources, onboarding never, capability per source (376.7927ms)
+✔ every database skip reason has plain wording and unknown reasons never leak raw codes (0.8545ms)
+✔ status summary counts every state once and never invents a delivered/read state (2.8103ms)
+✔ batch history is keyset-paged, tenant-filtered and shows actor names; the log keeps order and drops unknown states (6.5377ms)
+✔ message builder: follow-up text comes from stored template + live queue; a customer outside the queue or a denied role gets a reason, not a draft (4.6265ms)
+✔ composer: nothing is selected or created by default; create stays disabled until a preview exists; ineligible sources cannot be ticked (16.8429ms)
+✔ cancel control needs an explicit acknowledgement and is disabled when nothing is live (2.0486ms)
+✔ draft row shows the delivery log as user reports, with retries and notes, and nothing implies delivery (41.8347ms)
+✔ batch actions: ids only from the browser, server-built text, bounded, source-gated; no network path exists anywhere (3.1675ms)
+✔ lifecycle mirrors the database: terminal states have no exits, failed can retry, nothing implies delivery (7.4828ms)
+✔ opted-out, archived, missing-phone and onboarding rules (2.5774ms)
+✔ template variables: every placeholder must resolve or the draft is refused (42.0471ms)
+✔ customer-controlled text stays text: names with HTML or URL syntax are percent-encoded, not interpreted (2.1438ms)
+✔ onboarding drafts never carry the one-time link (0.6241ms)
+✔ server actions never accept a phone, organization or message from the browser (9.1548ms)
+✔ the only wired provider is the disabled one and it refuses every send (1.8041ms)
+✔ a template payload is built only from validated input and matches the official request shape (1.5758ms)
+✔ webhook signatures verify only for the exact body and secret (0.8974ms)
+✔ the verification handshake echoes the challenge only for the expected token (0.3009ms)
+✔ status events are normalized, bounded and carry no recipient number (2.5841ms)
+✔ the boundary module is pure: no environment, network, filesystem or database access (111.7144ms)
+✔ provider state: enabled is only ever true while the platform allows it (0.3875ms)
+✔ the form refuses anything that looks like a credential and requires a provider for ids (0.6209ms)
+✔ the settings page states it is unavailable, offers no way to enable, and lists the real prerequisites (16.8686ms)
+✔ loadProviderState reads one RPC with no argument and reports a refusal with its code (0.6972ms)
+✔ the action cannot enable a provider and sends no organization (0.7837ms)
+ℹ tests 359
+ℹ suites 0
+ℹ pass 359
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5156.0095
+exit=0

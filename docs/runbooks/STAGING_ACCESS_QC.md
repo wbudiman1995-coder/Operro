@@ -7,7 +7,7 @@ is a script for the owner/QA person. Tick as you observe. Stop at the first red 
 
 Preconditions
 
-- [ ] Staging Supabase project has all migrations through `20261031160000` applied (`select app.schema_version();`).
+- [ ] Staging Supabase project has all migrations through `20261101160000` applied (`select app.schema_version();`).
 - [ ] Staging web deployment has `NEXT_PUBLIC_SUPABASE_URL` / anon key of **staging** (never production).
 - [ ] Auth e-mail confirmation is **on**; SMTP sends to a real inbox you control.
 - [ ] You hold: the platform-owner login (the account whose e-mail is hard-wired as owner), and three independent mailboxes
