@@ -50,7 +50,7 @@ function DynamicMatrixRow({ service, columns, stored, layoutVersion, petTypes }:
     <td className="min-w-28 p-2"><form id={formId} action={action}><button disabled={pending} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{pending ? "Menyimpan…" : "Simpan"}</button></form>{state.error || state.success ? <p role={state.error ? "alert" : "status"} className={`mt-2 text-[10px] ${state.error ? "text-rose-700" : "text-emerald-700"}`}>{state.error ?? state.success}</p> : null}</td></tr>;
 }
 
-export function CatalogPriceMatrix({ services, sizeBands, petTypes }: { services: Service[]; sizeBands?: SizeBandWorkspace; petTypes: PetTypeOption[] }) {
+export function CatalogPriceMatrix({ services, sizeBands, petTypes = [] }: { services: Service[]; sizeBands?: SizeBandWorkspace; petTypes?: PetTypeOption[] }) {
   if (!services.length) return null;
   const dynamic = sizeBands?.settings.mode === "dynamic";
   const columns: BandColumn[] = dynamic ? pricingColumns(sizeBands.bands) : [];
