@@ -11,9 +11,10 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Masuk" };
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   const supabase = await createClient();
   const context = await loadAuthContext(supabase);
+  const { notice } = await searchParams;
 
   if (context) {
     redirect("/organizations");
@@ -27,6 +28,7 @@ export default async function LoginPage() {
           <p className="mt-12 text-xs font-bold uppercase tracking-[0.18em] text-[#0f8a72]">Selamat datang kembali</p>
           <h1 className="mt-3 text-4xl font-bold tracking-[-0.05em] text-slate-950">Masuk ke workspace Anda</h1>
           <p className="mt-4 text-sm leading-7 text-slate-500">Gunakan email dan kata sandi yang terdaftar. Organisasi aktif akan diverifikasi sebelum dashboard dibuka.</p>
+          {notice === "google-sign-in-disabled" ? <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Masuk dengan Google sudah dinonaktifkan. Gunakan email dan kata sandi Operro Anda.</p> : null}
           <LoginForm />
           <p className="mt-8 text-xs leading-5 text-slate-400">Dengan masuk, Anda mengakses data sesuai membership dan kebijakan keamanan organisasi Anda.</p>
         </div>

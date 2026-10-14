@@ -9,7 +9,6 @@ import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
-import { GoogleSignInButton } from "@/components/google-sign-in-button";
 
 function translateLoginError(message: string): string {
   if (/invalid login credentials/i.test(message)) {
@@ -136,8 +135,6 @@ export function LoginForm() {
           "Masuk ke Operro"
         )}
       </button>
-      <div className="flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />atau<span className="h-px flex-1 bg-slate-200" /></div>
-      <GoogleSignInButton />
     </form>
   );
 }

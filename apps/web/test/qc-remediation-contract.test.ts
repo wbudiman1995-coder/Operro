@@ -27,6 +27,6 @@ test("saved landing preference invalidates the /start redirect and invitation te
   const preferences = read("apps/web/src/app/settings/preferences/actions.ts");
   const invite = read("apps/web/src/components/accept-invitation-form.tsx");
   assert.match(preferences, /revalidatePath\("\/start"\)/);
-  assert.match(invite, /Aktifkan akses Operro/);
-  assert.doesNotMatch(invite, />Buat akun</);
+  assert.match(invite, /Buat akun & terima undangan/);
+  assert.doesNotMatch(invite, /GoogleSignInButton|signInWithOAuth/);
 });

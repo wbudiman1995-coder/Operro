@@ -6,11 +6,13 @@ import test from "node:test";
 const root = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string) => fs.readFileSync(path.join(root, relative), "utf8");
 
-test("QC closeout: invitations are sign-in only and business owners can add only Admins", () => {
+test("QC closeout: invitations create or use a password account and business owners can add only Admins", () => {
   const form = read("apps/web/src/components/accept-invitation-form.tsx");
   const migration = read("supabase/migrations/20261101200000_qc_finish_access_and_pets.sql");
-  assert.doesNotMatch(form, /auth\.signUp/);
-  assert.match(form, /GoogleSignInButton/);
+  assert.match(form, /signUp/);
+  assert.match(form, /signInWithPassword/);
+  assert.match(form, /pending_access_invitation_email/);
+  assert.doesNotMatch(form, /GoogleSignInButton|signInWithOAuth/);
   assert.match(migration, /p_role = 'Admin' and app\.is_business_owner\(p_org\)/);
 });
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-/** Completes OAuth without trusting an arbitrary return URL from the browser. */
+/** Completes an email-confirmation callback without trusting an arbitrary return URL. */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
