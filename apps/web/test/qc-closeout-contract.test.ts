@@ -22,6 +22,7 @@ test("invitation history supports audited revocation and normal login requires a
   const actions = read("apps/web/src/app/platform/actions.ts");
   const login = read("apps/web/src/components/login-form.tsx");
   const authContext = read("apps/web/src/lib/auth-context.ts");
+  const callback = read("apps/web/src/app/auth/callback/route.ts");
   const claim = read("supabase/migrations/20261019100000_platform_org_access.sql");
 
   assert.match(migration, /create or replace function app\.revoke_access_invitation/);
@@ -35,6 +36,9 @@ test("invitation history supports audited revocation and normal login requires a
   assert.match(authContext, /!isOperroOwner && organizations\.length === 0/);
   assert.match(claim, /lower\(v_user\.email\)<>v_inv\.email/);
   assert.match(claim, /au\.email_confirmed_at is not null/);
+  assert.match(callback, /claim_access_invitation/);
+  assert.match(callback, /login\?notice=account-confirmed/);
+  assert.match(callback, /auth\.signOut\(\)/);
 });
 
 test("QC closeout: catalog table owns service editing, including categories and added pet types", () => {

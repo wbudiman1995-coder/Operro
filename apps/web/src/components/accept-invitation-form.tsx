@@ -68,7 +68,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
       if (error) { setMessage(error.message.includes("already registered") ? "Email ini sudah punya akun. Pilih Masuk ke akun yang sudah ada." : "Akun tidak dapat dibuat. Coba lagi."); return; }
       if (data.session) { await claim(); return; }
-      setMessage("Kata sandi dibuat. Periksa email untuk mengonfirmasi akun, lalu Anda akan kembali ke undangan ini.");
+      setMessage("Kata sandi dibuat. Periksa email untuk mengonfirmasi akun, lalu masuk dengan kata sandi baru Anda.");
     } catch { setMessage("Koneksi gagal. Coba lagi."); }
     finally { setBusy(false); }
   }

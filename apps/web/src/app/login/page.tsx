@@ -29,6 +29,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h1 className="mt-3 text-4xl font-bold tracking-[-0.05em] text-slate-950">Masuk ke workspace Anda</h1>
           <p className="mt-4 text-sm leading-7 text-slate-500">Gunakan email dan kata sandi yang terdaftar. Organisasi aktif akan diverifikasi sebelum dashboard dibuka.</p>
           {notice === "google-sign-in-disabled" ? <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Masuk dengan Google sudah dinonaktifkan. Gunakan email dan kata sandi Operro Anda.</p> : null}
+          {notice === "account-confirmed" ? <p role="status" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">Email terkonfirmasi dan akses workspace sudah diaktifkan. Masuk dengan kata sandi baru Anda.</p> : null}
+          {notice === "confirmation-invalid" ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">Link konfirmasi sudah tidak berlaku. Minta undangan baru atau ulangi pembuatan akun dari link undangan.</p> : null}
+          {notice === "confirmation-incomplete" ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">Email terkonfirmasi, tetapi akses workspace belum dapat diaktifkan. Buka kembali link undangan lalu masuk.</p> : null}
           <LoginForm />
           <p className="mt-8 text-xs leading-5 text-slate-400">Dengan masuk, Anda mengakses data sesuai membership dan kebijakan keamanan organisasi Anda.</p>
         </div>
