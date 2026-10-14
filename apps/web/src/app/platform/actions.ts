@@ -58,6 +58,26 @@ export async function issueAccessInviteAction(_state: AccessState, data: FormDat
   return { error: null, success: `Link satu kali untuk ${email}, berlaku tujuh hari. Kirim hanya ke alamat ini.`, linkPath: `/accept/${result.data}` };
 }
 
+export async function revokeAccessInviteAction(_state: AccessState, data: FormData): Promise<AccessState> {
+  const supabase = await session();
+  if (!supabase) return denied;
+  const org = String(data.get("organizationId") ?? "");
+  const invitation = String(data.get("invitationId") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(org) || !/^[0-9a-f-]{36}$/i.test(invitation)) return denied;
+  const result = await supabase.schema("app").rpc("revoke_access_invitation", {
+    p_org: org,
+    p_invitation: invitation,
+  });
+  if (result.error) {
+    if (result.error.message.includes("invitation_not_pending")) return { error: "Undangan ini sudah digunakan atau sebelumnya sudah dicabut.", success: null };
+    if (result.error.message.includes("not_authorized")) return { error: "Anda tidak diizinkan mencabut undangan ini.", success: null };
+    return { error: "Undangan belum dapat dicabut. Muat ulang lalu coba lagi.", success: null };
+  }
+  revalidatePath("/platform");
+  revalidatePath("/settings/access");
+  return { error: null, success: "Undangan dicabut. Link lama tidak dapat digunakan dan riwayat tetap disimpan." };
+}
+
 export async function setOrganizationStatusAction(_state: AccessState, data: FormData): Promise<AccessState> {
   const supabase = await isPlatformOwner();
   if (!supabase) return denied;

@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   issueAccessInviteAction, issueOperroInvoiceAction, prepareOrganizationAction, setAdminPermissionsAction,
-  setBillingPeriodAction, setMemberRoleAction, setOrganizationStatusAction, deleteOrganizationAction, type AccessState,
+  setBillingPeriodAction, setMemberRoleAction, setOrganizationStatusAction, deleteOrganizationAction,
+  revokeAccessInviteAction, type AccessState,
 } from "@/app/platform/actions";
 
 const initial: AccessState = { error: null, success: null };
 type Access = { members: { email: string; role: string; status: string }[]; admin_keys: string[]; options: { key: string; description: string | null }[] };
+export type AccessInvitation = { id: string; email: string; role: string; status: string; expired: boolean; created_at: string; expires_at: string };
 
 export function OpenOrganizationButton({ organizationId }: { organizationId: string }) {
   const router = useRouter();
@@ -47,6 +49,18 @@ export function AccessInvitationForm({ organizationId, platform, organizationSta
   const link = state.linkPath ? `${origin}${state.linkPath}` : "";
   const suspended = organizationStatus === "suspended";
   return <form action={action} className="space-y-3 rounded-2xl border bg-white p-5"><input type="hidden" name="organizationId" value={organizationId} /><h2 className="font-bold">Link akses admin</h2><p className="text-xs leading-5 text-slate-500">Link hanya untuk pemilik, admin bisnis, atau bantuan Operro—bukan groomer. Penerima mengaktifkan kredensial Operro sendiri; akun Vercel tidak diperlukan. Groomer memakai kode pribadi tanpa email dari Layanan & tim.</p>{suspended ? <p role="status" className="rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-900">Organisasi ini sedang ditangguhkan. Aktifkan kembali sebelum membuat undangan.</p> : null}<div className="grid gap-3 sm:grid-cols-[1fr_170px_auto]"><input name="email" type="email" required placeholder="email@bisnis.com" aria-label="Email penerima" value={recipient} onChange={(event) => setRecipient(event.target.value)} className="h-10 min-w-0 rounded-lg border px-3 text-sm" /><select name="role" aria-label="Peran undangan" className="h-10 rounded-lg border px-2 text-xs"><option value="Admin">Admin bisnis</option>{platform ? <><option value="Pemilik">Pemilik bisnis</option><option value="Bantuan Operro">Bantuan Operro (tanpa payroll)</option></> : null}</select><button disabled={pending || suspended} className="h-10 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white disabled:opacity-50">{pending ? "Membuat…" : "Buat link"}</button></div><Feedback state={state} />{link ? <div className="flex flex-wrap gap-2"><input readOnly value={link} aria-label="Link undangan" className="h-10 min-w-48 flex-1 rounded-lg border px-2 text-xs" /><button type="button" onClick={() => navigator.clipboard.writeText(link).then(() => setCopied(true)).catch(() => setCopied(false))} className="rounded-lg border px-3 text-xs font-bold">{copied ? "Tersalin" : "Salin"}</button><a href={`mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent("Undangan Operro")}&body=${encodeURIComponent(`Buka link undangan Operro: ${link}`)}`} className="grid place-items-center rounded-lg border px-3 text-xs font-bold">Kirim lewat email</a></div> : null}</form>;
+}
+
+function InvitationHistoryRow({ organizationId, invitation, canRevoke }: { organizationId: string; invitation: AccessInvitation; canRevoke: boolean }) {
+  const [state, action, pending] = useActionState(revokeAccessInviteAction, initial);
+  const status = invitation.status === "accepted" ? "Diterima"
+    : invitation.status === "revoked" ? "Dicabut"
+      : invitation.expired ? "Kedaluwarsa" : "Menunggu";
+  return <div className="rounded-lg bg-slate-50 p-3 text-xs"><div className="flex flex-wrap items-center gap-2"><p className="min-w-52 flex-1"><strong>{invitation.email}</strong> · {invitation.role} · {status} · {new Date(invitation.created_at).toLocaleDateString("id-ID")}</p>{invitation.status === "pending" && canRevoke ? <form action={action}><input type="hidden" name="organizationId" value={organizationId} /><input type="hidden" name="invitationId" value={invitation.id} /><button disabled={pending} className="rounded-lg border border-rose-200 bg-white px-3 py-2 font-bold text-rose-700 disabled:opacity-50">{pending ? "Mencabut…" : "Cabut undangan"}</button></form> : null}</div><Feedback state={state} /></div>;
+}
+
+export function InvitationHistory({ organizationId, invitations, platform }: { organizationId: string; invitations: AccessInvitation[]; platform: boolean }) {
+  return <section className="rounded-2xl border bg-white p-5"><h2 className="font-bold">Riwayat undangan</h2><p className="mt-1 text-xs text-slate-500">Undangan yang belum dipakai dapat dicabut. Baris riwayat tetap disimpan agar status akses dapat dilacak.</p><div className="mt-3 space-y-2">{invitations.length ? invitations.map(invitation => <InvitationHistoryRow key={invitation.id} organizationId={organizationId} invitation={invitation} canRevoke={platform || invitation.role === "Admin"} />) : <p className="text-xs text-slate-500">Belum ada undangan.</p>}</div></section>;
 }
 
 function MemberEditor({ organizationId, member, platform }: { organizationId: string; member: Access["members"][number]; platform: boolean }) {

@@ -16,6 +16,27 @@ test("QC closeout: invitations create or use a password account and business own
   assert.match(migration, /p_role = 'Admin' and app\.is_business_owner\(p_org\)/);
 });
 
+test("invitation history supports audited revocation and normal login requires active access", () => {
+  const migration = read("supabase/migrations/20261101230000_invitation_revocation_and_login_gate.sql");
+  const management = read("apps/web/src/components/access-management.tsx");
+  const actions = read("apps/web/src/app/platform/actions.ts");
+  const login = read("apps/web/src/components/login-form.tsx");
+  const authContext = read("apps/web/src/lib/auth-context.ts");
+  const claim = read("supabase/migrations/20261019100000_platform_org_access.sql");
+
+  assert.match(migration, /create or replace function app\.revoke_access_invitation/);
+  assert.match(migration, /set status = 'revoked'/);
+  assert.doesNotMatch(migration, /delete from public\.platform_access_invitations/);
+  assert.match(migration, /v_invitation\.role_name = 'Admin' and app\.is_business_owner\(p_org\)/);
+  assert.match(management, /Cabut undangan/);
+  assert.match(actions, /rpc\("revoke_access_invitation"/);
+  assert.match(login, /rpc\("can_access_operro"\)/);
+  assert.match(login, /auth\.signOut\(\)/);
+  assert.match(authContext, /!isOperroOwner && organizations\.length === 0/);
+  assert.match(claim, /lower\(v_user\.email\)<>v_inv\.email/);
+  assert.match(claim, /au\.email_confirmed_at is not null/);
+});
+
 test("QC closeout: catalog table owns service editing, including categories and added pet types", () => {
   const matrix = read("apps/web/src/components/catalog-price-matrix.tsx");
   const page = read("apps/web/src/app/catalog/page.tsx");

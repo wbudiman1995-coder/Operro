@@ -61,6 +61,14 @@ export function LoginForm() {
         return;
       }
 
+      const access = await supabase.schema("app").rpc("can_access_operro");
+      if (access.error || access.data !== true) {
+        await supabase.auth.signOut();
+        setError("Email ini belum memiliki akses Operro aktif. Gunakan link undangan yang dikirim khusus ke email Anda.");
+        setLoading(false);
+        return;
+      }
+
       router.replace("/organizations");
       router.refresh();
     } catch {

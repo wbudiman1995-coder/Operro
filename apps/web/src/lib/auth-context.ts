@@ -69,6 +69,12 @@ export const loadAuthContext = cache(async function loadAuthContext(
     return null;
   }
 
+  // An Auth identity alone is not an Operro account. Invite acceptance creates
+  // the active membership; without one, regular application routes stay closed.
+  if (!isOperroOwner && organizations.length === 0) {
+    return null;
+  }
+
   const activeOrganizationId = readStringClaim(claims, "active_org_id");
   const activeOrganization = findActiveOrganization(
     organizations,
