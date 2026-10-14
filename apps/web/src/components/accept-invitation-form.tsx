@@ -31,7 +31,14 @@ export function AcceptInvitationForm({ token }: { token: string }) {
   useEffect(() => {
     const supabase = createClient();
     void supabase.schema("app").rpc("pending_access_invitation_email", { p_token: token }).then(({ data, error }) => {
-      if (error || typeof data !== "string") { setMessage("Link undangan sudah tidak berlaku. Minta pemilik bisnis mengirim link baru."); return; }
+      if (error || typeof data !== "string") {
+        const invitationUnavailable = error?.message.includes("invitation_unavailable")
+          || error?.message.includes("invalid_invitation");
+        setMessage(invitationUnavailable
+          ? "Link undangan sudah tidak berlaku. Minta pemilik bisnis mengirim link baru."
+          : "Undangan belum dapat diperiksa. Muat ulang halaman atau coba lagi sebentar.");
+        return;
+      }
       setEmail(data);
       setReady(true);
     }, () => setMessage("Link undangan tidak dapat diperiksa. Coba lagi."));
@@ -57,7 +64,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
     setBusy(true); setMessage("");
     try {
       const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(`/accept/${token}`)}`;
+      const redirectTo = `${globalThis.location.origin}/auth/callback?next=${encodeURIComponent(`/accept/${token}`)}`;
       const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
       if (error) { setMessage(error.message.includes("already registered") ? "Email ini sudah punya akun. Pilih Masuk ke akun yang sudah ada." : "Akun tidak dapat dibuat. Coba lagi."); return; }
       if (data.session) { await claim(); return; }
